@@ -25,8 +25,6 @@ import '../../providers/enhance_pir_provider.dart';
 import '../settings/widgets/language_picker.dart';
 import '../settings/widgets/custom_endpoint_settings_panel.dart';
 import 'shared/onboarding_welcome_art.dart';
-import 'shared/welcome_accent_button.dart';
-import 'shared/welcome_button_tokens.dart';
 import 'shared/welcome_gift_card_button.dart';
 import 'shared/welcome_language_button.dart';
 import 'shared/welcome_art_assets.dart';
@@ -155,7 +153,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
     return PopScope<void>(
       canPop: !_creationBlocksNavigation,
       child: Scaffold(
-        backgroundColor: const Color(0xff000000),
+        backgroundColor: context.colors.background.window,
         body: LayoutBuilder(
           builder: (context, constraints) {
             // The neon horizon stands in for upstream's landscape video: set
@@ -189,7 +187,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                     ),
                   ),
                 ),
-                const Positioned.fill(
+                Positioned.fill(
                   child: IgnorePointer(
                     child: DecoratedBox(
                       decoration: BoxDecoration(
@@ -197,12 +195,12 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                           begin: Alignment.centerLeft,
                           end: Alignment.centerRight,
                           colors: [
-                            Color(0xff000000),
-                            Color(0x80000000),
-                            Color(0x4d000000),
-                            Color(0x00000000),
+                            for (final alpha in const [1.0, 0.5, 0.3, 0.0])
+                              context.colors.background.window.withValues(
+                                alpha: alpha,
+                              ),
                           ],
-                          stops: [0.13333, 0.43813, 0.56875, 0.65583],
+                          stops: const [0.13333, 0.43813, 0.56875, 0.65583],
                         ),
                       ),
                     ),
@@ -339,7 +337,7 @@ class _WelcomeContent extends StatelessWidget {
           'Shielded\nby default', // l10n-ignore: brand tagline
           textAlign: TextAlign.center,
           style: AppTypography.displayLarge.copyWith(
-            color: const Color(0xffffffff),
+            color: context.colors.text.accent,
             fontSize: 56,
             height: 1.02,
             letterSpacing: -1.68,
@@ -356,30 +354,30 @@ class _WelcomeContent extends StatelessWidget {
                   createError!,
                   textAlign: TextAlign.center,
                   style: AppTypography.bodyMedium.copyWith(
-                    color: const Color(0xffffffff),
+                    color: context.colors.text.accent,
                   ),
                 ),
                 const SizedBox(height: AppSpacing.xs),
               ],
-              WelcomeAccentButton(
-                semanticKey: const ValueKey('welcome_create_wallet_button'),
-                height: 44,
-                glow: WelcomeButtonTokens.desktopAccentGlow,
-                onPressed: onCreate,
-                label: createLabel,
+              // AppButton's lit primary slab and its glass secondary, as
+              // every other desktop screen draws them.
+              KeyedSubtree(
+                key: const ValueKey('welcome_create_wallet_button'),
+                child: AppButton(
+                  expand: true,
+                  height: 44,
+                  onPressed: onCreate,
+                  child: Text(
+                    createLabel ?? context.l10n.onboardingWelcomeGetStarted,
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
               AppButton(
                 key: const ValueKey('welcome_import_wallet_button'),
                 expand: true,
                 height: 44,
-                focusRingColor: WelcomeButtonTokens.focusRing,
-                enabledBackgroundColor: WelcomeButtonTokens.secondaryBackground,
-                pressedBackgroundColor:
-                    WelcomeButtonTokens.secondaryHighlightedBackground,
-                enabledBorderColor: WelcomeButtonTokens.border,
-                enabledLabelColor: WelcomeButtonTokens.secondaryLabel,
-                pressedLabelColor: WelcomeButtonTokens.secondaryLabel,
+                variant: AppButtonVariant.secondary,
                 leading: const AppIcon(AppIcons.importWallet, size: 20),
                 onPressed: !navigationEnabled
                     ? null
@@ -505,13 +503,13 @@ class _BackRow extends StatelessWidget {
               AppIcon(
                 AppIcons.chevronBackward,
                 size: AppIconSize.medium,
-                color: const Color(0xfff7f7f7),
+                color: context.colors.icon.accent,
               ),
               const SizedBox(width: AppSpacing.xxs),
               Text(
                 context.l10n.commonBack,
                 style: AppTypography.labelLarge.copyWith(
-                  color: const Color(0xfff7f7f7),
+                  color: context.colors.text.accent,
                 ),
               ),
             ],

@@ -9,6 +9,7 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../rust/wallet/keystone.dart' show KeystoneAccountInfo;
 import 'keystone_onboarding_flow.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 class KeystoneSelectAccountScreen extends ConsumerStatefulWidget {
   const KeystoneSelectAccountScreen({super.key});
@@ -158,13 +159,8 @@ class _TitleBlock extends StatelessWidget {
         FittedBox(
           fit: BoxFit.scaleDown,
           alignment: Alignment.center,
-          child: Text(
+          child: NeonPageTitle(
             context.l10n.commonSelectAccount,
-            style: AppTypography.displayLarge.copyWith(
-              fontFamily: 'Gotham',
-              fontWeight: AppFontWeight.regular,
-              color: colors.text.accent,
-            ),
             maxLines: 1,
             overflow: TextOverflow.visible,
             softWrap: false,

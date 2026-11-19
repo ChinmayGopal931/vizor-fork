@@ -633,7 +633,9 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Update password'), findsNWidgets(2));
+      // The page title upper-cased, and the button.
+      expect(find.text('UPDATE PASSWORD'), findsOneWidget);
+      expect(find.text('Update password'), findsOneWidget);
       expect(find.byType(EditableText), findsNWidgets(2));
       await tester.enterText(find.byType(EditableText).at(0), _newPassword);
       await tester.enterText(find.byType(EditableText).at(1), _newPassword);

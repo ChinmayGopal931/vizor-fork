@@ -7,6 +7,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_icon.dart';
 import 'onboarding_split_view.dart';
+import '../../../core/widgets/neon_page_title.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
 
 /// Onboarding step 1 — "Intro to Zcash".
 ///
@@ -146,12 +148,8 @@ class _TitleBlock extends StatelessWidget {
         FittedBox(
           fit: BoxFit.scaleDown,
           alignment: Alignment.center,
-          child: Text(
+          child: NeonPageTitle(
             context.l10n.onboardingIntroTitle,
-            style: AppTypography.displayLarge.copyWith(
-              fontWeight: AppFontWeight.medium,
-              color: colors.text.accent,
-            ),
             textAlign: TextAlign.center,
           ),
         ),
@@ -174,90 +172,55 @@ class _TitleBlock extends StatelessWidget {
 class _ShieldedInfoCard extends StatelessWidget {
   const _ShieldedInfoCard();
 
-  static const double _cardWidth = 396;
   static const double _height = 163;
   static const double _textWidth = 334;
-  static const double _patternWidth = 1086.243;
-  static const double _patternHeight = 1220.409;
-  static const BorderRadius _radius = BorderRadius.all(Radius.circular(24));
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final isDark = context.appTheme == AppThemeData.dark;
-    final patternAsset = isDark
-        ? 'assets/illustrations/desktop/home_balance_card_pattern_dark.webp'
-        : 'assets/illustrations/desktop/home_balance_card_pattern_light.webp';
-
-    // A minimum, not a fixed height: longer translations grow the card.
-    return Container(
+    // A minimum, not a fixed height: longer translations grow the card. A
+    // neon glass panel on the black, with no painted pattern behind it.
+    return ConstrainedBox(
       constraints: const BoxConstraints(minHeight: _height),
-      width: double.infinity,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: colors.background.homeCard,
-        borderRadius: _radius,
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Positioned(
-            left: (_cardWidth - _patternWidth) / 2,
-            top: -566,
-            child: IgnorePointer(
-              child: Opacity(
-                opacity: 0.15,
-                child: Image.asset(
-                  patternAsset,
-                  width: _patternWidth,
-                  height: _patternHeight,
-                  fit: BoxFit.fill,
-                ),
-              ),
-            ),
-          ),
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.sm,
-                vertical: 32,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AppIcon(
-                    AppIcons.shieldKeyhole,
-                    size: 24,
-                    color: colors.text.homeCard,
+      child: SizedBox(
+        width: double.infinity,
+        child: NeonGlassPanel(
+          fill: colors.background.homeCard,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm,
+                    vertical: 32,
                   ),
-                  const SizedBox(height: AppSpacing.s),
-                  SizedBox(
-                    width: _textWidth,
-                    child: Text(
-                      context.l10n.onboardingIntroCard,
-                      style: AppTypography.bodyMedium.copyWith(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AppIcon(
+                        AppIcons.shieldKeyhole,
+                        size: 24,
                         color: colors.text.homeCard,
                       ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Positioned.fill(
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: _radius,
-                  border: Border.all(
-                    color: const Color(0xFFFFFFFF).withValues(alpha: 0.15),
+                      const SizedBox(height: AppSpacing.s),
+                      SizedBox(
+                        width: _textWidth,
+                        child: Text(
+                          context.l10n.onboardingIntroCard,
+                          style: AppTypography.bodyMedium.copyWith(
+                            color: colors.text.homeCard,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

@@ -111,7 +111,7 @@ void main() {
       textWidget.style?.color,
       AppThemeData.light.colors.border.utilityDestructive,
     );
-    expect(textWidget.style?.fontWeight, FontWeight.w400);
+    expect(textWidget.style?.fontWeight, AppFontWeight.regular);
   });
 
   testWidgets('configured wallet continues to account customisation', (

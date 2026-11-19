@@ -10,6 +10,7 @@ import '../theme/app_theme.dart';
 import 'app_button.dart';
 import 'app_icon.dart';
 import '../l10n/locale_typography.dart';
+import 'neon_page_title.dart';
 
 bool _needsKeyringNotice(LinuxKeyringCoordinator coordinator) {
   if (!coordinator.isEnabled) return false;
@@ -176,13 +177,10 @@ class _LinuxKeyringStartupHostState extends State<LinuxKeyringStartupHost> {
                     color: context.colors.icon.accent,
                   ),
                   const SizedBox(height: AppSpacing.md),
-                  Text(
+                  NeonPageTitle(
                     _failed
                         ? context.l10n.appOpenFailedTitle
                         : context.l10n.keyringOpeningTitle,
-                    style: AppTypography.headlineLarge.copyWith(
-                      color: context.colors.text.accent,
-                    ),
                     textAlign: TextAlign.center,
                   ),
                   if (_failed) ...[
@@ -303,11 +301,8 @@ class _LinuxKeyringNoticeState extends State<_LinuxKeyringNotice> {
                       Semantics(
                         namesRoute: true,
                         liveRegion: true,
-                        child: Text(
+                        child: NeonPageTitle(
                           title,
-                          style: AppTypography.headlineLarge.copyWith(
-                            color: colors.text.accent,
-                          ),
                           textAlign: TextAlign.center,
                         ),
                       ),

@@ -11,6 +11,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_icon.dart';
 import 'keystone_onboarding_flow.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 class KeystoneHowToConnectScreen extends ConsumerWidget {
   const KeystoneHowToConnectScreen({this.backTarget, super.key});
@@ -125,13 +126,8 @@ class _TitleBlock extends StatelessWidget {
         FittedBox(
           fit: BoxFit.scaleDown,
           alignment: Alignment.center,
-          child: Text(
+          child: NeonPageTitle(
             context.l10n.onboardingConnectKeystone,
-            style: AppTypography.displayLarge.copyWith(
-              fontFamily: 'Gotham',
-              fontWeight: AppFontWeight.regular,
-              color: colors.text.accent,
-            ),
             maxLines: 1,
             overflow: TextOverflow.visible,
             softWrap: false,

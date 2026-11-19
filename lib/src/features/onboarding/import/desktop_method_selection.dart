@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_icon.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 const double _contentAreaWidth = 420;
 const double _cardHeight = 80;
@@ -193,11 +194,7 @@ class _TitleBlock extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          title,
-          textAlign: TextAlign.center,
-          style: AppTypography.displayLarge.copyWith(color: colors.text.accent),
-        ),
+        NeonPageTitle(title, textAlign: TextAlign.center),
         const SizedBox(height: AppSpacing.sm),
         Text(
           subtitle,

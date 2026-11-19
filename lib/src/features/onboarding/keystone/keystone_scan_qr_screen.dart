@@ -11,6 +11,7 @@ import '../../keystone/widgets/keystone_qr_scanner_card.dart';
 import '../../../rust/api/keystone.dart' as rust_keystone;
 import '../../../services/qr_scanner.dart';
 import 'keystone_onboarding_flow.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 class KeystoneScanQrScreen extends ConsumerStatefulWidget {
   const KeystoneScanQrScreen({super.key});
@@ -170,13 +171,8 @@ class _TitleBlock extends StatelessWidget {
         FittedBox(
           fit: BoxFit.scaleDown,
           alignment: Alignment.center,
-          child: Text(
+          child: NeonPageTitle(
             context.l10n.commonScanQrCode,
-            style: AppTypography.displayLarge.copyWith(
-              fontFamily: 'Gotham',
-              fontWeight: AppFontWeight.regular,
-              color: colors.text.accent,
-            ),
             maxLines: 1,
             overflow: TextOverflow.visible,
             softWrap: false,

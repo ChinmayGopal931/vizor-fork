@@ -31,6 +31,7 @@ import 'onboarding_flow_args.dart';
 import 'onboarding_error_messages.dart';
 import 'account_setup_submission.dart';
 import '../../payment_links/widgets/desktop_gift_setup_shell.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 class SetPasswordScreen extends ConsumerStatefulWidget {
   const SetPasswordScreen({super.key, required this.args})
@@ -631,11 +632,8 @@ class _SetPasswordTitle extends StatelessWidget {
         FittedBox(
           fit: BoxFit.scaleDown,
           alignment: Alignment.center,
-          child: Text(
+          child: NeonPageTitle(
             context.l10n.onboardingStepSetPassword,
-            style: AppTypography.displayLarge.copyWith(
-              color: colors.text.accent,
-            ),
             textAlign: TextAlign.center,
           ),
         ),

@@ -14,6 +14,7 @@ class NeonPageTitle extends StatelessWidget {
     this.textAlign,
     this.maxLines,
     this.overflow,
+    this.softWrap,
     this.textKey,
     super.key,
   });
@@ -25,6 +26,7 @@ class NeonPageTitle extends StatelessWidget {
   final TextAlign? textAlign;
   final int? maxLines;
   final TextOverflow? overflow;
+  final bool? softWrap;
 
   /// A key for the [Text] itself, for screens whose tests find the title's
   /// text widget by key.
@@ -39,6 +41,7 @@ class NeonPageTitle extends StatelessWidget {
       textAlign: textAlign,
       maxLines: maxLines,
       overflow: overflow,
+      softWrap: softWrap,
       style: kNeonPageTitleStyle.copyWith(
         color: color ?? context.colors.text.accent,
       ),

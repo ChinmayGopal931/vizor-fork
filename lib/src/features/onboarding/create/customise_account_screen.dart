@@ -32,6 +32,7 @@ import '../shared/account_persona_randomise_button.dart';
 import 'onboarding_split_view.dart';
 import '../../payment_links/services/gift_claim_setup_coordinator.dart';
 import '../../payment_links/widgets/desktop_gift_setup_shell.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 typedef CustomiseAccountFinishCallback =
     Future<void> Function(String accountName, String profilePictureId);
@@ -569,12 +570,9 @@ class _CustomiseAccountTitle extends StatelessWidget {
       children: [
         FittedBox(
           fit: BoxFit.scaleDown,
-          child: Text(
+          child: NeonPageTitle(
             context.l10n.commonCustomiseAccount,
             textAlign: TextAlign.center,
-            style: AppTypography.displayLarge.copyWith(
-              color: colors.text.accent,
-            ),
           ),
         ),
         const SizedBox(height: AppSpacing.sm),

@@ -31,6 +31,7 @@ import 'package:zcash_wallet/src/providers/network_privacy_provider.dart';
 import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 import '../../fakes/fake_app_language_notifier.dart';
+import 'package:zcash_wallet/src/core/widgets/neon_glass_panel.dart';
 
 void main() {
   final api = _PrivacyApi();
@@ -130,7 +131,7 @@ void main() {
       find.byKey(const ValueKey('welcome_endpoint_settings_modal')),
       findsOneWidget,
     );
-    expect(find.text('Network settings'), findsOneWidget);
+    expect(find.text('NETWORK SETTINGS'), findsOneWidget);
     expect(find.text('Privacy'), findsOneWidget);
     expect(find.text('Use Tor'), findsOneWidget);
     expect(find.text('Direct'), findsOneWidget);
@@ -160,11 +161,10 @@ void main() {
     );
     await tester.pump();
 
-    final panel = tester.widget<DecoratedBox>(
+    final panel = tester.widget<NeonGlassPanel>(
       find.byKey(const ValueKey('network_settings_panel_surface')),
     );
-    final panelDecoration = panel.decoration as BoxDecoration;
-    expect(panelDecoration.color, AppThemeData.dark.colors.background.window);
+    expect(panel.fill, AppThemeData.dark.colors.background.window);
 
     final privacySurface = tester.widget<DecoratedBox>(
       find.byKey(const ValueKey('network_privacy_surface')),

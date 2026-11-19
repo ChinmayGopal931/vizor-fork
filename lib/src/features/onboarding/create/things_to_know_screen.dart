@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_icon.dart';
 import 'onboarding_split_view.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 class ThingsToKnowScreen extends StatelessWidget {
   const ThingsToKnowScreen({
@@ -105,11 +106,8 @@ class _TitleBlock extends StatelessWidget {
         FittedBox(
           fit: BoxFit.scaleDown,
           alignment: Alignment.center,
-          child: Text(
+          child: NeonPageTitle(
             context.l10n.onboardingThingsToKnow,
-            style: AppTypography.displayLarge.copyWith(
-              color: colors.text.accent,
-            ),
             textAlign: TextAlign.center,
           ),
         ),

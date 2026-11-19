@@ -15,6 +15,8 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_icon.dart';
 import 'shared/onboarding_welcome_art.dart';
+import '../../core/widgets/neon_page_title.dart';
+import '../../core/widgets/mobile/neon_horizon.dart';
 
 class StorageUnavailableScreen extends ConsumerStatefulWidget {
   const StorageUnavailableScreen({super.key});
@@ -111,13 +113,15 @@ class _StorageUnavailablePane extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
-          // The neon redesign (mobile) drops the painted welcome art.
+          // The neon look paints no welcome art: desktop sets the neon
+          // horizon low on the black, and the phones draw nothing.
           if (kAppFormFactor != AppFormFactor.mobile)
-            const Positioned.fill(
-              child: OnboardingWelcomeBackdrop(
-                fit: BoxFit.fitWidth,
-                alignment: Alignment.bottomCenter,
-              ),
+            const Positioned(
+              left: 0,
+              right: 0,
+              bottom: AppSpacing.md,
+              height: 180,
+              child: Center(child: NeonHorizon(width: 420, height: 180)),
             ),
           Positioned.fill(
             child: LayoutBuilder(
@@ -191,13 +195,18 @@ class _StorageUnavailableContent extends ConsumerWidget {
             color: colors.icon.accent,
           ),
           const SizedBox(height: AppSpacing.md),
-          Text(
-            _title(l10n, failureKind),
-            style: AppTypography.headlineLarge.copyWith(
-              color: colors.text.accent,
-            ),
-            textAlign: TextAlign.center,
-          ),
+          kDesktopFormFactor
+              ? NeonPageTitle(
+                  _title(l10n, failureKind),
+                  textAlign: TextAlign.center,
+                )
+              : Text(
+                  _title(l10n, failureKind),
+                  style: AppTypography.headlineLarge.copyWith(
+                    color: colors.text.accent,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
           const SizedBox(height: AppSpacing.sm),
           Text(
             _body(l10n, failureKind),

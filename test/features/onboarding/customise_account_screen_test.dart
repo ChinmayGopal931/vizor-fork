@@ -378,7 +378,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('Customise Account'), findsOneWidget);
+    expect(find.text('CUSTOMISE ACCOUNT'), findsOneWidget);
     expect(find.text('Windborne Wardbearer'), findsOneWidget);
     expect(find.text('Finish setup'), findsOneWidget);
     expect(random.nextIntCallCount, 3);

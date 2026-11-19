@@ -20,6 +20,8 @@ import '../../providers/wallet_mutation_guard.dart';
 import '../../services/device_owner_auth.dart';
 import 'shared/onboarding_auth_shell.dart';
 import '../../core/l10n/inline_spans.dart';
+import '../../core/widgets/neon_page_title.dart';
+import '../../core/layout/app_form_factor.dart';
 
 class LostPasswordScreen extends ConsumerStatefulWidget {
   const LostPasswordScreen({
@@ -269,16 +271,23 @@ class _LostPasswordContent extends StatelessWidget {
         Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              l10n.onboardingLostPasswordTitle,
-              style: AppTypography.displayMedium.copyWith(
-                color: colors.text.accent,
-                height: 48 / 45,
-              ),
-              maxLines: 1,
-              softWrap: false,
-              textAlign: TextAlign.center,
-            ),
+            kDesktopFormFactor
+                ? NeonPageTitle(
+                    l10n.onboardingLostPasswordTitle,
+                    maxLines: 1,
+                    softWrap: false,
+                    textAlign: TextAlign.center,
+                  )
+                : Text(
+                    l10n.onboardingLostPasswordTitle,
+                    style: AppTypography.displayMedium.copyWith(
+                      color: colors.text.accent,
+                      height: 48 / 45,
+                    ),
+                    maxLines: 1,
+                    softWrap: false,
+                    textAlign: TextAlign.center,
+                  ),
             const SizedBox(height: AppSpacing.sm),
             // Line breaks pinned to the design's rendered wrap (348px box).
             Text.rich(

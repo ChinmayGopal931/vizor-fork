@@ -27,6 +27,7 @@ import '../../ledger/widgets/ledger_device_app_prompt.dart';
 import '../shared/onboarding_chrome.dart';
 import 'ledger_desktop_ble_probe_dialog.dart';
 import 'ledger_setup_args.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 enum LedgerOnboardingStep { connect, birthday, setPassword, customiseAccount }
 
@@ -500,13 +501,8 @@ class _LedgerConnectScreenState extends ConsumerState<LedgerConnectScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text(
+                      NeonPageTitle(
                         context.l10n.commonConnectLedger,
-                        style: AppTypography.displayLarge.copyWith(
-                          fontFamily: kGothamFamily,
-                          fontWeight: AppFontWeight.regular,
-                          color: context.colors.text.accent,
-                        ),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: AppSpacing.xs),

@@ -27,6 +27,7 @@ import '../../../core/widgets/app_text_field.dart';
 import '../../../rust/api/wallet.dart' as rust_wallet;
 import '../shared/onboarding_flow_args.dart';
 import 'import_split_view.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 const _kBip39PassphraseMaxCharacters = 100;
 
@@ -707,13 +708,13 @@ class _ImportSecretTitle extends StatelessWidget {
         FittedBox(
           fit: BoxFit.scaleDown,
           alignment: Alignment.center,
-          child: Text(
+          child: NeonPageTitle(
             context.l10n.onboardingImportWalletTitle,
-            style: AppTypography.displayLarge.copyWith(color: textColor),
             maxLines: 1,
             overflow: TextOverflow.visible,
             softWrap: false,
             textAlign: TextAlign.center,
+            color: textColor,
           ),
         ),
         const SizedBox(height: AppSpacing.sm),

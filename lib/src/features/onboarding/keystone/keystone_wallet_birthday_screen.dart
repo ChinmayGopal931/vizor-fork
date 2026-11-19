@@ -19,6 +19,7 @@ import '../shared/onboarding_error_messages.dart';
 import '../shared/onboarding_flow_args.dart';
 import 'keystone_onboarding_flow.dart';
 import '../../../core/formatting/date_format.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 enum KeystoneBirthdayTab { date, blockHeight }
 
@@ -408,13 +409,8 @@ class _KeystoneWalletBirthdayScreenState
                         children: [
                           SizedBox(
                             width: _titleWidth,
-                            child: Text(
+                            child: NeonPageTitle(
                               context.l10n.onboardingBirthdayTitle,
-                              style: AppTypography.displayLarge.copyWith(
-                                fontFamily: 'Gotham',
-                                fontWeight: AppFontWeight.regular,
-                                color: context.colors.text.accent,
-                              ),
                               textAlign: TextAlign.center,
                             ),
                           ),

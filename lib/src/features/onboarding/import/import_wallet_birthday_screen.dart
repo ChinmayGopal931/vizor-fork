@@ -25,6 +25,7 @@ import 'import_birthday_calendar_overlay.dart';
 import 'import_birthday_unknown_height_modal.dart';
 import 'import_split_view.dart';
 import '../../../core/formatting/date_format.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 enum ImportBirthdayTab { date, blockHeight }
 
@@ -546,11 +547,8 @@ class _ImportWalletBirthdayScreenState
                         children: [
                           SizedBox(
                             width: _titleWidth,
-                            child: Text(
+                            child: NeonPageTitle(
                               context.l10n.onboardingBirthdayTitle,
-                              style: AppTypography.displayLarge.copyWith(
-                                color: context.colors.text.accent,
-                              ),
                               textAlign: TextAlign.center,
                             ),
                           ),

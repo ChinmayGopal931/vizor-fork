@@ -22,6 +22,7 @@ import '../../providers/payment_request_flow_provider.dart';
 import '../../providers/router_refresh_provider.dart';
 import '../../providers/sync_provider.dart';
 import 'shared/onboarding_auth_shell.dart';
+import '../../core/widgets/neon_page_title.dart';
 import 'shared/onboarding_welcome_art.dart' show VizorWordmark;
 
 class UnlockScreen extends ConsumerStatefulWidget {
@@ -243,12 +244,8 @@ class DesktopUnlockContent extends StatelessWidget {
               // One line; a translation wider than the card scales down.
               FittedBox(
                 fit: BoxFit.scaleDown,
-                child: Text(
+                child: NeonPageTitle(
                   context.l10n.onboardingUnlockWelcomeBack,
-                  style: AppTypography.displayMedium.copyWith(
-                    color: colors.text.accent,
-                    height: 48 / 45,
-                  ),
                   maxLines: 1,
                   softWrap: false,
                   textAlign: TextAlign.center,
