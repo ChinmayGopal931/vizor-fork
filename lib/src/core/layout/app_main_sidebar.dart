@@ -789,6 +789,7 @@ class _AppMainSidebarState extends ConsumerState<AppMainSidebar> {
                           : _SideBySideSyncReadouts(
                               wallet: _syncLine(sync, networkPrivacy),
                               railgun: railgunSyncLine,
+                              singlePadding: _syncReadoutPadding,
                             ),
                     ),
                   ],
@@ -1894,38 +1895,56 @@ class _SidebarPopoverHoverTargetState
   }
 }
 
-/// The wallet's sync and Railgun's side by side at the sidebar's foot, both
+/// The wallet's sync and Railgun's at the sidebar's foot.
+///
+/// Once both are synced they share the single readout, one line and one
+/// "Synced", as a wallet without Shielded USD has. Its semantics label
+/// names both. While either syncs or has failed, the two stand side by side,
 /// compact so their captions match: the wallet's red on the left with its
 /// readout before the line, Railgun's steel on the right with its readout
-/// after. Once both are synced they read the same "Synced"; Railgun's keeps
-/// its own semantics label, so a screen reader still hears which is which.
+/// after.
 class _SideBySideSyncReadouts extends StatelessWidget {
-  const _SideBySideSyncReadouts({required this.wallet, required this.railgun});
+  const _SideBySideSyncReadouts({
+    required this.wallet,
+    required this.railgun,
+    required this.singlePadding,
+  });
 
   final NeonSyncLine wallet;
   final NeonSyncLine railgun;
 
+  /// The single readout's padding, which sets its line in the glyphs' column.
+  final EdgeInsetsGeometry singlePadding;
+
   @override
   Widget build(BuildContext context) {
     final neon = context.colors.neon;
-    final synced = NeonSyncReadout.synced(context.l10n);
     final bothSynced =
-        wallet.readout == synced &&
+        wallet.readout == NeonSyncReadout.synced(context.l10n) &&
         !railgun.climbing &&
         !railgun.failed &&
         railgun.progress >= 1;
-    final railgunLine = bothSynced
-        ? NeonSyncLine(
-            progress: railgun.progress,
-            readout: synced,
-            semanticsLabel: railgun.semanticsLabel,
-            climbing: railgun.climbing,
-            failed: railgun.failed,
-            scanning: railgun.scanning,
-            lineX: railgun.lineX,
-            readoutStyle: railgun.readoutStyle,
-          )
-        : railgun;
+    if (bothSynced) {
+      return Padding(
+        padding: singlePadding,
+        child: NeonSidebarSyncReadout(
+          key: const ValueKey('sidebar_sync_status'),
+          textKey: const ValueKey('sidebar_sync_text'),
+          line: NeonSyncLine(
+            progress: wallet.progress,
+            readout: wallet.readout,
+            semanticsLabel:
+                '${wallet.semanticsLabel}. ${railgun.semanticsLabel}', // l10n-ignore: joins two localized labels
+            climbing: wallet.climbing,
+            failed: wallet.failed,
+            scanning: wallet.scanning,
+            lineX: wallet.lineX,
+            readoutStyle: wallet.readoutStyle,
+          ),
+        ),
+      );
+    }
+    final railgunLine = railgun;
     return Row(
       children: [
         Expanded(
