@@ -51,6 +51,13 @@ releases use t64 package names where applicable. On Fedora, check `gtk3`,
 `mesa-dri-drivers`. The private legacy ABI dependencies `libjpeg.so.8` and
 `libbz2.so.1.0` remain bundled for GStreamer/camera support.
 
+The `veylor` and `veylor-testnet` flavors build Veylor's identity
+(`com.veylor.desktop` and `com.veylor.desktop.testnet`, executables `veylor`
+and `veylor-testnet`) through `VIZOR_APPLICATION_ID`; see "Desktop identity" in
+AGENTS.md. They are not default flavors, never check for updates and embed no
+update information until Veylor has release keys of its own. Their assets are
+named `Veylor-linux-<arch>.AppImage` and `Veylor-Testnet-linux-<arch>.AppImage`.
+
 The default release flavors are `mainnet,testnet`. To package a single flavor
 or explicitly select both for a release:
 

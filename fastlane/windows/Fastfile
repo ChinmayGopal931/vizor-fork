@@ -13,6 +13,22 @@ WINDOWS_RELEASE_FLAVOR_CONFIGS = {
     pack_id: "com.keplr.vizor.testnet",
     pack_title: "Vizor Testnet",
     network: "testnet"
+  },
+  # Veylor's identity (AGENTS.md, "Desktop identity"). No update feed until
+  # Veylor has release keys of its own.
+  "veylor" => {
+    pack_id: "com.veylor.desktop",
+    pack_title: "Veylor",
+    network: "mainnet",
+    application_id: "com.veylor.desktop",
+    update_check: false
+  },
+  "veylor-testnet" => {
+    pack_id: "com.veylor.desktop.testnet",
+    pack_title: "Veylor Testnet",
+    network: "testnet",
+    application_id: "com.veylor.desktop.testnet",
+    update_check: false
   }
 }.freeze
 
@@ -96,12 +112,13 @@ def windows_release_metadata(flavor: "mainnet")
     arch: arch,
     pack_id: pack_id,
     pack_title: flavor_config.fetch(:pack_title),
+    application_id: flavor_config.fetch(:application_id, ""),
     network: flavor_config.fetch(:network),
     channel: channel,
     version: version,
     asset_version: asset_version,
     is_prerelease: tag_info.fetch(:is_prerelease),
-    update_enabled: !tag_info.fetch(:is_prerelease),
+    update_enabled: flavor_config.fetch(:update_check, true) && !tag_info.fetch(:is_prerelease),
     build_number: VizorRelease.release_build_number,
     tag: tag,
     release_name: ENV["RELEASE_NAME"] || tag,
@@ -223,6 +240,9 @@ platform :windows do
       "-ExecutionPolicy", "Bypass",
       "-File", windows_cmd_quote(script_path),
       "-Network", windows_cmd_quote(metadata.fetch(:network)),
+      # Empty for upstream's flavors, so an inherited VIZOR_APPLICATION_ID
+      # cannot turn them into Veylor.
+      "-ApplicationId", windows_cmd_quote(metadata.fetch(:application_id)),
       "-Arch", windows_cmd_quote(metadata.fetch(:arch)),
       "-Version", windows_cmd_quote(metadata.fetch(:asset_version)),
       "-OutputDir", windows_cmd_quote(metadata.fetch(:output_dir_arg)),

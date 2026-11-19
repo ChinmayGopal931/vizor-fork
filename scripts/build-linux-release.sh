@@ -15,7 +15,8 @@ Usage: scripts/build-linux-release.sh [options]
 Build Linux flavor artifacts with separate application identities.
 
 Options:
-  --flavor <mainnet|testnet>     Build one flavor. Can be repeated.
+  --flavor <flavor>              Build one flavor: mainnet, testnet, veylor or
+                                 veylor-testnet. Can be repeated.
   --flavors <a,b>                Build comma-separated flavors.
   --build-mode <release|profile|debug>
                                  Flutter build mode. Default: release.
@@ -35,6 +36,9 @@ Environment:
   FVM_BIN                        fvm executable path. Default: fvm.
 
 Default flavors: mainnet,testnet
+
+The veylor flavors build Veylor's identity through VIZOR_APPLICATION_ID
+(AGENTS.md, "Desktop identity") and never check for updates.
 USAGE
 }
 
@@ -115,6 +119,8 @@ normalize_flavor() {
   case "$1" in
     main|mainnet) echo "mainnet" ;;
     test|testnet) echo "testnet" ;;
+    veylor) echo "veylor" ;;
+    veylor-testnet) echo "veylor-testnet" ;;
     *)
       echo "Unsupported Linux flavor: $1" >&2
       exit 2
@@ -124,6 +130,10 @@ normalize_flavor() {
 
 load_flavor_metadata() {
   local flavor="$1"
+  # Set for the flavors selected through VIZOR_APPLICATION_ID, which also
+  # names the app, executable and icons (linux/CMakeLists.txt).
+  IDENTITY_APPLICATION_ID=""
+  UPDATE_CHECK_ALLOWED="true"
   case "$flavor" in
     mainnet)
       APP_IDENTIFIER="vizor"
@@ -140,6 +150,24 @@ load_flavor_metadata() {
       APPLICATION_ID="app.keplr.vizor.testnet"
       ZCASH_DEFAULT_NETWORK="test"
       ARTIFACT_NAME="Vizor-Testnet-linux"
+      ;;
+    veylor)
+      APP_DISPLAY_NAME="Veylor"
+      BINARY_NAME="veylor"
+      APPLICATION_ID="com.veylor.desktop"
+      IDENTITY_APPLICATION_ID="$APPLICATION_ID"
+      UPDATE_CHECK_ALLOWED="false"
+      ZCASH_DEFAULT_NETWORK="main"
+      ARTIFACT_NAME="Veylor-linux"
+      ;;
+    veylor-testnet)
+      APP_DISPLAY_NAME="Veylor Testnet"
+      BINARY_NAME="veylor-testnet"
+      APPLICATION_ID="com.veylor.desktop.testnet"
+      IDENTITY_APPLICATION_ID="$APPLICATION_ID"
+      UPDATE_CHECK_ALLOWED="false"
+      ZCASH_DEFAULT_NETWORK="test"
+      ARTIFACT_NAME="Veylor-Testnet-linux"
       ;;
     *)
       echo "Unsupported Linux flavor: $flavor" >&2
@@ -183,11 +211,24 @@ build_flavor() {
   fi
 
   echo "==> Building Linux $flavor ($APP_DISPLAY_NAME, $APPLICATION_ID)"
-  write_flavor_overrides
+  local update_check_enabled="${VIZOR_UPDATE_CHECK_ENABLED:-false}"
+  if [[ -n "$IDENTITY_APPLICATION_ID" ]]; then
+    rm -f "$OVERRIDES_PATH"
+  else
+    write_flavor_overrides
+  fi
+  if [[ "$UPDATE_CHECK_ALLOWED" != "true" ]]; then
+    update_check_enabled="false"
+  fi
   rm -rf "$ROOT_DIR/build/linux"
 
   (
     cd "$ROOT_DIR"
+    if [[ -n "$IDENTITY_APPLICATION_ID" ]]; then
+      export VIZOR_APPLICATION_ID="$IDENTITY_APPLICATION_ID"
+    else
+      unset VIZOR_APPLICATION_ID
+    fi
     "$FVM_BIN" flutter pub get
     flutter_args=(
       flutter build linux "--$BUILD_MODE"
@@ -195,7 +236,7 @@ build_flavor() {
       --dart-define="VIZOR_RELEASE_FLAVOR=${VIZOR_RELEASE_FLAVOR:-$flavor}"
       --dart-define="VIZOR_RELEASE_ARCH=${VIZOR_RELEASE_ARCH:-}"
       --dart-define="VIZOR_RELEASE_REPOSITORY=${VIZOR_RELEASE_REPOSITORY:-}"
-      --dart-define="VIZOR_UPDATE_CHECK_ENABLED=${VIZOR_UPDATE_CHECK_ENABLED:-false}"
+      --dart-define="VIZOR_UPDATE_CHECK_ENABLED=$update_check_enabled"
       --dart-define="VIZOR_COINGECKO_PRICE_BASE_URL=${VIZOR_COINGECKO_PRICE_BASE_URL:-https://api.coingecko.com/api/v3}"
       --dart-define="VIZOR_WALLET_LINK_BACKEND_URL=${VIZOR_WALLET_LINK_BACKEND_URL:-https://functions.vizor.cash}"
     )
@@ -222,6 +263,11 @@ build_flavor() {
   rm -rf "$staging_dir"
   mkdir -p "$DIST_DIR"
   cp -a "$bundle_dir/." "$staging_dir/"
+  # The link `flutter run` needs to a renamed executable has no place in a
+  # release bundle.
+  if [[ -n "$IDENTITY_APPLICATION_ID" && -L "$staging_dir/vizor" ]]; then
+    rm -f "$staging_dir/vizor"
+  fi
 
   if [[ ! -x "$staging_dir/$BINARY_NAME" ]]; then
     echo "Expected executable $staging_dir/$BINARY_NAME" >&2
