@@ -60,6 +60,13 @@ import '../../migration/providers/ironwood_migration_announcement_provider.dart'
 import '../../migration/widgets/ironwood_migration_announcement_modal.dart';
 import '../../portfolio_chart/models/portfolio_chart_models.dart';
 import '../../portfolio_chart/providers/portfolio_chart_provider.dart';
+import '../../private_usd/providers/private_usd_activity_provider.dart';
+import '../../private_usd/providers/private_usd_available_provider.dart';
+import '../../private_usd/widgets/desktop/desktop_private_usd_widgets.dart'
+    show desktopPrivateUsdFeedEntries;
+import '../../private_usd/widgets/mobile/private_usd_activity_rows.dart'
+    show PrivateUsdActivityDetailsState;
+import '../../private_usd/widgets/mobile/private_usd_home_strip.dart';
 import '../../swap/models/swap_activity_navigation.dart';
 import '../../swap/models/swap_fiat_value_formatting.dart';
 import '../../swap/providers/swap_activity_tracker.dart';
@@ -553,7 +560,8 @@ class _HomePane extends ConsumerStatefulWidget {
   ConsumerState<_HomePane> createState() => _HomePaneState();
 }
 
-class _HomePaneState extends ConsumerState<_HomePane> {
+class _HomePaneState extends ConsumerState<_HomePane>
+    with PrivateUsdActivityDetailsState {
   static const _recentActivityLimit = 5;
 
   Timer? _swapActivityRefreshTimer;
@@ -835,6 +843,17 @@ class _HomePaneState extends ConsumerState<_HomePane> {
             ),
           ),
         ),
+      // Shielded USD's rows, as the phone's Home has them but for the
+      // bridge's: a click unfolds a row's details under it.
+      for (final entry in desktopPrivateUsdFeedEntries(
+        context: context,
+        activity: accountUuid == null
+            ? PrivateUsdActivity.empty
+            : ref.watch(privateUsdActivityProvider(accountUuid)),
+        privacyModeEnabled: widget.privacyModeEnabled,
+        details: privateUsdActivityDetails,
+      ))
+        _HomeActivityEntry(timestamp: entry.timestamp, row: () => entry.row),
     ]..sort(_compareHomeActivityEntries);
     return entries
         .take(_recentActivityLimit)
@@ -1775,6 +1794,11 @@ class _HomeDesktopBalanceCardState extends State<_HomeDesktopBalanceCard> {
                     onShieldBalanceHoverChanged:
                         _handleShieldBalanceHoverChanged,
                   ),
+                // Shielded USD in the balance, as the phone's Home has it,
+                // and the way to its page.
+                _HomeDesktopPrivateUsdStrip(
+                  privacyModeEnabled: widget.privacyModeEnabled,
+                ),
               ],
             ),
           ),
@@ -1892,6 +1916,57 @@ class _HomeDesktopBalanceCardState extends State<_HomeDesktopBalanceCard> {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// Shielded USD under the balance sign, set off by the transparent tray's
+/// hairline of white light: the phone Home's strip ([PrivateUsdHomeStrip]),
+/// with a click cursor and the keyboard, opening `/private-usd`. Only while
+/// Shielded USD is available to the active account; it keeps the balance
+/// fresh only once Shielded USD is in use, so before that it starts nothing.
+class _HomeDesktopPrivateUsdStrip extends ConsumerWidget {
+  const _HomeDesktopPrivateUsdStrip({required this.privacyModeEnabled});
+
+  final bool privacyModeEnabled;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final uuid = ref.watch(
+      accountProvider.select((s) => s.value?.activeAccountUuid),
+    );
+    if (uuid == null || !ref.watch(privateUsdAvailableProvider)) {
+      return const SizedBox.shrink();
+    }
+    void open() => context.push('/private-usd');
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(
+            color: context.colors.neon.frameGlow.withValues(alpha: 0.2),
+          ),
+        ),
+      ),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: FocusableActionDetector(
+          shortcuts: _homeDesktopActivationShortcuts,
+          actions: <Type, Action<Intent>>{
+            ActivateIntent: CallbackAction<Intent>(
+              onInvoke: (_) {
+                open();
+                return null;
+              },
+            ),
+          },
+          child: PrivateUsdHomeStrip(
+            key: const ValueKey('home_desktop_private_usd_strip'),
+            accountUuid: uuid,
+            privacyModeEnabled: privacyModeEnabled,
+            onTap: open,
+          ),
+        ),
       ),
     );
   }
@@ -2769,8 +2844,12 @@ class _HomeDesktopActivityCard extends StatelessWidget {
                       HomeActivitySkeletonRow(
                         key: ValueKey('home_desktop_activity_skeleton_$index'),
                       )
-                    else
+                    else ...[
                       _HomeDesktopActivityRow(index: index, row: rows[index]),
+                      // What a row that unfolds in place shows once opened (a
+                      // Shielded USD row's details), as the feed draws it.
+                      ?rows[index].details,
+                    ],
                   ],
                 ],
               ),
@@ -3027,6 +3106,11 @@ class _HomeDesktopActivityGlyph extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    // An asset's logo in place of the plate (Shielded USD's), as the feed's
+    // rows draw it.
+    if (row.leading case final leading?) {
+      return SizedBox.square(dimension: 32, child: Center(child: leading));
+    }
     final progress = row.leadingProgressValue;
     if (progress != null) {
       return SizedBox(

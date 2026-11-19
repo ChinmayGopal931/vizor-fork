@@ -9,7 +9,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../main.dart' show log;
 import '../../providers/network_privacy_provider.dart';
-import '../layout/app_form_factor.dart';
 import '../layout/app_process_work_policy.dart';
 import '../network/network_http_client.dart';
 
@@ -22,9 +21,11 @@ const kVizorPrivateUsdEnabled = bool.fromEnvironment(
 );
 
 /// Whether this build can have Private USD at all: the define, in a mobile
-/// build. Const, so every other build drops the feature's code.
-const kPrivateUsdBuildEnabled =
-    kVizorPrivateUsdEnabled && kAppFormFactor == AppFormFactor.mobile;
+/// build or (since the Mac hosts the Railgun page) a desktop one. Const, so a
+/// build without it drops the feature's code. Where no host runs the page
+/// (Windows and Linux, macOS below 14, iOS below 17),
+/// `privateUsdPlatformHostsPage` keeps it hidden.
+const kPrivateUsdBuildEnabled = kVizorPrivateUsdEnabled;
 
 /// The kill-switch JSON's URL. Empty: no fetch, and the feature is
 /// available.
@@ -250,11 +251,15 @@ final privateUsdAvailabilityStoreProvider =
       (_) => const SharedPreferencesPrivateUsdAvailabilityStore(),
     );
 
-/// Whether a kill-switch retry may run in the current lifecycle (mobile is
-/// foreground-only).
+/// Whether a kill-switch retry may run in the current lifecycle: in the
+/// foreground only, as every Private USD request is (plan D9), on desktop
+/// too, where app-process work otherwise runs on while the window is hidden.
 final privateUsdKillSwitchWorkPolicyProvider =
     Provider<bool Function({required bool isInForeground})>(
-      (_) => canRunAppProcessWork,
+      (_) =>
+          ({required bool isInForeground}) =>
+              isInForeground &&
+              canRunAppProcessWork(isInForeground: isInForeground),
     );
 
 /// Delays before asking again after a failed fetch; the last one repeats.

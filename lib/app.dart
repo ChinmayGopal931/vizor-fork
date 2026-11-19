@@ -108,7 +108,12 @@ import 'src/features/payment_links/providers/payment_link_intake_provider.dart';
 import 'src/features/payment_links/providers/gift_claim_flow_provider.dart';
 import 'src/features/payment_links/screens/gift_claim_screen.dart';
 import 'src/features/payment_links/screens/desktop_payment_link_scan_screen.dart';
+import 'src/features/private_usd/models/private_usd_send.dart'
+    show PrivateUsdSendMode;
 import 'src/features/private_usd/providers/private_usd_available_provider.dart';
+import 'src/features/private_usd/screens/desktop/desktop_private_usd_receive_screen.dart';
+import 'src/features/private_usd/screens/desktop/desktop_private_usd_screen.dart';
+import 'src/features/private_usd/screens/desktop/desktop_private_usd_send_screens.dart';
 import 'src/features/private_usd/providers/private_usd_unfinished_provider.dart';
 import 'src/features/private_usd/widgets/mobile/private_usd_engine_host.dart';
 import 'src/features/send/screens/payment_request_scan_screen.dart';
@@ -1554,6 +1559,61 @@ List<RouteBase> _desktopRoutes(Ref ref) => [
   GoRoute(
     path: '/portfolio-chart',
     builder: (_, _) => const DesktopPortfolioChartScreen(),
+  ),
+  // Shielded USD, opened from Home's balance and the chart's holdings. The
+  // shared redirect sends these home while it is unavailable; desktop has no
+  // bridge yet, so the bridge's routes lead back to `/private-usd`.
+  GoRoute(
+    path: '/private-usd',
+    builder: (_, _) => const DesktopPrivateUsdScreen(),
+  ),
+  GoRoute(
+    path: '/private-usd/receive',
+    builder: (_, _) => const DesktopPrivateUsdReceiveScreen(),
+  ),
+  // Send and Withdraw: one page per mode, its review, and the status while it
+  // proves and posts, as on the phone.
+  GoRoute(
+    path: '/private-usd/send',
+    builder: (_, _) =>
+        const DesktopPrivateUsdSendScreen(mode: PrivateUsdSendMode.private),
+  ),
+  GoRoute(
+    path: '/private-usd/withdraw',
+    builder: (_, _) =>
+        const DesktopPrivateUsdSendScreen(mode: PrivateUsdSendMode.withdraw),
+  ),
+  GoRoute(
+    path: '/private-usd/send/review',
+    builder: (_, _) => const DesktopPrivateUsdSendReviewScreen(
+      mode: PrivateUsdSendMode.private,
+    ),
+  ),
+  GoRoute(
+    path: '/private-usd/withdraw/review',
+    builder: (_, _) => const DesktopPrivateUsdSendReviewScreen(
+      mode: PrivateUsdSendMode.withdraw,
+    ),
+  ),
+  GoRoute(
+    path: '/private-usd/send/status',
+    redirect: (_, state) =>
+        state.extra is PrivateUsdSendMode ? null : '/private-usd',
+    // `extra` does not survive a lock (the trip to /unlock and back); never
+    // assume it.
+    builder: (_, state) {
+      final mode = state.extra;
+      return mode is PrivateUsdSendMode
+          ? DesktopPrivateUsdSendStatusScreen(mode: mode)
+          : const DesktopPrivateUsdScreen();
+    },
+  ),
+  // Refunds and conversions come from bridges, which desktop does not start
+  // yet: a link to one opens the page.
+  GoRoute(path: '/private-usd/refunds', redirect: (_, _) => '/private-usd'),
+  GoRoute(
+    path: '/private-usd/conversion/:direction/:index',
+    redirect: (_, _) => '/private-usd',
   ),
   GoRoute(
     path: '/payment-links',

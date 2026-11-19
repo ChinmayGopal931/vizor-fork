@@ -33,8 +33,10 @@ BigInt? privateUsdRelayerFeeCap(rust_private_usd.ApiDeployment? deployment) =>
 /// Off, Bridge is hidden and its screens redirect; the balance, deposits,
 /// sends and withdrawals work either way.
 final privateUsdBridgeAvailableProvider = Provider<bool>((ref) {
-  // Const, so desktop builds and builds without the define drop the rest.
+  // Const, so builds without the define drop the rest.
   if (!kPrivateUsdBuildEnabled) return false;
+  // Desktop has no bridge screens yet: nothing there starts a conversion.
+  if (kDesktopFormFactor) return false;
   return ref.watch(privateUsdCurrentDeploymentProvider)?.bridgeAvailable ??
       false;
 });
@@ -97,7 +99,7 @@ class RailgunHostSupportedNotifier extends Notifier<bool> {
 /// Whether the active account sees Private USD. The banner and conversion
 /// progress of a swap under way do not follow it.
 final privateUsdAvailableProvider = Provider<bool>((ref) {
-  // Const, so desktop builds and builds without the define drop the rest.
+  // Const, so builds without the define drop the rest.
   if (!kPrivateUsdBuildEnabled) return false;
   return privateUsdAvailableFor(
     enabled: true,
@@ -139,10 +141,10 @@ bool privateUsdAvailableFor({
     !activeAccount.isHardware &&
     activeAccount.zip32AccountIndex != null;
 
-/// Whether this build runs the swap engine at all: the define, a mobile build
-/// on a platform that hosts the page, and a deployment for the network. It
-/// does not follow the active account or the kill switch: conversions under
-/// way keep being driven for every account.
+/// Whether this build runs the swap engine at all: the define, a build on a
+/// platform that hosts the page for its form factor, and a deployment for
+/// the network. It does not follow the active account or the kill switch:
+/// conversions under way keep being driven for every account.
 bool privateUsdEngineEnabledFor({
   required bool enabled,
   required AppFormFactor formFactor,
@@ -151,18 +153,24 @@ bool privateUsdEngineEnabledFor({
   required bool hasDeployment,
 }) =>
     enabled &&
-    formFactor == AppFormFactor.mobile &&
     privateUsdPlatformHostsPage(
+      formFactor: formFactor,
       platform: platform,
       hostSupported: hostSupported,
     ) &&
     hasDeployment;
 
-/// Whether [platform] runs the Railgun page: every Android build, and iOS
-/// where its host says so (iOS 17 and later).
+/// Whether [platform] runs the Railgun page in a [formFactor] build: on the
+/// phones every Android build, and iOS where its host says so (iOS 17 and
+/// later); on desktop the Mac where its host says so (macOS 14 and later).
+/// Windows and Linux have no host yet.
 bool privateUsdPlatformHostsPage({
+  required AppFormFactor formFactor,
   required TargetPlatform platform,
   required bool hostSupported,
-}) =>
+}) => switch (formFactor) {
+  AppFormFactor.mobile =>
     platform == TargetPlatform.android ||
-    (platform == TargetPlatform.iOS && hostSupported);
+        (platform == TargetPlatform.iOS && hostSupported),
+  AppFormFactor.desktop => platform == TargetPlatform.macOS && hostSupported,
+};

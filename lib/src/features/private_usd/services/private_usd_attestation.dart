@@ -43,7 +43,8 @@ class PrivateUsdAttestationSignature {
 
 /// The platform's attestation key for a Privacy Pass issuer, over the
 /// `com.zcash.wallet/private_usd_attestation` channel: Android's Keystore
-/// signs with a key attested up to Google's root; iOS answers `unavailable`.
+/// signs with a key attested up to Google's root; iOS and macOS answer
+/// `unavailable`.
 /// The key is the platform's to make and keep (one per issuer, remade only
 /// once its chain expired); nothing here deletes or names it.
 class PrivateUsdAttestation implements PrivateUsdAttester {
@@ -74,7 +75,7 @@ class PrivateUsdAttestation implements PrivateUsdAttester {
         _ => PrivateUsdAttestationErrorCode.keystore,
       });
     } on MissingPluginException {
-      // No host for the channel: a desktop build.
+      // No host for the channel: a Windows or Linux build.
       throw const PrivateUsdAttestationException(
         PrivateUsdAttestationErrorCode.unavailable,
       );

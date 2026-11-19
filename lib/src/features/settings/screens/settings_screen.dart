@@ -42,6 +42,10 @@ import '../widgets/near_swap_privacy_info.dart';
 import '../widgets/network_privacy_control.dart';
 import '../widgets/hide_balance_on_unlock_control.dart';
 import '../widgets/portfolio_chart_settings_control.dart';
+import '../widgets/private_usd_settings_control.dart';
+import '../../private_usd/providers/private_usd_custom_rpc_provider.dart';
+import '../../private_usd/widgets/desktop/desktop_private_usd_rpc_dialog.dart';
+import '../../../app_bootstrap.dart';
 import '../widgets/enhance_pir_privacy_control.dart';
 import '../widgets/private_queries_turn_off.dart';
 import '../widgets/language_picker.dart';
@@ -580,6 +584,9 @@ class _SettingsList extends ConsumerWidget {
     final recoveryTransition = ref.watch(enhancePirTransitionProvider);
     final changingRecovery =
         recoveryTransition == EnhancePirTransition.changing;
+    // As the phone's Settings shows its Ethereum RPC and relayer claims rows:
+    // while Shielded USD is available, or a URL of the user's own is set.
+    final showPrivateUsd = ref.watch(privateUsdRpcSettingVisibleProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -691,6 +698,17 @@ class _SettingsList extends ConsumerWidget {
               ),
           ],
         ),
+        if (showPrivateUsd) ...[
+          const SizedBox(height: AppSpacing.md),
+          _SettingsBlock(
+            key: const ValueKey('settings_private_usd_block'),
+            title: context.l10n.privateUsdTitle,
+            rows: const [
+              _PrivateUsdEthereumRpcRow(),
+              PrivateUsdRelayerClaimsControl(),
+            ],
+          ),
+        ],
         const SizedBox(height: AppSpacing.md),
         _SettingsBlock(
           title: context.l10n.settingsPrivacyTitle,
@@ -1107,6 +1125,33 @@ class _UpdateProgressBar extends StatelessWidget {
           decoration: BoxDecoration(color: colors.background.inverse),
         ),
       ),
+    );
+  }
+}
+
+/// Shielded USD's Ethereum RPC: the default, or the host of the user's own
+/// URL (never the URL, which can hold a key). Opens the dialog that checks a
+/// URL before saving it.
+class _PrivateUsdEthereumRpcRow extends ConsumerWidget {
+  const _PrivateUsdEthereumRpcRow();
+
+  Future<void> _open(BuildContext context) async {
+    final done = await showDesktopPrivateUsdRpcDialog(context);
+    if (done != null && context.mounted) showAppToast(context, done);
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final network = ref.watch(appBootstrapProvider).network;
+    final custom = ref.watch(privateUsdCustomRpcProvider(network)).value;
+    return _SettingsRow(
+      key: const ValueKey('settings_ethereum_rpc_row'),
+      iconName: AppIcons.link,
+      label: context.l10n.privateUsdRpcTitle,
+      value: custom == null
+          ? context.l10n.commonDefault
+          : privateUsdCustomRpcHost(custom),
+      onTap: () => unawaited(_open(context)),
     );
   }
 }

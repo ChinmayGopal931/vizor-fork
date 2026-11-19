@@ -23,6 +23,11 @@ import '../../../providers/rpc_endpoint_provider.dart';
 import '../../../providers/sync_provider.dart';
 import '../../../providers/pending_activity_evidence_provider.dart';
 import '../../../rust/api/sync.dart' as rust_sync;
+import '../../private_usd/providers/private_usd_activity_provider.dart';
+import '../../private_usd/widgets/desktop/desktop_private_usd_widgets.dart'
+    show desktopPrivateUsdFeedEntries;
+import '../../private_usd/widgets/mobile/private_usd_activity_rows.dart'
+    show PrivateUsdActivityDetailsState;
 import '../../swap/models/swap_activity_navigation.dart';
 import '../../swap/providers/swap_activity_tracker.dart';
 import '../../swap/providers/swap_payout_discovery_provider.dart';
@@ -51,7 +56,8 @@ class ActivityScreen extends ConsumerStatefulWidget {
   ConsumerState<ActivityScreen> createState() => _ActivityScreenState();
 }
 
-class _ActivityScreenState extends ConsumerState<ActivityScreen> {
+class _ActivityScreenState extends ConsumerState<ActivityScreen>
+    with PrivateUsdActivityDetailsState {
   List<rust_sync.TransactionInfo>? _transactions;
   String? _transactionsAccountUuid;
   (int?, int?, DateTime?)? _transactionsSnapshot;
@@ -446,10 +452,31 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
       );
     }
     entries.sort(_compareActivityEntries);
-    final sections = _activityFeedSections(
-      context.l10n,
-      entries.take(_pager?.visibleCount ?? activityPageSize).toList(),
-    );
+    final pager = _pager;
+    final sections = _activityFeedSections(context.l10n, [
+      ...entries.take(pager?.visibleCount ?? activityPageSize),
+      // Shielded USD's rows, as the phone's Activity has them but for the
+      // bridge's; a click unfolds a row's details under it. They are all
+      // loaded while the pager pages the wallet's rows, so one shows only
+      // above the page's last row, as on the phone.
+      for (final entry in desktopPrivateUsdFeedEntries(
+        context: context,
+        activity: accountUuid == null
+            ? PrivateUsdActivity.empty
+            : ref.watch(privateUsdActivityProvider(accountUuid)),
+        privacyModeEnabled: privacyModeEnabled,
+        details: privateUsdActivityDetails,
+      ))
+        if (pager == null || pager.showsUnpagedRow(entry.timestamp))
+          _ActivityEntry(
+            sortKey: ActivityEntrySortKey(
+              timestamp: entry.timestamp,
+              isPendingTransaction: false,
+              sourceOrder: sourceOrder++,
+            ),
+            row: entry.row,
+          ),
+    ]..sort(_compareActivityEntries));
 
     final content = AppDesktopShell(
       sidebar: const AppMainSidebar(),

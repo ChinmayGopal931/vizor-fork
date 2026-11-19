@@ -82,7 +82,7 @@ String? privateUsdDepositAccountOf(Ref ref) {
 
 /// [privateUsdEngineEnabledFor] for this build.
 final privateUsdEngineEnabledProvider = Provider<bool>((ref) {
-  // Const, so desktop builds and builds without the define drop the rest.
+  // Const, so builds without the define drop the rest.
   if (!kPrivateUsdBuildEnabled) return false;
   return privateUsdEngineEnabledFor(
     enabled: true,
