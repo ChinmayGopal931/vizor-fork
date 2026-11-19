@@ -203,7 +203,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 800));
         expect(
           find.text(switch (phase) {
-            SendBroadcastPhase.succeeded => 'Thank you for\nsupporting Vizor',
+            SendBroadcastPhase.succeeded => 'Thank you for\nsupporting Veylor',
             SendBroadcastPhase.pendingBroadcast => 'Donation queued',
             _ => 'Donation failed',
           }),

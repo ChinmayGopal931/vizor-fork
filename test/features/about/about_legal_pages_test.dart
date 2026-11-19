@@ -58,7 +58,7 @@ void main() {
     await tester.pumpWidget(_routerHarness(router, _walletBootstrap('/about')));
     await tester.pumpAndSettle();
 
-    expect(find.text('About Vizor'), findsNothing);
+    expect(find.text('About Veylor'), findsNothing);
     expect(find.text('About Veylor Wallet'), findsOneWidget);
     expect(find.text('Version: 0.0.0 Public Beta'), findsOneWidget);
     expect(find.text('Built by the Keplr team'), findsOneWidget);
@@ -105,7 +105,7 @@ void main() {
     await tester.pumpWidget(_routerHarness(router, _walletBootstrap('/about')));
     await tester.pumpAndSettle();
 
-    expect(find.text('About Vizor'), findsNothing);
+    expect(find.text('About Veylor'), findsNothing);
     expect(find.text('About Veylor Wallet'), findsOneWidget);
     final backLink = find.byType(AppRouteBackLink);
     expect(

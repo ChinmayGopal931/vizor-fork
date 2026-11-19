@@ -1267,7 +1267,7 @@ void main() {
     );
     expect(
       find.text(
-        'Recipient can redeem the Card in their Vizor wallet using the Link. '
+        'Recipient can redeem the Card in their Veylor wallet using the Link. '
         'The sender covers the deposit and redeem fees, so the recipient '
         'receives the full Card amount.',
       ),

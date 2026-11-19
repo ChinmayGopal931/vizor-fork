@@ -141,7 +141,7 @@ void main() {
         );
         expect(procedure.currentStep, 0);
         expect(procedure.steps.first.busy, isTrue);
-        expect(find.text('Vizor is checking the Zcash app.'), findsNothing);
+        expect(find.text('Veylor is checking the Zcash app.'), findsNothing);
         await tester.tap(
           action == 'reselect'
               ? find.bySemanticsLabel('Choose another Ledger')

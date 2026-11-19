@@ -1052,7 +1052,7 @@ final class DeviceOwnerAuthChannel {
         let arguments = call.arguments as? [String: Any]
         // Fallback mirrors the Dart canonical `kWalletResetDeviceAuthReason`;
         // the Dart side always sends `reason`, so this default is defensive only.
-        let reason = (arguments?["reason"] as? String) ?? "Confirm reset Vizor"
+        let reason = (arguments?["reason"] as? String) ?? "Confirm reset Veylor"
         verify(reason: reason, result: result)
       default:
         result(FlutterMethodNotImplemented)

@@ -3111,7 +3111,7 @@ const figmaCompareScenarios = <FigmaCompareScenario>[
   ),
   FigmaCompareScenario(
     id: 'settings-support-vizor',
-    description: 'Desktop settings scrolled to Support Vizor',
+    description: 'Desktop settings scrolled to Support Veylor',
     builder: buildSettingsSupportVizorUseCase,
   ),
   FigmaCompareScenario(

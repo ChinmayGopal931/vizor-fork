@@ -634,7 +634,7 @@ void main() {
         );
         expect(find.text('Secret Passphrase'), findsNothing);
         expect(
-          find.textContaining(existing ? 'new account' : 'new Vizor wallet'),
+          find.textContaining(existing ? 'new account' : 'new Veylor wallet'),
           findsOneWidget,
         );
         for (var i = 0; i < 2; i++) {

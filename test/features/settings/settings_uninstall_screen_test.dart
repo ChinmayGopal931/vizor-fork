@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/app.dart';
 import 'package:zcash_wallet/src/app_bootstrap.dart';
 import 'package:zcash_wallet/src/core/config/rpc_endpoint_config.dart';
+import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 import 'package:zcash_wallet/src/core/widgets/app_button.dart';
 import 'package:zcash_wallet/src/features/onboarding/welcome.dart';
 import 'package:zcash_wallet/src/features/payment_links/services/payment_link_received_store.dart';
@@ -21,6 +22,12 @@ import '../../support/test_l10n.dart';
 const _validPassword = 'Correct123!';
 
 void main() {
+  // The test font is much wider than Gotham: "Uninstall Veylor" overflows its
+  // button in it, though not in the running app.
+  setUpAll(() async {
+    await loadGothamFonts();
+  });
+
   testWidgets(
     'uninstall reset stays on the data removed screen instead of welcome',
     (tester) async {
@@ -72,7 +79,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.widgetWithText(AppButton, 'Uninstall Vizor'));
+      await tester.tap(find.widgetWithText(AppButton, 'Uninstall Veylor'));
       await tester.pumpAndSettle();
 
       // The password gate never opens and nothing is wiped: the claim would
@@ -120,7 +127,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.widgetWithText(AppButton, 'Uninstall Vizor'));
+      await tester.tap(find.widgetWithText(AppButton, 'Uninstall Veylor'));
       await tester.pump();
 
       // The wait covers the Gift Card claim check too, so the label must not
@@ -175,7 +182,7 @@ Future<void> _runUninstallFlow(
     await tester.pumpAndSettle();
 
     if (openFromSettings) {
-      final uninstallEntry = find.text('Uninstall Vizor');
+      final uninstallEntry = find.text('Uninstall Veylor');
       await tester.ensureVisible(uninstallEntry);
       await tester.pumpAndSettle();
       await tester.tap(uninstallEntry);
@@ -186,7 +193,7 @@ Future<void> _runUninstallFlow(
       find.textContaining('Unshared gift card links will be permanently lost.'),
       findsOneWidget,
     );
-    await tester.tap(find.widgetWithText(AppButton, 'Uninstall Vizor'));
+    await tester.tap(find.widgetWithText(AppButton, 'Uninstall Veylor'));
     await tester.pumpAndSettle();
     expect(find.text('Confirm access'), findsOneWidget);
 
@@ -213,7 +220,7 @@ Future<void> _runUninstallFlow(
 
     expect(accountNotifier.resetWalletCalled, isTrue);
     expect(find.text('Your data has been removed'), findsOneWidget);
-    expect(find.text('Close Vizor'), findsOneWidget);
+    expect(find.text('Close Veylor'), findsOneWidget);
     expect(find.byType(WelcomeScreen), findsNothing);
   } finally {
     debugDefaultTargetPlatformOverride = null;

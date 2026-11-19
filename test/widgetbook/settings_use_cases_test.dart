@@ -218,7 +218,7 @@ void main() {
     );
 
     _expectNoCrash(errors);
-    expect(find.text('Uninstall Vizor'), findsWidgets);
+    expect(find.text('Uninstall Veylor'), findsWidgets);
     expect(find.text('This cannot be undone.'), findsOneWidget);
   });
 
@@ -260,7 +260,7 @@ void main() {
 
     _expectNoCrash(errors);
     expect(find.text('Confirm access'), findsOneWidget);
-    expect(find.text('To link Vizor Mobile.'), findsOneWidget);
+    expect(find.text('To link Veylor Mobile.'), findsOneWidget);
   });
 
   testWidgets('settings wallet link QR use case renders the timer', (
@@ -272,9 +272,11 @@ void main() {
     );
 
     _expectNoCrash(errors);
-    expect(find.text('Scan with Vizor mobile'), findsOneWidget);
+    expect(find.text('Scan with Veylor mobile'), findsOneWidget);
     expect(
-      find.text('Open Vizor on your phone → Add a wallet → Link Vizor Desktop'),
+      find.text(
+        'Open Veylor on your phone → Add a wallet → Link Veylor Desktop',
+      ),
       findsOneWidget,
     );
     expect(find.text('Expires in 0:59'), findsOneWidget);
@@ -289,7 +291,7 @@ void main() {
     );
 
     _expectNoCrash(errors);
-    expect(find.text('Vizor Mobile linked successfully'), findsOneWidget);
+    expect(find.text('Veylor Mobile linked successfully'), findsOneWidget);
     expect(
       find.text('6 accounts and 20 contacts were imported on mobile.'),
       findsOneWidget,

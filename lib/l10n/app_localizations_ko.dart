@@ -868,12 +868,12 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String appLinuxUpdateAvailable(String version) {
-    return 'Vizor $version 버‍전‍을 사‍용‍할 수 있‍어‍요.';
+    return 'Veylor $version 버‍전‍을 사‍용‍할 수 있‍어‍요.';
   }
 
   @override
   String appLinuxUpdateAvailableTor(String version) {
-    return 'Vizor $version 버‍전‍을 사‍용‍할 수 있‍어‍요. 릴‍리‍스 페‍이‍지‍는 Vizor‍의 Tor 연‍결 밖‍에‍서 브‍라‍우‍저‍로 열‍려‍요.';
+    return 'Veylor $version 버‍전‍을 사‍용‍할 수 있‍어‍요. 릴‍리‍스 페‍이‍지‍는 Veylor‍의 Tor 연‍결 밖‍에‍서 브‍라‍우‍저‍로 열‍려‍요.';
   }
 
   @override
@@ -1793,7 +1793,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get commonSubmittingTransaction => '거‍래‍를 제‍출‍하‍는 중';
 
   @override
-  String get commonSupportVizor => 'Vizor 후‍원‍하‍기';
+  String get commonSupportVizor => 'Veylor 후‍원‍하‍기';
 
   @override
   String get commonSwapFailed => '스‍왑 실‍패';
@@ -1941,7 +1941,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get donationSwitchCurrency => 'ZEC‍와 USD 전‍환';
 
   @override
-  String get donationThanksTitle => 'Vizor‍를 후‍원‍해 주‍셔‍서 감‍사‍해‍요';
+  String get donationThanksTitle => 'Veylor‍를 후‍원‍해 주‍셔‍서 감‍사‍해‍요';
 
   @override
   String get endpointAutomatic => '자‍동';
@@ -2220,7 +2220,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get homePasswordChangeUnverified =>
-      '이‍전 비‍밀‍번‍호 변‍경‍을 확‍인‍하‍지 못‍했‍어‍요. 다‍시 시‍도‍하‍거‍나 Vizor‍를 다‍시 시‍작‍해 주‍세‍요.';
+      '이‍전 비‍밀‍번‍호 변‍경‍을 확‍인‍하‍지 못‍했‍어‍요. 다‍시 시‍도‍하‍거‍나 Veylor‍를 다‍시 시‍작‍해 주‍세‍요.';
 
   @override
   String get homePayInUsdc => 'USDC‍로 결‍제';
@@ -2465,24 +2465,24 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get keyringLockedBody =>
-      'Vizor‍가 시‍스‍템 키‍링‍에 접‍근‍할 수 없‍어‍요. 키‍링 잠‍금‍을 해‍제‍한 뒤 다‍시 시‍도‍를 선‍택‍하‍세‍요. 시‍스‍템‍에‍서 키‍링 비‍밀‍번‍호‍를 물‍어‍볼 수 있‍어‍요.';
+      'Veylor‍가 시‍스‍템 키‍링‍에 접‍근‍할 수 없‍어‍요. 키‍링 잠‍금‍을 해‍제‍한 뒤 다‍시 시‍도‍를 선‍택‍하‍세‍요. 시‍스‍템‍에‍서 키‍링 비‍밀‍번‍호‍를 물‍어‍볼 수 있‍어‍요.';
 
   @override
   String get keyringNoResponse => '키‍링‍이 응‍답‍하‍지 않‍았‍어‍요. 다‍시 시‍도‍해 주‍세‍요.';
 
   @override
-  String get keyringOpeningTitle => 'Vizor 여‍는 중';
+  String get keyringOpeningTitle => 'Veylor 여‍는 중';
 
   @override
   String get keyringPromptBody =>
-      'Vizor‍를 계‍속 사‍용‍하‍려‍면 시‍스‍템 키‍링 안‍내‍를 완‍료‍하‍세‍요.';
+      'Veylor‍를 계‍속 사‍용‍하‍려‍면 시‍스‍템 키‍링 안‍내‍를 완‍료‍하‍세‍요.';
 
   @override
-  String get keyringRestartHint => 'Vizor‍를 종‍료‍하‍고 다‍시 시‍작‍해 주‍세‍요.';
+  String get keyringRestartHint => 'Veylor‍를 종‍료‍하‍고 다‍시 시‍작‍해 주‍세‍요.';
 
   @override
   String get keyringSaveUnconfirmedBody =>
-      '변‍경 사‍항‍이 저‍장‍되‍었‍는‍지 Vizor‍가 확‍인‍하‍지 못‍했‍어‍요. 계‍속‍하‍기 전‍에 Vizor‍를 종‍료‍하‍고 다‍시 시‍작‍해 주‍세‍요.';
+      '변‍경 사‍항‍이 저‍장‍되‍었‍는‍지 Veylor‍가 확‍인‍하‍지 못‍했‍어‍요. 계‍속‍하‍기 전‍에 Veylor‍를 종‍료‍하‍고 다‍시 시‍작‍해 주‍세‍요.';
 
   @override
   String get keyringSaveUnconfirmedTitle => '저‍장‍을 확‍인‍할 수 없‍어‍요';
@@ -2502,7 +2502,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get keyringUnreadableBody =>
-      'Vizor‍가 시‍스‍템 키‍링‍의 데‍이‍터‍를 읽‍지 못‍했‍어‍요. 접‍근‍을 복‍구‍한 뒤 다‍시 시‍도‍하‍거‍나 Vizor‍를 종‍료‍해 주‍세‍요.';
+      'Veylor‍가 시‍스‍템 키‍링‍의 데‍이‍터‍를 읽‍지 못‍했‍어‍요. 접‍근‍을 복‍구‍한 뒤 다‍시 시‍도‍하‍거‍나 Veylor‍를 종‍료‍해 주‍세‍요.';
 
   @override
   String get keyringUnreadableTitle => '보‍안 저‍장‍소‍를 읽‍을 수 없‍어‍요';
@@ -3401,7 +3401,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get ledgerMacosBluetoothPrompt =>
-      'macOS‍에‍서 Bluetooth 접‍근 권‍한‍을 요‍청‍할 수 있‍어‍요. 요‍청‍이 나‍타‍나‍면 Vizor‍에 접‍근‍을 허‍용‍해 주‍세‍요.';
+      'macOS‍에‍서 Bluetooth 접‍근 권‍한‍을 요‍청‍할 수 있‍어‍요. 요‍청‍이 나‍타‍나‍면 Veylor‍에 접‍근‍을 허‍용‍해 주‍세‍요.';
 
   @override
   String get ledgerMismatchChooseHolder =>
@@ -3863,7 +3863,7 @@ class AppLocalizationsKo extends AppLocalizations {
       'Ledger‍의 잠‍금‍을 해‍제‍하‍고, 안‍내‍가 나‍타‍나‍면 Zcash 열‍기‍를 확‍인‍해 주‍세‍요.';
 
   @override
-  String get ledgerVizorCheckingZcash => 'Vizor‍가 Zcash 앱‍을 확‍인‍하‍고 있‍어‍요.';
+  String get ledgerVizorCheckingZcash => 'Veylor‍가 Zcash 앱‍을 확‍인‍하‍고 있‍어‍요.';
 
   @override
   String get ledgerWaitingForApproval => '승‍인‍을 기‍다‍리‍는 중…';
@@ -4170,7 +4170,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get migrationExpectKeepRunningBody =>
-      '다‍음 마‍이‍그‍레‍이‍션 거‍래‍를 보‍내‍려‍면 컴‍퓨‍터‍의 잠‍금‍이 해‍제‍되‍어 있‍고 Vizor‍가 실‍행 중‍이‍어‍야 해‍요';
+      '다‍음 마‍이‍그‍레‍이‍션 거‍래‍를 보‍내‍려‍면 컴‍퓨‍터‍의 잠‍금‍이 해‍제‍되‍어 있‍고 Veylor‍가 실‍행 중‍이‍어‍야 해‍요';
 
   @override
   String get migrationExpectLongBody =>
@@ -5525,7 +5525,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get migrationPrivacyLockDescription =>
-      '10‍분 동‍안 사‍용‍하‍지 않‍아 Vizor‍를 자‍동‍으‍로 잠‍갔‍어‍요.';
+      '10‍분 동‍안 사‍용‍하‍지 않‍아 Veylor‍를 자‍동‍으‍로 잠‍갔‍어‍요.';
 
   @override
   String migrationProgressTipBlockTime(String seconds) {
@@ -6159,7 +6159,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get nativeTorUpdateBody =>
-      'Tor‍로 업‍데‍이‍트‍하‍면 시‍간‍이 더 걸‍릴 수 있‍어‍요. Tor‍를 끄‍면 Vizor‍의 모‍든 네‍트‍워‍크 요‍청‍이 직‍접 연‍결‍로 바‍뀌‍어‍요.';
+      'Tor‍로 업‍데‍이‍트‍하‍면 시‍간‍이 더 걸‍릴 수 있‍어‍요. Tor‍를 끄‍면 Veylor‍의 모‍든 네‍트‍워‍크 요‍청‍이 직‍접 연‍결‍로 바‍뀌‍어‍요.';
 
   @override
   String get nativeTorUpdateCancel => '취‍소';
@@ -6588,7 +6588,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get onboardingImportSecretPassphraseDescriptionDesktop =>
-      'Vizor 또‍는 다‍른 Zcash 지‍갑';
+      'Veylor 또‍는 다‍른 Zcash 지‍갑';
 
   @override
   String get onboardingImportSecretPassphraseDescriptionMobile =>
@@ -6647,7 +6647,8 @@ class AppLocalizationsKo extends AppLocalizations {
   String get onboardingLostPasswordImportAction => '계‍정‍을 다‍시 가‍져‍와‍야 해‍요';
 
   @override
-  String get onboardingLostPasswordResetAction => 'Vizor 앱‍을 완‍전‍히 초‍기‍화‍하‍는 것';
+  String get onboardingLostPasswordResetAction =>
+      'Veylor 앱‍을 완‍전‍히 초‍기‍화‍하‍는 것';
 
   @override
   String onboardingLostPasswordResetCountdown(int seconds) {
@@ -6891,7 +6892,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get onboardingUnlockDescription =>
-      'Vizor‍를 열‍려‍면 비‍밀‍번‍호‍를 입‍력‍해 주‍세‍요.';
+      'Veylor‍를 열‍려‍면 비‍밀‍번‍호‍를 입‍력‍해 주‍세‍요.';
 
   @override
   String get onboardingUnlockEnterPasscode =>
@@ -7323,7 +7324,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get paymentLinkBatchPaymentUnconfirmed =>
-      'Vizor‍가 결‍제‍가 전‍송‍되‍었‍는‍지 확‍인‍하‍지 못‍했‍어‍요. 이 카‍드‍를 보‍관‍하‍고, 링‍크‍를 공‍유‍하‍기 전‍에 다‍시 확‍인‍해 주‍세‍요.';
+      'Veylor‍가 결‍제‍가 전‍송‍되‍었‍는‍지 확‍인‍하‍지 못‍했‍어‍요. 이 카‍드‍를 보‍관‍하‍고, 링‍크‍를 공‍유‍하‍기 전‍에 다‍시 확‍인‍해 주‍세‍요.';
 
   @override
   String get paymentLinkBatchPrepareFailed => '이 카‍드‍들‍을 준‍비‍하‍지 못‍했‍어‍요.';
@@ -7730,7 +7731,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get paymentLinkEntryExplainWalletDesktop =>
-      '카‍드‍를 받‍으‍면 카‍드 잔‍액‍이 들‍어 있‍는 새 Vizor 지‍갑‍을 만‍들‍어 드‍려‍요.';
+      '카‍드‍를 받‍으‍면 카‍드 잔‍액‍이 들‍어 있‍는 새 Veylor 지‍갑‍을 만‍들‍어 드‍려‍요.';
 
   @override
   String get paymentLinkEntryExplanationAccount =>
@@ -7873,7 +7874,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get paymentLinkHowDesktopStepRedeem =>
-      '받‍는 사‍람‍은 링‍크‍로 Vizor 지‍갑‍에‍서 카‍드‍를 받‍을 수 있‍어‍요. 충‍전 수‍수‍료‍와 받‍기 수‍수‍료‍는 보‍내‍는 사‍람‍이 부‍담‍하‍므‍로 받‍는 사‍람‍은 카‍드 금‍액 전‍액‍을 받‍아‍요.';
+      '받‍는 사‍람‍은 링‍크‍로 Veylor 지‍갑‍에‍서 카‍드‍를 받‍을 수 있‍어‍요. 충‍전 수‍수‍료‍와 받‍기 수‍수‍료‍는 보‍내‍는 사‍람‍이 부‍담‍하‍므‍로 받‍는 사‍람‍은 카‍드 금‍액 전‍액‍을 받‍아‍요.';
 
   @override
   String get paymentLinkHowDesktopStepShare =>
@@ -10451,7 +10452,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get sendContactPickerTitle => 'Zcash 연‍락‍처';
 
   @override
-  String get sendDonationAddressTitle => 'Vizor 후‍원 주‍소';
+  String get sendDonationAddressTitle => 'Veylor 후‍원 주‍소';
 
   @override
   String get sendEnterAddressToContinue => '계‍속‍하‍려‍면 주‍소‍를 입‍력‍하‍세‍요';
@@ -11049,10 +11050,10 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get sendStatusMobileDonationSupport =>
-      '보‍내 주‍신 후‍원 덕‍분‍에 Vizor‍가 계‍속 나‍아‍갈 수 있‍어‍요.';
+      '보‍내 주‍신 후‍원 덕‍분‍에 Veylor‍가 계‍속 나‍아‍갈 수 있‍어‍요.';
 
   @override
-  String get sendStatusMobileDonationThanks => 'Vizor‍를\n후‍원‍해 주‍셔‍서 감‍사‍해‍요';
+  String get sendStatusMobileDonationThanks => 'Veylor‍를\n후‍원‍해 주‍셔‍서 감‍사‍해‍요';
 
   @override
   String get sendStatusMobileNothingSent =>
@@ -11588,7 +11589,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsProfilePictureCustom => '사‍용‍자 지‍정';
 
   @override
-  String get settingsRowAboutVizor => 'Vizor 정‍보';
+  String get settingsRowAboutVizor => 'Veylor 정‍보';
 
   @override
   String get settingsRowAccountNameMobile => '계‍정 이‍름';
@@ -11603,7 +11604,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsRowChangePassword => '비‍밀‍번‍호 변‍경';
 
   @override
-  String get settingsRowLinkMobile => 'Vizor 모‍바‍일 연‍결';
+  String get settingsRowLinkMobile => 'Veylor 모‍바‍일 연‍결';
 
   @override
   String get settingsRowMyGiftCards => '내 기‍프‍트 카‍드';
@@ -11889,7 +11890,7 @@ class AppLocalizationsKo extends AppLocalizations {
       '받‍는 중‍인 기‍프‍트 카‍드‍를 확‍인‍하‍지 못‍했‍어‍요. 삭‍제‍하‍기 전‍에 다‍시 시‍도‍해 주‍세‍요.';
 
   @override
-  String get settingsUninstallCloseApp => 'Vizor 닫‍기';
+  String get settingsUninstallCloseApp => 'Veylor 닫‍기';
 
   @override
   String get settingsUninstallDeviceGeneric => '이 기‍기';
@@ -11905,18 +11906,18 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsUninstallFinishGeneric =>
-      '삭‍제‍를 마‍치‍려‍면 이 기‍기‍에‍서 Vizor 앱‍을 제‍거‍하‍세‍요.';
+      '삭‍제‍를 마‍치‍려‍면 이 기‍기‍에‍서 Veylor 앱‍을 제‍거‍하‍세‍요.';
 
   @override
   String get settingsUninstallFinishMac =>
-      '삭‍제‍를 마‍치‍려‍면 응‍용 프‍로‍그‍램‍에‍서 Vizor 앱‍을 제‍거‍하‍세‍요.';
+      '삭‍제‍를 마‍치‍려‍면 응‍용 프‍로‍그‍램‍에‍서 Veylor 앱‍을 제‍거‍하‍세‍요.';
 
   @override
   String get settingsUninstallFinishWindows =>
-      '삭‍제‍를 마‍치‍려‍면 Windows 설‍정‍에‍서 Vizor‍를 제‍거‍하‍세‍요.';
+      '삭‍제‍를 마‍치‍려‍면 Windows 설‍정‍에‍서 Veylor‍를 제‍거‍하‍세‍요.';
 
   @override
-  String get settingsUninstallPasswordSubtitle => 'Vizor‍를 삭‍제‍하‍려‍면 필‍요‍해‍요.';
+  String get settingsUninstallPasswordSubtitle => 'Veylor‍를 삭‍제‍하‍려‍면 필‍요‍해‍요.';
 
   @override
   String get settingsUninstallRemovingTitle => '데‍이‍터 삭‍제 중...';
@@ -11926,7 +11927,7 @@ class AppLocalizationsKo extends AppLocalizations {
       '진‍행 중‍인 스‍왑‍을 확‍인‍하‍지 못‍했‍어‍요. 삭‍제‍하‍기 전‍에 다‍시 시‍도‍해 주‍세‍요.';
 
   @override
-  String get settingsUninstallTitle => 'Vizor 삭‍제';
+  String get settingsUninstallTitle => 'Veylor 삭‍제';
 
   @override
   String get settingsUninstallWipeFailed =>
@@ -11934,7 +11935,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String settingsUninstallWipeSubtitle(String device) {
-    return 'Vizor‍가 $device‍에‍서 지‍갑 데‍이‍터‍와 보‍안 저‍장‍소‍를 삭‍제‍해‍요. 공‍유‍하‍지 않‍은 기‍프‍트 카‍드 링‍크‍는 영‍구‍적‍으‍로 사‍라‍져‍요.';
+    return 'Veylor‍가 $device‍에‍서 지‍갑 데‍이‍터‍와 보‍안 저‍장‍소‍를 삭‍제‍해‍요. 공‍유‍하‍지 않‍은 기‍프‍트 카‍드 링‍크‍는 영‍구‍적‍으‍로 사‍라‍져‍요.';
   }
 
   @override
@@ -11992,14 +11993,14 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get settingsUpdateStatusRestarting => 'Vizor‍를 다‍시 시‍작‍하‍고 있‍어‍요.';
+  String get settingsUpdateStatusRestarting => 'Veylor‍를 다‍시 시‍작‍하‍고 있‍어‍요.';
 
   @override
   String get settingsUpdateStatusUnsupported =>
       '설‍치‍된 Windows 앱‍에‍서 업‍데‍이‍트‍할 수 있‍어‍요.';
 
   @override
-  String get settingsUpdateStatusUpToDate => 'Vizor‍가 최‍신 버‍전‍이‍에‍요.';
+  String get settingsUpdateStatusUpToDate => 'Veylor‍가 최‍신 버‍전‍이‍에‍요.';
 
   @override
   String get settingsUpdateUnavailable => '사‍용 불‍가';
@@ -12108,7 +12109,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsWinUpdateTorBlockedBody =>
-      'Vizor‍는 직‍접 요‍청‍을 계‍속 차‍단‍했‍어‍요. 설‍정‍에‍서 업‍데‍이‍트‍를 다‍시 시‍도‍하‍거‍나, Tor‍를 끄‍고 다‍시 다‍운‍로‍드‍해 보‍세‍요.';
+      'Veylor‍는 직‍접 요‍청‍을 계‍속 차‍단‍했‍어‍요. 설‍정‍에‍서 업‍데‍이‍트‍를 다‍시 시‍도‍하‍거‍나, Tor‍를 끄‍고 다‍시 다‍운‍로‍드‍해 보‍세‍요.';
 
   @override
   String get settingsWinUpdateTorBlockedTitle =>
@@ -12116,14 +12117,14 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsWinUpdateTorChoiceBody =>
-      'Tor‍로 업‍데‍이‍트‍하‍면 더 오‍래 걸‍릴 수 있‍어‍요. Tor‍를 끄‍면 Vizor‍의 모‍든 네‍트‍워‍크 요‍청‍이 직‍접 연‍결‍로 바‍뀌‍어‍요.';
+      'Tor‍로 업‍데‍이‍트‍하‍면 더 오‍래 걸‍릴 수 있‍어‍요. Tor‍를 끄‍면 Veylor‍의 모‍든 네‍트‍워‍크 요‍청‍이 직‍접 연‍결‍로 바‍뀌‍어‍요.';
 
   @override
   String get settingsWinUpdateTorChoiceTitle => '이 업‍데‍이‍트‍에 Tor‍를 사‍용‍할‍까‍요?';
 
   @override
   String get settingsWinUpdateTorOffFailedBody =>
-      'Tor‍가 켜‍진 채‍라‍서 Vizor‍가 업‍데‍이‍트‍를 계‍속 차‍단‍했‍어‍요. 다‍시 시‍도‍하‍거‍나, 설‍정‍에‍서 Tor‍를 끈 뒤 다‍운‍로‍드‍하‍세‍요.';
+      'Tor‍가 켜‍진 채‍라‍서 Veylor‍가 업‍데‍이‍트‍를 계‍속 차‍단‍했‍어‍요. 다‍시 시‍도‍하‍거‍나, 설‍정‍에‍서 Tor‍를 끈 뒤 다‍운‍로‍드‍하‍세‍요.';
 
   @override
   String get settingsWinUpdateTorOffFailedTitle => 'Tor‍를 끄‍지 못‍했‍어‍요';
@@ -14387,7 +14388,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get walletLinkDesktopConfirmSubtitle =>
-      'Vizor 모‍바‍일‍을 연‍결‍하‍려‍면 필‍요‍해‍요.';
+      'Veylor 모‍바‍일‍을 연‍결‍하‍려‍면 필‍요‍해‍요.';
 
   @override
   String get walletLinkDesktopEncryptedNotice =>
@@ -14440,10 +14441,10 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get walletLinkDesktopInitialBody =>
-      '일‍회‍용 QR 코‍드‍를 스‍캔‍해 이 지‍갑‍을 Vizor 모‍바‍일 앱‍에 연‍결‍하‍세‍요.';
+      '일‍회‍용 QR 코‍드‍를 스‍캔‍해 이 지‍갑‍을 Veylor 모‍바‍일 앱‍에 연‍결‍하‍세‍요.';
 
   @override
-  String get walletLinkDesktopLinkedBody => 'Vizor 모‍바‍일‍이 이 지‍갑‍에 연‍결‍됐‍어‍요.';
+  String get walletLinkDesktopLinkedBody => 'Veylor 모‍바‍일‍이 이 지‍갑‍에 연‍결‍됐‍어‍요.';
 
   @override
   String walletLinkDesktopLinkedCounts(int accountCount, int contactCount) {
@@ -14451,7 +14452,7 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get walletLinkDesktopLinkedTitle => 'Vizor 모‍바‍일‍을 연‍결‍했‍어‍요';
+  String get walletLinkDesktopLinkedTitle => 'Veylor 모‍바‍일‍을 연‍결‍했‍어‍요';
 
   @override
   String get walletLinkDesktopReadyToScan => '1/1 스‍캔 준‍비 완‍료...';
@@ -14461,10 +14462,10 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get walletLinkDesktopScanBody =>
-      '휴‍대‍폰‍에‍서 Vizor 열‍기 → 지‍갑 추‍가 → Vizor 데‍스‍크‍톱 연‍결';
+      '휴‍대‍폰‍에‍서 Veylor 열‍기 → 지‍갑 추‍가 → Veylor 데‍스‍크‍톱 연‍결';
 
   @override
-  String get walletLinkDesktopScanTitle => 'Vizor 모‍바‍일‍로 스‍캔';
+  String get walletLinkDesktopScanTitle => 'Veylor 모‍바‍일‍로 스‍캔';
 
   @override
   String get walletLinkDesktopStartLinking => '연‍결 시‍작';

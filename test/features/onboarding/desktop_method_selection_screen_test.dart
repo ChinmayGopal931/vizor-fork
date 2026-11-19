@@ -17,7 +17,7 @@ void main() {
       location: '/import/method',
       labels: {
         'desktop_import_secret_passphrase_card':
-            'Import secret passphrase\nVizor or any other Zcash wallet',
+            'Import secret passphrase\nVeylor or any other Zcash wallet',
         'desktop_import_hardware_card':
             'Connect hardware wallet\nLedger or Keystone wallet',
       },
@@ -72,10 +72,10 @@ void main() {
     expect(find.text('Import Account\nto Veylor'), findsOneWidget);
     expect(find.text('Select the method you want.'), findsOneWidget);
     expect(find.text('Import secret passphrase'), findsOneWidget);
-    expect(find.text('Vizor or any other Zcash wallet'), findsOneWidget);
+    expect(find.text('Veylor or any other Zcash wallet'), findsOneWidget);
     expect(find.text('Connect hardware wallet'), findsOneWidget);
     expect(find.text('Ledger or Keystone wallet'), findsOneWidget);
-    expect(find.text('Link Vizor Desktop'), findsNothing);
+    expect(find.text('Link Veylor Desktop'), findsNothing);
     expect(find.text('Cancel'), findsOneWidget);
 
     final background = find.byKey(

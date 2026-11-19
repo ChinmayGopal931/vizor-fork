@@ -136,7 +136,7 @@ enum NativeStrings {
     case .nativePrepTrackingPausedBody: return "Open Veylor to resume migration preparation."
     case .nativePrepTrackingPausedTitle: return "Preparation tracking paused"
     case .nativePrepUpdatesTitle: return "Migration preparation updates"
-    case .nativeTorUpdateBody: return "Updating over Tor may take longer. Turning Tor off switches all Vizor network requests to a direct connection."
+    case .nativeTorUpdateBody: return "Updating over Tor may take longer. Turning Tor off switches all Veylor network requests to a direct connection."
     case .nativeTorUpdateCancel: return "Cancel"
     case .nativeTorUpdateClose: return "Close"
     case .nativeTorUpdateContinue: return "Continue with Tor"
@@ -191,7 +191,7 @@ enum NativeStrings {
     .nativePrepTrackingPausedBody: "마이그레이션 준비를 다시 시작하려면 Veylor를 열어 주세요.",
     .nativePrepTrackingPausedTitle: "준비 추적이 일시 중지됐어요",
     .nativePrepUpdatesTitle: "마이그레이션 준비 업데이트",
-    .nativeTorUpdateBody: "Tor로 업데이트하면 시간이 더 걸릴 수 있어요. Tor를 끄면 Vizor의 모든 네트워크 요청이 직접 연결로 바뀌어요.",
+    .nativeTorUpdateBody: "Tor로 업데이트하면 시간이 더 걸릴 수 있어요. Tor를 끄면 Veylor의 모든 네트워크 요청이 직접 연결로 바뀌어요.",
     .nativeTorUpdateCancel: "취소",
     .nativeTorUpdateClose: "닫기",
     .nativeTorUpdateContinue: "Tor로 계속",
@@ -245,7 +245,7 @@ enum NativeStrings {
     .nativePrepTrackingPausedBody: "打开 Veylor 以恢复迁移准备。",
     .nativePrepTrackingPausedTitle: "准备进度跟踪已暂停",
     .nativePrepUpdatesTitle: "迁移准备动态",
-    .nativeTorUpdateBody: "通过 Tor 更新可能需要更长时间。关闭 Tor 后，Vizor 的所有网络请求都会改为直接连接。",
+    .nativeTorUpdateBody: "通过 Tor 更新可能需要更长时间。关闭 Tor 后，Veylor 的所有网络请求都会改为直接连接。",
     .nativeTorUpdateCancel: "取消",
     .nativeTorUpdateClose: "关闭",
     .nativeTorUpdateContinue: "继续使用 Tor",

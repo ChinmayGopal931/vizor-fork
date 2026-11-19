@@ -41,7 +41,7 @@ void main() {
     var appBuilds = 0;
     Future<Widget> loadApp() {
       loadCalls++;
-      expect(find.text('Opening Vizor'), findsOneWidget);
+      expect(find.text('Opening Veylor'), findsOneWidget);
       expect(
         SchedulerBinding.instance.schedulerPhase,
         SchedulerPhase.postFrameCallbacks,

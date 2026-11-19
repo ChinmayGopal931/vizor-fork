@@ -139,7 +139,7 @@ object NativeStrings {
         NativeString.nativePrepTrackingPausedBody -> "Open Veylor to resume migration preparation."
         NativeString.nativePrepTrackingPausedTitle -> "Preparation tracking paused"
         NativeString.nativePrepUpdatesTitle -> "Migration preparation updates"
-        NativeString.nativeTorUpdateBody -> "Updating over Tor may take longer. Turning Tor off switches all Vizor network requests to a direct connection."
+        NativeString.nativeTorUpdateBody -> "Updating over Tor may take longer. Turning Tor off switches all Veylor network requests to a direct connection."
         NativeString.nativeTorUpdateCancel -> "Cancel"
         NativeString.nativeTorUpdateClose -> "Close"
         NativeString.nativeTorUpdateContinue -> "Continue with Tor"
@@ -193,7 +193,7 @@ object NativeStrings {
         NativeString.nativePrepTrackingPausedBody to "마이그레이션 준비를 다시 시작하려면 Veylor를 열어 주세요.",
         NativeString.nativePrepTrackingPausedTitle to "준비 추적이 일시 중지됐어요",
         NativeString.nativePrepUpdatesTitle to "마이그레이션 준비 업데이트",
-        NativeString.nativeTorUpdateBody to "Tor로 업데이트하면 시간이 더 걸릴 수 있어요. Tor를 끄면 Vizor의 모든 네트워크 요청이 직접 연결로 바뀌어요.",
+        NativeString.nativeTorUpdateBody to "Tor로 업데이트하면 시간이 더 걸릴 수 있어요. Tor를 끄면 Veylor의 모든 네트워크 요청이 직접 연결로 바뀌어요.",
         NativeString.nativeTorUpdateCancel to "취소",
         NativeString.nativeTorUpdateClose to "닫기",
         NativeString.nativeTorUpdateContinue to "Tor로 계속",
@@ -247,7 +247,7 @@ object NativeStrings {
         NativeString.nativePrepTrackingPausedBody to "打开 Veylor 以恢复迁移准备。",
         NativeString.nativePrepTrackingPausedTitle to "准备进度跟踪已暂停",
         NativeString.nativePrepUpdatesTitle to "迁移准备动态",
-        NativeString.nativeTorUpdateBody to "通过 Tor 更新可能需要更长时间。关闭 Tor 后，Vizor 的所有网络请求都会改为直接连接。",
+        NativeString.nativeTorUpdateBody to "通过 Tor 更新可能需要更长时间。关闭 Tor 后，Veylor 的所有网络请求都会改为直接连接。",
         NativeString.nativeTorUpdateCancel to "取消",
         NativeString.nativeTorUpdateClose to "关闭",
         NativeString.nativeTorUpdateContinue to "继续使用 Tor",

@@ -276,13 +276,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Review Amount'), findsOneWidget);
-    expect(find.text('Support Vizor'), findsOneWidget);
+    expect(find.text('Support Veylor'), findsOneWidget);
     expect(find.text('Send'), findsNothing);
     expect(find.text('Donation'), findsNothing);
     expect(_sidebarItem(tester, 'Home').active, isFalse);
     expect(_sidebarItem(tester, 'Settings').active, isFalse);
 
-    await tester.tap(find.text('Support Vizor'));
+    await tester.tap(find.text('Support Veylor'));
     await tester.pumpAndSettle();
 
     expect(find.text('donation-route'), findsOneWidget);

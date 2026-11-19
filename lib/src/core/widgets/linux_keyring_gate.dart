@@ -145,7 +145,7 @@ class _LinuxKeyringStartupHostState extends State<LinuxKeyringStartupHost> {
     // Shown before storage is readable, so there is no saved language yet:
     // follow the device.
     return MaterialApp(
-      title: 'Vizor', // l10n-ignore: product name
+      title: 'Veylor', // l10n-ignore: product name
       debugShowCheckedModeBanner: false,
       supportedLocales: appSupportedLocales(),
       localizationsDelegates: appLocalizationsDelegates,

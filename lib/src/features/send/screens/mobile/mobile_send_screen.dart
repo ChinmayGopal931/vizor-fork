@@ -3647,7 +3647,7 @@ class _MobileSendScreenState extends ConsumerState<MobileSendScreen> {
         ZecAmount.tryParse(_amountText)?.receipt.toString() ??
         '$_amountText ZEC'; // l10n-ignore: amount format
     final toLabel = _isDonation
-        ? 'Vizor Wallet' // l10n-ignore: product name
+        ? 'Veylor Wallet' // l10n-ignore: product name
         : _contactLabel ?? _truncateAddress(_addressController.text.trim());
 
     return Padding(

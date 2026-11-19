@@ -41,7 +41,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Support Vizor'), findsOneWidget);
+    expect(find.text('Support Veylor'), findsOneWidget);
     expect(find.text('0.02 ZEC'), findsOneWidget);
     expect(find.text('0.12 ZEC'), findsOneWidget);
     expect(find.text('Shielded balance'), findsOneWidget);
@@ -222,7 +222,7 @@ void main() {
     );
 
     expect(find.text('Review Amount'), findsOneWidget);
-    expect(find.text('Vizor Wallet'), findsOneWidget);
+    expect(find.text('Veylor Wallet'), findsOneWidget);
     expect(find.text('Confirm donation'), findsOneWidget);
     expect(find.text('Cancel'), findsNothing);
   });
@@ -231,8 +231,8 @@ void main() {
     await tester.pumpWidget(
       _host(SizedBox.expand(child: DonationSuccessView(onDone: () {}))),
     );
-    expect(find.text('Thank you for supporting Vizor'), findsOneWidget);
-    expect(find.text('Your support keeps Vizor going.'), findsOneWidget);
+    expect(find.text('Thank you for supporting Veylor'), findsOneWidget);
+    expect(find.text('Your support keeps Veylor going.'), findsOneWidget);
     expect(find.text('Done'), findsOneWidget);
   });
 }

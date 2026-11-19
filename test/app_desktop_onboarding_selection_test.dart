@@ -192,7 +192,7 @@ void main() {
     (tester) async {
       await pump(tester);
       expect(find.text('Import secret passphrase'), findsOneWidget);
-      expect(find.text('Link Vizor Desktop'), findsNothing);
+      expect(find.text('Link Veylor Desktop'), findsNothing);
       await tester.tap(
         find.byKey(const ValueKey('desktop_import_hardware_card')),
       );
