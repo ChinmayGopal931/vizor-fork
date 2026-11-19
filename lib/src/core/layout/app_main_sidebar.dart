@@ -20,6 +20,10 @@ import '../../providers/voting/voting_submission_guard_provider.dart';
 import '../../rust/api/sync.dart' as rust_sync;
 import '../../features/migration/providers/ironwood_migration_announcement_provider.dart';
 import '../../features/migration/providers/ironwood_migration_coordinator_provider.dart';
+import '../../features/private_usd/providers/private_usd_available_provider.dart';
+import '../../features/private_usd/providers/private_usd_balance_provider.dart';
+import '../../features/private_usd/providers/railgun_engine_provider.dart';
+import '../../features/private_usd/widgets/mobile/private_usd_sync_line.dart';
 import '../../features/swap/models/swap_activity_navigation.dart';
 import '../../features/swap/providers/swap_state_provider.dart';
 import '../navigation/external_action_guard_provider.dart';
@@ -485,6 +489,13 @@ class _AppMainSidebarState extends ConsumerState<AppMainSidebar> {
     }
   }
 
+  /// Puts a sync readout's line under the glyphs' column.
+  static const _syncReadoutPadding = EdgeInsetsDirectional.only(
+    start:
+        AppSidebarItem.glyphInset +
+        (AppSidebarItem.glyphSize - NeonSidebarGlyph.size) / 2,
+  );
+
   /// The wallet's sync line, as Home's reads; the sidebar needs only its
   /// whole percentage, never the per-frame one.
   NeonSyncLine _syncLine(SyncState sync, NetworkPrivacyState networkPrivacy) {
@@ -495,6 +506,44 @@ class _AppMainSidebarState extends ConsumerState<AppMainSidebar> {
       whole: whole,
       networkPrivacy: networkPrivacy,
       climbProgress: () => whole / 100,
+    );
+  }
+
+  /// Railgun's sync, a separate one, as the Shielded USD page's line reads it
+  /// ([privateUsdSyncLine]): it follows the balance's syncs and starts none.
+  /// Null on the phones, while Shielded USD is not available to the account,
+  /// and while a wallet Railgun never synced has nothing to report: no
+  /// balance, and no sync running or failed. Only the page starts a first
+  /// sync, so its line would stand at 0% until then. A balance from an
+  /// earlier session reads as synced, as on the page, until a sync this
+  /// session climbs or fails.
+  NeonSyncLine? _railgunSyncLine(
+    String? accountUuid,
+    NetworkPrivacyState networkPrivacy,
+  ) {
+    if (!kDesktopFormFactor ||
+        accountUuid == null ||
+        !ref.watch(privateUsdAvailableProvider)) {
+      return null;
+    }
+    final state = ref.watch(privateUsdBalanceProvider(accountUuid));
+    if (state.balances == null &&
+        !state.isRefreshing &&
+        !state.refreshFailed &&
+        state.firstSyncPercent == null) {
+      return null;
+    }
+    return privateUsdSyncLine(
+      context.l10n,
+      state,
+      networkPrivacy: networkPrivacy,
+      txidCatchUp: ref.watch(
+        railgunEngineStateProvider.select(
+          (engine) => engine.accountUuid == accountUuid
+              ? engine.screening?.txids
+              : null,
+        ),
+      ),
     );
   }
 
@@ -525,6 +574,7 @@ class _AppMainSidebarState extends ConsumerState<AppMainSidebar> {
     }
     final sync = ref.watch(syncProvider).value ?? SyncState();
     final networkPrivacy = ref.watch(networkPrivacyProvider);
+    final railgunSyncLine = _railgunSyncLine(activeAccountUuid, networkPrivacy);
     final accountSync = sync.scopedToAccount(activeAccountUuid);
     final showImporting = ref
         .watch(homeInitializationPresentationProvider)
@@ -724,18 +774,28 @@ class _AppMainSidebarState extends ConsumerState<AppMainSidebar> {
                     // readout as a red HUD caption, read from the same
                     // [NeonSyncLine.wallet] as Home's line.
                     Padding(
-                      padding: const EdgeInsetsDirectional.only(
-                        start:
-                            AppSidebarItem.glyphInset +
-                            (AppSidebarItem.glyphSize - NeonSidebarGlyph.size) /
-                                2,
-                      ),
+                      padding: _syncReadoutPadding,
                       child: NeonSidebarSyncReadout(
                         key: const ValueKey('sidebar_sync_status'),
                         textKey: const ValueKey('sidebar_sync_text'),
                         line: _syncLine(sync, networkPrivacy),
                       ),
                     ),
+                    // Railgun's sync under it in the same style, with the
+                    // Shielded USD page's readouts.
+                    if (railgunSyncLine != null) ...[
+                      SizedBox(
+                        height: compact ? AppSpacing.xxs : AppSpacing.xs,
+                      ),
+                      Padding(
+                        padding: _syncReadoutPadding,
+                        child: NeonSidebarSyncReadout(
+                          key: const ValueKey('sidebar_railgun_sync_status'),
+                          textKey: const ValueKey('sidebar_railgun_sync_text'),
+                          line: railgunSyncLine,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

@@ -495,7 +495,13 @@ otherwise.
     Its foot is the phone sidebar's `NeonSidebarSyncReadout`, built by
     `NeonSyncLine.wallet` as Home's line is, in place of upstream's status
     row and its block height; its text keeps the `sidebar_sync_text` key,
-    upper-cased. The accounts popover is an opaque glass panel headed by a
+    upper-cased. Where Shielded USD is available to the account, Railgun's
+    sync, a separate one, has a second readout under it, built by the
+    Shielded USD page's `privateUsdSyncLine` (`RAILGUN SYNC n%`, `RAILGUN
+    SYNCED`, `RAILGUN SYNC FAILED`) and starting no sync; a wallet Railgun
+    never synced has none until a sync starts (only the page starts a first
+    one), and a balance kept from an earlier session reads as synced, as on
+    the page. The accounts popover is an opaque glass panel headed by a
     red HUD caption, with cut-corner slabs for its two actions, and the
     migration rail is lit red.
   - Not yet neon on desktop, and why: the Gift Cards feature (unchanged by

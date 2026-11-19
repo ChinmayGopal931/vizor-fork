@@ -108,6 +108,16 @@ the phone's widgets and painters where they fit.
   no bridge, so a desktop wallet has none. Activity pages only the wallet's
   rows: a Shielded USD row shows once the loaded page reaches its time, as on
   the phone.
+- The sidebar's foot: under the wallet's sync readout, Railgun's, in the same
+  style (`NeonSidebarSyncReadout`), built by the page's `privateUsdSyncLine`
+  from the balance's state, so it reads `RAILGUN SYNC n%`, `RAILGUN SYNCED`,
+  `RAILGUN SYNC FAILED` and the Tor readouts as the page's line does. It shows
+  only while Shielded USD is available to the account, and starts no sync.
+  Before Railgun's first sync of the session, a balance kept from an earlier
+  one reads `RAILGUN SYNCED` (the page's rule for a balance it shows, the
+  screen reader hearing when it was updated); a wallet Railgun never synced
+  has no Railgun line until a sync starts, since only the page starts a first
+  sync and its line would stand at 0% until then.
 - Settings: a Shielded USD block, shown when the phone shows its rows
   (`privateUsdRpcSettingVisibleProvider`): Ethereum RPC, whose dialog checks a
   URL as the phone's sheet does before saving it, and the relayer claims switch.
@@ -191,8 +201,8 @@ Untested, for the owner's session:
 
 - Everything with a wallet: the screens, a refresh from the page, Receive,
   deposits and a deposit's recovery, a send and a withdrawal (Sepolia),
-  Settings' RPC dialog and the relayer claims switch, and the Shielded USD rows
-  in Home's recent activity and in Activity.
+  Settings' RPC dialog and the relayer claims switch, the Shielded USD rows in
+  Home's recent activity and in Activity, and the sidebar's Railgun readout.
 - The lifecycle on the Mac: minimise, hide, a covered window, a locked screen,
   sleep and wake (that the engine pauses and resumes, and that the page resumes
   its sync), and the keep-awake assertion through a first sync
