@@ -13,9 +13,11 @@ PRODUCT_BUNDLE_IDENTIFIER = com.keplr.vizor
 // The application's macOS icon composer asset name.
 MACOS_APP_ICON_FILE = AppIcon
 
-// Fastlane writes this ignored file for macOS release flavors. It is included
-// here, instead of passed as global xcodebuild settings, so Pods targets keep
-// their own PRODUCT_NAME and bundle paths.
+// Fastlane writes this ignored file for macOS release flavors, and
+// scripts/macos-identity.sh writes it to select Veylor's identity
+// (AGENTS.md, "Desktop identity"). It is included here, instead of passed as
+// global xcodebuild settings, so Pods targets keep their own PRODUCT_NAME and
+// bundle paths.
 #include? "FlavorOverrides.xcconfig"
 
 // The copyright displayed in application information

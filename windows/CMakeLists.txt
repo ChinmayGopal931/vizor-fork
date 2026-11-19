@@ -6,10 +6,52 @@ project(Vizor LANGUAGES CXX)
 # the on-disk name of your application.
 set(BINARY_NAME "Vizor")
 
+# The VIZOR_APPLICATION_ID environment variable selects Veylor's identity
+# (AGENTS.md, "Desktop identity"); without it the build keeps upstream's. The
+# identity sets the version resource's company and product names, which name
+# the app-data directory, and the prefix of its secure storage and
+# single-instance lock, so none of them is shared with an installed Vizor.
+set(VIZOR_IDENTITY_STORAGE_PREFIX "Vizor")
+set(VIZOR_IDENTITY_COMPANY_NAME "com.keplr")
+set(VIZOR_IDENTITY_PRODUCT_NAME "Vizor")
+set(VIZOR_IDENTITY_VEYLOR_ICON 0)
+set(VIZOR_APPLICATION_ID "$ENV{VIZOR_APPLICATION_ID}")
+if(NOT VIZOR_APPLICATION_ID STREQUAL "")
+  if(NOT VIZOR_APPLICATION_ID MATCHES "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$")
+    message(FATAL_ERROR
+      "VIZOR_APPLICATION_ID must be a package name such as com.veylor.desktop, "
+      "not '${VIZOR_APPLICATION_ID}'.")
+  elseif(VIZOR_APPLICATION_ID STREQUAL "com.veylor.desktop")
+    set(VIZOR_IDENTITY_STORAGE_PREFIX "Veylor")
+    set(VIZOR_IDENTITY_PRODUCT_NAME "Veylor")
+  elseif(VIZOR_APPLICATION_ID STREQUAL "com.veylor.desktop.testnet")
+    set(VIZOR_IDENTITY_STORAGE_PREFIX "VeylorTestnet")
+    set(VIZOR_IDENTITY_PRODUCT_NAME "Veylor Testnet")
+  else()
+    message(FATAL_ERROR
+      "No Windows identity is defined for VIZOR_APPLICATION_ID "
+      "'${VIZOR_APPLICATION_ID}'. Use com.veylor.desktop or "
+      "com.veylor.desktop.testnet.")
+  endif()
+  set(VIZOR_IDENTITY_COMPANY_NAME "com.veylor")
+  set(VIZOR_IDENTITY_VEYLOR_ICON 1)
+  # A value left in the environment by another build must not mix into this
+  # identity: the data and secure storage would then be Vizor's.
+  foreach(identity_field STORAGE_PREFIX COMPANY_NAME PRODUCT_NAME)
+    set(identity_env "VIZOR_WINDOWS_${identity_field}")
+    if(NOT "$ENV{${identity_env}}" STREQUAL "" AND
+       NOT "$ENV{${identity_env}}" STREQUAL "${VIZOR_IDENTITY_${identity_field}}")
+      message(FATAL_ERROR
+        "${identity_env}='$ENV{${identity_env}}' conflicts with "
+        "VIZOR_APPLICATION_ID=${VIZOR_APPLICATION_ID}. Unset ${identity_env}.")
+    endif()
+  endforeach()
+endif()
+
 if(DEFINED ENV{VIZOR_WINDOWS_STORAGE_PREFIX} AND NOT "$ENV{VIZOR_WINDOWS_STORAGE_PREFIX}" STREQUAL "")
   set(VIZOR_WINDOWS_STORAGE_PREFIX "$ENV{VIZOR_WINDOWS_STORAGE_PREFIX}")
 else()
-  set(VIZOR_WINDOWS_STORAGE_PREFIX "Vizor")
+  set(VIZOR_WINDOWS_STORAGE_PREFIX "${VIZOR_IDENTITY_STORAGE_PREFIX}")
 endif()
 set(STORAGE_PREFIX "${VIZOR_WINDOWS_STORAGE_PREFIX}")
 
