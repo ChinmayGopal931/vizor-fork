@@ -200,7 +200,8 @@ class _DesktopPrivateUsdScreenState
             context.l10n.privateUsdInfoReceive,
             context.l10n.privateUsdInfoSend,
             context.l10n.privateUsdInfoWithdraw,
-            if (bridge) context.l10n.privateUsdInfoRefunds,
+            // Refunds hold deposits Railgun sent back too, bridge or not.
+            context.l10n.privateUsdInfoRefunds,
           ],
           notes: [
             context.l10n.privateUsdInfoScreening(

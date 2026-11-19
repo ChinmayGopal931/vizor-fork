@@ -218,9 +218,11 @@ class _DesktopPrivateUsdConversionScreenState
 /// (paying, which the Railgun page proves, and "Authorize settlement" once the
 /// market maker's ZEC is in), and the call-off behind a confirmation. While
 /// settlement is being authorized or the bridge called off, back is held and
-/// the sidebar veiled, as the phone holds its screen; and while the payment
-/// is proved and posted, as desktop's send is: an account switch or a sign-out
-/// would close the Railgun page mid-proof.
+/// the sidebar veiled, as the phone holds its screen. While the payment is
+/// proved and posted, back stays, as on the phone (the proof outlives the
+/// screen), and only the sidebar is veiled, as the phone's wide-window
+/// sidebar is: an account switch or a sign-out would close the Railgun page
+/// mid-proof.
 class DesktopPrivateUsdReverseConversionScreen extends ConsumerStatefulWidget {
   const DesktopPrivateUsdReverseConversionScreen({
     required this.path,
@@ -293,12 +295,13 @@ class _DesktopPrivateUsdReverseConversionScreenState
     final notifier = ref.read(
       privateUsdReverseConversionProvider(key).notifier,
     );
-    // An authorized step (settlement, the call-off) holds the screen, and so
-    // does the payment while the page proves and posts it.
+    // An authorized step (settlement, the call-off) holds the screen, as on
+    // the phone. The payment the page proves and posts holds only the
+    // sidebar.
     final holds =
         state.acting == PrivateUsdReverseUserStep.readying ||
-        state.acting == PrivateUsdReverseUserStep.cancelling ||
-        (state.funding?.running ?? false);
+        state.acting == PrivateUsdReverseUserStep.cancelling;
+    final paying = state.funding?.running ?? false;
     final message = state.message(l10n);
     final label = presentation?.actionLabel;
     final callOff = presentation?.callOffLabel;
@@ -322,6 +325,7 @@ class _DesktopPrivateUsdReverseConversionScreenState
         title: presentation?.title ?? l10n.privateUsdConvertProgressTitle,
         contentKey: const ValueKey('desktop_private_usd_progress_content'),
         canGoBack: !holds,
+        holdsSidebar: paying,
         onInfo: () => unawaited(showDesktopPrivateUsdReverseInfo(context)),
         action: label == null
             ? null

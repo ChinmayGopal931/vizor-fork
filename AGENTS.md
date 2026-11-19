@@ -2081,8 +2081,11 @@ desktop layouts that place the phone's bridge widgets (never its screens).
 Windows and Linux have no host and hide it. Desktop Home's recent activity and
 Activity list the phone's Shielded USD rows, bridges included, and leave out
 the wallet transactions a bridge row stands in for
-(`desktopPrivateUsdFeedEntries`). The Mac's host, the bridge's desktop screens
-and hooks, how it differs from iOS's and what has run are in
+(`desktopPrivateUsdFeedEntries`). Desktop follows the phone's flows action for
+action (checked 2026-11-19): the same provider calls, guards, confirmations
+and states, differing only in layout, mouse and keyboard, the Mac's own
+behaviour and wording. The Mac's host, the bridge's desktop screens and hooks,
+what desktop keeps different, how it differs from iOS's and what has run are in
 `docs/private-usd-macos.md`. Before changing it,
 read `docs/private-usd-android-plan.md`: §3.5 lists the invariants and why
 each one exists. The pinned config and defines are in

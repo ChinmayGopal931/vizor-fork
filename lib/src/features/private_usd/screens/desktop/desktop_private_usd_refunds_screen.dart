@@ -32,7 +32,8 @@ String _masked(String usd, bool privacyModeEnabled) => hideAmountIfPrivacyMode(
 /// its vault. The phone's screen and its rules ([privateUsdRefundsProvider]):
 /// the checks are chain reads only, a recovery needs the seed and is the
 /// user's alone, behind a confirmation that names the relayer's fee (at most
-/// the 2 USDC cap), and one recovery runs at a time, holding back meanwhile.
+/// the 2 USDC cap). Refunds recover one at a time and a deposit waits for any
+/// recovery, holding back meanwhile, as on the phone.
 class DesktopPrivateUsdRefundsScreen extends ConsumerStatefulWidget {
   const DesktopPrivateUsdRefundsScreen({super.key});
 
@@ -129,7 +130,11 @@ class _DesktopPrivateUsdRefundsScreenState
 
     final canGoBack = state.canGoBack && _depositRecovering == null;
     final error = state.error?.call(l10n);
-    final busy = state.recovering != null || _depositRecovering != null;
+    // As on the phone: a deposit's recovery waits for any recovery, a
+    // refund's only for another refund's.
+    final canRecoverDeposit =
+        _depositRecovering == null && state.recovering == null;
+    final canRecoverRefund = state.recovering == null;
     return PopScope<Object?>(
       canPop: canGoBack,
       child: DesktopPrivateUsdPage(
@@ -182,7 +187,7 @@ class _DesktopPrivateUsdRefundsScreenState
               ),
               rescue: rescue,
               recovering: _depositRecovering == rescue.index,
-              canRecover: !busy,
+              canRecover: canRecoverDeposit,
               error: _depositErrors[rescue.index],
               privacyModeEnabled: privacyModeEnabled,
               onRecover: () => unawaited(_recoverDeposit(account, rescue)),
@@ -207,7 +212,7 @@ class _DesktopPrivateUsdRefundsScreenState
                 key: ValueKey('desktop_private_usd_refund_$i'),
                 row: row,
                 recovering: state.recovering == row.record.index,
-                canRecover: !busy,
+                canRecover: canRecoverRefund,
                 privacyModeEnabled: privacyModeEnabled,
                 onRecover: () => unawaited(recover(row.record.index)),
               ),

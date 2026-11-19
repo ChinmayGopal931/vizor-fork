@@ -79,6 +79,7 @@ class DesktopPrivateUsdPage extends StatelessWidget {
     this.syncLine,
     this.action,
     this.canGoBack = true,
+    this.holdsSidebar = false,
     this.onBeforeBack,
     this.contentKey,
     this.titleKey,
@@ -104,6 +105,13 @@ class DesktopPrivateUsdPage extends StatelessWidget {
   /// account switch or a sign-out would close the Railgun page mid-proof.
   final bool canGoBack;
 
+  /// The sidebar is veiled while the back link stays: a step runs that the
+  /// back link may leave, as the phone's back does, but that an account
+  /// switch or a sign-out from the sidebar would cut short (a bridge's
+  /// payment while the page proves it). The phone's wide-window sidebar is
+  /// veiled through its Private USD flows the same way, Back only.
+  final bool holdsSidebar;
+
   /// Runs before the back link navigates.
   final VoidCallback? onBeforeBack;
   final Key? contentKey;
@@ -114,6 +122,7 @@ class DesktopPrivateUsdPage extends StatelessWidget {
     final onInfo = this.onInfo;
     final syncLine = this.syncLine;
     final action = this.action;
+    final sidebarHeld = !canGoBack || holdsSidebar;
     Widget column(bool occlude, {double bottomReserve = 0}) {
       Widget title = NeonPageTitle(
         this.title,
@@ -206,12 +215,12 @@ class DesktopPrivateUsdPage extends StatelessWidget {
       // One shape either way, so the sidebar keeps its state as a step
       // starts and ends.
       sidebar: ExcludeFocus(
-        excluding: !canGoBack,
+        excluding: sidebarHeld,
         child: IgnorePointer(
-          ignoring: !canGoBack,
+          ignoring: sidebarHeld,
           child: AnimatedOpacity(
             key: const ValueKey('desktop_private_usd_sidebar'),
-            opacity: canGoBack ? 1 : 0.4,
+            opacity: sidebarHeld ? 0.4 : 1,
             duration: const Duration(milliseconds: 160),
             child: const AppMainSidebar(),
           ),
