@@ -10,17 +10,17 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aboutBuiltByBody =>
-      '我们打造了 Keplr，这款钱包服务于 Cosmos、Ethereum 和 Bitcoin 生态的数百万用户。Veylor 是我们心目中 Zcash 钱包该有的样子。';
+      'Veylor 是 Vizor 的分叉版本。Vizor 是 Keplr 团队打造的开源 Zcash 钱包。我们很喜欢 Vizor，所以在它的基础上打造了 Veylor，并加入了我们自己的设计和功能。';
 
   @override
-  String get aboutBuiltByHeading => '由 Keplr 团队打造';
+  String get aboutBuiltByHeading => 'Vizor 的分叉版本';
 
   @override
   String get aboutLegalPlaceholderBody =>
       '与 Bitcoin 或 Ethereum 不同，隐私 Zcash 交易会隐藏发送方、接收方和金额。';
 
   @override
-  String get aboutLegalPlaceholderHeading => '来自打造 Keplr 钱包的团队。';
+  String get aboutLegalPlaceholderHeading => '基于 Keplr 团队的 Vizor 打造。';
 
   @override
   String aboutLinkSemantics(String label) {

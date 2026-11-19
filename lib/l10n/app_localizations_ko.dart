@@ -10,17 +10,18 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get aboutBuiltByBody =>
-      '저‍희‍는 Cosmos, Ethereum, Bitcoin‍에‍서 수‍백‍만 명‍이 쓰‍는 지‍갑 Keplr‍를 만‍들‍었‍어‍요. Veylor‍는 Zcash 지‍갑‍이‍라‍면 이‍래‍야 한‍다‍는 저‍희‍의 답‍이‍에‍요.';
+      'Veylor‍는 Keplr 팀‍이 만‍든 오‍픈 소‍스 Zcash 지‍갑 Vizor‍의 포‍크‍예‍요. Vizor‍가 정‍말 마‍음‍에 들‍어‍서, 그 위‍에 Veylor‍만‍의 디‍자‍인‍과 기‍능‍을 더‍해 만‍들‍었‍어‍요.';
 
   @override
-  String get aboutBuiltByHeading => 'Keplr 팀‍이 만‍들‍었‍어‍요';
+  String get aboutBuiltByHeading => 'Vizor‍의 포‍크';
 
   @override
   String get aboutLegalPlaceholderBody =>
       'Bitcoin‍이‍나 Ethereum‍과 달‍리 비‍공‍개 Zcash 거‍래‍는 보‍낸 사‍람, 받‍는 사‍람, 금‍액‍을 숨‍겨‍요.';
 
   @override
-  String get aboutLegalPlaceholderHeading => 'Keplr 지‍갑‍을 만‍든 팀‍이 만‍들‍었‍어‍요.';
+  String get aboutLegalPlaceholderHeading =>
+      'Keplr 팀‍의 Vizor‍를 바‍탕‍으‍로 만‍들‍었‍어‍요.';
 
   @override
   String aboutLinkSemantics(String label) {

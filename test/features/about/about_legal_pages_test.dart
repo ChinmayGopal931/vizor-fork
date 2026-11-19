@@ -61,7 +61,7 @@ void main() {
     expect(find.text('About Veylor'), findsNothing);
     expect(find.text('ABOUT VEYLOR WALLET'), findsOneWidget);
     expect(find.text('Version: 0.0.0 Public Beta'), findsOneWidget);
-    expect(find.text('Built by the Keplr team'), findsOneWidget);
+    expect(find.text('A fork of Vizor'), findsOneWidget);
     expect(find.text('Designed for shielded Zcash'), findsOneWidget);
     expect(find.text('Open source, self-custodied'), findsOneWidget);
     expect(find.text('Github'), findsOneWidget);
@@ -147,7 +147,7 @@ void main() {
     _expectUtilityContentCentered(
       tester,
       titleText: 'Terms of Usage',
-      headingText: 'From the team that brought you Keplr Wallet.',
+      headingText: 'Built on Vizor, from the Keplr team.',
     );
 
     await tester.pumpWidget(
@@ -167,7 +167,7 @@ void main() {
     _expectUtilityContentCentered(
       tester,
       titleText: 'About Veylor Wallet',
-      headingText: 'Built by the Keplr team',
+      headingText: 'A fork of Vizor',
     );
   });
 
@@ -195,7 +195,7 @@ void main() {
     final backTopBeforeScroll = tester.getTopLeft(find.text('Welcome')).dy;
     final headingTopBeforeScroll = tester
         .getTopLeft(
-          find.text('From the team that brought you Keplr Wallet.').first,
+          find.text('Built on Vizor, from the Keplr team.').first,
         )
         .dy;
     await tester.drag(
@@ -206,7 +206,7 @@ void main() {
     final backTopAfterScroll = tester.getTopLeft(find.text('Welcome')).dy;
     final headingTopAfterScroll = tester
         .getTopLeft(
-          find.text('From the team that brought you Keplr Wallet.').first,
+          find.text('Built on Vizor, from the Keplr team.').first,
         )
         .dy;
 

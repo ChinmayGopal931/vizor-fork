@@ -10,10 +10,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutBuiltByBody =>
-      'We built Keplr, the wallet used by millions across Cosmos, Ethereum, and Bitcoin. Veylor is our take on what a Zcash wallet should feel like.';
+      'Veylor is a fork of Vizor, the open-source Zcash wallet from the Keplr team. We like Vizor a lot, so we built Veylor on it, with our own look and features.';
 
   @override
-  String get aboutBuiltByHeading => 'Built by the Keplr team';
+  String get aboutBuiltByHeading => 'A fork of Vizor';
 
   @override
   String get aboutLegalPlaceholderBody =>
@@ -21,7 +21,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutLegalPlaceholderHeading =>
-      'From the team that brought you Keplr Wallet.';
+      'Built on Vizor, from the Keplr team.';
 
   @override
   String aboutLinkSemantics(String label) {

@@ -1,10 +1,10 @@
 {
   "@@locale": "en",
-  "aboutBuiltByBody": "We built Keplr, the wallet used by millions across Cosmos, Ethereum, and Bitcoin. Veylor is our take on what a Zcash wallet should feel like.",
+  "aboutBuiltByBody": "Veylor is a fork of Vizor, the open-source Zcash wallet from the Keplr team. We like Vizor a lot, so we built Veylor on it, with our own look and features.",
   "@aboutBuiltByBody": {
     "description": "Body of the first paragraph of the About screen."
   },
-  "aboutBuiltByHeading": "Built by the Keplr team",
+  "aboutBuiltByHeading": "A fork of Vizor",
   "@aboutBuiltByHeading": {
     "description": "Heading of the first paragraph of the About screen."
   },
@@ -12,7 +12,7 @@
   "@aboutLegalPlaceholderBody": {
     "description": "Body of the placeholder paragraphs on the Terms and Privacy Policy screens."
   },
-  "aboutLegalPlaceholderHeading": "From the team that brought you Keplr Wallet.",
+  "aboutLegalPlaceholderHeading": "Built on Vizor, from the Keplr team.",
   "@aboutLegalPlaceholderHeading": {
     "description": "Heading of the placeholder paragraphs on the Terms and Privacy Policy screens."
   },

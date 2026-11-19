@@ -103,13 +103,13 @@ abstract class AppLocalizations {
   /// Body of the first paragraph of the About screen.
   ///
   /// In en, this message translates to:
-  /// **'We built Keplr, the wallet used by millions across Cosmos, Ethereum, and Bitcoin. Veylor is our take on what a Zcash wallet should feel like.'**
+  /// **'Veylor is a fork of Vizor, the open-source Zcash wallet from the Keplr team. We like Vizor a lot, so we built Veylor on it, with our own look and features.'**
   String get aboutBuiltByBody;
 
   /// Heading of the first paragraph of the About screen.
   ///
   /// In en, this message translates to:
-  /// **'Built by the Keplr team'**
+  /// **'A fork of Vizor'**
   String get aboutBuiltByHeading;
 
   /// Body of the placeholder paragraphs on the Terms and Privacy Policy screens.
@@ -121,7 +121,7 @@ abstract class AppLocalizations {
   /// Heading of the placeholder paragraphs on the Terms and Privacy Policy screens.
   ///
   /// In en, this message translates to:
-  /// **'From the team that brought you Keplr Wallet.'**
+  /// **'Built on Vizor, from the Keplr team.'**
   String get aboutLegalPlaceholderHeading;
 
   /// Accessibility label of a link button on mobile About; {label} is the visible button label.
