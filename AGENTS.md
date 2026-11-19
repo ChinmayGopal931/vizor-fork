@@ -565,7 +565,8 @@ own way, and a malformed or unknown id fails the build:
     Apple Development certificate and the Mac development profile "Veylor
     Desktop Mac Development". The profile lists the Macs a build runs on. To
     add a Mac, register it and regenerate the profile through the App Store
-    Connect API.
+    Connect API. With `--release`, Release builds sign for distribution
+    instead and compile Sparkle in ("Veylor macOS release" below).
   - **Testnet:** the testnet id has no profile yet.
   - **Where signing lives:** the Runner target's signing is set in
     `AppInfo.xcconfig`, not the project file, so the overrides can replace it.
@@ -600,12 +601,60 @@ Packaging follows the same switch: the `veylor` and `veylor-testnet` flavors of
 `VIZOR_WINDOWS_FLAVOR`), `scripts/build-linux-release.sh --flavor veylor` and
 `scripts/package-windows-velopack.ps1 -ApplicationId com.veylor.desktop` make
 `Veylor-macos.dmg`, `Veylor-linux-<arch>.AppImage` and the
-`com.veylor.desktop` Velopack package. Until Veylor has release keys of its own
-there are no updates: Sparkle stays compiled out with no key, the Linux check
-is off, and Windows hides its updater in a build without a feed key. Signing,
-the Apple team, match and the release targets are unchanged (upstream's), and
-the macOS lane refuses to sign a Veylor flavor; on a Mac without upstream's
-team a local build needs an uncommitted signing override.
+`com.veylor.desktop` Velopack package. Those packages have no updates: the
+fastlane builds leave Sparkle out, the Linux check is off, and Windows hides
+its updater in a build without a feed key. The lanes keep upstream's signing,
+Apple team, match and release targets, and the macOS lane refuses to sign a
+Veylor flavor. Veylor's macOS release has its own signing, notarization and
+update feed (below); Linux and Windows have no Veylor release yet.
+
+### Veylor macOS release
+
+`scripts/release-veylor-macos.sh --version 0.9.0 --build-number 1` builds a
+release from a clean tree and publishes nothing:
+
+- **Identity and signing.** For the build it selects
+  `scripts/macos-identity.sh com.veylor.desktop --release`, then restores the
+  earlier overrides. Release then signs with "Developer ID Application: Zapp
+  LLC (63UVRFCV97)" and the "Veylor Desktop Developer ID" profile
+  (MAC_APP_DIRECT), which grants the application identifier and keychain
+  entitlements. The Runner target's Release settings add the hardened runtime
+  and a secure timestamp. The script refuses any identity but Zapp LLC's.
+- **Build.** Mainnet, Shielded USD on, the public RPC (no keyed RPC file):
+  `ZCASH_DEFAULT_NETWORK=main`, `VIZOR_PRIVATE_USD_ENABLED=true`,
+  `VIZOR_RELEASE_VERSION`, and `VIZOR_RELEASE_REPOSITORY` set to the fork.
+  The version comes from `--build-name` and `--build-number`, never
+  pubspec's, which the phones use. `flutter build macos --config-only` and
+  `xcodebuild` build into `build/veylor-release`, so a Veylor running from
+  `build/macos` keeps its bundle.
+- **Sparkle.** `SPARKLE_ENABLED` is compiled in. A staged copy of the app gets
+  `SUFeedURL`
+  (`https://github.com/ChinmayGopal931/vizor-fork/releases/latest/download/appcast.xml`),
+  `SUPublicEDKey`, a required feed signature and verification before
+  extraction, as upstream's lane sets them. Sparkle's helpers and the app are
+  then signed again. Upstream's update-over-Tor handling is unchanged.
+- **Notarization.** `notarytool` with the App Store Connect key named in
+  `~/dev/zapp/ios-zapp/fastlane/.env`, read in place (never copied, printed
+  or committed). The app and the DMG are notarized, stapled, and checked with
+  `spctl --assess` and `stapler validate`.
+- **DMG.** `Veylor-macos.dmg`, volume "Veylor", with the neon background in
+  `macos/Packaging/DMG/veylor/` (drawn by `render-background.swift`). dmgbuild
+  (pinned with hashes in `scripts/veylor-macos-release/requirements.txt`)
+  writes the window layout itself; nothing scripts Finder.
+- **Appcast.** `generate_appcast` and `sign_update` with Veylor's EdDSA key:
+  the login Keychain's `veylor-desktop` account, backed up (mode 600) in
+  `~/keys/veylor/sparkle/`, which the script uses first. Never print or
+  commit it. `check_appcast.py` checks the feed before it ships.
+
+The assets land in `dist/veylor-macos/vX.Y.Z/`: `Veylor-macos.dmg`,
+`appcast.xml`, `Veylor-macos.md` (the Sparkle release notes, from
+`release_notes/veylor-macos-vX.Y.Z.md`), `SHA256SUMS`, `release-info.txt` and
+the logs. Publish the first three unchanged to a release on the fork tagged
+`veylor-macos/vX.Y.Z`, as a full release, not a pre-release or a draft: the
+website's `releases/latest/download/Veylor-macos.dmg` and the feed resolve
+through "latest", so any later release that becomes latest carries
+`appcast.xml` too. The DMG's name never carries the version, and each release
+takes a higher build number.
 
 ## Deep-link Host (VIZOR_DEEPLINK_BASE_URL)
 
@@ -833,7 +882,8 @@ When asked to prepare user-facing release notes or a changelog for a release,
 read `release_notes/README.md` and create `release_notes/vX.Y.Z.md`.
 Unless the request explicitly says otherwise, draft desktop release notes for
 Windows, Linux, and macOS from desktop user-facing changes only. Exclude
-mobile-only changes.
+mobile-only changes. Veylor's macOS releases use
+`release_notes/veylor-macos-vX.Y.Z.md` ("Veylor macOS release").
 
 ### clear-app.sh
 
