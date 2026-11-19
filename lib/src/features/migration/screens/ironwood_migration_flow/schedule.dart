@@ -1165,7 +1165,7 @@ class _MigrationPreparationScheduleStatus extends StatelessWidget {
       color: completed
           ? colors.text.positiveStrong
           : awaiting
-          ? const Color(0xFFB83AD9)
+          ? colors.neon.glow
           : colors.text.secondary,
       fontWeight: AppFontWeight.regular,
     );
@@ -1185,7 +1185,7 @@ class _MigrationPreparationScheduleStatus extends StatelessWidget {
           color: completed
               ? colors.icon.success
               : awaiting
-              ? const Color(0xFFB83AD9)
+              ? colors.neon.glow
               : active
               ? colors.icon.accent
               : colors.icon.regular,
@@ -1598,7 +1598,7 @@ class _MigrationSchedulePartStatus extends StatelessWidget {
       color: completed
           ? colors.text.positiveStrong
           : needsInput
-          ? const Color(0xFFB83AD9)
+          ? colors.neon.glow
           : colors.text.secondary,
       fontWeight: AppFontWeight.regular,
     );
@@ -1612,7 +1612,7 @@ class _MigrationSchedulePartStatus extends StatelessWidget {
     final iconColor = completed
         ? colors.icon.success
         : needsInput
-        ? const Color(0xFFB83AD9)
+        ? colors.neon.glow
         : active
         ? colors.icon.accent
         : colors.icon.regular;

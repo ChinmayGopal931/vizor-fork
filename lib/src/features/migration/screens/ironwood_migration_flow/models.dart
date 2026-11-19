@@ -18,23 +18,6 @@ const _keystoneMigrationProofPollInterval = Duration(seconds: 1);
 const _migrationPrepareConfirmationBlocks = 3;
 const _keystoneMigrationSignBatchResultUrType = 'zcash-batch-sig-result';
 const _keystoneMigrationLegacySignResultUrType = 'zcash-sign-result';
-const _ironwoodMigrationIntroBannerLightAsset =
-    'assets/illustrations/desktop/ironwood_migration_intro_banner_light.webp';
-const _ironwoodMigrationIntroBannerDarkAsset =
-    'assets/illustrations/desktop/ironwood_migration_intro_banner_dark.webp';
-const _ironwoodMigrationHowStepAssets = [
-  'assets/illustrations/desktop/ironwood_migration_how_step_1.webp',
-  'assets/illustrations/desktop/ironwood_migration_how_step_2.webp',
-  'assets/illustrations/desktop/ironwood_migration_time.webp',
-];
-const _ironwoodMigrationExpectationRunningAsset =
-    'assets/illustrations/desktop/ironwood_migration_expect_running.webp';
-const _ironwoodMigrationExpectationAssets = [
-  'assets/illustrations/desktop/ironwood_migration_time.webp',
-  'assets/illustrations/desktop/ironwood_migration_expect_spend.webp',
-  'assets/illustrations/desktop/ironwood_migration_expect_privacy.webp',
-  _ironwoodMigrationExpectationRunningAsset,
-];
 
 final ironwoodMigrationAnalyzingMinimumDurationProvider = Provider<Duration>(
   (_) => _defaultMigrationAnalyzingMinimumDuration,

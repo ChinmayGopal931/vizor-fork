@@ -19,13 +19,19 @@ class _ReviewMetricRow extends StatelessWidget {
         SizedBox(
           width: 28,
           height: 28,
+          // A lit cut-corner plate in place of upstream's green disc.
           child: DecoratedBox(
             decoration: ShapeDecoration(
-              color: const Color(0xFFE3FBEE),
-              shape: const OvalBorder(),
+              color: colors.neon.glow.withValues(alpha: 0.07),
+              shape: Neon.chamferBorder(
+                cut: AppChamfer.small + 1,
+                side: BorderSide(
+                  color: colors.neon.glow.withValues(alpha: 0.55),
+                ),
+              ),
             ),
             child: Center(
-              child: AppIcon(icon, size: 16, color: GreenPrimitives.p500Light),
+              child: AppIcon(icon, size: 16, color: colors.neon.core),
             ),
           ),
         ),
@@ -627,11 +633,11 @@ class _MigrationStageLabel extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         DecoratedBox(
-          decoration: BoxDecoration(
+          decoration: ShapeDecoration(
             color: active
                 ? colors.background.overlay
                 : colors.background.ground,
-            shape: BoxShape.circle,
+            shape: Neon.chamferBorder(cut: AppChamfer.small),
           ),
           child: SizedBox(
             width: 22,
@@ -761,16 +767,18 @@ class _PoolMigrationHero extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
+          // The neon horizon in place of upstream's painted banner.
           ColoredBox(
-            color: colors.background.ground,
-            child: Image.asset(
-              isDark
-                  ? _ironwoodMigrationIntroBannerDarkAsset
-                  : _ironwoodMigrationIntroBannerLightAsset,
-              key: ValueKey(
-                'ironwood_migration_intro_banner_${isDark ? 'dark' : 'light'}',
+            color: colors.background.window,
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: NeonHorizon(
+                key: ValueKey(
+                  'ironwood_migration_intro_banner_${isDark ? 'dark' : 'light'}',
+                ),
+                width: 420,
+                height: 150,
               ),
-              fit: BoxFit.cover,
             ),
           ),
           Positioned(
@@ -880,20 +888,7 @@ class _MigrationOptionCard extends StatelessWidget {
         onTap: onTap,
         child: SizedBox(
           height: 104,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: colors.background.ground,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: selected
-                  ? const []
-                  : const [
-                      BoxShadow(
-                        color: Color(0x10000000),
-                        offset: Offset(0, 2),
-                        blurRadius: 10,
-                      ),
-                    ],
-            ),
+          child: NeonGlassPanel(
             child: Stack(
               children: [
                 Padding(
@@ -954,12 +949,14 @@ class _MigrationOptionCard extends StatelessWidget {
                 if (selected)
                   Positioned.fill(
                     child: IgnorePointer(
+                      // The selection strokes the glass panel's outline.
                       child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(
-                            color: colors.text.accent,
-                            width: 2,
+                        decoration: ShapeDecoration(
+                          shape: Neon.wedgeBorder().copyWith(
+                            side: BorderSide(
+                              color: colors.text.accent,
+                              width: 2,
+                            ),
                           ),
                         ),
                       ),
@@ -1002,17 +999,20 @@ class _RecommendedBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
+    // A lit cut-corner tag in place of upstream's green pill.
     return DecoratedBox(
       decoration: ShapeDecoration(
-        color: GreenPrimitives.p500Light,
-        shape: const StadiumBorder(),
+        color: colors.neon.glow,
+        shape: Neon.chamferBorder(cut: AppChamfer.small),
+        shadows: Neon.boxGlow(colors.neon.glow, intensity: 0.4),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
         child: Text(
           label,
           style: AppTypography.labelSmall.copyWith(
-            color: const Color(0xFFEAFEEF),
+            color: colors.button.primary.label,
           ),
         ),
       ),
@@ -1033,7 +1033,10 @@ class _SelectionMark extends StatelessWidget {
     return Container(
       width: 20,
       height: 20,
-      decoration: ShapeDecoration(color: fill, shape: const OvalBorder()),
+      decoration: ShapeDecoration(
+        color: fill,
+        shape: Neon.chamferBorder(cut: AppChamfer.small),
+      ),
       child: selected
           ? Center(
               child: AppIcon(

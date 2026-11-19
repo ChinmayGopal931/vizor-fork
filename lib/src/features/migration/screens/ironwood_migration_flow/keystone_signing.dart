@@ -1619,13 +1619,18 @@ class _IronwoodMigrationKeystonePrivateSignScreenState
         children: [
           const AppIcon(AppIcons.warning, size: 32),
           const SizedBox(height: AppSpacing.s),
-          Text(
-            context.l10n.migrationKeystoneUnavailableTitle,
-            textAlign: TextAlign.center,
-            style: AppTypography.headlineLarge.copyWith(
-              color: colors.text.accent,
-            ),
-          ),
+          kDesktopFormFactor
+              ? NeonPageTitle(
+                  context.l10n.migrationKeystoneUnavailableTitle,
+                  textAlign: TextAlign.center,
+                )
+              : Text(
+                  context.l10n.migrationKeystoneUnavailableTitle,
+                  textAlign: TextAlign.center,
+                  style: AppTypography.headlineLarge.copyWith(
+                    color: colors.text.accent,
+                  ),
+                ),
           const SizedBox(height: AppSpacing.s),
           Text(
             _error ?? context.l10n.migrationKeystoneTryAfterSync,
@@ -1686,13 +1691,18 @@ class _IronwoodMigrationKeystonePrivateSignScreenState
             ),
           ),
           const SizedBox(height: AppSpacing.base),
-          Text(
-            context.l10n.migrationKeystonePlanTitle,
-            textAlign: TextAlign.center,
-            style: AppTypography.headlineLarge.copyWith(
-              color: colors.text.accent,
-            ),
-          ),
+          kDesktopFormFactor
+              ? NeonPageTitle(
+                  context.l10n.migrationKeystonePlanTitle,
+                  textAlign: TextAlign.center,
+                )
+              : Text(
+                  context.l10n.migrationKeystonePlanTitle,
+                  textAlign: TextAlign.center,
+                  style: AppTypography.headlineLarge.copyWith(
+                    color: colors.text.accent,
+                  ),
+                ),
           const SizedBox(height: AppSpacing.lg),
           Container(
             width: 360,
@@ -1804,15 +1814,22 @@ class _IronwoodMigrationKeystonePrivateSignScreenState
             ),
             const SizedBox(height: AppSpacing.xxs),
           ],
-          Text(
-            widget.step == _KeystonePrivateSignStep.immediate
-                ? widget.step.qrTitle(context.l10n)
-                : context.l10n.migrationKeystoneScanRequest,
-            textAlign: TextAlign.center,
-            style: AppTypography.headlineLarge.copyWith(
-              color: colors.text.accent,
-            ),
-          ),
+          kDesktopFormFactor
+              ? NeonPageTitle(
+                  widget.step == _KeystonePrivateSignStep.immediate
+                      ? widget.step.qrTitle(context.l10n)
+                      : context.l10n.migrationKeystoneScanRequest,
+                  textAlign: TextAlign.center,
+                )
+              : Text(
+                  widget.step == _KeystonePrivateSignStep.immediate
+                      ? widget.step.qrTitle(context.l10n)
+                      : context.l10n.migrationKeystoneScanRequest,
+                  textAlign: TextAlign.center,
+                  style: AppTypography.headlineLarge.copyWith(
+                    color: colors.text.accent,
+                  ),
+                ),
           const SizedBox(height: AppSpacing.s),
           SizedBox(
             width: 360,
@@ -1925,15 +1942,22 @@ class _IronwoodMigrationKeystonePrivateSignScreenState
             ),
             const SizedBox(height: AppSpacing.xxs),
           ],
-          Text(
-            widget.step == _KeystonePrivateSignStep.immediate
-                ? context.l10n.commonScanQrCode
-                : context.l10n.migrationKeystoneScanSignature,
-            textAlign: TextAlign.center,
-            style: AppTypography.headlineLarge.copyWith(
-              color: colors.text.accent,
-            ),
-          ),
+          kDesktopFormFactor
+              ? NeonPageTitle(
+                  widget.step == _KeystonePrivateSignStep.immediate
+                      ? context.l10n.commonScanQrCode
+                      : context.l10n.migrationKeystoneScanSignature,
+                  textAlign: TextAlign.center,
+                )
+              : Text(
+                  widget.step == _KeystonePrivateSignStep.immediate
+                      ? context.l10n.commonScanQrCode
+                      : context.l10n.migrationKeystoneScanSignature,
+                  textAlign: TextAlign.center,
+                  style: AppTypography.headlineLarge.copyWith(
+                    color: colors.text.accent,
+                  ),
+                ),
           const SizedBox(height: AppSpacing.s),
           SizedBox(
             width: 360,
@@ -1989,13 +2013,18 @@ class _IronwoodMigrationKeystonePrivateSignScreenState
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              context.l10n.migrationKeystoneUnavailableTitle,
-              textAlign: TextAlign.center,
-              style: AppTypography.headlineLarge.copyWith(
-                color: colors.text.accent,
-              ),
-            ),
+            kDesktopFormFactor
+                ? NeonPageTitle(
+                    context.l10n.migrationKeystoneUnavailableTitle,
+                    textAlign: TextAlign.center,
+                  )
+                : Text(
+                    context.l10n.migrationKeystoneUnavailableTitle,
+                    textAlign: TextAlign.center,
+                    style: AppTypography.headlineLarge.copyWith(
+                      color: colors.text.accent,
+                    ),
+                  ),
             const SizedBox(height: AppSpacing.s),
             SizedBox(
               width: 360,
@@ -2039,28 +2068,31 @@ class _ImmediateKeystoneScannerPreviewCard extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
+          // The scanner's preview in the neon look: a glass panel around a
+          // cut-corner viewfinder.
+          SizedBox(
             width: 396,
             height: 310,
-            decoration: BoxDecoration(
-              color: const Color(0xFF171918),
-              borderRadius: BorderRadius.circular(28),
-            ),
-            child: Center(
-              child: Container(
-                width: 210,
-                height: 210,
-                decoration: BoxDecoration(
-                  border: Border.all(color: const Color(0xFFFFFFFF), width: 4),
-                  borderRadius: BorderRadius.circular(32),
-                ),
-                child: Center(
-                  child: Container(
-                    width: 110,
-                    height: 110,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF343737),
-                      borderRadius: BorderRadius.circular(8),
+            child: NeonGlassPanel(
+              fill: colors.background.ground,
+              child: Center(
+                child: Container(
+                  width: 210,
+                  height: 210,
+                  decoration: ShapeDecoration(
+                    shape: Neon.chamferBorder(
+                      cut: AppChamfer.xLarge,
+                      side: BorderSide(color: colors.text.accent, width: 4),
+                    ),
+                  ),
+                  child: Center(
+                    child: Container(
+                      width: 110,
+                      height: 110,
+                      decoration: ShapeDecoration(
+                        color: colors.background.overlay,
+                        shape: Neon.chamferBorder(cut: AppChamfer.small),
+                      ),
                     ),
                   ),
                 ),

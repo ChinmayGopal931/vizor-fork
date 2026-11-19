@@ -133,13 +133,7 @@ class _IronwoodMigrationPrivateStatusContentState
             width: 362,
             child: Column(
               children: [
-                Text(
-                  presentation.title,
-                  textAlign: TextAlign.center,
-                  style: AppTypography.headlineLarge.copyWith(
-                    color: colors.text.accent,
-                  ),
-                ),
+                NeonPageTitle(presentation.title, textAlign: TextAlign.center),
                 const SizedBox(height: 22),
                 SizedBox(
                   width: 318,
@@ -158,23 +152,19 @@ class _IronwoodMigrationPrivateStatusContentState
             left: 12,
             top: 210,
             width: 396,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: colors.background.ground,
-                borderRadius: BorderRadius.circular(28),
-              ),
+            child: NeonGlassPanel(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
                 child: Column(
                   children: [
                     if (progress != null) ...[
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(999),
+                        borderRadius: BorderRadius.circular(AppRadii.full),
                         child: LinearProgressIndicator(
                           value: progress,
                           minHeight: 8,
                           backgroundColor: colors.background.raised,
-                          color: GreenPrimitives.p500Light,
+                          color: colors.neon.glow,
                         ),
                       ),
                       const SizedBox(height: 20),
@@ -279,12 +269,9 @@ class _IronwoodMigrationPrivateStatusErrorContent extends StatelessWidget {
             width: 362,
             child: Column(
               children: [
-                Text(
+                NeonPageTitle(
                   context.l10n.migrationStatusUnavailableTitle,
                   textAlign: TextAlign.center,
-                  style: AppTypography.headlineLarge.copyWith(
-                    color: colors.text.accent,
-                  ),
                 ),
                 const SizedBox(height: 22),
                 SizedBox(
@@ -304,11 +291,7 @@ class _IronwoodMigrationPrivateStatusErrorContent extends StatelessWidget {
             left: 12,
             top: 262,
             width: 396,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: colors.background.ground,
-                borderRadius: BorderRadius.circular(28),
-              ),
+            child: NeonGlassPanel(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(28, 32, 28, 32),
                 child: Text(
