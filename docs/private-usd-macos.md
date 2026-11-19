@@ -96,6 +96,18 @@ the phone's widgets and painters where they fit.
   opening `/private-usd`; the chart page's holdings list Shielded USD as on the
   phone (`MobileHoldingsPanel`, already shared). The sidebar keeps Home lit on
   the Shielded USD pages, as it does on the chart.
+- Activity: Home's recent activity and `/activity` list the phone's Shielded
+  USD rows among the ZEC rows, newest first, and Activity groups them into the
+  same weeks and months (`desktopPrivateUsdFeedEntries`, on
+  `privateUsdActivityProvider` and `privateUsdFeedEntries`). They are the
+  deposits, sends, withdrawals and what arrived: a click (or Enter) unfolds a
+  row's details under it, as a tap does on the phone, and its transactions
+  open on their explorers. Privacy mode masks their amounts and details as it
+  does ZEC's. Bridge rows are left out until step 3b, and the wallet
+  transactions they stand in for on the phone stay as ZEC rows; desktop starts
+  no bridge, so a desktop wallet has none. Activity pages only the wallet's
+  rows: a Shielded USD row shows once the loaded page reaches its time, as on
+  the phone.
 - Settings: a Shielded USD block, shown when the phone shows its rows
   (`privateUsdRpcSettingVisibleProvider`): Ethereum RPC, whose dialog checks a
   URL as the phone's sheet does before saving it, and the relayer claims switch.
@@ -179,7 +191,8 @@ Untested, for the owner's session:
 
 - Everything with a wallet: the screens, a refresh from the page, Receive,
   deposits and a deposit's recovery, a send and a withdrawal (Sepolia),
-  Settings' RPC dialog and the relayer claims switch.
+  Settings' RPC dialog and the relayer claims switch, and the Shielded USD rows
+  in Home's recent activity and in Activity.
 - The lifecycle on the Mac: minimise, hide, a covered window, a locked screen,
   sleep and wake (that the engine pauses and resumes, and that the page resumes
   its sync), and the keep-awake assertion through a first sync

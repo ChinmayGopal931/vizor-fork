@@ -2071,7 +2071,9 @@ has its code in but has not yet run on a simulator or an iPhone. The macOS
 desktop app hosts it too (macOS 14 and later, behind the same define; step 3a,
 2026-11-19), with desktop screens for everything but the bridge, which desktop
 hides until its screens come (step 3b); Windows and Linux have no host and hide
-it. The Mac's host, how it differs from iOS's and what has run are in
+it. Desktop Home's recent activity and Activity list the phone's Shielded USD
+rows but the bridge's (`desktopPrivateUsdFeedEntries`). The Mac's host, how it
+differs from iOS's and what has run are in
 `docs/private-usd-macos.md`. Before changing it,
 read `docs/private-usd-android-plan.md`: §3.5 lists the invariants and why
 each one exists. The pinned config and defines are in

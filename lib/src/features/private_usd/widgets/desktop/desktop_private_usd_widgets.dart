@@ -14,10 +14,48 @@ import '../../../../core/widgets/app_icon_hover_button.dart';
 import '../../../../core/widgets/app_modal_card.dart';
 import '../../../../core/widgets/neon_glass_panel.dart';
 import '../../../../core/widgets/neon_page_title.dart';
+import '../../../activity/activity_feed_sections.dart' show ActivityEntry;
+import '../../providers/private_usd_activity_provider.dart';
+import '../mobile/private_usd_activity_details.dart';
+import '../mobile/private_usd_activity_rows.dart';
 
 /// How wide the Shielded USD pages' column runs: the chart page's, wider
 /// than Home's, so a ledger row and an address have room.
 const kDesktopPrivateUsdContentWidth = 560.0;
+
+/// [activity]'s rows for desktop Home's recent activity and the Activity
+/// feed, to sort in with the wallet's by time: the phone's rows for the
+/// account's deposits, sends, withdrawals and what it received, each
+/// unfolding into its details on a click, as on the phone. Bridge rows are
+/// left out, and the wallet transactions they stand in for on the phone stay
+/// as they are: desktop starts no bridge until its screens come (step 3b).
+/// [details] is read only when there is a row to unfold.
+List<ActivityEntry> desktopPrivateUsdFeedEntries({
+  required BuildContext context,
+  required PrivateUsdActivity activity,
+  required bool privacyModeEnabled,
+  required PrivateUsdActivityDetailsConfig Function() details,
+}) {
+  if (activity.depositRecords.isEmpty &&
+      activity.sends.isEmpty &&
+      activity.receipts.isEmpty) {
+    return const [];
+  }
+  return privateUsdFeedEntries(
+    context: context,
+    activity: PrivateUsdActivity(
+      depositRecords: activity.depositRecords,
+      sends: activity.sends,
+      receipts: activity.receipts,
+      zcashConfirmations: activity.zcashConfirmations,
+      screening: activity.screening,
+    ),
+    privacyModeEnabled: privacyModeEnabled,
+    // No bridge row is left to open a conversion.
+    onOpenConversion: (_) {},
+    details: details(),
+  );
+}
 
 /// A desktop Shielded USD page: the main sidebar, and in the pane the back
 /// link (with the info button on its right), the page title and [children]
