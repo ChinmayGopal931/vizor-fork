@@ -40,6 +40,7 @@ import '../widgets/voting_metadata_widgets.dart';
 import '../widgets/voting_pane_scroll_area.dart';
 import '../widgets/voting_proposal_list.dart';
 import '../../../core/widgets/mobile/mobile_surface_card.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
 
 class VotingProposalDetailScreen extends StatelessWidget {
   const VotingProposalDetailScreen({super.key, required this.roundId});
@@ -1934,19 +1935,21 @@ class _VotedPollHeader extends StatelessWidget {
         const SizedBox(height: AppSpacing.md),
         Container(
           padding: const EdgeInsets.all(AppSpacing.md),
-          decoration: BoxDecoration(
-            color: colors.background.ground,
-            borderRadius: BorderRadius.circular(AppRadii.large),
-            boxShadow: kAppFormFactor == AppFormFactor.mobile
-                ? mobileSurfaceShadows(colors)
-                : [
-                    BoxShadow(
-                      color: colors.shadows.subtle,
-                      offset: const Offset(0, 1),
-                      blurRadius: 2,
-                    ),
-                  ],
-          ),
+          decoration: kDesktopFormFactor
+              ? NeonGlassDecoration.themed(colors)
+              : BoxDecoration(
+                  color: colors.background.ground,
+                  borderRadius: BorderRadius.circular(AppRadii.large),
+                  boxShadow: kAppFormFactor == AppFormFactor.mobile
+                      ? mobileSurfaceShadows(colors)
+                      : [
+                          BoxShadow(
+                            color: colors.shadows.subtle,
+                            offset: const Offset(0, 1),
+                            blurRadius: 2,
+                          ),
+                        ],
+                ),
           child: Column(
             children: [
               _VotedReviewRow(

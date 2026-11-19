@@ -1244,7 +1244,7 @@ void main() {
     await tester.tap(find.text('Received'));
     await tester.pump();
     await tester.pump();
-    expect(find.text('Received successfully'), findsOneWidget);
+    expect(find.text('RECEIVED SUCCESSFULLY'), findsOneWidget);
     expect(history.isCompleted, isFalse);
     expect(suppliedArgs!.sourceAccountUuid, 'account-1');
     expect(suppliedArgs!.initialTransaction, same(tx));

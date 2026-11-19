@@ -13,6 +13,7 @@ import '../../../providers/account_provider.dart'
     show UnsharedGiftCardsChangedException;
 import '../../payment_links/services/payment_link_recovery_store.dart';
 import 'account_modal_card.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
 
 enum AccountRemoveProgress { stoppingSync, removingAccount }
 
@@ -341,13 +342,11 @@ class _AccountRemoveWarningPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return Container(
+    // A neon glass panel, its cut corners lit.
+    return NeonGlassPanel(
+      cut: AppChamfer.medium,
+      fill: colors.background.raised,
       padding: const EdgeInsets.all(AppSpacing.sm),
-      decoration: BoxDecoration(
-        color: colors.background.raised,
-        border: Border.all(color: colors.border.subtle),
-        borderRadius: BorderRadius.circular(AppRadii.xSmall),
-      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

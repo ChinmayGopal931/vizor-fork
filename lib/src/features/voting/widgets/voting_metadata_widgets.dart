@@ -13,6 +13,7 @@ import '../voting_flow_models.dart';
 import 'voting_auto_advance_indicator.dart';
 import '../../../core/l10n/locale_typography.dart';
 import '../../../core/widgets/mobile/mobile_surface_card.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
 
 class VotingMetadataBadge extends StatelessWidget {
   const VotingMetadataBadge(this.label, {super.key});
@@ -205,31 +206,35 @@ class VotingProposalCard extends StatelessWidget {
     final titleCollapsedMaxLines = this.titleCollapsedMaxLines;
     return Container(
       padding: const EdgeInsets.all(AppSpacing.sm),
-      decoration: BoxDecoration(
-        color: colors.background.ground,
-        borderRadius: BorderRadius.circular(AppRadii.medium),
-        border: Border.all(color: colors.border.subtle),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0A231F20),
-            offset: Offset(0, 1),
-            blurRadius: 1,
-            spreadRadius: -0.5,
-          ),
-          BoxShadow(
-            color: Color(0x0A231F20),
-            offset: Offset(0, 3),
-            blurRadius: 3,
-            spreadRadius: -1.5,
-          ),
-          BoxShadow(
-            color: Color(0x0A231F20),
-            offset: Offset(0, 24),
-            blurRadius: 24,
-            spreadRadius: -12,
-          ),
-        ],
-      ),
+      // Desktop's question card is a neon glass panel; the phones keep the
+      // Figma card.
+      decoration: kDesktopFormFactor
+          ? NeonGlassDecoration.themed(colors, cut: AppChamfer.medium)
+          : BoxDecoration(
+              color: colors.background.ground,
+              borderRadius: BorderRadius.circular(AppRadii.medium),
+              border: Border.all(color: colors.border.subtle),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x0A231F20),
+                  offset: Offset(0, 1),
+                  blurRadius: 1,
+                  spreadRadius: -0.5,
+                ),
+                BoxShadow(
+                  color: Color(0x0A231F20),
+                  offset: Offset(0, 3),
+                  blurRadius: 3,
+                  spreadRadius: -1.5,
+                ),
+                BoxShadow(
+                  color: Color(0x0A231F20),
+                  offset: Offset(0, 24),
+                  blurRadius: 24,
+                  spreadRadius: -12,
+                ),
+              ],
+            ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

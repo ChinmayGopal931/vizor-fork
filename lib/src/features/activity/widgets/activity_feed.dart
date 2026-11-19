@@ -15,6 +15,7 @@ import '../../../core/widgets/receipt_loading_skeleton.dart';
 import 'activity_skeleton_row.dart';
 import '../models/activity_row_data.dart';
 import '../activity_scroll_anchor.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 const _activityFeedActivationShortcuts = <ShortcutActivator, Intent>{
   SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
@@ -798,14 +799,17 @@ class _ActivityFeedTitleRow extends StatelessWidget {
       height: 33,
       child: Stack(
         children: [
+          // Desktop's page title; the phones keep their headline.
           Center(
-            child: Text(
-              context.l10n.navActivity,
-              style: AppTypography.headlineLarge.copyWith(
-                color: colors.text.accent,
-                letterSpacing: 0,
-              ),
-            ),
+            child: _mobile
+                ? Text(
+                    context.l10n.navActivity,
+                    style: AppTypography.headlineLarge.copyWith(
+                      color: colors.text.accent,
+                      letterSpacing: 0,
+                    ),
+                  )
+                : NeonPageTitle(context.l10n.navActivity),
           ),
         ],
       ),
@@ -1520,13 +1524,15 @@ class _ActivityProgressRingPainter extends CustomPainter {
   }
 
   void _paintProgressRing(Canvas canvas) {
+    // Desktop lights the ring red on the dark theme it is locked to; the
+    // phones keep the Figma colours.
     final trackPaint = Paint()
-      ..color = _trackColor
+      ..color = _mobile ? _trackColor : AppColors.dark.border.regular
       ..strokeWidth = _ringStrokeWidth
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
     final progressPaint = Paint()
-      ..color = _progressColor
+      ..color = _mobile ? _progressColor : AppColors.dark.neon.glow
       ..strokeWidth = _ringStrokeWidth
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
@@ -1558,7 +1564,9 @@ class _ActivityProgressRingPainter extends CustomPainter {
 
   void _paintInnerCircle(Canvas canvas) {
     final fillPaint = Paint()
-      ..color = _innerFillColor
+      ..color = _mobile
+          ? _innerFillColor
+          : AppColors.dark.background.neutralSubtleOpacity
       ..style = PaintingStyle.fill;
     canvas.drawCircle(const Offset(18.1836, 18.1841), 13, fillPaint);
   }

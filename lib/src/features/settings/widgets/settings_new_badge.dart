@@ -20,7 +20,7 @@ class SettingsNewBadge extends StatelessWidget {
         horizontal: AppSpacing.xxs,
         vertical: 2,
       ),
-      decoration: kAppFormFactor == AppFormFactor.desktop
+      decoration: kDesktopFormFactor
           ? ShapeDecoration(
               color: brandColor.withValues(alpha: 0.15),
               shape: Neon.chamferBorder(cut: AppChamfer.small),

@@ -35,6 +35,8 @@ import '../../swap/providers/swap_activity_store.dart';
 import '../widgets/account_edit_modal.dart';
 import '../widgets/account_profile_picture_modal.dart';
 import '../widgets/account_remove_modal.dart';
+import '../../../core/widgets/neon_page_title.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
 
 const _accountRowHeight = 44.0;
 const _accountsContentWidth = 420.0;
@@ -639,12 +641,9 @@ class _AccountsPane extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
+              NeonPageTitle(
                 context.l10n.accountsTitle,
                 textAlign: TextAlign.center,
-                style: AppTypography.headlineLarge.copyWith(
-                  color: context.colors.text.accent,
-                ),
               ),
               const SizedBox(height: _accountsTitleSurfaceGap),
               _AccountsList(
@@ -741,9 +740,10 @@ class _AccountsAddAccountButtonState extends State<_AccountsAddAccountButton> {
                 curve: Curves.easeOut,
                 height: 36,
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s),
+                // AppButton's cut-corner slab in place of upstream's pill.
                 decoration: ShapeDecoration(
                   color: backgroundColor,
-                  shape: const StadiumBorder(),
+                  shape: Neon.chamferBorder(cut: 6),
                 ),
                 child: IconTheme.merge(
                   data: IconThemeData(color: labelColor, size: 16),
@@ -894,18 +894,17 @@ class _AccountsSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    // A neon glass panel, its two cut corners lit.
+    return SizedBox(
       height: height,
-      padding: const EdgeInsets.symmetric(
-        horizontal: _accountsSurfaceHorizontalPadding,
-        vertical: _accountsSurfaceVerticalPadding,
+      child: NeonGlassPanel(
+        fill: _accountsSurfaceColor(context),
+        padding: const EdgeInsets.symmetric(
+          horizontal: _accountsSurfaceHorizontalPadding,
+          vertical: _accountsSurfaceVerticalPadding,
+        ),
+        child: child,
       ),
-      decoration: BoxDecoration(
-        color: _accountsSurfaceColor(context),
-        borderRadius: BorderRadius.circular(AppRadii.large),
-        boxShadow: appSurfaceShadow(context.colors),
-      ),
-      child: child,
     );
   }
 }
@@ -1138,16 +1137,18 @@ class _AccountRowAvatar extends StatelessWidget {
               right: -5,
               bottom: 0,
               child: DecoratedBox(
-                decoration: BoxDecoration(
+                // A cut-corner plate; the ring sits OUTSIDE the 16px badge
+                // like the Figma stroke, leaving the full box to the logo.
+                decoration: ShapeDecoration(
                   color: colors.background.inverse,
-                  // The ring sits OUTSIDE the 16px badge like the Figma
-                  // stroke, leaving the full box to the 14px logo.
-                  border: Border.all(
-                    color: _accountsSurfaceColor(context),
-                    width: 2,
-                    strokeAlign: BorderSide.strokeAlignOutside,
+                  shape: Neon.chamferBorder(
+                    cut: AppChamfer.small,
+                    side: BorderSide(
+                      color: _accountsSurfaceColor(context),
+                      width: 2,
+                      strokeAlign: BorderSide.strokeAlignOutside,
+                    ),
                   ),
-                  borderRadius: BorderRadius.circular(AppSpacing.xxs),
                 ),
                 child: SizedBox(
                   width: 16,

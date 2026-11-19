@@ -15,6 +15,7 @@ import '../../../core/widgets/mobile_text_field.dart';
 import '../models/address_book_contact.dart';
 import '../providers/address_book_provider.dart';
 import 'address_book_network_icon.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
 
 const double _contactPickerRowHeight = 44;
 const double _contactPickerRowGap = AppSpacing.xs;
@@ -139,11 +140,15 @@ class _AddressBookContactPickerModalState
         AppSpacing.sm,
         0,
       ),
-      decoration: BoxDecoration(
-        color: colors.background.base,
-        borderRadius: BorderRadius.circular(AppRadii.large),
-        boxShadow: _modalSurfaceShadows,
-      ),
+      // Desktop's picker is an opaque neon glass panel; the phones keep
+      // the Figma card.
+      decoration: kDesktopFormFactor
+          ? NeonGlassDecoration.themed(colors, fill: colors.background.base)
+          : BoxDecoration(
+              color: colors.background.base,
+              borderRadius: BorderRadius.circular(AppRadii.large),
+              boxShadow: _modalSurfaceShadows,
+            ),
       child: Column(
         mainAxisSize: MainAxisSize.max,
         crossAxisAlignment: CrossAxisAlignment.stretch,

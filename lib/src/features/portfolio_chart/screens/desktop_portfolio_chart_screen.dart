@@ -11,6 +11,7 @@ import '../providers/portfolio_chart_provider.dart';
 import '../providers/portfolio_chart_settings_provider.dart';
 import '../widgets/mobile/mobile_holdings_panel.dart';
 import '../widgets/mobile/mobile_portfolio_chart_card.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 /// The full chart on desktop, opened from Home's balance sign: the phone's
 /// chart card and holdings ([MobilePortfolioChartCard], [MobileHoldingsPanel])
@@ -50,12 +51,9 @@ class DesktopPortfolioChartScreen extends ConsumerWidget {
                 key: const ValueKey('desktop_portfolio_chart_content'),
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
+                  NeonPageTitle(
                     context.l10n.portfolioChartScreenTitle,
                     textAlign: TextAlign.center,
-                    style: AppTypography.headlineLarge.copyWith(
-                      color: colors.text.accent,
-                    ),
                   ),
                   const SizedBox(height: AppSpacing.md),
                   if (state is PortfolioChartHidden)

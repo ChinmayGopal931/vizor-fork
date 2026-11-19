@@ -144,14 +144,15 @@ void main() {
           ownAccounts: ownAccounts,
           privacy: privacy,
         ),
+    // Desktop draws the receipt titles as neon page titles, upper-cased.
     titles: const ReceiptTitles(
-      received: 'Received successfully',
-      receiving: 'Receive in progress...',
-      receiveFailed: 'Receive failed',
-      shielded: 'Shielded successfully',
-      sending: 'Send in progress...',
-      sent: 'Sent successfully',
-      sendFailed: 'Send failed',
+      received: 'RECEIVED SUCCESSFULLY',
+      receiving: 'RECEIVE IN PROGRESS...',
+      receiveFailed: 'RECEIVE FAILED',
+      shielded: 'SHIELDED SUCCESSFULLY',
+      sending: 'SEND IN PROGRESS...',
+      sent: 'SENT SUCCESSFULLY',
+      sendFailed: 'SEND FAILED',
       transaction: 'Transaction',
       recipient: 'To',
     ),
@@ -166,7 +167,7 @@ void main() {
       ),
     ]);
     final prioritized = await _pump(tester, details);
-    expect(find.text('Sent successfully'), findsOneWidget);
+    expect(find.text('SENT SUCCESSFULLY'), findsOneWidget);
     expect(find.text(testL10n.activityDetailsUnknownRecipient), findsOneWidget);
     expect(find.text('Show full address'), findsNothing);
     // The other party's output is listed as the transaction's; the change is

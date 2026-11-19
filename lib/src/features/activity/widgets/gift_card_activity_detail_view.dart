@@ -9,6 +9,7 @@ import '../../payment_links/widgets/payment_link_gift_card.dart';
 import '../../send/widgets/send_review_layout.dart';
 import '../gift_card_activity_index.dart';
 import '../../../core/l10n/l10n.dart';
+import '../../../core/widgets/neon_page_title.dart';
 import '../activity_row_mapper.dart' show giftCardActivityTitle;
 
 /// Totals for a receipt that funded a group of cards in one transaction.
@@ -111,7 +112,7 @@ class GiftCardActivityDetailView extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
+              NeonPageTitle(
                 giftCardActivityTitle(
                   context.l10n,
                   kind,
@@ -120,10 +121,6 @@ class GiftCardActivityDetailView extends StatelessWidget {
                   batchCount: batch?.count,
                 ),
                 textAlign: TextAlign.center,
-                style: AppTypography.bodyLarge.copyWith(
-                  color: context.colors.text.accent,
-                  fontWeight: AppFontWeight.semiBold,
-                ),
               ),
               SizedBox(height: gap),
               Center(

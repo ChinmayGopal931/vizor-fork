@@ -79,7 +79,7 @@ void main() {
     expect(find.text('Alice'), findsOneWidget);
     expect(find.text('u1alice'), findsOneWidget);
     expect(find.text('No contacts yet'), findsNothing);
-    expect(find.text('Contacts'), findsOneWidget);
+    expect(find.text('CONTACTS'), findsOneWidget);
   });
 
   testWidgets('empty-state add button is a compact users-icon pill', (
@@ -737,7 +737,7 @@ void main() {
     // Chevron hugs the pane/toolbar left edge (small toolbar + back-link
     // inset), not floated into the middle of the band.
     expect(backRect.left - toolbarRect.left, lessThan(24));
-    expect(backRect.top, lessThan(tester.getTopLeft(find.text('Contacts')).dy));
+    expect(backRect.top, lessThan(tester.getTopLeft(find.text('CONTACTS')).dy));
   });
 
   testWidgets('keeps the last group card clear of the floating add button', (

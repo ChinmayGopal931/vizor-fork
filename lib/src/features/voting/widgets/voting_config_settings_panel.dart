@@ -21,6 +21,8 @@ import '../../../providers/voting/voting_service_providers.dart';
 import '../../../providers/voting/voting_submission_guard_provider.dart';
 import '../../../services/voting/voting_config_loader.dart';
 import 'voting_config_error_text.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
+import '../../../core/layout/app_form_factor.dart';
 
 class VotingConfigSettingsPanel extends ConsumerStatefulWidget {
   const VotingConfigSettingsPanel({
@@ -424,11 +426,16 @@ class _VotingConfigSettingsPanelState
         .isNotEmpty;
 
     return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colors.background.ground,
-        borderRadius: BorderRadius.circular(AppRadii.large),
-        border: Border.all(color: colors.border.subtle),
-      ),
+      decoration: kDesktopFormFactor
+          ? NeonGlassDecoration.themed(
+              context.colors,
+              fill: colors.background.ground,
+            )
+          : BoxDecoration(
+              color: colors.background.ground,
+              borderRadius: BorderRadius.circular(AppRadii.large),
+              border: Border.all(color: colors.border.subtle),
+            ),
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: widget.width,

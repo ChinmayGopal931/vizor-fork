@@ -75,10 +75,10 @@ void main() {
     await tester.pumpWidget(_accountsHarness());
     await tester.pump();
 
-    expect(find.text('Accounts'), findsOneWidget);
+    expect(find.text('ACCOUNTS'), findsOneWidget);
     final paneTop = tester.getTopLeft(find.byType(AppDesktopPane)).dy;
     final paneHeight = tester.getSize(find.byType(AppDesktopPane)).height;
-    final titleTop = tester.getTopLeft(find.text('Accounts')).dy;
+    final titleTop = tester.getTopLeft(find.text('ACCOUNTS')).dy;
     expect(titleTop, lessThan(paneTop + paneHeight * 0.25));
     expect(
       find.byKey(const ValueKey('accounts_active_row_account-1')),
@@ -266,7 +266,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('sidebar_accounts_manage')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Accounts'), findsOneWidget);
+    expect(find.text('ACCOUNTS'), findsOneWidget);
   });
 
   testWidgets('selecting another account makes it active', (tester) async {

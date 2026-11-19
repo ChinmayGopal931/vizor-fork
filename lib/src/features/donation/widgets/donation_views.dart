@@ -484,7 +484,7 @@ class DonationVizorBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Desktop's badge is a lit glyph plate; the phones keep the painted one.
-    if (kAppFormFactor == AppFormFactor.desktop) {
+    if (kDesktopFormFactor) {
       return NeonGlyphBadge(iconName: AppIcons.donation, size: size);
     }
     return SizedBox.square(
@@ -645,7 +645,7 @@ class DonationHeartBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Desktop's badge is a lit glyph plate; the phones keep the painted one.
-    if (kAppFormFactor == AppFormFactor.desktop) {
+    if (kDesktopFormFactor) {
       return NeonGlyphBadge(iconName: AppIcons.donation, size: size);
     }
     return SizedBox.square(

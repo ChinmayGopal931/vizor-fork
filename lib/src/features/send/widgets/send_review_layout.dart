@@ -251,7 +251,6 @@ class SendReviewContentColumn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
     return Align(
       alignment: Alignment.topCenter,
       child: SizedBox(

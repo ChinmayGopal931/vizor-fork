@@ -30,6 +30,14 @@ const AppFormFactor kAppFormFactor = _formFactorDefine == 'mobile'
     ? AppFormFactor.mobile
     : AppFormFactor.desktop;
 
+/// Whether this binary is the desktop form factor, as a constant.
+///
+/// Gate a desktop-only branch in code the phones also run on this rather
+/// than on an inline `kAppFormFactor == AppFormFactor.desktop`: the front
+/// end folds a constant before whole-program analysis, so the phone builds
+/// keep neither the branch nor anything only it reaches.
+const kDesktopFormFactor = kAppFormFactor == AppFormFactor.desktop;
+
 /// True on the desktop platforms that `window_manager` supports and where
 /// layout switching is meaningful.
 bool get isDesktopLayoutPlatform {

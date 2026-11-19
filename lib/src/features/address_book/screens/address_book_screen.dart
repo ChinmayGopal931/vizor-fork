@@ -30,6 +30,8 @@ import '../models/address_book_contact.dart';
 import '../models/address_format_validator.dart';
 import '../providers/address_book_provider.dart';
 import '../widgets/address_book_network_icon.dart';
+import '../../../core/widgets/neon_page_title.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
 
 /// Fixed content column width for the group cards (Figma contacts design).
 const double _kContactsContentWidth = 352;
@@ -415,7 +417,6 @@ class _AddressBookPane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
     final showEmptySearch = state.hasContacts && state.filteredContacts.isEmpty;
     final wantsCenteredState = !state.hasContacts || showEmptySearch;
 
@@ -440,12 +441,9 @@ class _AddressBookPane extends StatelessWidget {
               // serif "No contacts yet" headline takes that role (Figma
               // 4098:554201 shows only the back link above the empty block).
               if (state.hasContacts) ...[
-                Text(
+                NeonPageTitle(
                   context.l10n.commonContacts,
                   textAlign: TextAlign.center,
-                  style: AppTypography.headlineLarge.copyWith(
-                    color: colors.text.accent,
-                  ),
                 ),
                 const SizedBox(height: AppSpacing.md),
               ],
@@ -618,13 +616,9 @@ class _ContactGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return Container(
+    return NeonGlassPanel(
+      fill: colors.background.base,
       padding: const EdgeInsets.all(AppSpacing.sm),
-      decoration: BoxDecoration(
-        color: colors.background.base,
-        borderRadius: BorderRadius.circular(AppRadii.large),
-        boxShadow: appSurfaceShadow(colors),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1267,9 +1261,10 @@ class _EditableContactAvatar extends StatelessWidget {
               child: Container(
                 width: 24,
                 height: 24,
-                decoration: BoxDecoration(
+                // A cut-corner plate in place of upstream's circle.
+                decoration: ShapeDecoration(
                   color: context.colors.background.inverse,
-                  shape: BoxShape.circle,
+                  shape: Neon.chamferBorder(cut: AppChamfer.small),
                 ),
                 child: Center(
                   child: AppIcon(

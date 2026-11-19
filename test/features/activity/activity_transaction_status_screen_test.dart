@@ -234,7 +234,7 @@ void main() {
     );
 
     expect(find.byType(GiftCardActivityDetailView), findsOneWidget);
-    expect(find.text('Created a gift card'), findsOneWidget);
+    expect(find.text('CREATED A GIFT CARD'), findsOneWidget);
     expect(find.text('Happy birthday!'), findsOneWidget);
     expect(find.text('Completed'), findsOneWidget);
     expect(find.text('0.001'), findsOneWidget);
@@ -426,7 +426,7 @@ void main() {
           ?.count,
       20,
     );
-    expect(find.text('Created 20 gift cards'), findsOneWidget);
+    expect(find.text('CREATED 20 GIFT CARDS'), findsOneWidget);
     expect(find.text('2.0035 ZEC'), findsOneWidget);
     expect(find.text('Message'), findsOneWidget);
   });
@@ -455,7 +455,7 @@ void main() {
         ),
       ),
     );
-    expect(find.text('Gift card group failed'), findsOneWidget);
+    expect(find.text('GIFT CARD GROUP FAILED'), findsOneWidget);
     expect(find.text('Planned total'), findsOneWidget);
     expect(find.text('Total spent'), findsNothing);
   });
@@ -477,7 +477,7 @@ void main() {
     );
 
     expect(find.byType(GiftCardActivityDetailView), findsOneWidget);
-    expect(find.text('Redeemed a gift card'), findsOneWidget);
+    expect(find.text('REDEEMED A GIFT CARD'), findsOneWidget);
     expect(find.text('Message'), findsNothing);
   });
 
@@ -510,7 +510,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(GiftCardActivityDetailView), findsOneWidget);
-    expect(find.text('Created a gift card'), findsOneWidget);
+    expect(find.text('CREATED A GIFT CARD'), findsOneWidget);
     expect(find.text('Happy birthday!'), findsOneWidget);
   });
 
@@ -575,7 +575,7 @@ void main() {
     );
 
     expect(find.byType(ReceivedReceiptView), findsOneWidget);
-    expect(find.text('Received successfully'), findsOneWidget);
+    expect(find.text('RECEIVED SUCCESSFULLY'), findsOneWidget);
     expect(find.text('Completed'), findsOneWidget);
     expect(find.text('120.00 ZEC'), findsOneWidget);
     expect(find.text('From'), findsOneWidget);
@@ -683,7 +683,7 @@ void main() {
     );
 
     expect(find.byType(ReceivedReceiptView), findsOneWidget);
-    expect(find.text('Receive in progress...'), findsOneWidget);
+    expect(find.text('RECEIVE IN PROGRESS...'), findsOneWidget);
     expect(find.text('In progress'), findsOneWidget);
     expect(find.text('Received successfully'), findsNothing);
   });
@@ -843,7 +843,7 @@ void main() {
     );
 
     expect(find.byType(SendStatusContentView), findsOneWidget);
-    expect(find.text('Sent successfully'), findsOneWidget);
+    expect(find.text('SENT SUCCESSFULLY'), findsOneWidget);
     expect(find.text('Completed'), findsOneWidget);
     expect(find.text('u195091 ... 190591'), findsOneWidget);
     expect(find.text('0.0001 ZEC'), findsOneWidget);
@@ -910,7 +910,7 @@ void main() {
     );
 
     expect(find.byType(ReceivedReceiptView), findsOneWidget);
-    expect(find.text('Received successfully'), findsOneWidget);
+    expect(find.text('RECEIVED SUCCESSFULLY'), findsOneWidget);
     expect(find.text('0.00 ZEC'), findsOneWidget);
     expect(find.text(memo), findsOneWidget);
   });
@@ -936,7 +936,7 @@ void main() {
     );
 
     expect(find.byType(SendStatusContentView), findsOneWidget);
-    expect(find.text('Sent successfully'), findsOneWidget);
+    expect(find.text('SENT SUCCESSFULLY'), findsOneWidget);
     expect(find.text('0.00 ZEC'), findsOneWidget);
     expect(find.text('0.0001 ZEC'), findsOneWidget);
     expect(find.text(memo), findsOneWidget);
@@ -992,7 +992,7 @@ void main() {
     );
 
     expect(find.byType(SendStatusContentView), findsOneWidget);
-    expect(find.text('Send failed'), findsOneWidget);
+    expect(find.text('SEND FAILED'), findsOneWidget);
     expect(find.text('Failed'), findsOneWidget);
   });
 
@@ -1046,7 +1046,7 @@ void main() {
     expect(find.byType(ShieldedReceiptView), findsOneWidget);
     expect(find.byType(ReceivedReceiptView), findsNothing);
     expect(find.byType(SendStatusContentView), findsNothing);
-    expect(find.text('Shielded successfully'), findsOneWidget);
+    expect(find.text('SHIELDED SUCCESSFULLY'), findsOneWidget);
     expect(find.text('From transparent balance'), findsOneWidget);
     expect(find.text('Shielded balance'), findsOneWidget);
     expect(find.text('Tx fee'), findsOneWidget);
@@ -1079,7 +1079,7 @@ void main() {
 
         expect(find.byType(ShieldedReceiptView), findsOneWidget);
         expect(find.byType(SendStatusContentView), findsNothing);
-        expect(find.text('Shielded successfully'), findsOneWidget);
+        expect(find.text('SHIELDED SUCCESSFULLY'), findsOneWidget);
         expect(find.text(expected[index]), findsOneWidget);
         expect(find.text('Tx fee'), findsOneWidget);
         expect(find.text('0.0002 ZEC'), findsNothing);
@@ -1183,7 +1183,7 @@ void main() {
       expect(find.byType(SendStatusContentView), findsOneWidget);
       expect(find.byType(ReceivedReceiptView), findsNothing);
       expect(find.byType(ShieldedReceiptView), findsNothing);
-      expect(find.text('Sent successfully'), findsOneWidget);
+      expect(find.text('SENT SUCCESSFULLY'), findsOneWidget);
       expect(find.text('Transaction'), findsNothing);
       expect(find.text('Amount'), findsOneWidget);
       expect(find.text('120.00 ZEC'), findsOneWidget);

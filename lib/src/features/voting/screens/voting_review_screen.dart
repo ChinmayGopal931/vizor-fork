@@ -23,6 +23,8 @@ import '../voting_poll_ordering.dart';
 import '../voting_routes.dart';
 import '../widgets/voting_metadata_widgets.dart';
 import '../widgets/voting_pane_scroll_area.dart';
+import '../../../core/widgets/neon_page_title.dart';
+import '../../../core/layout/app_form_factor.dart';
 
 const _mobileReviewActionExtent =
     AppSpacing.xs + AppButtonSizing.largeHeight + AppSpacing.md;
@@ -267,14 +269,19 @@ class _VotingReviewViewState extends ConsumerState<VotingReviewView>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (widget.showDesktopToolbar) ...[
-              Text(
-                context.l10n.votingReviewTitle,
-                textAlign: TextAlign.center,
-                style: AppTypography.displaySmall.copyWith(
-                  color: context.colors.text.accent,
-                  letterSpacing: 0,
-                ),
-              ),
+              kDesktopFormFactor
+                  ? NeonPageTitle(
+                      context.l10n.votingReviewTitle,
+                      textAlign: TextAlign.center,
+                    )
+                  : Text(
+                      context.l10n.votingReviewTitle,
+                      textAlign: TextAlign.center,
+                      style: AppTypography.displaySmall.copyWith(
+                        color: context.colors.text.accent,
+                        letterSpacing: 0,
+                      ),
+                    ),
               const SizedBox(height: AppSpacing.md),
             ],
             if (state.hasConfirmedVotingEligibility)

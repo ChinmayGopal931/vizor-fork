@@ -283,10 +283,7 @@ class _UtilityPageTitle extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        NeonPageTitle(
-          title,
-          textAlign: TextAlign.center,
-        ),
+        NeonPageTitle(title, textAlign: TextAlign.center),
         const SizedBox(height: AppSpacing.s),
         Text(
           subtitle,

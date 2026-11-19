@@ -452,9 +452,7 @@ class _MobileActivityScreenState extends ConsumerState<MobileActivityScreen>
         bottom: false,
         child: Column(
           children: [
-            MobileTopNav.back(
-              title: context.l10n.navActivity,
-            ),
+            MobileTopNav.back(title: context.l10n.navActivity),
             Expanded(
               // Soft edges under the top nav and the tab bar, as on Home.
               child: MobileTabRootScrollFades(
