@@ -45,7 +45,7 @@ void _showSendInfo(BuildContext context, PrivateUsdSendMode mode, String fee) {
             title: l10n.privateUsdSendInfoTitle,
             steps: [
               l10n.privateUsdSendInfoStepAddress,
-              l10n.privateUsdSendInfoStepProof,
+              l10n.privateUsdSendInfoStepProofDesktop,
               l10n.privateUsdSendInfoStepPrivate,
             ],
           )
@@ -54,7 +54,7 @@ void _showSendInfo(BuildContext context, PrivateUsdSendMode mode, String fee) {
             title: l10n.privateUsdWithdrawInfoTitle,
             steps: [
               l10n.privateUsdWithdrawInfoStepAddress,
-              l10n.privateUsdWithdrawInfoStepProof,
+              l10n.privateUsdWithdrawInfoStepProofDesktop,
             ],
             notes: [
               l10n.privateUsdWithdrawInfoNotePublic,
@@ -573,7 +573,7 @@ class _DesktopPrivateUsdSendStatusScreenState
           : context.l10n.privateUsdSendProvingPercent(percent);
       body = posting
           ? context.l10n.privateUsdSendLanding
-          : context.l10n.privateUsdSendProvingDetail;
+          : context.l10n.privateUsdSendProvingDetailDesktop;
       actions = const [];
       badge = const SizedBox.square(
         dimension: 72,

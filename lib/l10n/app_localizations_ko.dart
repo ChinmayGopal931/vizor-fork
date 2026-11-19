@@ -8933,6 +8933,10 @@ class AppLocalizationsKo extends AppLocalizations {
       '견‍적‍이 도‍착‍했‍을 때 이‍미 만‍료‍된 상‍태‍였‍어‍요. 휴‍대‍폰 시‍계‍가 맞‍는‍지 확‍인‍한 뒤 다‍시 시‍도‍해 주‍세‍요.';
 
   @override
+  String get privateUsdConvertQuoteClockAheadDesktop =>
+      '견‍적‍이 도‍착‍했‍을 때 이‍미 만‍료‍된 상‍태‍였‍어‍요. Mac 시‍계‍가 맞‍는‍지 확‍인‍한 뒤 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
   String privateUsdConvertQuoteExpires(String minutesSeconds) {
     return '견‍적 만‍료‍까‍지 $minutesSeconds';
   }
@@ -9998,6 +10002,10 @@ class AppLocalizationsKo extends AppLocalizations {
       '휴‍대‍폰‍에‍서 영‍지‍식 증‍명‍을 생‍성‍해‍요. 몇 초 걸‍려‍요.';
 
   @override
+  String get privateUsdSendInfoStepProofDesktop =>
+      'Mac‍에‍서 영‍지‍식 증‍명‍을 생‍성‍해‍요. 몇 초 걸‍려‍요.';
+
+  @override
   String get privateUsdSendInfoTitle => '비‍공‍개 USD 보‍내‍기';
 
   @override
@@ -10025,6 +10033,10 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get privateUsdSendProvingDetail =>
       '아‍무‍도 보‍내‍는 내‍용‍을 볼 수 없‍도‍록 휴‍대‍폰‍에‍서 영‍지‍식 증‍명‍을 생‍성‍하‍고 있‍어‍요. 몇 초 걸‍려‍요. Veylor‍를 열‍어 두‍세‍요.';
+
+  @override
+  String get privateUsdSendProvingDetailDesktop =>
+      '아‍무‍도 보‍내‍는 내‍용‍을 볼 수 없‍도‍록 Mac‍에‍서 영‍지‍식 증‍명‍을 생‍성‍하‍고 있‍어‍요. 몇 초 걸‍려‍요. Veylor‍를 열‍고 창‍을 화‍면‍에 띄‍워 두‍세‍요.';
 
   @override
   String privateUsdSendProvingPercent(int percent) {
@@ -10185,6 +10197,10 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get privateUsdWithdrawInfoStepProof =>
       '휴‍대‍폰‍에‍서 증‍명‍을 생‍성‍하‍면 달‍러‍가 Railgun‍을 떠‍나 그 주‍소‍로 가‍요.';
+
+  @override
+  String get privateUsdWithdrawInfoStepProofDesktop =>
+      'Mac‍에‍서 증‍명‍을 생‍성‍하‍면 달‍러‍가 Railgun‍을 떠‍나 그 주‍소‍로 가‍요.';
 
   @override
   String get privateUsdWithdrawInfoTitle => '출‍금‍하‍면 공‍개‍돼‍요';

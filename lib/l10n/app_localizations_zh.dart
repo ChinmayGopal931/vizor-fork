@@ -8389,6 +8389,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get privateUsdConvertQuoteClockAhead => '报价送达时已过期。请检查手机时间是否准确，然后重试。';
 
   @override
+  String get privateUsdConvertQuoteClockAheadDesktop =>
+      '报价送达时已过期。请检查 Mac 的时间是否准确，然后重试。';
+
+  @override
   String privateUsdConvertQuoteExpires(String minutesSeconds) {
     return '报价剩余有效时间 $minutesSeconds';
   }
@@ -9407,6 +9411,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get privateUsdSendInfoStepProof => '你的手机会生成零知识证明，需要几秒钟。';
 
   @override
+  String get privateUsdSendInfoStepProofDesktop => '你的 Mac 会生成零知识证明，需要几秒钟。';
+
+  @override
   String get privateUsdSendInfoTitle => '发送隐私 USD';
 
   @override
@@ -9432,6 +9439,10 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get privateUsdSendProvingDetail =>
       '你的手机正在生成零知识证明，让任何人都看不到你发送的内容。这需要几秒钟。请保持 Veylor 打开。';
+
+  @override
+  String get privateUsdSendProvingDetailDesktop =>
+      '你的 Mac 正在生成零知识证明，让任何人都看不到你发送的内容。这需要几秒钟。请保持 Veylor 打开并让其窗口保持可见。';
 
   @override
   String privateUsdSendProvingPercent(int percent) {
@@ -9582,6 +9593,10 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get privateUsdWithdrawInfoStepProof =>
       '你的手机会生成证明，然后美元会离开 Railgun，转到该地址。';
+
+  @override
+  String get privateUsdWithdrawInfoStepProofDesktop =>
+      '你的 Mac 会生成证明，然后美元会离开 Railgun，转到该地址。';
 
   @override
   String get privateUsdWithdrawInfoTitle => '提取后将公开';

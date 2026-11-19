@@ -14840,6 +14840,12 @@ abstract class AppLocalizations {
   /// **'The quote had expired by the time it arrived. Check that your phone\'s clock is right, then try again.'**
   String get privateUsdConvertQuoteClockAhead;
 
+  /// In the Mac app: the message on the bridge screens when a quote arrived already expired, which usually means the Mac's clock is wrong.
+  ///
+  /// In en, this message translates to:
+  /// **'The quote had expired by the time it arrived. Check that your Mac\'s clock is right, then try again.'**
+  String get privateUsdConvertQuoteClockAheadDesktop;
+
   /// Countdown caption under the quote on the bridge amount screen, drawn in uppercase in English; {minutesSeconds} is the time left in minutes and seconds, such as 4:59.
   ///
   /// In en, this message translates to:
@@ -16550,6 +16556,12 @@ abstract class AppLocalizations {
   /// **'Your phone builds a zero-knowledge proof. This takes a few seconds.'**
   String get privateUsdSendInfoStepProof;
 
+  /// In the Mac app: the second step in the send info card, where the Mac builds a zero-knowledge proof.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Mac builds a zero-knowledge proof. This takes a few seconds.'**
+  String get privateUsdSendInfoStepProofDesktop;
+
   /// Title of the info sheet on the Shielded USD send screens explaining how a send works.
   ///
   /// In en, this message translates to:
@@ -16597,6 +16609,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your phone builds a zero-knowledge proof so nobody can see what you send. This takes a few seconds. Keep Veylor open.'**
   String get privateUsdSendProvingDetail;
+
+  /// In the Mac app: the body of the send and withdraw progress screen while the zero-knowledge proof is built. The window must stay showing, because the Mac pauses the proof while it's hidden.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Mac builds a zero-knowledge proof so nobody can see what you send. This takes a few seconds. Keep Veylor open, with its window showing.'**
+  String get privateUsdSendProvingDetailDesktop;
 
   /// Title of the send and withdraw progress screen while the phone builds the proof, with its progress; {percent} is a whole number from 0 to 100.
   ///
@@ -16849,6 +16867,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your phone builds a proof, and the dollars leave Railgun for that address.'**
   String get privateUsdWithdrawInfoStepProof;
+
+  /// In the Mac app: the second step in the withdraw info card, where the Mac builds a proof and the dollars leave Railgun for the address.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Mac builds a proof, and the dollars leave Railgun for that address.'**
+  String get privateUsdWithdrawInfoStepProofDesktop;
 
   /// Title of the info sheet on the withdraw screens: a withdrawal moves the dollars to a public Ethereum address.
   ///

@@ -11589,6 +11589,10 @@
   "@privateUsdConvertQuoteClockAhead": {
     "description": "Message on the bridge screens when a quote arrived already expired, which usually means the phone's clock is wrong."
   },
+  "privateUsdConvertQuoteClockAheadDesktop": "The quote had expired by the time it arrived. Check that your Mac's clock is right, then try again.",
+  "@privateUsdConvertQuoteClockAheadDesktop": {
+    "description": "In the Mac app: the message on the bridge screens when a quote arrived already expired, which usually means the Mac's clock is wrong."
+  },
   "privateUsdConvertQuoteExpires": "Quote expires in {minutesSeconds}",
   "@privateUsdConvertQuoteExpires": {
     "description": "Countdown caption under the quote on the bridge amount screen, drawn in uppercase in English; {minutesSeconds} is the time left in minutes and seconds, such as 4:59.",
@@ -13066,6 +13070,10 @@
   "@privateUsdSendInfoStepProof": {
     "description": "Second step in the send info sheet: the phone builds a zero-knowledge proof."
   },
+  "privateUsdSendInfoStepProofDesktop": "Your Mac builds a zero-knowledge proof. This takes a few seconds.",
+  "@privateUsdSendInfoStepProofDesktop": {
+    "description": "In the Mac app: the second step in the send info card, where the Mac builds a zero-knowledge proof."
+  },
   "privateUsdSendInfoTitle": "Sending shielded USD",
   "@privateUsdSendInfoTitle": {
     "description": "Title of the info sheet on the Shielded USD send screens explaining how a send works."
@@ -13102,6 +13110,10 @@
   "privateUsdSendProvingDetail": "Your phone builds a zero-knowledge proof so nobody can see what you send. This takes a few seconds. Keep Veylor open.",
   "@privateUsdSendProvingDetail": {
     "description": "Body of the send and withdraw progress screen while the zero-knowledge proof is built."
+  },
+  "privateUsdSendProvingDetailDesktop": "Your Mac builds a zero-knowledge proof so nobody can see what you send. This takes a few seconds. Keep Veylor open, with its window showing.",
+  "@privateUsdSendProvingDetailDesktop": {
+    "description": "In the Mac app: the body of the send and withdraw progress screen while the zero-knowledge proof is built. The window must stay showing, because the Mac pauses the proof while it's hidden."
   },
   "privateUsdSendProvingPercent": "Proving your transaction · {percent}%",
   "@privateUsdSendProvingPercent": {
@@ -13315,6 +13327,10 @@
   "privateUsdWithdrawInfoStepProof": "Your phone builds a proof, and the dollars leave Railgun for that address.",
   "@privateUsdWithdrawInfoStepProof": {
     "description": "Second step in the withdraw info sheet: the phone builds a proof and the dollars leave Railgun for the address."
+  },
+  "privateUsdWithdrawInfoStepProofDesktop": "Your Mac builds a proof, and the dollars leave Railgun for that address.",
+  "@privateUsdWithdrawInfoStepProofDesktop": {
+    "description": "In the Mac app: the second step in the withdraw info card, where the Mac builds a proof and the dollars leave Railgun for the address."
   },
   "privateUsdWithdrawInfoTitle": "Withdrawing makes it public",
   "@privateUsdWithdrawInfoTitle": {

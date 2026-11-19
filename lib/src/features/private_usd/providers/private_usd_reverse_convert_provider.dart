@@ -1,3 +1,4 @@
+import '../../../core/layout/app_form_factor.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -467,7 +468,9 @@ class PrivateUsdReverseConvertNotifier
       state = state.copyWith(
         quoting: false,
         clearDraft: !onReview,
-        quoteError: (l10n) => l10n.privateUsdConvertQuoteClockAhead,
+        quoteError: (l10n) => kDesktopFormFactor
+            ? l10n.privateUsdConvertQuoteClockAheadDesktop
+            : l10n.privateUsdConvertQuoteClockAhead,
         stale: next.units,
       );
       return;

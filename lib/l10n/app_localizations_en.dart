@@ -9068,6 +9068,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'The quote had expired by the time it arrived. Check that your phone\'s clock is right, then try again.';
 
   @override
+  String get privateUsdConvertQuoteClockAheadDesktop =>
+      'The quote had expired by the time it arrived. Check that your Mac\'s clock is right, then try again.';
+
+  @override
   String privateUsdConvertQuoteExpires(String minutesSeconds) {
     return 'Quote expires in $minutesSeconds';
   }
@@ -10158,6 +10162,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Your phone builds a zero-knowledge proof. This takes a few seconds.';
 
   @override
+  String get privateUsdSendInfoStepProofDesktop =>
+      'Your Mac builds a zero-knowledge proof. This takes a few seconds.';
+
+  @override
   String get privateUsdSendInfoTitle => 'Sending shielded USD';
 
   @override
@@ -10185,6 +10193,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get privateUsdSendProvingDetail =>
       'Your phone builds a zero-knowledge proof so nobody can see what you send. This takes a few seconds. Keep Veylor open.';
+
+  @override
+  String get privateUsdSendProvingDetailDesktop =>
+      'Your Mac builds a zero-knowledge proof so nobody can see what you send. This takes a few seconds. Keep Veylor open, with its window showing.';
 
   @override
   String privateUsdSendProvingPercent(int percent) {
@@ -10351,6 +10363,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get privateUsdWithdrawInfoStepProof =>
       'Your phone builds a proof, and the dollars leave Railgun for that address.';
+
+  @override
+  String get privateUsdWithdrawInfoStepProofDesktop =>
+      'Your Mac builds a proof, and the dollars leave Railgun for that address.';
 
   @override
   String get privateUsdWithdrawInfoTitle => 'Withdrawing makes it public';
