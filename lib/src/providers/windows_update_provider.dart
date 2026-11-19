@@ -194,6 +194,13 @@ final windowsUpdateServiceProvider = Provider<WindowsUpdateService>(
   (ref) => WindowsUpdateService(),
 );
 
+/// Whether this Windows build carries a signed update feed key. Builds without
+/// one (development builds, and Veylor until it has release keys of its own)
+/// hide the updater rather than show a control that can only fail.
+final windowsUpdateFeedConfiguredProvider = FutureProvider<bool>(
+  (ref) => ref.read(windowsUpdateServiceProvider).isFeedConfigured(),
+);
+
 final windowsUpdateTorEnabledProvider = Provider<bool Function()>(
   (_) => rust_network_privacy.isTorEnabled,
 );

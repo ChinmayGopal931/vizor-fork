@@ -851,9 +851,15 @@ std::unique_ptr<UpdateSession> CreateSession(const std::string& arch) {
   return session;
 }
 
+// A build without a feed key (development builds, and Veylor until it has
+// release keys of its own) has no updater, so Dart hides the update controls.
+bool UpdateFeedKeyConfigured() {
+  return DecodeBase64(VIZOR_UPDATE_FEED_PUBLIC_KEY_B64).size() == 64;
+}
+
 bool EnsureManagerLocked() {
   if (g_session) return true;
-  if (DecodeBase64(VIZOR_UPDATE_FEED_PUBLIC_KEY_B64).size() != 64) {
+  if (!UpdateFeedKeyConfigured()) {
     SetUnavailableLocked("Signed update feed public key is not configured.");
     return false;
   }
@@ -1118,6 +1124,10 @@ CreateVelopackUpdateChannel(flutter::BinaryMessenger* messenger) {
 
   channel->SetMethodCallHandler([](const auto& call, auto result) {
     const std::string& method = call.method_name();
+    if (method == "isFeedConfigured") {
+      result->Success(flutter::EncodableValue(UpdateFeedKeyConfigured()));
+      return;
+    }
     if (method == "getUpdateBaseUrl") {
       result->Success(flutter::EncodableValue(DirectReleaseBaseUrl()));
       return;

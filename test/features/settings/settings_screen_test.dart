@@ -465,6 +465,9 @@ void main() {
             status: NetworkPrivacyConnectionStatus.connected,
           ),
           extraOverrides: [
+            windowsUpdateFeedConfiguredProvider.overrideWithValue(
+              const AsyncData(true),
+            ),
             windowsUpdateProvider.overrideWith(
               () => _RecordingWindowsUpdateNotifier(downloads),
             ),
@@ -503,6 +506,9 @@ void main() {
       await tester.pumpWidget(
         _settingsHarness(
           extraOverrides: [
+            windowsUpdateFeedConfiguredProvider.overrideWithValue(
+              const AsyncData(true),
+            ),
             windowsUpdateProvider.overrideWith(
               () => _FailedWindowsUpdateNotifier(),
             ),

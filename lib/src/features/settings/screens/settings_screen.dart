@@ -239,7 +239,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ref.watch(zcashExplorerProvider),
       networkName: endpoint.networkName,
     );
-    final updateState = defaultTargetPlatform == TargetPlatform.windows
+    final updateState =
+        defaultTargetPlatform == TargetPlatform.windows &&
+            ref.watch(windowsUpdateFeedConfiguredProvider).value == true
         ? ref.watch(windowsUpdateProvider)
         : null;
     final showUninstall = settingsUninstallSupported();
