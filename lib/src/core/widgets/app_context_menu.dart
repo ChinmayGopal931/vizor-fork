@@ -2,6 +2,8 @@ import 'package:flutter/widgets.dart';
 
 import '../theme/app_theme.dart';
 import 'app_icon.dart';
+import 'neon_glass_panel.dart';
+import '../layout/app_form_factor.dart';
 
 /// A floating action menu surface (the visual "dropdown" shown on a row's
 /// overflow button).
@@ -157,13 +159,11 @@ class _AppContextMenuState extends State<AppContextMenu> {
       style: const TextStyle(decoration: TextDecoration.none),
       child: SizedBox(
         width: widget.width,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: colors.background.inverse,
-            borderRadius: BorderRadius.circular(AppRadii.small),
-            border: Border.all(color: colors.border.subtleOpacity),
-            boxShadow: appContextMenuShadow,
-          ),
+        // An opaque neon glass panel floating over the pane, its cut
+        // corners lit.
+        child: NeonGlassPanel(
+          cut: AppChamfer.medium,
+          fill: colors.surface.nav,
           child: Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.xxs,
@@ -210,10 +210,10 @@ class _AppContextMenuItemState extends State<AppContextMenuItem> {
     final colors = context.colors;
     final itemColor = widget.destructive
         ? colors.text.destructiveLight
-        : colors.text.inverse;
+        : colors.text.accent;
     final iconColor = widget.destructive
         ? colors.icon.destructiveLight
-        : colors.icon.inverse;
+        : colors.icon.accent;
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -231,11 +231,8 @@ class _AppContextMenuItemState extends State<AppContextMenuItem> {
             vertical: AppSpacing.xxs,
           ),
           decoration: BoxDecoration(
-            // The menu sits on the inverse surface, so the regular hover
-            // tint (a dark alpha in light mode) is invisible here; the
-            // inverse-opacity tint flips with the surface in both themes.
-            color: _isHovered ? colors.border.inverseOpacity : null,
-            borderRadius: BorderRadius.circular(AppSpacing.xxs),
+            color: _isHovered ? colors.state.hover : null,
+            borderRadius: BorderRadius.circular(AppRadii.small),
           ),
           child: Row(
             children: [
@@ -279,8 +276,11 @@ class AppContextMenuDivider extends StatelessWidget {
         height: 1,
         width: double.infinity,
         child: DecoratedBox(
+          // Desktop's menu is dark glass; the phones keep the inverse tint.
           decoration: BoxDecoration(
-            color: context.colors.border.inverseOpacity,
+            color: kDesktopFormFactor
+                ? context.colors.border.subtle
+                : context.colors.border.inverseOpacity,
           ),
         ),
       ),

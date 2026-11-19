@@ -12,6 +12,7 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_icon.dart';
 import 'keystone_onboarding_flow.dart';
 import '../../../core/widgets/neon_page_title.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
 
 class KeystoneHowToConnectScreen extends ConsumerWidget {
   const KeystoneHowToConnectScreen({this.backTarget, super.key});
@@ -149,59 +150,44 @@ class _KeystoneInstructionsPanel extends StatelessWidget {
   const _KeystoneInstructionsPanel();
 
   static const double _minHeight = 392;
-  static const _radius = BorderRadius.all(Radius.circular(24));
-
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     final isDark = context.appTheme == AppThemeData.dark;
     final fill = isDark ? colors.background.base : colors.background.ground;
 
-    return Container(
+    return SizedBox(
       width: double.infinity,
-      constraints: const BoxConstraints(minHeight: _minHeight),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.md,
-      ),
-      decoration: BoxDecoration(
-        color: fill,
-        borderRadius: _radius,
-        boxShadow: [
-          BoxShadow(color: colors.shadows.subtle, blurRadius: 1),
-          BoxShadow(
-            color: colors.shadows.subtle,
-            offset: const Offset(0, 1),
-            blurRadius: 2,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: _minHeight),
+        child: NeonGlassPanel(
+          fill: fill,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: AppSpacing.md,
           ),
-          BoxShadow(
-            color: colors.shadows.subtle,
-            offset: const Offset(0, 2),
-            blurRadius: 4,
+          child: Column(
+            children: [
+              _InstructionSection(
+                iconName: AppIcons.importWallet,
+                stepNumber: 1,
+                title: context.l10n.keystoneFirmwareTitle,
+                body: null,
+                action: const _FirmwareBodyWithLink(),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              const _Divider(),
+              const SizedBox(height: AppSpacing.md),
+              _InstructionSection(
+                iconName: AppIcons.qr,
+                stepNumber: 2,
+                title: context.l10n.keystonePrepareToConnectTitle,
+                body: null,
+                action: const _ConnectionSteps(),
+              ),
+            ],
           ),
-          BoxShadow(color: colors.shadows.subtle, blurRadius: 1),
-        ],
-      ),
-      child: Column(
-        children: [
-          _InstructionSection(
-            iconName: AppIcons.importWallet,
-            stepNumber: 1,
-            title: context.l10n.keystoneFirmwareTitle,
-            body: null,
-            action: const _FirmwareBodyWithLink(),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          const _Divider(),
-          const SizedBox(height: AppSpacing.md),
-          _InstructionSection(
-            iconName: AppIcons.qr,
-            stepNumber: 2,
-            title: context.l10n.keystonePrepareToConnectTitle,
-            body: null,
-            action: const _ConnectionSteps(),
-          ),
-        ],
+        ),
       ),
     );
   }

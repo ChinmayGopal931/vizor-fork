@@ -380,7 +380,9 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
             ),
             if (modalAccount != null && _activeModal != null)
               AppPaneModalOverlay(
-                borderRadius: const BorderRadius.all(Radius.circular(20)),
+                borderRadius: const BorderRadius.all(
+                  Radius.circular(AppRadii.large),
+                ),
                 onDismiss: _closeModal,
                 child: switch (_activeModal!) {
                   _AccountModalType.editAccount => AccountEditModal(

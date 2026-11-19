@@ -385,7 +385,9 @@ class _CustomiseAccountScreenState
   Widget build(BuildContext context) {
     final profilePictureOverlay = _showProfilePicturePicker
         ? AppPaneModalOverlay(
-            borderRadius: const BorderRadius.all(Radius.circular(20)),
+            borderRadius: const BorderRadius.all(
+              Radius.circular(AppRadii.large),
+            ),
             onDismiss: _closeProfilePicturePicker,
             child: AppProfilePicturePickerModal(
               title: context.l10n.profilePictureSelect,
@@ -758,7 +760,8 @@ class _EditableProfilePicture extends StatelessWidget {
                     height: 24,
                     decoration: BoxDecoration(
                       color: colors.text.homeCard,
-                      shape: BoxShape.circle,
+                      // Near-square, as the neon look's corners are.
+                      borderRadius: BorderRadius.circular(AppRadii.small),
                       border: Border.all(
                         color: colors.background.homeCard,
                         width: 3,

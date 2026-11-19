@@ -302,7 +302,8 @@ class _LedgerConnectScreenState extends ConsumerState<LedgerConnectScreen> {
                       color: selected
                           ? context.colors.background.inverse
                           : context.colors.background.neutralSubtleOpacity,
-                      shape: BoxShape.circle,
+                      // Near-square, as the neon look's corners are.
+                      borderRadius: BorderRadius.circular(AppRadii.small),
                     ),
                     child: selected
                         ? Center(

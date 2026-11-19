@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart' show Colors;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -310,9 +311,7 @@ class _AccountRadioCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final borderColor = selected
-        ? colors.border.strong
-        : const Color(0x00000000);
+    final borderColor = selected ? colors.border.strong : Colors.transparent;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
@@ -452,7 +451,8 @@ class _RadioIndicator extends StatelessWidget {
         color: selected
             ? colors.background.inverse
             : colors.background.neutralSubtleOpacity,
-        shape: BoxShape.circle,
+        // Near-square, as the neon look's corners are.
+        borderRadius: BorderRadius.circular(AppRadii.small),
       ),
       child: selected
           ? AppIcon(AppIcons.check, size: 12, color: colors.text.inverse)

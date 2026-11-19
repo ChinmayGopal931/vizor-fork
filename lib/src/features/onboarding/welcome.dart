@@ -452,7 +452,8 @@ class _WelcomeIconButtonState extends State<_WelcomeIconButton> {
                   color: _hovered
                       ? colors.background.neutralScrim.withValues(alpha: 0.7)
                       : colors.background.neutralScrim,
-                  shape: BoxShape.circle,
+                  // Near-square, as the neon look's corners are.
+                  borderRadius: BorderRadius.circular(AppRadii.small),
                 ),
                 child: SizedBox(
                   width: 32,

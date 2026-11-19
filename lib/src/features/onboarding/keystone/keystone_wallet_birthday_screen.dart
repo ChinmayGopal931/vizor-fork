@@ -645,7 +645,10 @@ class _DatePickerField extends StatelessWidget {
             decoration: BoxDecoration(
               color: colors.surface.input.primary,
               borderRadius: BorderRadius.circular(AppRadii.small),
-              border: Border.all(color: const Color(0x00000000), width: 1.5),
+              border: Border.all(
+                color: material.Colors.transparent,
+                width: 1.5,
+              ),
               boxShadow: _birthdayFieldSurfaceShadow(colors),
             ),
             child: Row(
@@ -696,7 +699,7 @@ class _BlockHeightField extends StatelessWidget {
         ? colors.border.utilityDestructive
         : focusNode.hasFocus
         ? colors.background.inverse
-        : const Color(0x00000000);
+        : material.Colors.transparent;
 
     return Container(
       width: width,

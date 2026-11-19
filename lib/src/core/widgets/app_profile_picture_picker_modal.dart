@@ -277,13 +277,16 @@ class _ProfilePictureOptionButtonState
               children: [
                 if (showFocusRing)
                   Positioned.fill(
+                    // The focus ring follows the portrait's cut corners.
                     child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: colors.state.focusRing,
-                          width: _focusRingWidth,
+                      decoration: ShapeDecoration(
+                        shape: Neon.chamferBorder(
+                          cut: AppChamfer.medium,
+                          side: BorderSide(
+                            color: colors.state.focusRing,
+                            width: _focusRingWidth,
+                          ),
                         ),
-                        shape: BoxShape.circle,
                       ),
                     ),
                   ),
@@ -298,13 +301,16 @@ class _ProfilePictureOptionButtonState
                     child: Container(
                       width: _checkBadgeSize,
                       height: _checkBadgeSize,
-                      decoration: BoxDecoration(
+                      // A cut-corner plate in place of upstream's circle.
+                      decoration: ShapeDecoration(
                         color: colors.background.inverse,
-                        border: Border.all(
-                          color: colors.background.base,
-                          width: 2,
+                        shape: Neon.chamferBorder(
+                          cut: AppChamfer.small,
+                          side: BorderSide(
+                            color: colors.background.base,
+                            width: 2,
+                          ),
                         ),
-                        shape: BoxShape.circle,
                       ),
                       child: Center(
                         child: AppIcon(

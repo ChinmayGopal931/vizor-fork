@@ -351,7 +351,8 @@ class LedgerPairingRecovery extends ConsumerWidget {
         height: 22,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          shape: BoxShape.circle,
+          // Near-square, as the neon look's corners are.
+          borderRadius: BorderRadius.circular(AppRadii.small),
           border: Border.all(
             color: context.colors.background.neutralSubtleOpacity,
           ),
