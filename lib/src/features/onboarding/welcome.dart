@@ -17,6 +17,8 @@ import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_icon.dart';
 import '../../core/widgets/app_pane_modal_overlay.dart';
 import '../../core/widgets/app_tooltip.dart';
+import '../../core/widgets/mobile/neon_horizon.dart';
+import '../../core/widgets/mobile/neon_motion.dart';
 import '../../core/l10n/app_language.dart';
 import '../../providers/app_language_provider.dart';
 import '../../providers/enhance_pir_provider.dart';
@@ -27,7 +29,6 @@ import 'shared/welcome_accent_button.dart';
 import 'shared/welcome_button_tokens.dart';
 import 'shared/welcome_gift_card_button.dart';
 import 'shared/welcome_language_button.dart';
-import 'shared/welcome_video_backdrop.dart';
 import 'shared/welcome_art_assets.dart';
 import 'providers/welcome_network_settings_provider.dart';
 
@@ -157,21 +158,35 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
         backgroundColor: const Color(0xff000000),
         body: LayoutBuilder(
           builder: (context, constraints) {
-            final scale = constraints.maxHeight / 720;
+            // The neon horizon stands in for upstream's landscape video: set
+            // beside the pane, centred in the space to its right, as the
+            // mobile Welcome sets it in a wide window.
+            final paneRight = math.min(_welcomePaneWidth, constraints.maxWidth);
+            final horizonWidth = constraints.maxWidth - paneRight;
+            final horizonHeight = constraints.maxHeight * 0.6;
             return Stack(
               fit: StackFit.expand,
               clipBehavior: Clip.hardEdge,
               children: [
                 Positioned(
-                  left: 75 * scale + (constraints.maxWidth - 1080 * scale) / 2,
-                  top: 0,
-                  width: 1280 * scale,
-                  height: constraints.maxHeight,
-                  child: WelcomeVideoBackdrop(
-                    videoAsset: kDesktopWelcomeVideoAsset,
-                    posterAsset: kDesktopWelcomePosterAsset,
-                    animatedImageAsset: kDesktopWelcomeAnimatedImageAsset,
-                    animate: widget.animateBackground,
+                  left: paneRight,
+                  top: (constraints.maxHeight - horizonHeight) / 2,
+                  width: horizonWidth,
+                  height: horizonHeight,
+                  // The floor's lines fan out past its box; keep them out of
+                  // the pane.
+                  child: ClipRect(
+                    child: NeonIgnition(
+                      enabled: widget.animateBackground,
+                      builder: (context, light) => Opacity(
+                        opacity: light,
+                        child: NeonHorizon(
+                          key: const ValueKey('welcome_horizon'),
+                          width: horizonWidth,
+                          height: horizonHeight,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 const Positioned.fill(
@@ -318,7 +333,7 @@ class _WelcomeContent extends StatelessWidget {
     child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const VizorWordmark(width: 106, height: 40, color: Color(0xffffffff)),
+        const VizorWordmark(width: 106, height: 40),
         const SizedBox(height: 48),
         Text(
           'Shielded\nby default', // l10n-ignore: brand tagline

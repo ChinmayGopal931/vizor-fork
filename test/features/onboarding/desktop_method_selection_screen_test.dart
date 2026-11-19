@@ -78,12 +78,6 @@ void main() {
     expect(find.text('Link Veylor Desktop'), findsNothing);
     expect(find.text('Cancel'), findsOneWidget);
 
-    final background = find.byKey(
-      const ValueKey('desktop_method_selection_background'),
-    );
-    expect(tester.getTopLeft(background), const Offset(-264, 0));
-    expect(tester.getSize(background), const Size(1344, 520));
-
     expect(
       tester.getSize(
         find.byKey(const ValueKey('desktop_import_secret_passphrase_card')),

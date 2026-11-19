@@ -362,9 +362,9 @@ abstract final class GreenPrimitives {
   static const p900Alpha65Light = Color(0xA6001E0A);
 }
 
-/// Veylor's mobile "neon" palette: true black, neon red and white light.
-/// Mobile builds only: the semantic categories pick these faces when
-/// `kAppFormFactor` is mobile, and desktop keeps the Figma ladders above.
+/// Veylor's "neon" palette: true black, neon red and white light. The
+/// semantic categories pick these faces on both form factors; the Figma
+/// ladders above stay for the sets that pin upstream's design.
 ///
 /// `*Dark` faces are near-black steps with a faint cool cast; `*Light` faces
 /// are brushed-steel greys. Like the ladders above, widgets never reference

@@ -358,14 +358,14 @@ void main() {
 
     // The pane stays interactive while the cards load, so the user can open
     // a modal the late navigation would replace.
-    await tester.tap(find.text('Theme'));
+    await tester.tap(find.text('Account name'));
     await tester.pumpAndSettle();
-    expect(find.text('System (Auto)'), findsOneWidget);
+    expect(find.byType(AccountEditModal), findsOneWidget);
 
     cards.complete(const PaymentLinkCardsSnapshot(created: [], received: []));
     await tester.pumpAndSettle();
 
-    expect(find.text('System (Auto)'), findsOneWidget);
+    expect(find.byType(AccountEditModal), findsOneWidget);
     expect(find.textContaining('payment links route'), findsNothing);
   });
 
@@ -420,16 +420,17 @@ void main() {
     // Personal leads, and Privacy sits after System (not between Account
     // and System as it used to). The System block is located by its first
     // row because "System" is also the theme value.
-    expect(sectionTop('Personal'), lessThan(sectionTop('Account')));
-    expect(sectionTop('Account'), lessThan(sectionTop('Endpoint')));
-    expect(sectionTop('Endpoint'), lessThan(sectionTop('Privacy')));
-    expect(sectionTop('Privacy'), lessThan(sectionTop('Misc')));
+    // Section heads are HUD captions, upper-cased where drawn.
+    expect(sectionTop('PERSONAL'), lessThan(sectionTop('ACCOUNT')));
+    expect(sectionTop('ACCOUNT'), lessThan(sectionTop('Endpoint')));
+    expect(sectionTop('Endpoint'), lessThan(sectionTop('PRIVACY')));
+    expect(sectionTop('PRIVACY'), lessThan(sectionTop('MISC')));
 
     // Personal owns the gift cards and address book entries.
     expect(find.text('Address book'), findsOneWidget);
     expect(find.text('Contacts'), findsNothing);
     expect(sectionTop('My gift cards'), lessThan(sectionTop('Address book')));
-    expect(sectionTop('Address book'), lessThan(sectionTop('Account')));
+    expect(sectionTop('Address book'), lessThan(sectionTop('ACCOUNT')));
 
     // Account keeps the renamed mobile-link row.
     expect(find.text('Link Veylor mobile'), findsOneWidget);
@@ -443,7 +444,7 @@ void main() {
       await tester.pumpWidget(_settingsHarness());
       await tester.pump();
 
-      expect(find.text('Danger zone'), findsNothing);
+      expect(find.text('DANGER ZONE'), findsNothing);
       expect(find.text('Uninstall Veylor'), findsNothing);
     } finally {
       _resetPlatformOverride();
@@ -1334,7 +1335,7 @@ void main() {
       find.byKey(const ValueKey('network_privacy_status_connected_true')),
     );
     expect(status.style?.fontSize, 14);
-    expect(status.style?.fontWeight, FontWeight.w400);
+    expect(status.style?.fontWeight, AppFontWeight.regular);
     expect(status.style?.height, 16 / 14);
     expect(status.style?.color, AppThemeData.light.colors.text.brandCrimson);
 
@@ -1342,7 +1343,7 @@ void main() {
       find.byKey(const ValueKey('network_privacy_description_connected_true')),
     );
     expect(description.style?.fontSize, 14);
-    expect(description.style?.fontWeight, FontWeight.w400);
+    expect(description.style?.fontWeight, AppFontWeight.regular);
     expect(description.style?.height, 21 / 14);
     expect(description.style?.color, AppThemeData.light.colors.text.accent);
   });
@@ -1718,7 +1719,7 @@ void main() {
         await tester.pumpWidget(_settingsHarness());
         await tester.pump();
 
-        expect(find.text('Danger zone'), findsOneWidget);
+        expect(find.text('DANGER ZONE'), findsOneWidget);
         expect(find.text('Uninstall Veylor'), findsOneWidget);
       }
     } finally {

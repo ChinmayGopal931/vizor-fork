@@ -460,12 +460,6 @@ void main() {
       );
       expect(
         find.byKey(
-          const ValueKey('home_desktop_ironwood_migration_background'),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(
           const ValueKey('home_desktop_ironwood_migration_cta_button'),
         ),
         findsOneWidget,
@@ -494,7 +488,7 @@ void main() {
             )
             .style
             ?.color,
-        AppThemeData.light.colors.text.disabled,
+        AppThemeData.dark.colors.text.disabled,
       );
       await tester.tap(find.byKey(const ValueKey('home_desktop_send_button')));
       await _pumpUntilPresent(tester, find.byType(SendScreen));
@@ -1634,7 +1628,7 @@ void main() {
             find.byKey(ValueKey('home_desktop_activity_skeleton_$i')),
           ),
       ];
-      final header = tester.getRect(find.text('Recent activity'));
+      final header = tester.getRect(find.text('RECENT ACTIVITY'));
       final seeAll = tester.getRect(find.text('See all'));
       final balance = tester.getRect(
         find.byKey(const ValueKey('home_desktop_balance_amount_text')),
@@ -1657,7 +1651,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(tester.getRect(card), before);
-      expect(tester.getRect(find.text('Recent activity')), header);
+      expect(tester.getRect(find.text('RECENT ACTIVITY')), header);
       expect(tester.getRect(find.text('See all')), seeAll);
       expect(
         tester.getRect(
@@ -1799,7 +1793,7 @@ void main() {
             expect(find.byType(HomeActivitySkeletonRow), findsNothing);
           } else {
             expect(find.byType(HomeActivitySkeletonRow), findsNWidgets(5));
-            expect(find.text('Recent activity'), findsOneWidget);
+            expect(find.text('RECENT ACTIVITY'), findsOneWidget);
             expect(find.text('See all'), findsOneWidget);
             expect(
               find.byKey(const ValueKey('home_desktop_empty_activity')),

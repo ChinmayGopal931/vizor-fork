@@ -22,6 +22,7 @@ import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/app_pane_modal_overlay.dart';
 import '../../../core/widgets/app_profile_picture.dart';
 import '../../../core/widgets/app_toast.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
 import '../../../core/widgets/untranslated_details.dart';
 import '../../../providers/account_provider.dart';
 import '../../../providers/enhance_pir_provider.dart';
@@ -660,12 +661,14 @@ class _SettingsList extends ConsumerWidget {
               value: explorerLabel,
               onTap: onExplorer,
             ),
-            _SettingsRow(
-              iconName: AppIcons.theme,
-              label: context.l10n.settingsThemeTitle,
-              value: themeLabel,
-              onTap: onTheme,
-            ),
+            // Veylor is dark only for now.
+            if (!kThemeLockedToDark)
+              _SettingsRow(
+                iconName: AppIcons.theme,
+                label: context.l10n.settingsThemeTitle,
+                value: themeLabel,
+                onTap: onTheme,
+              ),
             if (languageLabel case final languageLabel?)
               _SettingsRow(
                 key: const ValueKey('settings_language_row'),
@@ -1113,16 +1116,13 @@ class _SettingsBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    return Container(
+    // A neon glass panel under a red HUD caption, as mobile's settings
+    // groups are.
+    return NeonGlassPanel(
       clipBehavior: Clip.antiAlias,
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.sm,
         vertical: AppSpacing.md,
-      ),
-      decoration: BoxDecoration(
-        color: colors.background.ground,
-        borderRadius: BorderRadius.circular(AppRadii.large),
-        boxShadow: _settingsSurfaceShadow(colors),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1130,11 +1130,8 @@ class _SettingsBlock extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(AppSpacing.xxs),
             child: Text(
-              title,
-              style: AppTypography.labelLarge.copyWith(
-                fontWeight: FontWeight.w400,
-                color: colors.text.secondary,
-              ),
+              title.toUpperCase(),
+              style: kNeonHudCaptionStyle.copyWith(color: colors.neon.glow),
             ),
           ),
           const SizedBox(height: AppSpacing.s),
@@ -1342,6 +1339,3 @@ Color _settingsRowHoverBackgroundColor(BuildContext context) {
   final isDark = AppTheme.of(context) == AppThemeData.dark;
   return isDark ? colors.background.raised : colors.background.base;
 }
-
-List<BoxShadow> _settingsSurfaceShadow(AppColors colors) =>
-    appSurfaceShadow(colors);

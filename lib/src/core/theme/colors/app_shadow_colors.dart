@@ -1,9 +1,6 @@
 import 'package:flutter/painting.dart';
 
-import '../../layout/app_form_factor.dart';
 import '../primitives.dart';
-
-const _mobile = kAppFormFactor == AppFormFactor.mobile;
 
 /// Shadow colors from the Figma `Semantic/Shadows` tokens.
 class AppShadowColors {
@@ -21,8 +18,8 @@ class AppShadowColors {
   final Color subtle;
   final Color regular;
 
-  static const dark = _mobile ? neonDark : figmaDark;
-  static const light = _mobile ? neonLight : figmaLight;
+  static const dark = neonDark;
+  static const light = neonLight;
 
   static const figmaDark = AppShadowColors(
     shadow1: Primitives.p0Alpha0Dark,

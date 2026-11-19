@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:flutter/material.dart' show Colors, Scaffold;
 import 'package:flutter/widgets.dart';
@@ -8,6 +7,7 @@ import '../theme/app_theme.dart';
 import '../widgets/app_back_link.dart';
 import '../widgets/app_icon.dart';
 import '../widgets/app_toast.dart';
+import '../widgets/neon_glass_panel.dart';
 import 'content_overlay_inset.dart';
 
 /// Width the desktop shell reserves for its main sidebar.
@@ -87,55 +87,28 @@ class AppDesktopSidebarSurface extends StatelessWidget {
   final Widget child;
   final Color? backgroundColor;
   final Clip clipBehavior;
+
+  /// Draws the sidebar's neon glass panel: its top-left and bottom-right
+  /// corners cut and lit, its content clipped to the same outline.
   final bool glass;
 
-  static const glassRadius = 20.0;
-  static const _glassBlur = 17.5;
+  /// The corner radius of the surfaces that follow the sidebar's shape, such
+  /// as the onboarding modals: near-square, as the neon look's corners are.
+  static const glassRadius = AppRadii.large;
+
+  /// How far the glass panel's corner cuts reach: the panel's own cut, short
+  /// of mobile's sidebar cut so the lit top-left corner clears the macOS
+  /// window controls above the sidebar's content.
+  static const glassCut = AppChamfer.large;
 
   @override
   Widget build(BuildContext context) {
     if (glass) {
-      final colors = context.colors;
-      final radius = BorderRadius.circular(glassRadius);
-      final fill = backgroundColor ?? colors.macosUtility.navPanel;
-      final thinBorderColor = colors.macosUtility.thinBorder;
-      final innerHighlightColor = colors.macosUtility.innerBorder;
-
-      return DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: radius,
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF000000).withValues(alpha: 0.12),
-              blurRadius: 44,
-            ),
-            BoxShadow(color: thinBorderColor, blurRadius: 0, spreadRadius: 1),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: radius,
-          clipBehavior: clipBehavior,
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: _glassBlur, sigmaY: _glassBlur),
-            child: DecoratedBox(
-              decoration: BoxDecoration(color: fill, borderRadius: radius),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  child,
-                  IgnorePointer(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        borderRadius: radius,
-                        border: Border.all(color: innerHighlightColor),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
+      return NeonGlassPanel(
+        cut: glassCut,
+        fill: backgroundColor,
+        clipBehavior: clipBehavior,
+        child: child,
       );
     }
 
@@ -169,7 +142,9 @@ class AppDesktopPane extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: paintBackground ? backgroundColor ?? Colors.transparent : null,
-        borderRadius: BorderRadius.circular(AppWindowSizing.paneRadius),
+        // Near-square, as the neon look's corners are; the Figma pane
+        // corner is [AppWindowSizing.paneRadius].
+        borderRadius: BorderRadius.circular(AppRadii.large),
       ),
       clipBehavior: Clip.antiAlias,
       child: AppToastHost(

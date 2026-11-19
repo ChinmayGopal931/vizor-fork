@@ -20,23 +20,27 @@ void main() {
 
     expect(
       AppTypography.bodyMedium,
-      mobile ? AppTypographyMobile.bodyMedium : AppTypographyDesktop.bodyMedium,
+      mobile
+          ? AppTypographyMobile.bodyMedium
+          : AppTypographyDesktopNeon.bodyMedium,
     );
     expect(
       AppTypography.displayLarge,
       mobile
           ? AppTypographyMobile.displayLarge
-          : AppTypographyDesktop.displayLarge,
+          : AppTypographyDesktopNeon.displayLarge,
     );
     expect(
       AppTypography.headlineMedium,
       mobile
           ? AppTypographyMobile.headlineMedium
-          : AppTypographyDesktop.headlineMedium,
+          : AppTypographyDesktopNeon.headlineMedium,
     );
     expect(
       AppTypography.codeMedium,
-      mobile ? AppTypographyMobile.codeMedium : AppTypographyDesktop.codeMedium,
+      mobile
+          ? AppTypographyMobile.codeMedium
+          : AppTypographyDesktopNeon.codeMedium,
     );
     expect(
       AppButtonSizing.largeHeight,
@@ -58,11 +62,9 @@ void main() {
           ? AppButtonSizingMobile.mediumSmallIconSize
           : AppButtonSizingDesktop.mediumSmallIconSize,
     );
-    expect(
-      AppRadii.xLarge,
-      mobile ? AppRadiiMobile.xLarge : AppRadiiDesktop.xLarge,
-    );
-    expect(AppRadii.full, mobile ? AppRadiiMobile.full : AppRadiiDesktop.full);
+    // Both form factors draw the neon corners.
+    expect(AppRadii.xLarge, AppRadiiNeon.xLarge);
+    expect(AppRadii.full, AppRadiiNeon.full);
   });
 
   test('desktop sizing tokens match 1 Sizing-3.zip', () {
@@ -107,12 +109,12 @@ void main() {
 
   test('mobile sizing tokens match 1 Sizing-3.zip', () {
     // Near-square corners: even a pill is a 4px slab.
-    expect(AppRadiiMobile.xSmall, 2);
-    expect(AppRadiiMobile.small, 2);
-    expect(AppRadiiMobile.medium, 3);
-    expect(AppRadiiMobile.large, 4);
-    expect(AppRadiiMobile.xLarge, 4);
-    expect(AppRadiiMobile.full, 4);
+    expect(AppRadiiNeon.xSmall, 2);
+    expect(AppRadiiNeon.small, 2);
+    expect(AppRadiiNeon.medium, 3);
+    expect(AppRadiiNeon.large, 4);
+    expect(AppRadiiNeon.xLarge, 4);
+    expect(AppRadiiNeon.full, 4);
 
     expect(AppAssetSizeMobile.size, 40);
     expect(AppAssetSizeMobile.icon, 18);
@@ -126,7 +128,7 @@ void main() {
     expect(AppInputSizingMobile.iconSize, 24);
     // Figma `Input/Radii` aliases `Radii.SM` on mobile; the Figma radii
     // scale is shifted one tier against Dart's, so `SM` = `medium`.
-    expect(AppInputSizingMobile.radius, AppRadiiMobile.medium);
+    expect(AppInputSizingMobile.radius, AppRadiiNeon.medium);
   });
 
   test('desktop font tokens preserve redesign serif typography', () {
@@ -280,13 +282,13 @@ void main() {
     expect(AppTypographyMobile.labelSmall, AppTypographyMobile.labelMedium);
   });
 
-  test('AppFontWeight keeps the desktop weight and is Light on mobile', () {
-    const mobile = kAppFormFactor == AppFormFactor.mobile;
-    expect(AppFontWeight.regular, mobile ? FontWeight.w300 : FontWeight.w400);
-    expect(AppFontWeight.medium, mobile ? FontWeight.w300 : FontWeight.w500);
-    expect(AppFontWeight.semiBold, mobile ? FontWeight.w300 : FontWeight.w600);
-    expect(AppFontWeight.bold, mobile ? FontWeight.w300 : FontWeight.w700);
-    expect(AppFontWeight.extraBold, mobile ? FontWeight.w300 : FontWeight.w800);
+  test('AppFontWeight is Light on both form factors', () {
+    expect(AppFontWeight.regular, FontWeight.w300);
+    expect(AppFontWeight.medium, FontWeight.w300);
+    expect(AppFontWeight.semiBold, FontWeight.w300);
+    expect(AppFontWeight.bold, FontWeight.w300);
+    expect(AppFontWeight.extraBold, FontWeight.w300);
+    expect(AppFontWeight.heading, FontWeight.w100);
   });
 
   test('semantic color tokens match 2 Color Theme-3.zip', () {

@@ -1,8 +1,4 @@
-import '../layout/app_form_factor.dart';
-
-const _mobile = kAppFormFactor == AppFormFactor.mobile;
-
-/// Corner-radius scale from the Figma token export (Mode 1 / Radii).
+/// Corner-radius scale.
 ///
 /// Figma names these `XS / S / SM / M / L / Full`; Dart exposes full words so
 /// callers read like the rest of the design-system API.
@@ -12,30 +8,19 @@ const _mobile = kAppFormFactor == AppFormFactor.mobile;
 /// adapts automatically to any element height. Keep [full] available for
 /// the few places where a literal radius is more convenient.
 ///
-/// Mobile builds resolve to the near-square [AppRadiiMobile]; desktop keeps
-/// the Figma scale in [AppRadiiDesktop].
+/// Both form factors resolve to the near-square [AppRadiiNeon] of Veylor's
+/// neon look; [AppRadiiDesktop] keeps upstream's Figma scale for the tooling
+/// and tests that pin it.
 abstract final class AppRadii {
-  static const double xSmall = _mobile
-      ? AppRadiiMobile.xSmall
-      : AppRadiiDesktop.xSmall;
-  static const double small = _mobile
-      ? AppRadiiMobile.small
-      : AppRadiiDesktop.small;
-  static const double medium = _mobile
-      ? AppRadiiMobile.medium
-      : AppRadiiDesktop.medium;
-  static const double large = _mobile
-      ? AppRadiiMobile.large
-      : AppRadiiDesktop.large;
-  static const double xLarge = _mobile
-      ? AppRadiiMobile.xLarge
-      : AppRadiiDesktop.xLarge;
-  static const double full = _mobile
-      ? AppRadiiMobile.full
-      : AppRadiiDesktop.full;
+  static const double xSmall = AppRadiiNeon.xSmall;
+  static const double small = AppRadiiNeon.small;
+  static const double medium = AppRadiiNeon.medium;
+  static const double large = AppRadiiNeon.large;
+  static const double xLarge = AppRadiiNeon.xLarge;
+  static const double full = AppRadiiNeon.full;
 }
 
-/// The Figma radii (desktop).
+/// The Figma radii (upstream's desktop design).
 abstract final class AppRadiiDesktop {
   static const double xSmall = 8;
   static const double small = 12;
@@ -45,9 +30,9 @@ abstract final class AppRadiiDesktop {
   static const double full = 999;
 }
 
-/// The mobile radii: flat planes and near-square corners. Even a "pill" is a
+/// The neon radii: flat planes and near-square corners. Even a "pill" is a
 /// slab with a 4px edge.
-abstract final class AppRadiiMobile {
+abstract final class AppRadiiNeon {
   static const double xSmall = 2;
   static const double small = 2;
   static const double medium = 3;
@@ -56,9 +41,9 @@ abstract final class AppRadiiMobile {
   static const double full = 4;
 }
 
-/// 45° corner cuts for the mobile surfaces (buttons, panels, badges,
-/// avatars), drawn with `BeveledRectangleBorder`. A value is how far the cut
-/// reaches along each edge.
+/// 45° corner cuts for the neon surfaces (buttons, panels, badges, avatars),
+/// drawn with `BeveledRectangleBorder`. A value is how far the cut reaches
+/// along each edge.
 abstract final class AppChamfer {
   static const double small = 4;
   static const double medium = 8;

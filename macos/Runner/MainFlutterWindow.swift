@@ -8,27 +8,26 @@ import desktop_window_bootstrap
 import ScreenCaptureKit
 #endif
 
+/// The window colour behind Flutter: the neon look's window colour, true
+/// black in dark mode and steel in light (`AppMacosUtilityColors.neonDark`
+/// and `.neonLight` in Dart).
 private func appWindowBackgroundColor(for brightness: String) -> NSColor {
   if brightness == "dark" {
-    return NSColor(
-      srgbRed: 15.0 / 255.0,
-      green: 15.0 / 255.0,
-      blue: 15.0 / 255.0,
-      alpha: 1
-    )
+    return NSColor(srgbRed: 0, green: 0, blue: 0, alpha: 1)
   }
   return NSColor(
-    srgbRed: 245.0 / 255.0,
-    green: 245.0 / 255.0,
-    blue: 245.0 / 255.0,
+    srgbRed: 234.0 / 255.0,
+    green: 234.0 / 255.0,
+    blue: 230.0 / 255.0,
     alpha: 1
   )
 }
 
-private func currentSystemBrightness() -> String {
-  let match = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua])
-  return match == .darkAqua ? "dark" : "light"
-}
+/// The brightness the window opens in, before Flutter reports its theme's.
+/// Veylor is dark only for now (`kThemeLockedToDark` in Dart), so the window
+/// opens dark and black whatever the system appearance, and nothing light
+/// shows before the first frame.
+private let launchBrightness = "dark"
 
 private final class VizorWindowToolbarDelegate: NSObject, NSToolbarDelegate {
   func toolbarAllowedItemIdentifiers(
@@ -1219,10 +1218,15 @@ class MainFlutterWindow: NSWindow {
   }
 
   override func awakeFromNib() {
+    let launchAppearance = NSAppearance(
+      named: launchBrightness == "dark" ? .darkAqua : .aqua
+    )
+    NSApp.appearance = launchAppearance
+    appearance = launchAppearance
     let desktopWindowViewController = DesktopWindowBootstrapMacOS.start(
       mainFlutterWindow: self,
       visualStyle: .opaque,
-      backgroundColor: appWindowBackgroundColor(for: currentSystemBrightness())
+      backgroundColor: appWindowBackgroundColor(for: launchBrightness)
     )
     title = ""
     installVizorWindowToolbarObservers()

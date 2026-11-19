@@ -1,5 +1,3 @@
-import 'dart:ui' as ui;
-
 import 'package:flutter/material.dart' show Scaffold;
 import 'package:flutter/widgets.dart';
 
@@ -10,10 +8,6 @@ import '../../../core/widgets/app_icon.dart';
 const double _contentAreaWidth = 420;
 const double _cardHeight = 80;
 const double _footerButtonWidth = 210;
-const double _backgroundLeftOverflow = 264;
-const double _backgroundHeight = 520;
-const double _backgroundFadeStart = 143;
-const double _backgroundFadeEnd = 529;
 
 /// Shared full-window presentation for the desktop import method pickers.
 ///
@@ -45,27 +39,7 @@ class DesktopMethodSelectionScaffold extends StatelessWidget {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Positioned(
-            left: -_backgroundLeftOverflow,
-            right: 0,
-            top: 0,
-            height: _backgroundHeight,
-            child: ShaderMask(
-              blendMode: BlendMode.dstIn,
-              shaderCallback: (_) => ui.Gradient.linear(
-                const Offset(0, _backgroundFadeStart),
-                const Offset(0, _backgroundFadeEnd),
-                const [Color(0x26FFFFFF), Color(0x00FFFFFF)],
-              ),
-              child: Image.asset(
-                'assets/illustrations/desktop/donation_success_background.webp', // l10n-ignore: asset path
-                key: const ValueKey('desktop_method_selection_background'),
-                fit: BoxFit.cover,
-                alignment: Alignment.center,
-                excludeFromSemantics: true,
-              ),
-            ),
-          ),
+          // The neon look paints no backdrop behind the methods.
           Padding(
             padding: const EdgeInsets.only(top: 48),
             child: Center(

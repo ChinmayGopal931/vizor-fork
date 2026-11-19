@@ -63,10 +63,7 @@ void main() {
       find.byType(Container).first,
     );
     final decoration = paneContainer.decoration as BoxDecoration;
-    expect(
-      decoration.borderRadius,
-      BorderRadius.circular(AppWindowSizing.paneRadius),
-    );
+    expect(decoration.borderRadius, AppPaneModalOverlay.defaultBorderRadius);
     expect(paneContainer.clipBehavior, Clip.antiAlias);
   });
 

@@ -22,6 +22,7 @@ import '../../../core/widgets/app_profile_picture.dart';
 import '../../../core/widgets/app_profile_picture_picker_modal.dart';
 import '../../../core/widgets/app_tappable.dart';
 import '../../../core/widgets/app_text_field.dart';
+import '../../../core/widgets/mobile/neon_horizon.dart';
 import '../../send/models/send_prefill_args.dart';
 import '../../address_scan/widgets/address_qr_scan_modal.dart';
 import '../../address_scan/widgets/address_scan_resolver.dart';
@@ -955,11 +956,11 @@ class _AddressBookNoContacts extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Image.asset(
-          _addressBookEmptyContactsAsset,
+        // The neon horizon, in the slot of upstream's illustration.
+        const SizedBox(
           width: 340,
           height: 220,
-          fit: BoxFit.contain,
+          child: Center(child: NeonHorizon(width: 340, height: 150)),
         ),
         const SizedBox(height: AppSpacing.base),
         Text(
@@ -1000,11 +1001,10 @@ class _EmptySearchResult extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Image.asset(
-          _addressBookEmptySearchAsset,
+        const SizedBox(
           width: 170,
           height: 170,
-          fit: BoxFit.contain,
+          child: Center(child: NeonHorizon(width: 200, height: 88)),
         ),
         const SizedBox(height: AppSpacing.base),
         Text(
@@ -1672,8 +1672,3 @@ class _AddressBookError extends StatelessWidget {
     );
   }
 }
-
-const _addressBookEmptyContactsAsset =
-    'assets/illustrations/address_book_empty_contacts.webp';
-const _addressBookEmptySearchAsset =
-    'assets/illustrations/address_book_empty_search.webp';

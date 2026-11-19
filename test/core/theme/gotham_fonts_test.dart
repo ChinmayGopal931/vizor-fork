@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zcash_wallet/src/core/layout/app_form_factor.dart';
 import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 
 /// Checksum written differently from the implementation under test: each byte
@@ -163,16 +164,20 @@ void main() {
     await loadGothamFonts();
     await loadGothamFonts(); // idempotent
 
+    // Desktop registers no face heavier than Light, so every heavier weight
+    // resolves to Light there.
+    String heavy(String face) =>
+        kAppFormFactor == AppFormFactor.desktop ? 'Light' : face;
     final expected = <FontWeight, String>{
       FontWeight.w100: 'Thin',
       FontWeight.w200: 'Thin',
       FontWeight.w300: 'Light',
-      FontWeight.w400: 'Book',
-      FontWeight.w500: 'Medium',
-      FontWeight.w600: 'Bold',
-      FontWeight.w700: 'Bold',
-      FontWeight.w800: 'Black',
-      FontWeight.w900: 'Ultra',
+      FontWeight.w400: heavy('Book'),
+      FontWeight.w500: heavy('Medium'),
+      FontWeight.w600: heavy('Bold'),
+      FontWeight.w700: heavy('Bold'),
+      FontWeight.w800: heavy('Black'),
+      FontWeight.w900: heavy('Ultra'),
     };
     for (final entry in expected.entries) {
       expect(

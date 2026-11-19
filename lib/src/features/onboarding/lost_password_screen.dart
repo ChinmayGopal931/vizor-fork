@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../main.dart' show log;
-import '../../core/layout/app_form_factor.dart';
 import '../../core/l10n/l10n.dart';
 import '../../core/l10n/locale_typography.dart';
 import '../../core/theme/app_theme.dart';
@@ -265,14 +264,7 @@ class _LostPasswordContent extends StatelessWidget {
         // Figma: this screen's badge sits on a 30% gray shield, unlike the
         // crimson welcome/unlock badge. The neon (mobile) look has no
         // illustrated badges: a lit lock takes the same slot.
-        if (kAppFormFactor == AppFormFactor.mobile)
-          const NeonGlyphBadge(iconName: AppIcons.lock, size: 50)
-        else
-          Image.asset(
-            'assets/illustrations/lost_password_badge.webp',
-            width: 50,
-            height: 50,
-          ),
+        const NeonGlyphBadge(iconName: AppIcons.lock, size: 50),
         const SizedBox(height: AppSpacing.base),
         Column(
           mainAxisSize: MainAxisSize.min,

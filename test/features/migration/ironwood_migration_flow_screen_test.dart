@@ -5159,7 +5159,10 @@ void main() {
     final scheduleDecoration =
         tester.widget<DecoratedBox>(firstScheduleSurface).decoration
             as BoxDecoration;
-    expect(scheduleDecoration.borderRadius, BorderRadius.circular(16));
+    expect(
+      scheduleDecoration.borderRadius,
+      BorderRadius.circular(AppRadii.medium),
+    );
     final completedStatus = find.byKey(
       const ValueKey('ironwood_migration_schedule_status_0'),
     );

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../app_bootstrap.dart';
-import '../core/layout/app_form_factor.dart';
 import '../core/storage/app_secure_store.dart';
 
 /// Holds the user's selected [ThemeMode] (system / light / dark).
@@ -33,10 +32,10 @@ class ThemeModeNotifier extends Notifier<ThemeMode> {
   }
 }
 
-/// The mobile app is dark only for now: the theme is pinned to dark and
-/// Settings hides its Theme row. A saved choice stays stored for when the
-/// lock is lifted.
-const kThemeLockedToDark = kAppFormFactor == AppFormFactor.mobile;
+/// Veylor is dark only for now, on mobile and desktop alike: the theme is
+/// pinned to dark and Settings hides its Theme row. A saved choice stays
+/// stored for when the lock is lifted.
+const kThemeLockedToDark = true;
 
 final themeModeProvider = NotifierProvider<ThemeModeNotifier, ThemeMode>(
   ThemeModeNotifier.new,

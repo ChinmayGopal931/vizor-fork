@@ -10,6 +10,7 @@ import '../../../core/layout/app_form_factor.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
 import '../../../core/widgets/receipt_loading_skeleton.dart';
 import 'activity_skeleton_row.dart';
 import '../models/activity_row_data.dart';
@@ -49,12 +50,6 @@ final _activitySupportingStyle = kAppFormFactor == AppFormFactor.mobile
 const _activityRowSubtitleIconSize = kAppFormFactor == AppFormFactor.mobile
     ? AppIconSize.medium
     : 16.0;
-
-/// Month group titles. Mobile uses the label's own weight, like the Settings
-/// group titles; desktop keeps its semibold.
-const _activityGroupTitleWeight = kAppFormFactor == AppFormFactor.mobile
-    ? FontWeight.w500
-    : FontWeight.w600;
 
 /// Leading circle and its glyph. Mobile uses a 44px circle with a 20px glyph
 /// (the asset tokens' 18/40 proportion); desktop keeps the asset tokens. 48px
@@ -621,14 +616,10 @@ class _ActivityFeedSectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    // A red HUD caption, upper-cased where drawn.
     return Text(
-      _mobile ? title.toUpperCase() : title,
-      style: _mobile
-          ? kNeonHudCaptionStyle.copyWith(color: colors.neon.glow)
-          : AppTypography.labelLarge.copyWith(
-              color: colors.text.secondary,
-              fontWeight: _activityGroupTitleWeight,
-            ),
+      title.toUpperCase(),
+      style: kNeonHudCaptionStyle.copyWith(color: colors.neon.glow),
     );
   }
 }
@@ -687,99 +678,113 @@ class _ActivityFeedCardSegment extends StatelessWidget {
     return _ActivityFeedCentered(
       width: width,
       child: CustomPaint(
-        painter: _ActivityFeedCardSegmentShadowPainter(
+        painter: _ActivityFeedGlassSegmentPainter(
           position: position,
-          shadows: appSurfaceShadow(colors),
+          fill: colors.background.window.withValues(alpha: 0.62),
+          glow: colors.neon.glow,
+          core: colors.neon.core,
         ),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: colors.background.ground,
-            borderRadius: _activityFeedSegmentRadius(position),
-          ),
-          child: child,
-        ),
+        child: child,
       ),
     );
   }
 }
 
-class _ActivityFeedCardSegmentShadowPainter extends CustomPainter {
-  const _ActivityFeedCardSegmentShadowPainter({
+/// One slice of a month's neon glass panel (`NeonGlassPanelPainter`'s
+/// panel): the segments of a sliver feed stack into one panel cut and lit at
+/// its top-left and bottom-right corners, with a faint edge along its sides.
+class _ActivityFeedGlassSegmentPainter extends CustomPainter {
+  const _ActivityFeedGlassSegmentPainter({
     required this.position,
-    required this.shadows,
+    required this.fill,
+    required this.glow,
+    required this.core,
   });
 
-  static const _shadowPaintExtent = 24.0;
-
   final _ActivityFeedCardSegmentPosition position;
-  final List<BoxShadow> shadows;
+  final Color fill;
+  final Color glow;
+  final Color core;
+
+  bool get _top =>
+      position == _ActivityFeedCardSegmentPosition.single ||
+      position == _ActivityFeedCardSegmentPosition.first;
+
+  bool get _bottom =>
+      position == _ActivityFeedCardSegmentPosition.single ||
+      position == _ActivityFeedCardSegmentPosition.last;
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (shadows.isEmpty) return;
-    final clipPath = _shadowClipPath(size);
-    canvas.save();
-    canvas.clipPath(clipPath);
-    final radius = _activityFeedSegmentRadius(position);
-    final baseRect = Offset.zero & size;
-    for (final shadow in shadows) {
-      final rect = baseRect.inflate(shadow.spreadRadius).shift(shadow.offset);
-      canvas.drawRRect(radius.toRRect(rect), shadow.toPaint());
-    }
-    canvas.restore();
-  }
+    // Open ends run to the segment's edge, so the sides join the next slice.
+    final rect = Rect.fromLTRB(
+      0.5,
+      _top ? 0.5 : 0,
+      size.width - 0.5,
+      _bottom ? size.height - 0.5 : size.height,
+    );
+    final cut = math.min(
+      AppChamfer.large,
+      math.min(rect.width, rect.height) / 2,
+    );
+    final topLeft = _top ? cut : 0.0;
+    final bottomRight = _bottom ? cut : 0.0;
+    canvas.drawPath(
+      Neon.chamferedRect(rect, topLeft: topLeft, bottomRight: bottomRight),
+      Paint()..color = fill,
+    );
 
-  Path _shadowClipPath(Size size) {
-    const extent = _shadowPaintExtent;
-    final width = size.width;
-    final height = size.height;
-    final path = Path();
-    switch (position) {
-      case _ActivityFeedCardSegmentPosition.single:
-        path.addRect(
-          Rect.fromLTRB(-extent, -extent, width + extent, height + extent),
-        );
-      case _ActivityFeedCardSegmentPosition.first:
-        path.addRect(Rect.fromLTRB(-extent, -extent, width + extent, height));
-      case _ActivityFeedCardSegmentPosition.middle:
-        path
-          ..addRect(Rect.fromLTRB(-extent, 0, 0, height))
-          ..addRect(Rect.fromLTRB(width, 0, width + extent, height));
-      case _ActivityFeedCardSegmentPosition.last:
-        path.addRect(
-          Rect.fromLTRB(-extent, 0, width + extent, height + extent),
-        );
+    final edge = Path();
+    if (_top && _bottom) {
+      edge.addPath(
+        Neon.chamferedRect(rect, topLeft: topLeft, bottomRight: bottomRight),
+        Offset.zero,
+      );
+    } else {
+      edge
+        ..moveTo(rect.left, _bottom ? rect.top : rect.bottom)
+        ..lineTo(rect.left, rect.top + topLeft);
+      if (_top) {
+        edge
+          ..lineTo(rect.left + topLeft, rect.top)
+          ..lineTo(rect.right, rect.top)
+          ..lineTo(rect.right, rect.bottom);
+      } else if (_bottom) {
+        edge
+          ..lineTo(rect.left, rect.bottom)
+          ..lineTo(rect.right - bottomRight, rect.bottom)
+          ..lineTo(rect.right, rect.bottom - bottomRight)
+          ..lineTo(rect.right, rect.top);
+      } else {
+        edge
+          ..moveTo(rect.right, rect.top)
+          ..lineTo(rect.right, rect.bottom);
+      }
     }
-    return path;
+    canvas.drawPath(
+      edge,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = glow.withValues(alpha: 0.22),
+    );
+    if (_top || _bottom) {
+      Neon.strokeTube(
+        canvas,
+        Neon.chamferCuts(rect, topLeft: topLeft, bottomRight: bottomRight),
+        glow: glow,
+        core: core,
+        width: 1.4,
+      );
+    }
   }
 
   @override
-  bool shouldRepaint(
-    covariant _ActivityFeedCardSegmentShadowPainter oldDelegate,
-  ) {
-    if (oldDelegate.position != position) return true;
-    if (oldDelegate.shadows.length != shadows.length) return true;
-    for (var index = 0; index < shadows.length; index++) {
-      if (oldDelegate.shadows[index] != shadows[index]) return true;
-    }
-    return false;
-  }
-}
-
-BorderRadius _activityFeedSegmentRadius(
-  _ActivityFeedCardSegmentPosition position,
-) {
-  const radius = Radius.circular(AppRadii.large);
-  return switch (position) {
-    _ActivityFeedCardSegmentPosition.single => const BorderRadius.all(radius),
-    _ActivityFeedCardSegmentPosition.first => const BorderRadius.vertical(
-      top: radius,
-    ),
-    _ActivityFeedCardSegmentPosition.middle => BorderRadius.zero,
-    _ActivityFeedCardSegmentPosition.last => const BorderRadius.vertical(
-      bottom: radius,
-    ),
-  };
+  bool shouldRepaint(_ActivityFeedGlassSegmentPainter oldDelegate) =>
+      oldDelegate.position != position ||
+      oldDelegate.fill != fill ||
+      oldDelegate.glow != glow ||
+      oldDelegate.core != core;
 }
 
 class _ActivityFeedTitleRow extends StatelessWidget {
@@ -963,15 +968,7 @@ class _ActivityFeedCardShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!_activityFeedOnCards) return child;
-    final colors = context.colors;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colors.background.ground,
-        borderRadius: BorderRadius.circular(AppRadii.large),
-        boxShadow: appSurfaceShadow(colors),
-      ),
-      child: child,
-    );
+    return NeonGlassPanel(child: child);
   }
 }
 
@@ -1452,21 +1449,16 @@ class _ActivityIconFallback extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      // Mobile: a cut-corner plate with a lit edge.
-      decoration: _mobile
-          ? ShapeDecoration(
-              color: row.leadingBackgroundColor,
-              shape: Neon.chamferBorder(
-                cut: AppChamfer.small + 3,
-                side: BorderSide(
-                  color: context.colors.neon.glow.withValues(alpha: 0.35),
-                ),
-              ),
-            )
-          : BoxDecoration(
-              color: row.leadingBackgroundColor,
-              shape: BoxShape.circle,
-            ),
+      // A cut-corner plate with a lit edge.
+      decoration: ShapeDecoration(
+        color: row.leadingBackgroundColor,
+        shape: Neon.chamferBorder(
+          cut: AppChamfer.small + 3,
+          side: BorderSide(
+            color: context.colors.neon.glow.withValues(alpha: 0.35),
+          ),
+        ),
+      ),
       child: Center(
         child: AppIcon(
           row.leadingIconName,

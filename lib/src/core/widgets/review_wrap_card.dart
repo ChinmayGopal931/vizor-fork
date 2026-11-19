@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import '../layout/app_form_factor.dart';
 import '../theme/app_theme.dart';
 import 'mobile/mobile_surface_card.dart';
+import 'neon_glass_panel.dart';
 
 /// The [ReviewWrapCard] inner inset shared by every default instance.
 const kReviewWrapCardPadding = EdgeInsets.symmetric(
@@ -15,7 +16,8 @@ const kReviewWrapCardPadding = EdgeInsets.symmetric(
 /// surface shadow, hosting list rows and dividers with a 16px gap.
 ///
 /// Figma `radii/m` is 24px → [AppRadii.large], NOT `AppRadii.medium` (16);
-/// the radii scale is mapped by value, not by token name.
+/// the radii scale is mapped by value, not by token name. Desktop draws the
+/// card as a [NeonGlassPanel] instead.
 class ReviewWrapCard extends StatelessWidget {
   const ReviewWrapCard({
     required this.children,
@@ -48,28 +50,39 @@ class ReviewWrapCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final rows = Column(
+      mainAxisSize: mainAxisSize,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < children.length; i++) ...[
+          if (i > 0) const SizedBox(height: AppSpacing.sm),
+          children[i],
+        ],
+      ],
+    );
+    if (kAppFormFactor == AppFormFactor.desktop) {
+      // Desktop's cards are neon glass panels.
+      return SizedBox(
+        width: double.infinity,
+        child: NeonGlassPanel(
+          fill: surfaceColor,
+          padding: padding,
+          clipBehavior: Clip.antiAlias,
+          child: rows,
+        ),
+      );
+    }
     return Container(
       width: double.infinity,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: surfaceColor ?? colors.background.ground,
         borderRadius: BorderRadius.circular(AppRadii.large),
-        // Mobile surfaces share the soft lift; desktop keeps its outline.
-        boxShadow: kAppFormFactor == AppFormFactor.mobile
-            ? mobileSurfaceShadows(colors)
-            : appSurfaceShadow(colors),
+        // Mobile surfaces share the soft lift.
+        boxShadow: mobileSurfaceShadows(colors),
       ),
       padding: padding,
-      child: Column(
-        mainAxisSize: mainAxisSize,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (var i = 0; i < children.length; i++) ...[
-            if (i > 0) const SizedBox(height: AppSpacing.sm),
-            children[i],
-          ],
-        ],
-      ),
+      child: rows,
     );
   }
 }

@@ -165,7 +165,8 @@ class KeystoneOnboardingShell extends StatelessWidget {
 
     return AppDesktopShell(
       sidebarWidth: kAppDesktopSidebarWidth,
-      background: _KeystoneOnboardingWindowBackground(activeStep: activeStep),
+      // The neon look paints no backdrop behind the steps.
+      background: const SizedBox.shrink(),
       sidebar: SlideTransition(
         position: Tween<Offset>(
           begin: const Offset(-1, 0),
@@ -177,35 +178,6 @@ class KeystoneOnboardingShell extends StatelessWidget {
         ),
       ),
       pane: FadeTransition(opacity: entrance, child: child),
-    );
-  }
-}
-
-class _KeystoneOnboardingWindowBackground extends StatelessWidget {
-  const _KeystoneOnboardingWindowBackground({required this.activeStep});
-
-  final KeystoneOnboardingStep activeStep;
-
-  @override
-  Widget build(BuildContext context) {
-    final asset = switch (activeStep) {
-      KeystoneOnboardingStep.setPassword =>
-        'assets/illustrations/desktop/onboarding_secret_passphrase_background.webp',
-      KeystoneOnboardingStep.customiseAccount => null,
-      _ => null,
-    };
-
-    if (asset == null) {
-      return const SizedBox.shrink();
-    }
-
-    return DecoratedBox(
-      decoration: BoxDecoration(color: context.colors.background.window),
-      child: Image.asset(
-        asset,
-        fit: BoxFit.cover,
-        alignment: Alignment.topCenter,
-      ),
     );
   }
 }

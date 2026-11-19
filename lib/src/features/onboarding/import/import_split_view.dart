@@ -73,7 +73,8 @@ class ImportOnboardingShell extends StatelessWidget {
 
     return AppDesktopShell(
       sidebarWidth: kAppDesktopSidebarWidth,
-      background: _ImportOnboardingWindowBackground(activeStep: activeStep),
+      // The neon look paints no backdrop behind the steps.
+      background: const SizedBox.shrink(),
       sidebar: SlideTransition(
         position: Tween<Offset>(
           begin: const Offset(-1, 0),
@@ -85,42 +86,6 @@ class ImportOnboardingShell extends StatelessWidget {
         ),
       ),
       pane: FadeTransition(opacity: entrance, child: child),
-    );
-  }
-}
-
-class _ImportOnboardingWindowBackground extends StatelessWidget {
-  const _ImportOnboardingWindowBackground({required this.activeStep});
-
-  final ImportOnboardingStep activeStep;
-
-  @override
-  Widget build(BuildContext context) {
-    final asset = switch (activeStep) {
-      ImportOnboardingStep.secretPassphrase ||
-      ImportOnboardingStep.walletBirthdayHeight =>
-        'assets/illustrations/desktop/onboarding_secret_passphrase_background.webp',
-      // Figma uses the same castle line-art for both themes (alpha-only
-      // strokes composite against the window color), so one asset serves
-      // light and dark — same wiring as the create flow.
-      ImportOnboardingStep.setPassword =>
-        'assets/illustrations/desktop/onboarding_set_password_background_light.webp',
-      ImportOnboardingStep.customiseAccount => null,
-    };
-
-    if (asset == null) {
-      return DecoratedBox(
-        decoration: BoxDecoration(color: context.colors.background.window),
-      );
-    }
-
-    return DecoratedBox(
-      decoration: BoxDecoration(color: context.colors.background.window),
-      child: Image.asset(
-        asset,
-        fit: BoxFit.cover,
-        alignment: Alignment.topCenter,
-      ),
     );
   }
 }

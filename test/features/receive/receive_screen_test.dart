@@ -136,7 +136,7 @@ void main() {
     final shieldedSpan = shieldedRichText.text as TextSpan;
     expect(shieldedRichText.overflow, TextOverflow.clip);
     expect(shieldedSpan.style?.fontFamily, 'Gotham');
-    expect(shieldedSpan.style?.fontWeight, FontWeight.w500);
+    expect(shieldedSpan.style?.fontWeight, AppTypography.labelLarge.fontWeight);
     expect(shieldedSpan.style?.fontSize, 14);
     expect(shieldedSpan.style?.height, 16 / 14);
     expect(shieldedSpan.style?.letterSpacing, -0.06);

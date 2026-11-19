@@ -91,7 +91,7 @@ void main() {
 
     final text = tester.widget<Text>(find.text("Can't read the clipboard"));
     expect(text.style?.color, const Color(0xFFFFFFFF));
-    expect(text.style?.fontWeight, FontWeight.w400);
+    expect(text.style?.fontWeight, AppFontWeight.regular);
     expect(text.style?.fontSize, AppTypography.labelLarge.fontSize);
 
     final icon = tester.widget<AppIcon>(find.byType(AppIcon));

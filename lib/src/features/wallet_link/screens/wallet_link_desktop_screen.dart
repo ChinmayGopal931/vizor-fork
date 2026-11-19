@@ -24,6 +24,8 @@ import '../../../providers/app_security_provider.dart';
 import '../../settings/widgets/confirm_access_card.dart';
 import '../../settings/widgets/settings_pane_backdrop.dart';
 import '../../../core/widgets/dot_qr_shape.dart';
+import '../../../core/widgets/mobile/neon_glyph_badge.dart';
+import '../../../core/widgets/mobile/tron_glyph.dart';
 import '../models/wallet_link_models.dart';
 import '../providers/wallet_link_provider.dart';
 
@@ -428,11 +430,7 @@ class _LinkedContent extends StatelessWidget {
       visual: const SizedBox(
         width: 300,
         height: 200,
-        child: _Illustration(
-          asset: 'assets/illustrations/desktop/wallet_link_success.webp',
-          width: 158,
-          height: 200,
-        ),
+        child: Center(child: NeonGlyphBadge(glyph: TronGlyphKind.check)),
       ),
       action: AppButton(
         onPressed: onContinue,
@@ -468,11 +466,7 @@ class _ExpiredContent extends StatelessWidget {
       visual: const SizedBox(
         width: 300,
         height: 200,
-        child: _Illustration(
-          asset: 'assets/illustrations/desktop/wallet_link_expired.webp',
-          width: 160,
-          height: 200,
-        ),
+        child: Center(child: NeonGlyphBadge(glyph: TronGlyphKind.warning)),
       ),
       action: AppButton(
         onPressed: onRegenerate,
@@ -735,29 +729,6 @@ class _QrTransferCard extends StatelessWidget {
     final fraction =
         remaining.inMilliseconds / const Duration(minutes: 1).inMilliseconds;
     return math.max(0, math.min(1, fraction));
-  }
-}
-
-class _Illustration extends StatelessWidget {
-  const _Illustration({
-    required this.asset,
-    required this.width,
-    required this.height,
-  });
-
-  final String asset;
-  final double width;
-  final double height;
-
-  @override
-  Widget build(BuildContext context) {
-    return Image.asset(
-      asset,
-      width: width,
-      height: height,
-      fit: BoxFit.contain,
-      filterQuality: FilterQuality.high,
-    );
   }
 }
 

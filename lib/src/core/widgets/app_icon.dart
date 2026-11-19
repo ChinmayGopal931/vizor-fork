@@ -1,7 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-import '../layout/app_form_factor.dart';
 import '../theme/app_theme.dart';
 import 'app_loading_icon.dart';
 import 'mobile/tron_glyph.dart';
@@ -131,8 +130,6 @@ abstract final class AppIcons {
   static const zcashCurrency = 'zcash_currency';
 }
 
-const _mobile = kAppFormFactor == AppFormFactor.mobile;
-
 /// Renders a Figma-exported icon from `assets/icons/<name>.svg`.
 ///
 /// SVGs preserve their Figma icon frame in the viewBox, so the art's
@@ -194,26 +191,24 @@ class AppIcon extends StatelessWidget {
         semanticLabel: semanticLabel,
       );
     }
-    // Mobile draws the round icons as angular glyphs.
-    if (_mobile) {
-      final glyph = switch (name) {
-        AppIcons.checkCircle => TronGlyphKind.check,
-        AppIcons.arrowDownCircle => TronGlyphKind.receive,
-        AppIcons.addNew => TronGlyphKind.plus,
-        AppIcons.warningCircle => TronGlyphKind.warning,
-        AppIcons.cancel => TronGlyphKind.cancel,
-        AppIcons.help => TronGlyphKind.help,
-        _ => null,
-      };
-      if (glyph != null) {
-        // The same semantics as the SVG it replaces.
-        return Semantics(
-          container: semanticLabel != null,
-          image: true,
-          label: semanticLabel ?? '',
-          child: TronGlyph(glyph, color: resolved, size: size),
-        );
-      }
+    // The neon look draws the round icons as angular glyphs.
+    final glyph = switch (name) {
+      AppIcons.checkCircle => TronGlyphKind.check,
+      AppIcons.arrowDownCircle => TronGlyphKind.receive,
+      AppIcons.addNew => TronGlyphKind.plus,
+      AppIcons.warningCircle => TronGlyphKind.warning,
+      AppIcons.cancel => TronGlyphKind.cancel,
+      AppIcons.help => TronGlyphKind.help,
+      _ => null,
+    };
+    if (glyph != null) {
+      // The same semantics as the SVG it replaces.
+      return Semantics(
+        container: semanticLabel != null,
+        image: true,
+        label: semanticLabel ?? '',
+        child: TronGlyph(glyph, color: resolved, size: size),
+      );
     }
     return SvgPicture.asset(
       'assets/icons/$name.svg',

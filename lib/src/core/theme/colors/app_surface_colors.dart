@@ -1,9 +1,6 @@
 import 'package:flutter/painting.dart';
 
-import '../../layout/app_form_factor.dart';
 import '../primitives.dart';
-
-const _mobile = kAppFormFactor == AppFormFactor.mobile;
 
 /// Component-level surface colors.
 ///
@@ -36,8 +33,8 @@ class AppSurfaceColors {
   final Color qrCode;
   final Color scrollbarThumb;
 
-  static const dark = _mobile ? neonDark : figmaDark;
-  static const light = _mobile ? neonLight : figmaLight;
+  static const dark = neonDark;
+  static const light = neonLight;
 
   static const figmaDark = AppSurfaceColors(
     card: Primitives.p100Dark,
@@ -94,8 +91,8 @@ class AppInputSurfaceColors {
   final Color secondary;
   final Color focus;
 
-  static const dark = _mobile ? neonDark : figmaDark;
-  static const light = _mobile ? neonLight : figmaLight;
+  static const dark = neonDark;
+  static const light = neonLight;
 
   static const figmaDark = AppInputSurfaceColors(
     primary: Primitives.p50Dark,

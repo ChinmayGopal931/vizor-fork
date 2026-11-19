@@ -1500,36 +1500,6 @@ void main() {
     expect(_syncTextTooltip(), findsNothing);
   });
 
-  testWidgets('sidebar uses dark success sync indicator color from Figma', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _sidebarHarness(SyncState(), themeData: AppThemeData.dark),
-    );
-    await tester.pump();
-
-    expect(_syncIndicatorColor(tester), const Color(0xFF0DC87D));
-  });
-
-  testWidgets('sidebar uses dark failure sync indicator color from Figma', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _sidebarHarness(
-        SyncState(
-          failure: const SyncFailure(
-            kind: SyncFailureKind.network,
-            rawMessage: 'network failed',
-          ),
-        ),
-        themeData: AppThemeData.dark,
-      ),
-    );
-    await tester.pump();
-
-    expect(_syncIndicatorColor(tester), const Color(0xFFA3A4A4));
-  });
-
   for (final entry in failureLabels.entries) {
     testWidgets('sidebar maps ${entry.key} sync failures', (tester) async {
       await tester.pumpWidget(

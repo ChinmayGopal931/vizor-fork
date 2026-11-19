@@ -32,6 +32,8 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/app_pane_modal_overlay.dart';
 import '../../../core/widgets/app_tooltip.dart';
+import '../../../core/widgets/mobile/neon_horizon.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
 import '../../../providers/zec_price_change_provider.dart';
 import '../../../providers/account_provider.dart';
 import '../../../providers/enhance_pir_provider.dart';
@@ -67,8 +69,6 @@ import '../widgets/nu7_announcement.dart';
 
 const _shieldErrorTooltipIconSize = 14.0;
 const _shieldErrorTooltipGap = AppSpacing.xxs;
-const _ironwoodMigrationIllustrationAsset =
-    'assets/illustrations/desktop/ironwood_migration_illustration.webp';
 const _ironwoodMigrationCtaBackgroundColor = Color(0xFF1B1F1F);
 const _ironwoodMigrationCtaBorderColor = Color(0x12FFFFFF);
 const _homeDesktopActivationShortcuts = <ShortcutActivator, Intent>{
@@ -337,14 +337,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final transparentBalance = TransparentBalanceDisplay.of(sync);
     final canShieldTransparentBalance =
         sync.canShieldTransparentBalance && !isMigrationRequired;
-    final isImportingForBackground = ref
-        .watch(homeInitializationPresentationProvider)
-        .showImporting;
-    final isDark = context.appTheme == AppThemeData.dark;
-    final backgroundAsset = isImportingForBackground
-        ? 'assets/illustrations/home_importing_background.webp'
-        : 'assets/illustrations/desktop/' // l10n-ignore: asset path
-              'home_default_background_${isDark ? 'dark' : 'light'}.webp';
     final ironwoodAnnouncementAsync = ref.watch(
       ironwoodMigrationAnnouncementProvider,
     );
@@ -388,7 +380,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ? nu7Network
         : null;
     return AppDesktopBackdropShell(
-      background: _HomeFullPageBackground(assetName: backgroundAsset),
+      // The neon look paints no backdrop: the window's black shows.
+      background: const SizedBox.shrink(),
       sidebar: const AppMainSidebar(),
       pane: Stack(
         fit: StackFit.expand,
@@ -899,22 +892,6 @@ class _HomeActivityEntry {
   /// Builds the row, which Home does only for the entries it shows, so a swap
   /// it doesn't show starts no payout check.
   final ActivityRowData Function() row;
-}
-
-class _HomeFullPageBackground extends StatelessWidget {
-  const _HomeFullPageBackground({required this.assetName});
-
-  final String assetName;
-
-  @override
-  Widget build(BuildContext context) {
-    return Image.asset(
-      assetName,
-      key: const ValueKey('home_full_page_background'),
-      fit: BoxFit.cover,
-      alignment: Alignment.topCenter,
-    );
-  }
 }
 
 int _compareHomeActivityEntries(_HomeActivityEntry a, _HomeActivityEntry b) {
@@ -1550,15 +1527,12 @@ class _HomeImportingContent extends StatelessWidget {
                     ),
                   ),
                 ),
-                Positioned(
+                const Positioned(
                   left: 47,
                   top: 222,
                   width: 246,
                   height: 192,
-                  child: Image.asset(
-                    'assets/illustrations/home_rest_character.webp',
-                    fit: BoxFit.contain,
-                  ),
+                  child: Center(child: NeonHorizon(width: 246, height: 124)),
                 ),
               ],
             ),
@@ -2160,27 +2134,7 @@ class _HomeDesktopMigrationCtaButton extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // Like the mobile banner, attention states drop the art.
-                  if (!stopped)
-                    ShaderMask(
-                      blendMode: BlendMode.dstIn,
-                      shaderCallback: (bounds) => LinearGradient(
-                        colors: [
-                          Colors.white.withValues(alpha: 0.05),
-                          Colors.white.withValues(alpha: 0.55),
-                        ],
-                      ).createShader(bounds),
-                      child: Opacity(
-                        opacity: hovered ? 0.82 : 1,
-                        child: Image.asset(
-                          _ironwoodMigrationIllustrationAsset,
-                          key: const ValueKey(
-                            'home_desktop_ironwood_migration_background',
-                          ),
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
+                  // The neon look draws no painted art behind the card.
                   Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.sm,
@@ -2612,11 +2566,9 @@ class _HomeDesktopEmptyActivity extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.xxs),
-                Image.asset(
-                  'assets/illustrations/home_rest_character.webp',
+                NeonHorizon(
                   width: illustrationWidth,
                   height: illustrationHeight,
-                  fit: BoxFit.contain,
                 ),
               ],
             ),
@@ -2641,51 +2593,47 @@ class _HomeDesktopActivityCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final isDark = context.appTheme == AppThemeData.dark;
-    return Container(
+    return SizedBox(
       key: const ValueKey('home_desktop_activity_card'),
       width: 396,
-      padding: const EdgeInsets.all(AppSpacing.sm),
-      decoration: BoxDecoration(
-        color: isDark ? colors.surface.card : const Color(0xFFFFFFFF),
-        borderRadius: BorderRadius.circular(AppRadii.large),
-        boxShadow: appSurfaceShadow(colors),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _HomeDesktopActivityHeader(
-            onSeeAll: onSeeAll,
-            titleStyle: AppTypography.labelLarge.copyWith(
-              color: colors.text.accent,
-              fontWeight: FontWeight.w600,
+      child: NeonGlassPanel(
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _HomeDesktopActivityHeader(
+              onSeeAll: onSeeAll,
+              titleStyle: kNeonHudCaptionStyle.copyWith(
+                color: colors.neon.glow,
+              ),
+              seeAllStyle: AppTypography.labelLarge.copyWith(
+                color: colors.button.ghost.label,
+              ),
             ),
-            seeAllStyle: AppTypography.labelLarge.copyWith(
-              color: colors.button.ghost.label,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Semantics(
-            label: isLoading ? context.l10n.commonLoadingActivity : null,
-            child: Column(
-              children: [
-                for (
-                  var index = 0;
-                  index < (isLoading ? homeActivitySkeletonCount : rows.length);
-                  index++
-                ) ...[
-                  if (index > 0) const SizedBox(height: AppSpacing.s),
-                  if (isLoading)
-                    HomeActivitySkeletonRow(
-                      key: ValueKey('home_desktop_activity_skeleton_$index'),
-                    )
-                  else
-                    _HomeDesktopActivityRow(index: index, row: rows[index]),
+            const SizedBox(height: AppSpacing.sm),
+            Semantics(
+              label: isLoading ? context.l10n.commonLoadingActivity : null,
+              child: Column(
+                children: [
+                  for (
+                    var index = 0;
+                    index <
+                        (isLoading ? homeActivitySkeletonCount : rows.length);
+                    index++
+                  ) ...[
+                    if (index > 0) const SizedBox(height: AppSpacing.s),
+                    if (isLoading)
+                      HomeActivitySkeletonRow(
+                        key: ValueKey('home_desktop_activity_skeleton_$index'),
+                      )
+                    else
+                      _HomeDesktopActivityRow(index: index, row: rows[index]),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -2707,7 +2655,8 @@ class _HomeDesktopActivityHeader extends StatelessWidget {
     final colors = context.colors;
     return Row(
       children: [
-        Text(context.l10n.homeRecentActivity, style: titleStyle),
+        // A red HUD caption, as Home's recent activity is on mobile.
+        Text(context.l10n.homeRecentActivity.toUpperCase(), style: titleStyle),
         const Spacer(),
         MouseRegion(
           cursor: SystemMouseCursors.click,

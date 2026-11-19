@@ -22,6 +22,7 @@ import '../../providers/payment_request_flow_provider.dart';
 import '../../providers/router_refresh_provider.dart';
 import '../../providers/sync_provider.dart';
 import 'shared/onboarding_auth_shell.dart';
+import 'shared/onboarding_welcome_art.dart' show VizorWordmark;
 
 class UnlockScreen extends ConsumerStatefulWidget {
   const UnlockScreen({super.key});
@@ -231,11 +232,8 @@ class DesktopUnlockContent extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Image.asset(
-          'assets/illustrations/desktop/welcome_badge.webp',
-          width: 50,
-          height: 50,
-        ),
+        // The lit VEYLOR wordmark, in the slot of upstream's 50 px badge.
+        const VizorWordmark(width: 200, height: 50),
         const SizedBox(height: AppSpacing.md),
         SizedBox(
           width: _titleWidth,

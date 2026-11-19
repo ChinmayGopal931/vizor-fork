@@ -1,9 +1,6 @@
 import 'package:flutter/painting.dart';
 
-import '../../layout/app_form_factor.dart';
 import '../primitives.dart';
-
-const _mobile = kAppFormFactor == AppFormFactor.mobile;
 
 /// Border / divider weights.
 ///
@@ -46,8 +43,8 @@ class AppBorderColors {
   final Color utilityPositiveStrong;
   final Color brandCrimsonStrong;
 
-  static const dark = _mobile ? neonDark : figmaDark;
-  static const light = _mobile ? neonLight : figmaLight;
+  static const dark = neonDark;
+  static const light = neonLight;
 
   static const figmaDark = AppBorderColors(
     subtle: Primitives.p150Dark,

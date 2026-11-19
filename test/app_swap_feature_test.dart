@@ -326,7 +326,7 @@ void main() {
     );
     await _pumpUntilPresent(tester, find.text('Swapping...'));
 
-    expect(find.text('Recent activity'), findsOneWidget);
+    expect(find.text('RECENT ACTIVITY'), findsOneWidget);
     expect(find.text('Swapping...'), findsOneWidget);
     expect(find.text('-1.0000 ZEC'), findsOneWidget);
 
