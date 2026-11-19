@@ -139,7 +139,15 @@ Untagged tests may run in either lane and must be lane-agnostic:
   Colours do not depend on the form factor either: both draw the neon
   sets.
 - Form-factor branching in app code uses `kAppFormFactor` (const, so the
-  dead branch is tree-shaken) — never `Platform.isIOS`-style checks.
+  dead branch is tree-shaken) — never `Platform.isIOS`-style checks. A
+  desktop-only branch in code the phones also run is gated on the constant
+  `kDesktopFormFactor` (`app_form_factor.dart`), as a conditional
+  expression or an early return: the front end folds it before
+  whole-program analysis, while an inline
+  `kAppFormFactor == AppFormFactor.desktop` is not folded there and keeps a
+  desktop-only class (and the type facts it changes) in the phone builds.
+  A collection `if` changes how its list is built even when folded, so a
+  gated list element is a conditional expression instead.
   Runtime `Platform` checks remain only for OS-specific *behavior*
   (keychain, background sync), not for choosing UI metrics or layout
   shells.
@@ -205,10 +213,13 @@ otherwise.
   in for and resolves to Light on both form factors
   (`AppFontWeight.heading` is the Thin heading weight); the legacy
   Material theme goes through it too, so unstyled text is Light. Desktop
-  code still names heavier weights in places, so desktop builds register no
-  Gotham face heavier than Light (`gothamHeaviestWeight` in
-  `gotham_fonts.dart`) and those render Light; mobile registers every
-  face. There are no exceptions.
+  code's one-off weights are tokens, never a heavier `FontWeight` literal:
+  desktop-only code uses `AppFontWeight`, and code the phones also run uses
+  `AppSharedFontWeight`, Light on desktop and the Figma weight the phone
+  always drew, so Korean and Chinese render Light on desktop too. Desktop
+  builds still register no Gotham face heavier than Light
+  (`gothamHeaviestWeight` in `gotham_fonts.dart`), as a guard; mobile
+  registers every face. There are no exceptions.
   Page titles (`MobileTopNav.back`) are spaced uppercase Thin; section heads
   (Settings groups, Activity dates, Home's recent activity, on both form
   factors) are uppercase red HUD captions. These uppercase captions are a
@@ -380,7 +391,8 @@ otherwise.
   tokens and a few shared pieces; their layouts, sizes, flows and keyboard
   handling are upstream's. Shared widgets that both form factors draw keep
   mobile exactly as it was: a desktop-only change in one is gated on
-  `kAppFormFactor`.
+  `kDesktopFormFactor` (see "Rules for new code"), and the phones' release
+  code is unchanged by it.
   - The window is true black: the Mac window opens in the dark appearance on
     black (`appWindowBackgroundColor`, `launchBrightness` in
     `MainFlutterWindow.swift`), Linux's view is black, and Flutter paints
@@ -389,8 +401,18 @@ otherwise.
     (`AppDesktopSidebarSurface(glass: true)`, the main and onboarding
     sidebars), `AppModalCard` (opaque), `ReviewWrapCard`, Settings' groups,
     Home's recent activity, the Activity feed's months (sliver segments are
-    slices of one panel) and the unlock card. The pane and its modal scrim
-    are near-square.
+    slices of one panel), the unlock card, and the cards every screen draws
+    itself (2026-11-19): Home's notice, migration call and setup reminders,
+    the Settings sub-screens, Send, Receive, Request, Pay and Swap, Accounts
+    and Contacts, Voting, the migration screens, the onboarding panels and
+    the popovers (accounts, contacts, assets, mnemonic suggestions, context
+    menus; opaque). A choice among others is a `NeonOptionPanel`, whose
+    outline a selection strokes, with a `NeonOptionCheck` (a cut-corner
+    check plate in place of upstream's round one); a card that is a
+    `Container` the phones build too swaps only its decoration, for a
+    `NeonGlassDecoration`. Badges, tags and indicators are cut-corner plates,
+    and the receive and request QR plates are cut and lit (the Keystone
+    scan-first plate is not). The pane and its modal scrim are near-square.
   - Settings' groups, Activity's months and Home's recent activity are
     headed by red HUD captions.
   - No painted backgrounds: Home, Settings' sub-screens, the onboarding
@@ -399,9 +421,21 @@ otherwise.
     neon horizon beside its pane in place of upstream's video, the
     onboarding sidebars a small horizon in place of their art, the unlock
     card the lit wordmark, and Home's and the address book's empty states a
-    horizon. The wallet link outcomes are `NeonGlyphBadge`s.
-  - Page titles are upstream's per-screen headlines in the Thin tokens, not
-    `kNeonPageTitleStyle`: desktop has no shared page title.
+    horizon. The wallet link outcomes are `NeonGlyphBadge`s. Desktop-only
+    art went the same way: the Ironwood announcement, intro banner,
+    how-it-works steps, expectations and completion (glyph badges and a
+    horizon; the Ironwood wordmark stays), the donation badges and success
+    backdrop, the uninstall badge (a lit plate whose glyph fades), the
+    custom endpoint card, the swap timeout, the voting beta label (a lit tag
+    drawing the label's own text), the intro card's pattern, the decorative
+    divider (a lit diamond bead) and the storage-unavailable backdrop (a
+    horizon). The Welcome's buttons are `AppButton`'s slabs.
+  - Page titles are the neon page title: `NeonPageTitle`
+    (`neon_page_title.dart`) draws a screen's title in `kNeonPageTitleStyle`,
+    upper-cased where drawn and read as written. Every desktop screen's
+    title takes it, keeping upstream's position; content headings (a poll's
+    title, a card's heading, an empty state's statement) keep the Thin
+    tokens, and modal titles take `AppFontWeight.heading`.
   - The neon signature pieces (2026-11-19) are the phone's widgets placed in
     upstream's desktop screens; a phone widget that needed a desktop size or
     input took a parameter whose default keeps the phone as it was. Every
@@ -433,8 +467,12 @@ otherwise.
     the pane's back link). Without Private USD the holdings are the shielded
     pools, their total and the transparent ZEC. A hidden chart (off, or no
     history) leaves the sign inert. The Send, Receive and Pay buttons under
-    it are still upstream's pills. The end-to-end tests' keys stay:
-    `home_desktop_balance_amount_text` is a plain `Text` of the amount once
+    it are `AppButton`'s slab (the primary lit, the secondaries glass with
+    an outside hairline), the Ironwood call a glass panel with a lit square
+    beacon, and the transparent tray sits under a hairline of white light
+    with "Shield now" lit red while it can shield. The end-to-end tests'
+    keys stay: `home_desktop_balance_amount_text` is a plain `Text` of the
+    amount once
     the digits settle (`NeonScrambleText.textKey`), and the ticker is its own
     `Text`.
   - **Chart settings.** Settings has a Portfolio chart block after Account
@@ -452,7 +490,15 @@ otherwise.
     Its foot is the phone sidebar's `NeonSidebarSyncReadout`, built by
     `NeonSyncLine.wallet` as Home's line is, in place of upstream's status
     row and its block height; its text keeps the `sidebar_sync_text` key,
-    upper-cased.
+    upper-cased. The accounts popover is an opaque glass panel headed by a
+    red HUD caption, with cut-corner slabs for its two actions, and the
+    migration rail is lit red.
+  - Not yet neon on desktop, and why: the Gift Cards feature (unchanged by
+    design); art the phones also draw (the Keystone scan error in the
+    migration flow, the payment-request caution letter, the privacy
+    overlay's #141818 grey, the welcome-only button tokens the mobile
+    Welcome uses); the Windows title bar (it cannot be checked on a Mac);
+    and `ReceiveDesktopPreview`, a Widgetbook-only preview.
 
 ## Google Play opt-out (VIZOR_DEGOOGLED)
 
