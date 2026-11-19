@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../config/private_usd_feature_config.dart';
 import '../../layout/app_form_factor.dart';
 import '../../../features/private_usd/providers/private_usd_keep_awake_provider.dart';
 import '../../../providers/sync_keep_awake_provider.dart';
@@ -46,7 +47,10 @@ class _SyncKeepAwakeNativeHostState
   @override
   void initState() {
     super.initState();
-    if (kAppFormFactor != AppFormFactor.mobile) return;
+    if (kAppFormFactor != AppFormFactor.mobile) {
+      if (kDesktopFormFactor && kPrivateUsdBuildEnabled) _listenOnDesktop();
+      return;
+    }
 
     final lifecycleState = WidgetsBinding.instance.lifecycleState;
     _isInForeground =
@@ -68,8 +72,34 @@ class _SyncKeepAwakeNativeHostState
       final syncActive = ref.watch(syncKeepAwakeActiveProvider);
       final privateUsdActive = ref.watch(privateUsdKeepAwakeProvider);
       _requestNativeState(_isInForeground && (syncActive || privateUsdActive));
+    } else if (kDesktopFormFactor && kPrivateUsdBuildEnabled) {
+      // The Mac stays awake only for Private USD: a sleeping display locks the
+      // Mac, and a hidden app pauses it. The wallet sync runs on while hidden.
+      final privateUsdActive = ref.watch(privateUsdKeepAwakeProvider);
+      _requestNativeState(_isInForeground && privateUsdActive);
     }
     return widget.child;
+  }
+
+  /// On desktop a shown window is the foreground, focused or not: Private USD
+  /// pauses only once the app is hidden (a minimised or hidden window, a
+  /// locked screen, a Mac asleep), so an unfocused window keeps it awake.
+  void _listenOnDesktop() {
+    final lifecycleState = WidgetsBinding.instance.lifecycleState;
+    _isInForeground =
+        lifecycleState == null ||
+        lifecycleState == AppLifecycleState.resumed ||
+        lifecycleState == AppLifecycleState.inactive;
+    _lifecycleListener = AppLifecycleListener(
+      onShow: _handleDesktopShow,
+      onHide: _handleLifecycleBackground,
+    );
+  }
+
+  void _handleDesktopShow() {
+    if (_isInForeground) return;
+    _isInForeground = true;
+    _requestNativeState(ref.read(privateUsdKeepAwakeProvider));
   }
 
   @override

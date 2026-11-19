@@ -18,8 +18,9 @@ import '../../../core/widgets/neon_page_title.dart';
 /// in the desktop pane, under the pane's back link to Home. The line is read
 /// under the pointer, and the range chips take a click and the keyboard.
 ///
-/// Without Private USD (a phone feature) the holdings are the shielded pools,
-/// their total and the transparent ZEC.
+/// Where Shielded USD is available (on desktop, the Mac's host) the holdings
+/// list it among the shielded pools, as the phone's do; without it they are
+/// the shielded pools, their total and the transparent ZEC.
 class DesktopPortfolioChartScreen extends ConsumerWidget {
   const DesktopPortfolioChartScreen({super.key});
 

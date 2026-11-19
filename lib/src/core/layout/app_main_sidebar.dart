@@ -133,7 +133,9 @@ class _AppMainSidebarState extends ConsumerState<AppMainSidebar> {
           _matches('/send') ||
           _matches('/receive') ||
           _matches('/migration') ||
-          _matches('/portfolio-chart'));
+          _matches('/portfolio-chart') ||
+          // Shielded USD opens from Home's balance, as the chart does.
+          _matches('/private-usd'));
 
   bool get _settingsShouldBeActive =>
       !widget.suppressActiveSelection &&

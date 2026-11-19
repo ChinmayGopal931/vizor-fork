@@ -67,6 +67,7 @@ abstract final class AppBackResolver {
     '/voting/poll/:roundId/submitted': (l) => l.appBackSubmitted,
     '/voting/poll/:roundId/results': (l) => l.commonResults,
     '/voting/keystone/scan': (_) => 'Keystone', // l10n-ignore: device name
+    '/private-usd': (l) => l.privateUsdTitle,
   };
 
   static AppBackTarget resolve(BuildContext context) {

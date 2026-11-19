@@ -10,8 +10,8 @@ import '../../providers/private_usd_settlement_reminder_provider.dart';
 /// the settlement reminder. The engine advances every account's conversions
 /// while the app is in the foreground and unlocked, and follows the lock and
 /// the lifecycle itself. Inert unless the build has Private USD, the Railgun
-/// page runs here and the network has a deployment; desktop never builds an
-/// engine.
+/// page runs here (the phones and the Mac; never Windows or Linux) and the
+/// network has a deployment.
 class PrivateUsdEngineHost extends ConsumerWidget {
   const PrivateUsdEngineHost({required this.child, super.key});
 

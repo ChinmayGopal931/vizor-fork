@@ -13,8 +13,8 @@ enum RailgunHostErrorCode {
   /// No reply in time, so the host closed the page. As [closed].
   timeout,
 
-  /// No WebView package or no proxy override (Android), or below iOS 17.
-  /// Do not retry in a loop.
+  /// No WebView package or no proxy override (Android), below iOS 17 or
+  /// below macOS 14. Do not retry in a loop.
   unavailable,
 
   /// A request or reply one side could not read: a bug.
@@ -94,10 +94,10 @@ String redactRailgunMessage(
 }
 
 /// Asks the platform's Railgun host whether the page can run here: Android
-/// always can, iOS from iOS 17. No handler means no host (desktop), except
-/// on iOS, where it can only mean the handler was not registered yet: the
-/// answer is then unknown (`null`), and the caller asks again after the
-/// first frame. Any other failure means no.
+/// always can, iOS from iOS 17 and the Mac from macOS 14. No handler means no
+/// host (Windows and Linux), except on iOS, where it can only mean the
+/// handler was not registered yet: the answer is then unknown (`null`), and
+/// the caller asks again after the first frame. Any other failure means no.
 Future<bool?> queryRailgunHostSupported({
   MethodChannel channel = const MethodChannel(
     RailgunHostChannel.methodChannelName,
@@ -115,7 +115,8 @@ Future<bool?> queryRailgunHostSupported({
   }
 }
 
-/// The platform's Railgun host (Kotlin's or Swift's `RailgunHostHandler`):
+/// The platform's Railgun host (Kotlin's, or the iOS or macOS Swift
+/// `RailgunHostHandler`):
 /// one hidden page at a time, process-wide, proxied through the Rust bridge's
 /// loopback port.
 abstract interface class RailgunHost {

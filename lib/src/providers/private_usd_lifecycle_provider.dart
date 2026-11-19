@@ -14,8 +14,8 @@ import 'rpc_endpoint_failover_provider.dart';
 
 final privateUsdLifecycleProvider = Provider(
   (ref) => PrivateUsdLifecycle(
-    // Const, so builds without Private USD (desktop among them) never look
-    // for conversions or Railgun wallets: they have none.
+    // Const, so builds without Private USD never look for conversions or
+    // Railgun wallets: they have none.
     conversions: kPrivateUsdBuildEnabled
         ? RustPrivateUsdSwapBackend(
             () => PrivateUsdSwapContext(
