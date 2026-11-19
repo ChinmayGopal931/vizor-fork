@@ -76,8 +76,6 @@ import '../widgets/nu7_announcement.dart';
 
 const _shieldErrorTooltipIconSize = 14.0;
 const _shieldErrorTooltipGap = AppSpacing.xxs;
-const _ironwoodMigrationCtaBackgroundColor = Color(0xFF1B1F1F);
-const _ironwoodMigrationCtaBorderColor = Color(0x12FFFFFF);
 const _homeDesktopActivationShortcuts = <ShortcutActivator, Intent>{
   SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
   SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
@@ -984,67 +982,74 @@ class _HomeTransparentBalanceStrip extends StatelessWidget {
     );
     final canHoverShieldBalance = canShieldBalance && !isShieldingBalance;
 
-    // Figma "Home Shield Balance" (4731:64262/64704): a 46px tray exposed on
-    // the card's ground shelf — 16/8 padding, muted primary text on the left,
-    // space-between to the shield action.
-    return SizedBox(
-      height: 46,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm,
-          vertical: AppSpacing.xs,
+    // Figma "Home Shield Balance" (4731:64262/64704): a 46px tray under the
+    // sign — 16/8 padding, muted primary text on the left, space-between to
+    // the shield action — set off from the sign by a hairline of white light.
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: colors.neon.frameGlow.withValues(alpha: 0.2)),
         ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AppIcon(
-                    AppIcons.transparentBalance,
-                    size: 20,
-                    color: colors.text.primary,
-                  ),
-                  const SizedBox(width: AppSpacing.xs),
-                  Flexible(
-                    child: _withHint(
-                      balanceHint,
-                      Text(
-                        context.l10n.homeTransparentBalance(displayedBalance),
-                        key: const ValueKey('home_transparent_balance_text'),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTypography.labelLarge.copyWith(
-                          color: colors.text.primary,
-                          fontWeight: FontWeight.w400,
+      ),
+      child: SizedBox(
+        height: 46,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: AppSpacing.xs,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AppIcon(
+                      AppIcons.transparentBalance,
+                      size: 20,
+                      color: colors.text.primary,
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Flexible(
+                      child: _withHint(
+                        balanceHint,
+                        Text(
+                          context.l10n.homeTransparentBalance(displayedBalance),
+                          key: const ValueKey('home_transparent_balance_text'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.labelLarge.copyWith(
+                            color: colors.text.primary,
+                            fontWeight: AppFontWeight.regular,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            if (showShieldBalanceAction) ...[
-              MouseRegion(
-                cursor: canHoverShieldBalance
-                    ? SystemMouseCursors.click
-                    : SystemMouseCursors.basic,
-                onEnter: canHoverShieldBalance
-                    ? (_) => onShieldBalanceHoverChanged(true)
-                    : null,
-                onExit: canHoverShieldBalance
-                    ? (_) => onShieldBalanceHoverChanged(false)
-                    : null,
-                child: _HomeShieldBalanceButton(
-                  enabled: canShieldBalance,
-                  isLoading: isShieldingBalance,
-                  contentColor: shieldBalanceContentColor,
-                  hovered: shieldBalanceHovered,
-                  onPressed: onShieldBalancePressed,
+                  ],
                 ),
               ),
+              if (showShieldBalanceAction) ...[
+                MouseRegion(
+                  cursor: canHoverShieldBalance
+                      ? SystemMouseCursors.click
+                      : SystemMouseCursors.basic,
+                  onEnter: canHoverShieldBalance
+                      ? (_) => onShieldBalanceHoverChanged(true)
+                      : null,
+                  onExit: canHoverShieldBalance
+                      ? (_) => onShieldBalanceHoverChanged(false)
+                      : null,
+                  child: _HomeShieldBalanceButton(
+                    enabled: canShieldBalance,
+                    isLoading: isShieldingBalance,
+                    contentColor: shieldBalanceContentColor,
+                    hovered: shieldBalanceHovered,
+                    onPressed: onShieldBalancePressed,
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -1070,6 +1075,10 @@ class _HomeShieldBalanceButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final isInteractive = enabled && !isLoading;
+    // While it can shield, the action is lit: red light that brightens under
+    // the pointer. Otherwise it keeps the tray's [contentColor].
+    final lit = isInteractive ? (hovered ? 0.6 : 0.35) : 0.0;
+    final labelColor = isInteractive ? colors.neon.core : contentColor;
 
     return Semantics(
       key: const ValueKey('home_shield_balance_button'),
@@ -1083,13 +1092,13 @@ class _HomeShieldBalanceButton extends StatelessWidget {
           behavior: HitTestBehavior.opaque,
           onTap: isInteractive ? onPressed : null,
           child: DecoratedBox(
-            decoration: BoxDecoration(
-              // Standard ghost-button hover fill; the design draws no hover
-              // state for the tray action.
+            decoration: ShapeDecoration(
+              // Standard ghost-button hover fill on a cut-corner slab; the
+              // design draws no hover state for the tray action.
               color: hovered && isInteractive
                   ? colors.button.ghost.bgHover
-                  : const Color(0x00000000),
-              borderRadius: BorderRadius.circular(AppRadii.full),
+                  : Colors.transparent,
+              shape: Neon.chamferBorder(cut: AppChamfer.small),
             ),
             child: ConstrainedBox(
               constraints: const BoxConstraints(minHeight: 30),
@@ -1108,14 +1117,17 @@ class _HomeShieldBalanceButton extends StatelessWidget {
                             ? context.l10n.commonShielding
                             : context.l10n.homeShieldNow,
                         style: AppTypography.labelLarge.copyWith(
-                          color: contentColor,
+                          color: labelColor,
+                          shadows: lit > 0
+                              ? Neon.textGlow(colors.neon.glow, intensity: lit)
+                              : null,
                         ),
                       ),
                     ),
                     AppIcon(
                       isLoading ? AppIcons.loader : AppIcons.chevronForward,
                       size: 16,
-                      color: contentColor,
+                      color: labelColor,
                     ),
                   ],
                 ),
@@ -1154,13 +1166,11 @@ class _HomeNoticeCard extends StatelessWidget {
     final colors = context.colors;
     final isDark = context.appTheme == AppThemeData.dark;
     final detailMessage = data.detailMessage;
-    return Container(
+    // A notice is a neon glass panel, its two cut corners lit.
+    return NeonGlassPanel(
       key: const ValueKey('home_notice_card'),
+      cut: AppChamfer.medium,
       padding: const EdgeInsets.all(AppSpacing.xs),
-      decoration: BoxDecoration(
-        color: colors.background.base,
-        borderRadius: BorderRadius.circular(AppRadii.xSmall),
-      ),
       child: Row(
         children: [
           AppIcon(data.iconName, size: 16, color: colors.icon.warning),
@@ -2106,14 +2116,18 @@ class _HomeDesktopBalanceSign extends StatelessWidget {
   }
 }
 
+/// The migration call's beacon: a lit square bead whose halo pulses outward,
+/// in the neon tube's light ([glow] around a white-hot [core]).
 class _HomeMigrationPulseIndicator extends StatefulWidget {
   const _HomeMigrationPulseIndicator({
     required this.animate,
-    required this.accentColor,
+    required this.glow,
+    required this.core,
   });
 
   final bool animate;
-  final Color accentColor;
+  final Color glow;
+  final Color core;
 
   @override
   State<_HomeMigrationPulseIndicator> createState() =>
@@ -2147,8 +2161,7 @@ class _HomeMigrationPulseIndicatorState
   @override
   void didUpdateWidget(covariant _HomeMigrationPulseIndicator oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.animate != widget.animate ||
-        oldWidget.accentColor != widget.accentColor) {
+    if (oldWidget.animate != widget.animate || oldWidget.glow != widget.glow) {
       _syncAnimation();
     }
   }
@@ -2202,8 +2215,7 @@ class _HomeMigrationPulseIndicatorState
                 scale: haloScale,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: widget.accentColor.withValues(alpha: haloOpacity),
-                    shape: BoxShape.circle,
+                    color: widget.glow.withValues(alpha: haloOpacity),
                   ),
                   child: const SizedBox.square(dimension: _dotSize),
                 ),
@@ -2212,13 +2224,11 @@ class _HomeMigrationPulseIndicatorState
                 scale: dotScale,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: widget.accentColor,
-                    shape: BoxShape.circle,
+                    color: widget.core,
+                    border: Border.all(color: widget.glow, width: 1.5),
                     boxShadow: [
                       BoxShadow(
-                        color: widget.accentColor.withValues(
-                          alpha: dotShadowAlpha,
-                        ),
+                        color: widget.glow.withValues(alpha: dotShadowAlpha),
                         blurRadius: 6 + (glow * 3),
                         spreadRadius: 1 + (glow * 1.5),
                       ),
@@ -2264,66 +2274,47 @@ class _HomeDesktopMigrationCtaButton extends StatelessWidget {
           fit: StackFit.expand,
           clipBehavior: Clip.none,
           children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 120),
-              curve: Curves.easeOut,
-              decoration: BoxDecoration(
-                color: _ironwoodMigrationCtaBackgroundColor,
-                borderRadius: BorderRadius.circular(AppRadii.medium),
+            // A neon glass panel, its cut corners lit; under the pointer its
+            // glass lifts to the hover fill.
+            NeonGlassPanel(
+              cut: AppChamfer.medium,
+              fill: hovered ? colors.state.hover : null,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.sm,
+                vertical: AppSpacing.s,
               ),
-              foregroundDecoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(AppRadii.medium),
-                border: Border.all(
-                  color: _ironwoodMigrationCtaBorderColor,
-                  strokeAlign: BorderSide.strokeAlignInside,
-                  width: 1.5,
-                ),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: Stack(
-                fit: StackFit.expand,
+              child: Row(
                 children: [
-                  // The neon look draws no painted art behind the card.
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.sm,
-                      vertical: AppSpacing.s,
+                  if (stopped)
+                    AppIcon(
+                      AppIcons.warning,
+                      key: const ValueKey(
+                        'home_desktop_ironwood_migration_stopped_icon',
+                      ),
+                      size: 20,
+                      color: colors.icon.warning,
+                    )
+                  else
+                    _HomeMigrationPulseIndicator(
+                      animate: animateIndicator,
+                      glow: colors.neon.glow,
+                      core: colors.neon.core,
                     ),
-                    child: Row(
-                      children: [
-                        if (stopped)
-                          AppIcon(
-                            AppIcons.warning,
-                            key: const ValueKey(
-                              'home_desktop_ironwood_migration_stopped_icon',
-                            ),
-                            size: 20,
-                            color: colors.icon.warning,
-                          )
-                        else
-                          _HomeMigrationPulseIndicator(
-                            animate: animateIndicator,
-                            accentColor: colors.text.positiveStrong,
-                          ),
-                        const SizedBox(width: AppSpacing.xs),
-                        Expanded(
-                          child: Text(
-                            label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTypography.labelLarge.copyWith(
-                              color: colors.text.homeCard,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                        AppIcon(
-                          AppIcons.chevronForward,
-                          size: 20,
-                          color: colors.text.homeCard,
-                        ),
-                      ],
+                  const SizedBox(width: AppSpacing.xs),
+                  Expanded(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.labelLarge.copyWith(
+                        color: colors.text.homeCard,
+                      ),
                     ),
+                  ),
+                  AppIcon(
+                    AppIcons.chevronForward,
+                    size: 20,
+                    color: colors.text.homeCard,
                   ),
                 ],
               ),
@@ -2336,11 +2327,13 @@ class _HomeDesktopMigrationCtaButton extends StatelessWidget {
                 bottom: -2,
                 child: IgnorePointer(
                   child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(AppRadii.medium + 2),
-                      border: Border.all(
-                        color: colors.state.focusRing,
-                        width: 2,
+                    decoration: ShapeDecoration(
+                      shape: Neon.wedgeBorder(
+                        cut: AppChamfer.medium + 1,
+                        side: BorderSide(
+                          color: colors.state.focusRing,
+                          width: 2,
+                        ),
                       ),
                     ),
                   ),
@@ -2416,9 +2409,22 @@ class _HomeDesktopActionButton extends StatelessWidget {
               height: 44,
               width: expanded ? double.infinity : null,
               alignment: Alignment.center,
+              // AppButton's slab: its corners cut at 45°, the primary lit
+              // with a red glow, the secondary glass with a hairline edge
+              // drawn outside it, so the row keeps its geometry.
               decoration: ShapeDecoration(
                 color: bg,
-                shape: const StadiumBorder(),
+                shape: Neon.chamferBorder(
+                  side: primary || !enabled
+                      ? BorderSide.none
+                      : BorderSide(
+                          color: colors.border.subtleOpacity,
+                          strokeAlign: BorderSide.strokeAlignOutside,
+                        ),
+                ),
+                shadows: primary && enabled
+                    ? Neon.boxGlow(bg, intensity: hovered ? 0.7 : 0.5)
+                    : null,
               ),
               child: compact
                   ? AppIcon(icon, size: 20, color: fg)
@@ -2429,10 +2435,7 @@ class _HomeDesktopActionButton extends StatelessWidget {
                         const SizedBox(width: AppSpacing.xxs),
                         Text(
                           label,
-                          style: AppTypography.labelMedium.copyWith(
-                            color: fg,
-                            fontWeight: FontWeight.w400,
-                          ),
+                          style: AppTypography.labelMedium.copyWith(color: fg),
                         ),
                       ],
                     ),
@@ -2446,7 +2449,8 @@ class _HomeDesktopActionButton extends StatelessWidget {
                 child: IgnorePointer(
                   child: DecoratedBox(
                     decoration: ShapeDecoration(
-                      shape: StadiumBorder(
+                      shape: Neon.chamferBorder(
+                        cut: AppChamfer.medium + 1,
                         side: BorderSide(color: focusRingColor, width: 2),
                       ),
                     ),
@@ -2960,7 +2964,7 @@ class _HomeDesktopActivityRowContent extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: AppTypography.labelLarge.copyWith(
                                 color: colors.text.secondary,
-                                fontWeight: FontWeight.w400,
+                                fontWeight: AppFontWeight.regular,
                               ),
                             ),
                           ),
@@ -2979,7 +2983,7 @@ class _HomeDesktopActivityRowContent extends StatelessWidget {
                       row.amountText,
                       style: AppTypography.labelLarge.copyWith(
                         color: amountColor,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: AppFontWeight.semiBold,
                       ),
                     ),
                     const SizedBox(height: AppSpacing.xxs),
@@ -3035,11 +3039,12 @@ class _HomeDesktopActivityGlyph extends StatelessWidget {
             width: 37,
             height: 37,
             child: CustomPaint(
+              // The ring's segments light red as the transaction moves on.
               painter: _HomeDesktopProgressRingPainter(
                 progress: progress,
-                trackColor: const Color(0xFFD4D4D4),
-                progressColor: const Color(0xFFC2546A),
-                innerFillColor: const Color(0x339A9A9A),
+                trackColor: colors.border.regular,
+                progressColor: colors.neon.glow,
+                innerFillColor: colors.background.neutralSubtleOpacity,
               ),
               child: Center(
                 child: AppIcon(
@@ -3053,12 +3058,16 @@ class _HomeDesktopActivityGlyph extends StatelessWidget {
         ),
       );
     }
+    // A cut-corner plate with a lit edge, as the activity feed's rows have.
     return Container(
       width: 32,
       height: 32,
-      decoration: BoxDecoration(
+      decoration: ShapeDecoration(
         color: colors.background.neutralSubtleOpacity,
-        shape: BoxShape.circle,
+        shape: Neon.chamferBorder(
+          cut: AppChamfer.small + 3,
+          side: BorderSide(color: colors.neon.glow.withValues(alpha: 0.35)),
+        ),
       ),
       child: Center(
         child: AppIcon(

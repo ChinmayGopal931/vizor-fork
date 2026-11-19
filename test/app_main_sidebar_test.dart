@@ -727,7 +727,8 @@ void main() {
       find.byKey(const ValueKey('sidebar_accounts_popover')),
       findsOneWidget,
     );
-    expect(find.text('My accounts'), findsOneWidget);
+    // The popover's head is a HUD caption, upper-cased where drawn.
+    expect(find.text('MY ACCOUNTS'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('sidebar_accounts_divider_0')),
       findsNothing,
@@ -737,14 +738,6 @@ void main() {
       findsOneWidget,
     );
 
-    final popoverDecoration = _boxDecorationByKey(
-      tester,
-      const ValueKey('sidebar_accounts_popover'),
-    );
-    // The Figma dropdown has no stroke; its outline comes from the
-    // three-layer shadow stack.
-    expect(popoverDecoration.border, isNull);
-    expect(popoverDecoration.boxShadow, hasLength(3));
     final scrollbar = tester.widget<RawScrollbar>(
       find.byKey(const ValueKey('sidebar_accounts_scrollbar')),
     );
@@ -752,7 +745,7 @@ void main() {
     expect(scrollbar.thumbVisibility, isFalse);
     expect(
       DefaultTextStyle.of(
-        tester.element(find.text('My accounts')),
+        tester.element(find.text('MY ACCOUNTS')),
       ).style.decoration,
       TextDecoration.none,
     );
@@ -1136,11 +1129,6 @@ void main() {
 
     expect(_sidebarItemWithLabel(tester, 'Pay').onTap, isNotNull);
   });
-}
-
-BoxDecoration _boxDecorationByKey(WidgetTester tester, Key key) {
-  final container = tester.widget<Container>(find.byKey(key));
-  return container.decoration! as BoxDecoration;
 }
 
 AppSidebarItem _sidebarItemWithLabel(WidgetTester tester, String label) {

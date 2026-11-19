@@ -47,14 +47,12 @@ class DesktopHomeSetupCarousel extends ConsumerWidget {
         if (backup)
           AppCarouselItem.icon(
             message: context.l10n.homeSetupBackupMessage,
-            tileColor: const Color(0xFF00A460),
             icon: AppIcons.key,
             onTap: () => context.push('/setup/backup', extra: account.uuid),
           ),
         if (education)
           AppCarouselItem.icon(
             message: context.l10n.homeSetupEducationMessage,
-            tileColor: const Color(0xFF9667E2),
             icon: AppIcons.zcash,
             onTap: () =>
                 context.push('/setup/education/intro', extra: account.uuid),

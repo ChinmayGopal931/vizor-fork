@@ -37,11 +37,17 @@ import '../widgets/app_icon.dart';
 import '../widgets/app_profile_picture.dart';
 import '../widgets/app_tappable.dart';
 import '../widgets/app_toast.dart';
+import '../widgets/neon_glass_panel.dart';
 import 'app_desktop_shell.dart';
+import 'app_form_factor.dart';
 import 'desktop_neon_session.dart';
 import 'desktop_sidebar_spacing.dart';
 import 'mobile/neon_sidebar.dart';
 import 'mobile/neon_sync_backdrop.dart';
+
+/// Desktop draws the sidebar's account header, its accounts popover and the
+/// migration rail in the neon look; the phones keep them as they were.
+const _neonDesktop = kAppFormFactor == AppFormFactor.desktop;
 
 final _sidebarThousandZatoshi = zatoshiPerZec * BigInt.from(1000);
 final _sidebarMillionZatoshi = zatoshiPerZec * BigInt.from(1000000);
@@ -906,6 +912,12 @@ class _SidebarMigrationGlow extends StatefulWidget {
   static const _radius = 13.0;
   static const _midAlpha = 0.15;
   static const _glowColor = Color(0xFF00A460);
+
+  /// Desktop's rail is a near-square slab of the tube's red light; the phones
+  /// keep the green pill.
+  static const _railRadius = _neonDesktop ? AppRadii.small : _radius;
+  static Color glowColor(BuildContext context) =>
+      _neonDesktop ? context.colors.neon.glow : _glowColor;
   static const _flowBandHeight = 34.0;
   static const _flowPeriod = Duration(milliseconds: 1800);
 
@@ -975,7 +987,7 @@ class _SidebarMigrationFlowHighlight extends StatelessWidget {
     final y = -bandHeight + (travel * t);
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(_SidebarMigrationGlow._radius),
+      borderRadius: BorderRadius.circular(_SidebarMigrationGlow._railRadius),
       child: ShaderMask(
         blendMode: BlendMode.dstIn,
         shaderCallback: (bounds) => const LinearGradient(
@@ -1033,20 +1045,25 @@ class _SidebarMigrationFlowBand extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final glow = _neonDesktop
+        ? _SidebarMigrationGlow.glowColor(context)
+        : _SidebarMigrationGlow._glowColor;
     return SizedBox(
       width: width,
       height: height,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(_SidebarMigrationGlow._radius),
+          borderRadius: BorderRadius.circular(
+            _SidebarMigrationGlow._railRadius,
+          ),
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              _SidebarMigrationGlow._glowColor.withValues(alpha: 0),
-              _SidebarMigrationGlow._glowColor.withValues(alpha: alpha),
-              _SidebarMigrationGlow._glowColor.withValues(alpha: alpha * 0.72),
-              _SidebarMigrationGlow._glowColor.withValues(alpha: 0),
+              glow.withValues(alpha: 0),
+              glow.withValues(alpha: alpha),
+              glow.withValues(alpha: alpha * 0.72),
+              glow.withValues(alpha: 0),
             ],
             stops: const [0, 0.42, 0.62, 1],
           ),
@@ -1064,21 +1081,24 @@ class _SidebarMigrationGlowPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final glow = _neonDesktop
+        ? _SidebarMigrationGlow.glowColor(context)
+        : _SidebarMigrationGlow._glowColor;
     return SizedBox(
       width: width,
       height: height,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(_SidebarMigrationGlow._radius),
+          borderRadius: BorderRadius.circular(
+            _SidebarMigrationGlow._railRadius,
+          ),
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              _SidebarMigrationGlow._glowColor.withValues(alpha: 0),
-              _SidebarMigrationGlow._glowColor.withValues(
-                alpha: _SidebarMigrationGlow._midAlpha,
-              ),
-              _SidebarMigrationGlow._glowColor.withValues(alpha: 0),
+              glow.withValues(alpha: 0),
+              glow.withValues(alpha: _SidebarMigrationGlow._midAlpha),
+              glow.withValues(alpha: 0),
             ],
             stops: const [0, 0.5, 1],
           ),
@@ -1154,7 +1174,9 @@ class _SidebarAccountHeader extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: AppTypography.labelLarge.copyWith(
                             color: colors.text.secondary,
-                            fontWeight: FontWeight.w400,
+                            fontWeight: _neonDesktop
+                                ? AppFontWeight.regular
+                                : FontWeight.w400,
                           ),
                         ),
                       ),
@@ -1216,17 +1238,31 @@ class _SidebarAccountAvatar extends StatelessWidget {
               child: Container(
                 width: 16,
                 height: 16,
-                decoration: BoxDecoration(
-                  color: colors.background.inverse,
-                  borderRadius: BorderRadius.circular(4),
-                  // The ring sits OUTSIDE the 16px badge like the Figma
-                  // stroke, leaving the full box to the 14px logo.
-                  border: Border.all(
-                    color: colors.background.ground,
-                    width: 2,
-                    strokeAlign: BorderSide.strokeAlignOutside,
-                  ),
-                ),
+                decoration: _neonDesktop
+                    // A cut-corner plate, its ring outside it in the
+                    // window's black.
+                    ? ShapeDecoration(
+                        color: colors.background.inverse,
+                        shape: Neon.chamferBorder(
+                          cut: AppChamfer.small,
+                          side: BorderSide(
+                            color: colors.background.window,
+                            width: 2,
+                            strokeAlign: BorderSide.strokeAlignOutside,
+                          ),
+                        ),
+                      )
+                    : BoxDecoration(
+                        color: colors.background.inverse,
+                        borderRadius: BorderRadius.circular(4),
+                        // The ring sits OUTSIDE the 16px badge like the Figma
+                        // stroke, leaving the full box to the 14px logo.
+                        border: Border.all(
+                          color: colors.background.ground,
+                          width: 2,
+                          strokeAlign: BorderSide.strokeAlignOutside,
+                        ),
+                      ),
                 child: Center(
                   child: AppIcon(
                     signerKind == HardwareSignerKind.keystone
@@ -1365,6 +1401,7 @@ class _SidebarAccountsPopoverState extends State<_SidebarAccountsPopover> {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final showScrollbar = widget.accounts.length > 3;
+    if (_neonDesktop) return _buildNeon(context, showScrollbar: showScrollbar);
     return DefaultTextStyle.merge(
       style: const TextStyle(decoration: TextDecoration.none),
       child: ClipRRect(
@@ -1518,6 +1555,166 @@ class _SidebarAccountsPopoverState extends State<_SidebarAccountsPopover> {
                   ),
                 ),
               ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+extension on _SidebarAccountsPopoverState {
+  /// Desktop's popover: an opaque neon glass panel floating over the sidebar,
+  /// its two cut corners lit, headed by a red HUD caption, with the cut-corner
+  /// slabs of `AppButton` for its two actions.
+  Widget _buildNeon(BuildContext context, {required bool showScrollbar}) {
+    final colors = context.colors;
+    const cut = AppChamfer.large;
+    return DefaultTextStyle.merge(
+      style: const TextStyle(decoration: TextDecoration.none),
+      child: ClipPath(
+        clipper: ShapeBorderClipper(shape: Neon.wedgeBorder(cut: cut)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 17.5, sigmaY: 17.5),
+          child: SizedBox(
+            key: const ValueKey('sidebar_accounts_popover'),
+            width: 221,
+            height: 254,
+            child: NeonGlassPanel(
+              cut: cut,
+              fill: colors.surface.nav,
+              padding: const EdgeInsets.all(AppSpacing.xs),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(AppSpacing.xxs),
+                    child: Text(
+                      context.l10n.sidebarMyAccounts.toUpperCase(),
+                      semanticsLabel: context.l10n.sidebarMyAccounts,
+                      style: kNeonHudCaptionStyle.copyWith(
+                        color: colors.neon.glow,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  SizedBox(
+                    key: const ValueKey('sidebar_accounts_list'),
+                    height: 153,
+                    child: RawScrollbar(
+                      key: const ValueKey('sidebar_accounts_scrollbar'),
+                      controller: _scrollController,
+                      thumbVisibility: showScrollbar,
+                      radius: const Radius.circular(AppRadii.full),
+                      thickness: 6,
+                      mainAxisMargin: 6,
+                      crossAxisMargin: 6,
+                      thumbColor: colors.surface.scrollbarThumb,
+                      child: Padding(
+                        key: const ValueKey('sidebar_accounts_list_gutter'),
+                        padding: const EdgeInsets.only(right: 18),
+                        child: ScrollConfiguration(
+                          behavior: ScrollConfiguration.of(
+                            context,
+                          ).copyWith(scrollbars: false),
+                          child: ListView.separated(
+                            controller: _scrollController,
+                            physics: const ClampingScrollPhysics(),
+                            padding: const EdgeInsets.only(
+                              bottom: AppSpacing.xs,
+                            ),
+                            itemCount: widget.accounts.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: AppSpacing.xxs),
+                            itemBuilder: (context, index) {
+                              final account = widget.accounts[index];
+                              return _SidebarAccountPopoverRow(
+                                key: ValueKey(
+                                  'sidebar_account_popover_row_${account.uuid}',
+                                ),
+                                account: account,
+                                selected:
+                                    account.uuid == widget.activeAccountUuid,
+                                onTap: () =>
+                                    widget.onSelectAccount(account.uuid),
+                                onCopyAddress:
+                                    account.uuid == widget.activeAccountUuid
+                                    ? null
+                                    : () =>
+                                          widget.onCopyAccountAddress(account),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  const _SidebarAccountsActionsDivider(),
+                  const SizedBox(height: AppSpacing.xs),
+                  SizedBox(
+                    height: 36,
+                    child: Row(
+                      children: [
+                        _SidebarPopoverHoverTarget(
+                          onTap: widget.onManageAccounts,
+                          builder: (context, hovered) => Container(
+                            key: const ValueKey('sidebar_accounts_manage'),
+                            width: 153,
+                            height: 36,
+                            alignment: Alignment.center,
+                            // A glass slab with a hairline edge.
+                            decoration: ShapeDecoration(
+                              color: hovered
+                                  ? colors.button.secondary.bgHover
+                                  : colors.button.secondary.bg,
+                              shape: Neon.chamferBorder(
+                                cut: 6,
+                                side: BorderSide(
+                                  color: colors.border.subtleOpacity,
+                                ),
+                              ),
+                            ),
+                            child: Text(
+                              context.l10n.commonManage,
+                              style: AppTypography.labelLarge.copyWith(
+                                color: colors.button.secondary.label,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.xxs),
+                        _SidebarPopoverHoverTarget(
+                          onTap: widget.onAddAccount,
+                          builder: (context, hovered) {
+                            final fill = hovered
+                                ? colors.button.primary.bgHover
+                                : colors.button.primary.bg;
+                            // The primary slab, lit with its red glow.
+                            return Container(
+                              key: const ValueKey('sidebar_accounts_add'),
+                              width: 48,
+                              height: 32,
+                              decoration: ShapeDecoration(
+                                color: fill,
+                                shape: Neon.chamferBorder(cut: 6),
+                                shadows: Neon.boxGlow(fill, intensity: 0.5),
+                              ),
+                              child: Center(
+                                child: AppIcon(
+                                  AppIcons.addNew,
+                                  size: 16,
+                                  color: colors.button.primary.label,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

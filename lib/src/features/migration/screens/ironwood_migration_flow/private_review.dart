@@ -714,24 +714,11 @@ class _MigrationReviewContent extends StatelessWidget {
               key: const ValueKey('ironwood_migration_keep_running_content'),
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                DecoratedBox(
-                  key: const ValueKey(
-                    'ironwood_migration_keep_running_icon_tile',
-                  ),
-                  decoration: BoxDecoration(
-                    color: _migrationCarouselCrimson,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: SizedBox.square(
-                      dimension: 48,
-                      child: Image.asset(
-                        _ironwoodMigrationExpectationRunningAsset,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                  ),
+                // A lit glyph badge in place of upstream's painted tile.
+                const NeonGlyphBadge(
+                  key: ValueKey('ironwood_migration_keep_running_icon_tile'),
+                  iconName: AppIcons.play,
+                  size: 48,
                 ),
                 const SizedBox(width: 16),
                 Expanded(

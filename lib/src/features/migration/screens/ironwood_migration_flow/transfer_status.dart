@@ -1,26 +1,19 @@
 part of '../ironwood_migration_flow_screen.dart';
 
-const _migrationCarouselPurple = Color(0xFF9667E2);
-const _migrationCarouselGreen = Color(0xFF00A460);
-const _migrationCarouselCrimson = Color(0xFFB90A4A);
-
 List<AppCarouselItem> _migrationPreparationCarouselItems(
   AppLocalizations l10n,
 ) => [
   AppCarouselItem.icon(
     message: l10n.migrationPreparationTipDelay,
-    tileColor: _migrationCarouselPurple,
     icon: AppIcons.history,
     iconSize: 18,
   ),
   AppCarouselItem.icon(
     message: l10n.migrationPreparationTipOrganizing,
-    tileColor: _migrationCarouselGreen,
     icon: AppIcons.wallet,
   ),
   AppCarouselItem.icon(
     message: l10n.migrationPreparationTipRounds,
-    tileColor: _migrationCarouselCrimson,
     icon: AppIcons.migrationSplit,
   ),
 ];
@@ -31,19 +24,16 @@ List<AppCarouselItem> _migrationInProgressCarouselItems(
 ) => [
   AppCarouselItem.icon(
     message: l10n.migrationProgressTipClose,
-    tileColor: _migrationCarouselPurple,
     icon: AppIcons.pause,
   ),
   AppCarouselItem.icon(
     message: l10n.migrationProgressTipBlockTime(secondsPerBlock.toString()),
-    tileColor: _migrationCarouselGreen,
     icon: AppIcons.migrationTimer,
     iconSize: 24,
   ),
-  AppCarouselItem.image(
+  AppCarouselItem.icon(
     message: l10n.migrationProgressTipKeepRunning,
-    tileColor: _migrationCarouselCrimson,
-    imageAsset: _ironwoodMigrationExpectationRunningAsset,
+    icon: AppIcons.play,
   ),
 ];
 
