@@ -213,7 +213,12 @@ final class RailgunPageHost {
 
   @available(iOS 17.0, *)
   private static func storeExists() async -> Bool {
-    await withCheckedContinuation { continuation in
+    // WebKit sets up its main run loop when its first object is made, and these class methods don't make one. A wipe
+    // before any page opened in this process (a reset from the lock screen) crashed when WebKit answered, on a run
+    // loop that didn't exist yet (seen on macOS, whose host shares this code). A throwaway in-memory store makes
+    // WebKit set it up first; it touches no disk.
+    _ = WKWebsiteDataStore.nonPersistent()
+    return await withCheckedContinuation { continuation in
       WKWebsiteDataStore.fetchAllDataStoreIdentifiers { identifiers in
         continuation.resume(returning: identifiers.contains(storeID))
       }
