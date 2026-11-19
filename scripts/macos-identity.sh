@@ -64,12 +64,18 @@ if [[ ! "$APPLICATION_ID" =~ $APPLICATION_ID_PATTERN ]]; then
   exit 1
 fi
 
+# Veylor builds sign with Zapp LLC's Apple Development certificate and the
+# app's Mac development profile, which lists the Macs it runs on (AGENTS.md,
+# "Desktop identity").
+VEYLOR_TEAM="63UVRFCV97"
 case "$APPLICATION_ID" in
   com.veylor.desktop)
     PRODUCT_NAME="Veylor"
+    PROFILE_NAME="Veylor Desktop Mac Development"
     ;;
   com.veylor.desktop.testnet)
     PRODUCT_NAME="Veylor Testnet"
+    PROFILE_NAME="Veylor Desktop Testnet Mac Development"
     ;;
   *)
     echo "No macOS identity is defined for '$APPLICATION_ID'. Use com.veylor.desktop or com.veylor.desktop.testnet." >&2
@@ -82,6 +88,13 @@ cat > "$OVERRIDES_PATH" <<EOF
 PRODUCT_NAME = $PRODUCT_NAME
 PRODUCT_BUNDLE_IDENTIFIER = $APPLICATION_ID
 MACOS_APP_ICON_FILE = VeylorAppIcon
+PRODUCT_COPYRIGHT = Copyright © 2026 Zapp LLC. All rights reserved.
+DEVELOPMENT_TEAM = $VEYLOR_TEAM
+CODE_SIGN_STYLE = Manual
+CODE_SIGN_STYLE[config=Release] = Manual
+CODE_SIGN_IDENTITY = Apple Development
+CODE_SIGN_IDENTITY[config=Release] = Apple Development
+PROVISIONING_PROFILE_SPECIFIER = $PROFILE_NAME
 EOF
 
 echo "macOS identity: $APPLICATION_ID ($PRODUCT_NAME)"

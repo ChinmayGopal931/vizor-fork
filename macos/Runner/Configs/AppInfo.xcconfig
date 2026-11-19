@@ -13,12 +13,23 @@ PRODUCT_BUNDLE_IDENTIFIER = com.keplr.vizor
 // The application's macOS icon composer asset name.
 MACOS_APP_ICON_FILE = AppIcon
 
+// The copyright displayed in application information
+PRODUCT_COPYRIGHT = Copyright © 2026 Space Explorers Inc. All rights reserved.
+
+// Signing, with upstream's team: Release signs with Developer ID, Debug and
+// Profile with Apple Development. These live here rather than in the project
+// file so FlavorOverrides.xcconfig can replace them for Veylor's identity.
+// Upstream's release lane still writes its own settings into the project.
+DEVELOPMENT_TEAM = SZTB68DXM4
+CODE_SIGN_STYLE = Automatic
+CODE_SIGN_STYLE[config=Release] = Manual
+CODE_SIGN_IDENTITY = Apple Development
+CODE_SIGN_IDENTITY[config=Release] = Developer ID Application
+PROVISIONING_PROFILE_SPECIFIER =
+
 // Fastlane writes this ignored file for macOS release flavors, and
 // scripts/macos-identity.sh writes it to select Veylor's identity
 // (AGENTS.md, "Desktop identity"). It is included here, instead of passed as
-// global xcodebuild settings, so Pods targets keep their own PRODUCT_NAME and
-// bundle paths.
+// global xcodebuild settings, so Pods targets keep their own PRODUCT_NAME,
+// bundle paths and signing. It comes last, so its values win.
 #include? "FlavorOverrides.xcconfig"
-
-// The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2026 Space Explorers Inc. All rights reserved.

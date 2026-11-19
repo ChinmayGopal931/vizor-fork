@@ -406,9 +406,18 @@ own way, and a malformed or unknown id fails the build:
 
 - **macOS**: `scripts/macos-identity.sh com.veylor.desktop` writes the ignored
   `macos/Runner/Configs/FlavorOverrides.xcconfig` (name, bundle id,
-  `VeylorAppIcon`). It stays until `scripts/macos-identity.sh --clear`, and a
-  fastlane run replaces it. Then `fvm flutter run -d macos` or
-  `fvm flutter build macos --release`.
+  `VeylorAppIcon`, copyright, signing). It stays until
+  `scripts/macos-identity.sh --clear`, and a fastlane run replaces it. Then
+  `fvm flutter run -d macos` or `fvm flutter build macos --release`.
+  - **Signing:** Veylor builds sign with Zapp LLC's team (`63UVRFCV97`): its
+    Apple Development certificate and the Mac development profile "Veylor
+    Desktop Mac Development". The profile lists the Macs a build runs on. To
+    add a Mac, register it and regenerate the profile through the App Store
+    Connect API.
+  - **Testnet:** the testnet id has no profile yet.
+  - **Where signing lives:** the Runner target's signing is set in
+    `AppInfo.xcconfig`, not the project file, so the overrides can replace it.
+    Upstream's release lane still writes its own settings into the project.
 - **Linux**: `VIZOR_APPLICATION_ID=com.veylor.desktop fvm flutter run -d linux`
   (or `fvm flutter build linux --release`). CMake sets the GTK application id,
   the desktop entry, the hicolor icons (named by the id) and the executable
@@ -418,7 +427,8 @@ own way, and a malformed or unknown id fails the build:
   as on most machines without development packages.
 - **Windows**: `$env:VIZOR_APPLICATION_ID = "com.veylor.desktop"`, then
   `fvm flutter run -d windows` (or `fvm flutter build windows --release`).
-  CMake sets the version resource (company `com.veylor`, product `Veylor`), the
+  CMake sets the version resource (company `com.veylor`, product `Veylor`,
+  copyright Zapp LLC), the
   window title, `veylor_app_icon.ico` and the storage prefix `Veylor`, and
   fails if an inherited `VIZOR_WINDOWS_STORAGE_PREFIX`, `_COMPANY_NAME` or
   `_PRODUCT_NAME` disagrees. `Vizor.exe` keeps its name.

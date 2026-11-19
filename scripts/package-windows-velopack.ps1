@@ -367,6 +367,7 @@ if ($Network -eq "mainnet") {
 }
 
 $CompanyName = "com.keplr"
+$CopyrightHolder = "com.keplr"
 $ProductName = $PackTitle
 $AppIconPath = Join-Path $repoRoot "windows\runner\resources\app_icon.ico"
 if ($VeylorIdentity) {
@@ -374,6 +375,7 @@ if ($VeylorIdentity) {
   # the identity, so nothing is shared with an installed Vizor. CMake checks
   # that these values match VIZOR_APPLICATION_ID.
   $CompanyName = "com.veylor"
+  $CopyrightHolder = "Zapp LLC"
   $ProductName = $VeylorIdentity.Title
   $WindowsStoragePrefix = $VeylorIdentity.StoragePrefix
   $AppIconPath = Join-Path $repoRoot "windows\runner\resources\veylor_app_icon.ico"
@@ -385,7 +387,7 @@ if ($VeylorIdentity) {
 $env:VIZOR_WINDOWS_COMPANY_NAME = $CompanyName
 $env:VIZOR_WINDOWS_FILE_DESCRIPTION = $PackTitle
 $env:VIZOR_WINDOWS_INTERNAL_NAME = $PackTitle
-$env:VIZOR_WINDOWS_LEGAL_COPYRIGHT = "Copyright (C) 2026 $CompanyName. All rights reserved."
+$env:VIZOR_WINDOWS_LEGAL_COPYRIGHT = "Copyright (C) 2026 $CopyrightHolder. All rights reserved."
 $env:VIZOR_WINDOWS_ORIGINAL_FILENAME = "Vizor.exe"
 $env:VIZOR_WINDOWS_PRODUCT_NAME = $ProductName
 $env:VIZOR_WINDOWS_STORAGE_PREFIX = $WindowsStoragePrefix
