@@ -26,6 +26,8 @@ import '../../../core/layout/app_main_sidebar.dart';
 import '../../../core/layout/app_desktop_backdrop_shell.dart';
 import '../../../core/layout/app_layout.dart';
 import '../../../core/layout/app_pane_scroll_scaffold.dart';
+import '../../../core/layout/desktop_neon_session.dart';
+import '../../../core/layout/mobile/neon_sync_backdrop.dart';
 import '../../../core/privacy/privacy_mask.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_button.dart';
@@ -33,6 +35,8 @@ import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/app_pane_modal_overlay.dart';
 import '../../../core/widgets/app_tooltip.dart';
 import '../../../core/widgets/mobile/neon_horizon.dart';
+import '../../../core/widgets/mobile/neon_motion.dart';
+import '../../../core/widgets/mobile/neon_scramble_text.dart';
 import '../../../core/widgets/neon_glass_panel.dart';
 import '../../../providers/zec_price_change_provider.dart';
 import '../../../providers/account_provider.dart';
@@ -54,6 +58,8 @@ import '../../activity/swap_activity_row_items_provider.dart';
 import '../../activity/swap_activity_row_mapper.dart';
 import '../../migration/providers/ironwood_migration_announcement_provider.dart';
 import '../../migration/widgets/ironwood_migration_announcement_modal.dart';
+import '../../portfolio_chart/models/portfolio_chart_models.dart';
+import '../../portfolio_chart/providers/portfolio_chart_provider.dart';
 import '../../swap/models/swap_activity_navigation.dart';
 import '../../swap/models/swap_fiat_value_formatting.dart';
 import '../../swap/providers/swap_activity_tracker.dart';
@@ -64,6 +70,7 @@ import '../services/transparent_balance_display.dart';
 import '../services/transparent_shielding_service.dart';
 import '../widgets/keystone_shield_signing_overlay.dart';
 import '../widgets/ledger_shield_signing_overlay.dart';
+import '../widgets/neon_balance_sign.dart';
 import '../providers/nu7_announcement_provider.dart';
 import '../widgets/nu7_announcement.dart';
 
@@ -383,87 +390,100 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       // The neon look paints no backdrop: the window's black shows.
       background: const SizedBox.shrink(),
       sidebar: const AppMainSidebar(),
-      pane: Stack(
-        fit: StackFit.expand,
-        children: [
-          SizedBox.expand(
-            child: walletAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (err, _) => Center(
-                child: Text(
-                  context.l10n.homeLoadFailed('$err'),
-                  style: AppTypography.bodyMedium.copyWith(
-                    color: context.colors.text.warning,
+      pane: NeonSyncScrolled(
+        builder: (context, scrolled) => Stack(
+          fit: StackFit.expand,
+          children: [
+            // The neon backdrop, as on the phone: the Tron floor, and the sync
+            // line once synced, behind Home's blocks.
+            Positioned.fill(child: NeonSyncBackdrop(scrolled: scrolled)),
+            SizedBox.expand(
+              child: walletAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (err, _) => Center(
+                  child: Text(
+                    context.l10n.homeLoadFailed('$err'),
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: context.colors.text.warning,
+                    ),
+                  ),
+                ),
+                data: (_) => _HomePane(
+                  sync: sync,
+                  hasActivitySyncData: hasActivitySyncData,
+                  passwordRotationRecoveryFailed:
+                      bootstrap.passwordRotationRecoveryFailed,
+                  privacyModeEnabled: privacyModeEnabled,
+                  showsIronwoodOnlyBalance: showsIronwoodOnlyBalance,
+                  shieldedBalanceText: _formatZec(displayedShieldedBalance),
+                  shieldedFiatBalanceText: shieldedFiatBalanceText,
+                  priceChange24hPct: priceChange24hPct,
+                  migratingBalanceText: formatZecAmount(migratingBalance),
+                  waitingForMigrationConfirmation:
+                      waitingForMigrationConfirmation,
+                  transparentBalanceText: transparentBalance.text(
+                    context.l10n,
+                    _formatZec,
+                  ),
+                  transparentBalanceHint: transparentBalance.hint(context.l10n),
+                  hasTransparentBalance: transparentBalance.visible,
+                  canShieldBalance: canShieldTransparentBalance,
+                  isShieldingBalance: _isShieldingBalance,
+                  shieldBalanceError: _shieldBalanceError,
+                  shieldBalanceErrorDetail: _shieldBalanceErrorDetail,
+                  onTogglePrivacyMode: () =>
+                      ref.read(privacyModeProvider.notifier).toggle(),
+                  onShieldBalancePressed: isMigrationRequired
+                      ? () {}
+                      : () => unawaited(_shieldTransparentBalance()),
+                  onDismissShieldBalanceError: _dismissShieldBalanceError,
+                  onRetrySync: () =>
+                      ref.read(syncProvider.notifier).startSync(),
+                  ironwoodMigrationCta: ironwoodHomeMigrationCta,
+                  onIronwoodMigrationCta: () => unawaited(
+                    _openIronwoodMigrationFromHomeCta(ironwoodHomeMigrationCta),
                   ),
                 ),
               ),
-              data: (_) => _HomePane(
-                sync: sync,
-                hasActivitySyncData: hasActivitySyncData,
-                passwordRotationRecoveryFailed:
-                    bootstrap.passwordRotationRecoveryFailed,
-                privacyModeEnabled: privacyModeEnabled,
-                showsIronwoodOnlyBalance: showsIronwoodOnlyBalance,
-                shieldedBalanceText: _formatZec(displayedShieldedBalance),
-                shieldedFiatBalanceText: shieldedFiatBalanceText,
-                priceChange24hPct: priceChange24hPct,
-                migratingBalanceText: formatZecAmount(migratingBalance),
-                waitingForMigrationConfirmation:
-                    waitingForMigrationConfirmation,
-                transparentBalanceText: transparentBalance.text(
-                  context.l10n,
-                  _formatZec,
-                ),
-                transparentBalanceHint: transparentBalance.hint(context.l10n),
-                hasTransparentBalance: transparentBalance.visible,
-                canShieldBalance: canShieldTransparentBalance,
-                isShieldingBalance: _isShieldingBalance,
-                shieldBalanceError: _shieldBalanceError,
-                shieldBalanceErrorDetail: _shieldBalanceErrorDetail,
-                onTogglePrivacyMode: () =>
-                    ref.read(privacyModeProvider.notifier).toggle(),
-                onShieldBalancePressed: isMigrationRequired
-                    ? () {}
-                    : () => unawaited(_shieldTransparentBalance()),
-                onDismissShieldBalanceError: _dismissShieldBalanceError,
-                onRetrySync: () => ref.read(syncProvider.notifier).startSync(),
-                ironwoodMigrationCta: ironwoodHomeMigrationCta,
-                onIronwoodMigrationCta: () => unawaited(
-                  _openIronwoodMigrationFromHomeCta(ironwoodHomeMigrationCta),
-                ),
+            ),
+            // The sync line while it climbs, and its readout, over the content.
+            Positioned.fill(
+              child: NeonSyncBackdrop(
+                layer: NeonSyncLayer.front,
+                scrolled: scrolled,
               ),
             ),
-          ),
-          if (_shieldHardwareSignerKind == HardwareSignerKind.keystone)
-            KeystoneShieldSigningOverlay(
-              onCancel: _closeHardwareShieldSigning,
-              onComplete: _closeHardwareShieldSigning,
-            ),
-          if (_shieldHardwareSignerKind == HardwareSignerKind.ledger)
-            LedgerShieldSigningOverlay(
-              onCancel: _closeHardwareShieldSigning,
-              onComplete: _closeHardwareShieldSigning,
-            ),
-          if (visibleIronwoodAnnouncement != null)
-            AppPaneModalOverlay(
-              key: const ValueKey('ironwood_migration_announcement_overlay'),
-              alignment: const Alignment(0, -0.08),
-              onDismiss: () =>
-                  _dismissIronwoodAnnouncement(visibleIronwoodAnnouncement),
-              child: IronwoodMigrationAnnouncementModal(
-                onStartMigration: () => unawaited(
-                  _openIronwoodMigration(visibleIronwoodAnnouncement),
-                ),
-                onOpenReleaseNotes: () =>
-                    unawaited(_openIronwoodReleaseNotes()),
+            if (_shieldHardwareSignerKind == HardwareSignerKind.keystone)
+              KeystoneShieldSigningOverlay(
+                onCancel: _closeHardwareShieldSigning,
+                onComplete: _closeHardwareShieldSigning,
               ),
-            ),
-          if (visibleNu7Network != null)
-            Nu7AnnouncementOverlay(
-              onClose: () =>
-                  unawaited(_dismissNu7Announcement(visibleNu7Network)),
-            ),
-        ],
+            if (_shieldHardwareSignerKind == HardwareSignerKind.ledger)
+              LedgerShieldSigningOverlay(
+                onCancel: _closeHardwareShieldSigning,
+                onComplete: _closeHardwareShieldSigning,
+              ),
+            if (visibleIronwoodAnnouncement != null)
+              AppPaneModalOverlay(
+                key: const ValueKey('ironwood_migration_announcement_overlay'),
+                alignment: const Alignment(0, -0.08),
+                onDismiss: () =>
+                    _dismissIronwoodAnnouncement(visibleIronwoodAnnouncement),
+                child: IronwoodMigrationAnnouncementModal(
+                  onStartMigration: () => unawaited(
+                    _openIronwoodMigration(visibleIronwoodAnnouncement),
+                  ),
+                  onOpenReleaseNotes: () =>
+                      unawaited(_openIronwoodReleaseNotes()),
+                ),
+              ),
+            if (visibleNu7Network != null)
+              Nu7AnnouncementOverlay(
+                onClose: () =>
+                    unawaited(_dismissNu7Announcement(visibleNu7Network)),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -541,9 +561,16 @@ class _HomePaneState extends ConsumerState<_HomePane> {
   Timer? _swapActivityRefreshTimer;
   String? _swapActivityRefreshAccountUuid;
 
+  /// The balance sign switches on as this Home appears, if it has not since
+  /// the wallet was unlocked: Home is built again on every return to it.
+  late final bool _igniteSign;
+
   @override
   void initState() {
     super.initState();
+    final session = ref.read(desktopNeonSessionProvider);
+    _igniteSign = !session.homeSignLit;
+    session.homeSignLit = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _syncSwapActivityStatusRefresh();
@@ -656,6 +683,9 @@ class _HomePaneState extends ConsumerState<_HomePane> {
     final animateMigrationCta = ref.watch(
       homeMigrationCtaPulseMotionEnabledProvider,
     );
+    // The history chart lives behind the sign: its line is the sign's light
+    // trail, and a click opens the full chart.
+    final chartState = ref.watch(portfolioChartViewProvider);
 
     final activityState =
         initialPresentation.activityUnavailable && rows.isEmpty
@@ -704,6 +734,11 @@ class _HomePaneState extends ConsumerState<_HomePane> {
       ironwoodMigrationCta: widget.ironwoodMigrationCta,
       animateMigrationCta: animateMigrationCta,
       onIronwoodMigrationCta: widget.onIronwoodMigrationCta,
+      chartState: chartState,
+      onOpenChart: chartState is PortfolioChartHidden
+          ? null
+          : () => context.push('/portfolio-chart'),
+      igniteSign: _igniteSign,
     );
     return DeferredGiftCardRecovery(
       accountUuid: activeAccountUuid,
@@ -1243,6 +1278,9 @@ class _HomeDesktopPane extends StatelessWidget {
     required this.ironwoodMigrationCta,
     required this.animateMigrationCta,
     required this.onIronwoodMigrationCta,
+    this.chartState = const PortfolioChartHidden(),
+    this.onOpenChart,
+    this.igniteSign = false,
   });
 
   final bool isImporting;
@@ -1277,6 +1315,12 @@ class _HomeDesktopPane extends StatelessWidget {
   final IronwoodHomeMigrationCtaState ironwoodMigrationCta;
   final bool animateMigrationCta;
   final VoidCallback onIronwoodMigrationCta;
+
+  /// See [_HomeDesktopBalanceCard.chartState], [_HomeDesktopBalanceCard.onOpenChart]
+  /// and [_HomeDesktopBalanceCard.igniteSign].
+  final PortfolioChartViewState chartState;
+  final VoidCallback? onOpenChart;
+  final bool igniteSign;
 
   static const _referencePaneHeight = 704.0;
   static const _referenceTop = 48.0;
@@ -1335,6 +1379,9 @@ class _HomeDesktopPane extends StatelessWidget {
                       ironwoodMigrationCta: ironwoodMigrationCta,
                       animateMigrationCta: animateMigrationCta,
                       onIronwoodMigrationCta: onIronwoodMigrationCta,
+                      chartState: chartState,
+                      onOpenChart: onOpenChart,
+                      igniteSign: igniteSign,
                     ),
                   ),
                 ),
@@ -1372,10 +1419,12 @@ class _HomeDesktopPane extends StatelessWidget {
                             AppSpacing.s,
                             AppSpacing.sm,
                           ),
-                          child: _HomeDesktopActivityCard(
-                            rows: activityRows,
-                            isLoading: isActivityLoading,
-                            onSeeAll: onActivity,
+                          child: NeonSyncOcclude(
+                            child: _HomeDesktopActivityCard(
+                              rows: activityRows,
+                              isLoading: isActivityLoading,
+                              onSeeAll: onActivity,
+                            ),
                           ),
                         ),
                 ),
@@ -1567,6 +1616,9 @@ class _HomeDesktopBalanceCard extends StatefulWidget {
     required this.ironwoodMigrationCta,
     required this.animateMigrationCta,
     required this.onIronwoodMigrationCta,
+    this.chartState = const PortfolioChartHidden(),
+    this.onOpenChart,
+    this.igniteSign = false,
   });
 
   final bool hasBalance;
@@ -1593,6 +1645,16 @@ class _HomeDesktopBalanceCard extends StatefulWidget {
   final IronwoodHomeMigrationCtaState ironwoodMigrationCta;
   final bool animateMigrationCta;
   final VoidCallback onIronwoodMigrationCta;
+
+  /// The portfolio chart's state: its line is the sign's light trail.
+  final PortfolioChartViewState chartState;
+
+  /// Opens the full chart; null while the chart is off or has no history,
+  /// which leaves the sign inert.
+  final VoidCallback? onOpenChart;
+
+  /// The sign flickers on as it appears (once after each unlock).
+  final bool igniteSign;
 
   @override
   State<_HomeDesktopBalanceCard> createState() =>
@@ -1627,10 +1689,8 @@ class _HomeDesktopBalanceCardState extends State<_HomeDesktopBalanceCard> {
     final migrationStopped =
         widget.ironwoodMigrationCta.mode ==
         IronwoodHomeMigrationCtaMode.stopped;
-    // The tray sits on the card's ground shelf (Figma 4731:64262/64704), so
-    // the action rests on the accent text token. The design draws no hover
-    // state; hover uses the standard ghost-button fill instead of inventing
-    // a color (the old gold chevron borrowed a background utility token).
+    // The design draws no hover state for the tray action; hover uses the
+    // standard ghost-button fill instead of inventing a color.
     final shieldBalanceContentColor = migrationRequired
         ? colors.text.disabled
         : widget.isShieldingBalance || widget.canShieldBalance
@@ -1648,173 +1708,341 @@ class _HomeDesktopBalanceCardState extends State<_HomeDesktopBalanceCard> {
         : roundedPriceChangePct < 0
         ? colors.text.homeCardNegative
         : colors.text.homeCard;
-    final cardRadius = BorderRadius.circular(AppRadii.large);
     final showIronwoodMigrationState =
         migrationRequired || migrationInProgress || migrationStopped;
-    final balanceContentColor = migrationRequired
-        ? colors.text.disabled
-        : colors.text.homeCard;
-    final balanceTitle = migrationRequired
-        ? context.l10n.homeMigrationRequiredTitle
-        : context.l10n.commonShieldedBalance;
 
     return SizedBox(
       width: 396,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          ClipRRect(
-            borderRadius: cardRadius,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                // Figma: the outer card is a ground shelf; only the balance
-                // block itself carries the dark homeCard fill, leaving the
-                // shield tray exposed on the bright surface.
-                color: colors.background.ground,
-                borderRadius: cardRadius,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 396,
-                    height: 200,
-                    decoration: BoxDecoration(
-                      color: colors.background.homeCard,
-                      borderRadius: cardRadius,
+          // The balance is the phone's neon sign, frameless on the black,
+          // with the transparent tray under it. Backed in black, so a synced
+          // sync line shows only beside it.
+          NeonSyncOcclude(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _HomeDesktopBalanceSign(
+                  balanceText: !widget.balanceIsAvailable
+                      ? '—'
+                      : widget.hasBalance
+                      ? visibleBalance
+                      : hideIfPrivacyMode(
+                          '0',
+                          privacyModeEnabled: widget.privacyModeEnabled,
+                        ),
+                  balanceLoaded: widget.balanceIsAvailable,
+                  fiatBalanceText: widget.hasBalance
+                      ? widget.shieldedFiatBalanceText
+                      : null,
+                  priceChange24hPct: widget.priceChange24hPct,
+                  priceChangeColor: priceChangeColor,
+                  privacyModeEnabled: widget.privacyModeEnabled,
+                  migrationRequired: migrationRequired,
+                  onTogglePrivacyMode: widget.onTogglePrivacyMode,
+                  chartState: widget.chartState,
+                  onOpenChart: widget.onOpenChart,
+                  ignite: widget.igniteSign,
+                ),
+                if (widget.hasTransparentBalance)
+                  _HomeTransparentBalanceStrip(
+                    key: const ValueKey(
+                      'home_desktop_transparent_balance_strip',
                     ),
-                    foregroundDecoration: BoxDecoration(
-                      borderRadius: cardRadius,
-                      border: Border.all(
-                        color: const Color(0xFFFFFFFF).withValues(alpha: 0.07),
-                        width: 1.5,
+                    balanceText: widget.transparentBalanceText,
+                    balanceHint: widget.transparentBalanceHint,
+                    canShieldBalance: widget.canShieldBalance,
+                    showShieldBalanceAction:
+                        migrationRequired ||
+                        widget.canShieldBalance ||
+                        widget.isShieldingBalance,
+                    isShieldingBalance: widget.isShieldingBalance,
+                    privacyModeEnabled: widget.privacyModeEnabled,
+                    shieldBalanceContentColor: shieldBalanceContentColor,
+                    shieldBalanceHovered: isShieldBalanceHoverActive,
+                    onShieldBalancePressed: widget.onShieldBalancePressed,
+                    onShieldBalanceHoverChanged:
+                        _handleShieldBalanceHoverChanged,
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.s),
+          if (showIronwoodMigrationState) ...[
+            NeonSyncOcclude(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _HomeDesktopActionButton(
+                      key: const ValueKey('home_desktop_send_button'),
+                      icon: AppIcons.plane,
+                      label: context.l10n.homeSend,
+                      onTap: widget.onSend,
+                      primary: true,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  Expanded(
+                    child: _HomeDesktopActionButton(
+                      key: const ValueKey('home_desktop_receive_button'),
+                      icon: AppIcons.arrowDownCircle,
+                      label: context.l10n.homeReceive,
+                      onTap: widget.onReceive,
+                      primary: false,
+                    ),
+                  ),
+                  if (widget.onPay != null) ...[
+                    const SizedBox(width: AppSpacing.xs),
+                    SizedBox(
+                      width: 60,
+                      child: _HomeDesktopActionButton(
+                        key: const ValueKey('home_desktop_pay_button'),
+                        icon: AppIcons.paid,
+                        label: context.l10n.homePayInUsdc,
+                        compact: true,
+                        onTap: widget.onPay!,
+                        primary: false,
                       ),
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppSpacing.sm),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            key: migrationRequired
-                                ? const ValueKey(
-                                    'home_desktop_ironwood_migration_required_pill',
-                                  )
-                                : null,
-                            children: [
-                              AppIcon(
-                                migrationRequired
-                                    ? AppIcons.lock
-                                    : AppIcons.shieldKeyhole,
-                                key: const ValueKey(
-                                  'home_desktop_shielded_balance_icon',
-                                ),
-                                size: 20,
-                                color: colors.text.homeCard,
-                              ),
-                              const SizedBox(width: AppSpacing.xs),
-                              Text(
-                                balanceTitle,
-                                style: AppTypography.labelLarge.copyWith(
-                                  color: colors.text.homeCard,
-                                  fontWeight: FontWeight.w400,
-                                ),
-                              ),
-                              const Spacer(),
-                              _HomeDesktopPrivacyButton(
-                                privacyModeEnabled: widget.privacyModeEnabled,
-                                onTap: widget.onTogglePrivacyMode,
-                              ),
-                            ],
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.s),
+            NeonSyncOcclude(
+              child: _HomeDesktopMigrationCtaButton(
+                label: migrationRequired
+                    ? context.l10n.commonMigrateToIronwood
+                    : migrationStopped
+                    ? context.l10n.commonMigrationStoppedByNetworkUpgrade
+                    : widget.waitingForMigrationConfirmation
+                    ? context.l10n.commonWaitingForConfirmation
+                    : context.l10n.homeMigrationStillMigrating(
+                        hideAmountIfPrivacyMode(
+                          '${widget.migratingBalanceText} ZEC', // l10n-ignore: amount format
+                          privacyModeEnabled: widget.privacyModeEnabled,
+                        ),
+                      ),
+                stopped: migrationStopped,
+                animateIndicator: widget.animateMigrationCta,
+                onTap: widget.onIronwoodMigrationCta,
+              ),
+            ),
+          ] else if (widget.balanceIsAvailable && !widget.hasBalance)
+            NeonSyncOcclude(
+              child: _HomeDesktopActionButton(
+                key: const ValueKey('home_desktop_receive_first_button'),
+                icon: AppIcons.arrowDownCircle,
+                label: context.l10n.homeReceiveFirstZec,
+                onTap: widget.onReceive,
+                primary: true,
+                expanded: true,
+              ),
+            )
+          else
+            NeonSyncOcclude(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _HomeDesktopActionButton(
+                      key: const ValueKey('home_desktop_send_button'),
+                      icon: AppIcons.plane,
+                      label: context.l10n.homeSend,
+                      onTap: widget.onSend,
+                      primary: true,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  Expanded(
+                    child: _HomeDesktopActionButton(
+                      key: const ValueKey('home_desktop_receive_button'),
+                      icon: AppIcons.arrowDownCircle,
+                      label: context.l10n.homeReceive,
+                      onTap: widget.onReceive,
+                      primary: false,
+                    ),
+                  ),
+                  if (widget.onPay != null) ...[
+                    const SizedBox(width: AppSpacing.xs),
+                    // Icon-only pay entry — Figma 5407:152492: fixed 60px pill.
+                    SizedBox(
+                      width: 60,
+                      child: _HomeDesktopActionButton(
+                        key: const ValueKey('home_desktop_pay_button'),
+                        icon: AppIcons.paid,
+                        label: context.l10n.homePayInUsdc,
+                        compact: true,
+                        onTap: widget.onPay!,
+                        primary: false,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Desktop Home's balance as the phone's neon sign: Thin red digits with a
+/// glow and the privacy eye beside them, the fiat line above, and the chart's
+/// line as a light trail below. Hiding or showing the balance re-encrypts the
+/// digits. A click (or Enter) on the sign opens the full chart; with the chart
+/// hidden the sign is inert.
+class _HomeDesktopBalanceSign extends StatelessWidget {
+  const _HomeDesktopBalanceSign({
+    required this.balanceText,
+    required this.balanceLoaded,
+    required this.fiatBalanceText,
+    required this.priceChange24hPct,
+    required this.priceChangeColor,
+    required this.privacyModeEnabled,
+    required this.migrationRequired,
+    required this.onTogglePrivacyMode,
+    required this.chartState,
+    required this.onOpenChart,
+    required this.ignite,
+  });
+
+  final String balanceText;
+
+  /// False while [balanceText] holds the placeholder of a balance not read
+  /// yet. The balance that replaces it is lit at once: only a change of a
+  /// shown balance re-encrypts the sign.
+  final bool balanceLoaded;
+  final String? fiatBalanceText;
+  final double? priceChange24hPct;
+  final Color? priceChangeColor;
+  final bool privacyModeEnabled;
+
+  /// The balance waits on the Ironwood migration: the sign is dimmed and
+  /// says so above the digits.
+  final bool migrationRequired;
+  final VoidCallback onTogglePrivacyMode;
+  final PortfolioChartViewState chartState;
+  final VoidCallback? onOpenChart;
+  final bool ignite;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final neon = colors.neon;
+    final cardText = colors.text.homeCard;
+    return NeonIgnition(
+      enabled: ignite,
+      builder: (context, light) {
+        final lit = migrationRequired ? light * 0.35 : light;
+        final fiat = fiatBalanceText;
+        final changeColor = priceChangeColor;
+        final sign = Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md,
+            AppSpacing.sm,
+            AppSpacing.sm,
+            AppSpacing.xs,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (migrationRequired) ...[
+                Row(
+                  key: const ValueKey(
+                    'home_desktop_ironwood_migration_required_pill',
+                  ),
+                  children: [
+                    AppIcon(AppIcons.lock, size: 16, color: cardText),
+                    const SizedBox(width: AppSpacing.xs),
+                    Flexible(
+                      child: Text(
+                        context.l10n.homeMigrationRequiredTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: kNeonSignCaptionStyle.copyWith(color: cardText),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xs),
+              ],
+              if (fiat != null)
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        fiat,
+                        key: const ValueKey('home_desktop_balance_fiat_text'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: kNeonSignCaptionStyle.copyWith(
+                          color: cardText.withValues(
+                            alpha: migrationRequired ? 0.4 : 0.75,
                           ),
-                          const Spacer(),
-                          if (widget.hasBalance &&
-                              widget.shieldedFiatBalanceText != null) ...[
-                            Row(
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    widget.shieldedFiatBalanceText!,
-                                    key: const ValueKey(
-                                      'home_desktop_balance_fiat_text',
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    // Label M per Figma (Home Card / Balance
-                                    // Performance): Geist Regular 14/16.
-                                    style: AppTypography.labelLarge.copyWith(
-                                      color: colors.text.homeCard,
-                                      fontWeight: FontWeight.w400,
-                                    ),
-                                  ),
+                        ),
+                      ),
+                    ),
+                    if (changeColor != null) ...[
+                      const SizedBox(width: AppSpacing.xs),
+                      Text(
+                        formatZecPriceChange24hPct(priceChange24hPct!),
+                        key: const ValueKey(
+                          'home_desktop_balance_price_change_text',
+                        ),
+                        style: kNeonSignCaptionStyle.copyWith(
+                          color: changeColor,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              const SizedBox(height: AppSpacing.xxs),
+              Row(
+                children: [
+                  Expanded(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          KeyedSubtree(
+                            key: ValueKey(balanceLoaded),
+                            child: NeonScrambleText(
+                              textKey: const ValueKey(
+                                'home_desktop_balance_amount_text',
+                              ),
+                              // Hiding or showing the balance re-encrypts it.
+                              text: balanceText,
+                              style: kNeonBalanceAmountStyle.copyWith(
+                                color: neon.signCore,
+                                shadows: Neon.textGlow(
+                                  neon.signGlow,
+                                  intensity: lit,
                                 ),
-                                // Figma separates the change run with a 4px
-                                // gap plus a leading space character (~8px
-                                // effective at 14px Geist).
-                                if (priceChangeColor != null) ...[
-                                  const SizedBox(width: AppSpacing.xs),
-                                  Text(
-                                    formatZecPriceChange24hPct(
-                                      widget.priceChange24hPct!,
-                                    ),
-                                    key: const ValueKey(
-                                      'home_desktop_balance_price_change_text',
-                                    ),
-                                    style: AppTypography.labelLarge.copyWith(
-                                      color: priceChangeColor,
-                                      fontWeight: FontWeight.w400,
-                                    ),
-                                  ),
-                                ],
-                              ],
+                              ),
+                              cipherStyle: kNeonBalanceAmountStyle.copyWith(
+                                color: neon.signGlow,
+                                shadows: Neon.textGlow(
+                                  neon.signGlow,
+                                  intensity: 0.5 * lit,
+                                ),
+                              ),
                             ),
-                            const SizedBox(height: AppSpacing.xs),
-                          ],
-                          SizedBox(
-                            width: double.infinity,
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerLeft,
-                              child: Row(
-                                // The Figma balance is one text run (amount
-                                // 45px, ticker 32px) sharing a baseline. The
-                                // Regular cut stands in for the spec'd Medium:
-                                // white-on-dark rasterization runs ~8% heavier
-                                // than Figma's renderer, so Medium reads bolder
-                                // here than the design intends.
-                                crossAxisAlignment: CrossAxisAlignment.baseline,
-                                textBaseline: TextBaseline.alphabetic,
-                                children: [
-                                  Text(
-                                    !widget.balanceIsAvailable
-                                        ? '—'
-                                        : widget.hasBalance
-                                        ? visibleBalance
-                                        : hideIfPrivacyMode(
-                                            '0',
-                                            privacyModeEnabled:
-                                                widget.privacyModeEnabled,
-                                          ),
-                                    key: const ValueKey(
-                                      'home_desktop_balance_amount_text',
-                                    ),
-                                    style: AppTypography.displayMedium.copyWith(
-                                      color: balanceContentColor,
-                                      fontWeight: FontWeight.w400,
-                                    ),
-                                  ),
-                                  const SizedBox(width: AppSpacing.xs),
-                                  Text(
-                                    kZcashDefaultCurrencyTicker,
-                                    key: const ValueKey(
-                                      'home_desktop_balance_currency_text',
-                                    ),
-                                    style: AppTypography.headlineLarge.copyWith(
-                                      color: balanceContentColor,
-                                      fontWeight: FontWeight.w400,
-                                    ),
-                                  ),
-                                ],
+                          ),
+                          const SizedBox(width: AppSpacing.xs),
+                          Text(
+                            kZcashDefaultCurrencyTicker,
+                            key: const ValueKey(
+                              'home_desktop_balance_currency_text',
+                            ),
+                            style: kNeonBalanceTickerStyle.copyWith(
+                              color: neon.signGlow,
+                              shadows: Neon.textGlow(
+                                neon.signGlow,
+                                intensity: 0.6 * lit,
                               ),
                             ),
                           ),
@@ -1822,137 +2050,58 @@ class _HomeDesktopBalanceCardState extends State<_HomeDesktopBalanceCard> {
                       ),
                     ),
                   ),
-                  if (widget.hasTransparentBalance)
-                    _HomeTransparentBalanceStrip(
-                      key: const ValueKey(
-                        'home_desktop_transparent_balance_strip',
-                      ),
-                      balanceText: widget.transparentBalanceText,
-                      balanceHint: widget.transparentBalanceHint,
-                      canShieldBalance: widget.canShieldBalance,
-                      showShieldBalanceAction:
-                          migrationRequired ||
-                          widget.canShieldBalance ||
-                          widget.isShieldingBalance,
-                      isShieldingBalance: widget.isShieldingBalance,
-                      privacyModeEnabled: widget.privacyModeEnabled,
-                      shieldBalanceContentColor: shieldBalanceContentColor,
-                      shieldBalanceHovered: isShieldBalanceHoverActive,
-                      onShieldBalancePressed: widget.onShieldBalancePressed,
-                      onShieldBalanceHoverChanged:
-                          _handleShieldBalanceHoverChanged,
-                    ),
+                  const SizedBox(width: AppSpacing.s),
+                  _HomeDesktopPrivacyButton(
+                    privacyModeEnabled: privacyModeEnabled,
+                    onTap: onTogglePrivacyMode,
+                  ),
                 ],
               ),
-            ),
+              const SizedBox(height: AppSpacing.xs),
+              NeonBalanceTrail(
+                chartState: chartState,
+                light: lit,
+                showOpenHint: onOpenChart != null,
+              ),
+            ],
           ),
-          const SizedBox(height: AppSpacing.s),
-          if (showIronwoodMigrationState) ...[
-            Row(
-              children: [
-                Expanded(
-                  child: _HomeDesktopActionButton(
-                    key: const ValueKey('home_desktop_send_button'),
-                    icon: AppIcons.plane,
-                    label: context.l10n.homeSend,
-                    onTap: widget.onSend,
-                    primary: true,
+        );
+
+        final open = onOpenChart;
+        return KeyedSubtree(
+          key: const ValueKey('home_desktop_balance_sign'),
+          child: open == null
+              ? sign
+              // Frameless: the sign floats on the backdrop, and its focus
+              // ring is the only outline it ever shows.
+              : _HomeDesktopInteractiveTarget(
+                  semanticsLabel: context.l10n.portfolioChartOpen,
+                  onTap: open,
+                  builder: (context, hovered, focused) => Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      sign,
+                      if (focused)
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: colors.state.focusRing,
+                                  width: 2,
+                                ),
+                                borderRadius: BorderRadius.circular(
+                                  AppRadii.small,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: AppSpacing.xs),
-                Expanded(
-                  child: _HomeDesktopActionButton(
-                    key: const ValueKey('home_desktop_receive_button'),
-                    icon: AppIcons.arrowDownCircle,
-                    label: context.l10n.homeReceive,
-                    onTap: widget.onReceive,
-                    primary: false,
-                  ),
-                ),
-                if (widget.onPay != null) ...[
-                  const SizedBox(width: AppSpacing.xs),
-                  SizedBox(
-                    width: 60,
-                    child: _HomeDesktopActionButton(
-                      key: const ValueKey('home_desktop_pay_button'),
-                      icon: AppIcons.paid,
-                      label: context.l10n.homePayInUsdc,
-                      compact: true,
-                      onTap: widget.onPay!,
-                      primary: false,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: AppSpacing.s),
-            _HomeDesktopMigrationCtaButton(
-              label: migrationRequired
-                  ? context.l10n.commonMigrateToIronwood
-                  : migrationStopped
-                  ? context.l10n.commonMigrationStoppedByNetworkUpgrade
-                  : widget.waitingForMigrationConfirmation
-                  ? context.l10n.commonWaitingForConfirmation
-                  : context.l10n.homeMigrationStillMigrating(
-                      hideAmountIfPrivacyMode(
-                        '${widget.migratingBalanceText} ZEC', // l10n-ignore: amount format
-                        privacyModeEnabled: widget.privacyModeEnabled,
-                      ),
-                    ),
-              stopped: migrationStopped,
-              animateIndicator: widget.animateMigrationCta,
-              onTap: widget.onIronwoodMigrationCta,
-            ),
-          ] else if (widget.balanceIsAvailable && !widget.hasBalance)
-            _HomeDesktopActionButton(
-              key: const ValueKey('home_desktop_receive_first_button'),
-              icon: AppIcons.arrowDownCircle,
-              label: context.l10n.homeReceiveFirstZec,
-              onTap: widget.onReceive,
-              primary: true,
-              expanded: true,
-            )
-          else
-            Row(
-              children: [
-                Expanded(
-                  child: _HomeDesktopActionButton(
-                    key: const ValueKey('home_desktop_send_button'),
-                    icon: AppIcons.plane,
-                    label: context.l10n.homeSend,
-                    onTap: widget.onSend,
-                    primary: true,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                Expanded(
-                  child: _HomeDesktopActionButton(
-                    key: const ValueKey('home_desktop_receive_button'),
-                    icon: AppIcons.arrowDownCircle,
-                    label: context.l10n.homeReceive,
-                    onTap: widget.onReceive,
-                    primary: false,
-                  ),
-                ),
-                if (widget.onPay != null) ...[
-                  const SizedBox(width: AppSpacing.xs),
-                  // Icon-only pay entry — Figma 5407:152492: fixed 60px pill.
-                  SizedBox(
-                    width: 60,
-                    child: _HomeDesktopActionButton(
-                      key: const ValueKey('home_desktop_pay_button'),
-                      icon: AppIcons.paid,
-                      label: context.l10n.homePayInUsdc,
-                      compact: true,
-                      onTap: widget.onPay!,
-                      primary: false,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -2338,12 +2487,15 @@ class _HomeDesktopPrivacyButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    // The sign's own button inside it.
     return _HomeDesktopInteractiveTarget(
       semanticsLabel: privacyModeEnabled
           ? context.l10n.sidebarShowBalance
           : context.l10n.sidebarHideBalance,
       onTap: onTap,
       builder: (context, hovered, focused) {
+        // Just the glyph, in the sign's light: no plate, no border. The box
+        // is the click target; a hovered glyph lights up fully.
         return SizedBox(
           key: const ValueKey('home_desktop_privacy_button'),
           width: 32,
@@ -2352,23 +2504,11 @@ class _HomeDesktopPrivacyButton extends StatelessWidget {
             clipBehavior: Clip.none,
             alignment: Alignment.center,
             children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 120),
-                curve: Curves.easeOut,
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: const Color(
-                    0xFFFFFFFF,
-                  ).withValues(alpha: hovered ? 0.10 : 0.05),
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: AppIcon(
-                    privacyModeEnabled ? AppIcons.eyeClosed : AppIcons.eye,
-                    size: 16,
-                    color: colors.text.homeCard,
-                  ),
+              AppIcon(
+                privacyModeEnabled ? AppIcons.eyeClosed : AppIcons.eye,
+                size: 16,
+                color: colors.neon.signCore.withValues(
+                  alpha: hovered ? 1 : 0.85,
                 ),
               ),
               if (focused)
@@ -2379,13 +2519,12 @@ class _HomeDesktopPrivacyButton extends StatelessWidget {
                   bottom: -2,
                   child: IgnorePointer(
                     child: DecoratedBox(
-                      decoration: ShapeDecoration(
-                        shape: CircleBorder(
-                          side: BorderSide(
-                            color: colors.state.focusRing,
-                            width: 2,
-                          ),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: colors.state.focusRing,
+                          width: 2,
                         ),
+                        borderRadius: BorderRadius.circular(AppRadii.small),
                       ),
                     ),
                   ),

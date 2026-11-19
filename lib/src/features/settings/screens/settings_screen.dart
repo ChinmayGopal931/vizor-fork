@@ -41,6 +41,7 @@ import '../settings_platform.dart';
 import '../widgets/near_swap_privacy_info.dart';
 import '../widgets/network_privacy_control.dart';
 import '../widgets/hide_balance_on_unlock_control.dart';
+import '../widgets/portfolio_chart_settings_control.dart';
 import '../widgets/enhance_pir_privacy_control.dart';
 import '../widgets/private_queries_turn_off.dart';
 import '../widgets/language_picker.dart';
@@ -646,6 +647,14 @@ class _SettingsList extends ConsumerWidget {
           ],
         ),
         const SizedBox(height: AppSpacing.md),
+        // Home's balance chart: where the phone's Settings has it, after the
+        // account.
+        _SettingsBlock(
+          key: const ValueKey('settings_portfolio_chart_block'),
+          title: context.l10n.portfolioChartSettingsTitle,
+          rows: const [PortfolioChartSettingsControl()],
+        ),
+        const SizedBox(height: AppSpacing.md),
         _SettingsBlock(
           title: context.l10n.settingsSectionSystem,
           rows: [
@@ -1107,7 +1116,7 @@ class _UpdateProgressBar extends StatelessWidget {
 }
 
 class _SettingsBlock extends StatelessWidget {
-  const _SettingsBlock({required this.title, required this.rows});
+  const _SettingsBlock({required this.title, required this.rows, super.key});
 
   final String title;
   final List<Widget> rows;

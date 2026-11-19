@@ -117,7 +117,7 @@ void main() {
         () =>
             proxy.addressUtxosStreamCallCount >= 2 &&
             !rust_sync.isSyncRunning() &&
-            textForKey(tester, const ValueKey('sidebar_sync_text')) == 'Synced',
+            textForKey(tester, const ValueKey('sidebar_sync_text')) == 'SYNCED',
         description: 'completed sync after the stalled UTXO stream timeout',
         timeout: const Duration(seconds: 75),
       );
@@ -129,7 +129,7 @@ void main() {
         network: 'regtest',
       );
       expect(persistedStatus.isComplete, isTrue);
-      expect(textForKey(tester, const ValueKey('sidebar_sync_text')), 'Synced');
+      expect(textForKey(tester, const ValueKey('sidebar_sync_text')), 'SYNCED');
       expect(find.text(_networkFailure), findsNothing);
       expect(find.text(_endpointFailure), findsNothing);
       expect(find.text(_genericFailure), findsNothing);
