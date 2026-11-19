@@ -104,13 +104,29 @@ class NeonSidebarGlyph extends StatelessWidget {
 ///
 /// The line breathes while it climbs, and holds still under reduced motion.
 class NeonSidebarSyncReadout extends StatefulWidget {
-  const NeonSidebarSyncReadout({required this.line, this.textKey, super.key});
+  const NeonSidebarSyncReadout({
+    required this.line,
+    this.textKey,
+    this.glow,
+    this.core,
+    this.textFirst = false,
+    super.key,
+  });
 
   final NeonSyncLine line;
 
   /// Keys the readout's text; the desktop sidebar keeps the key its sync
   /// status had, which its end-to-end tests read.
   final Key? textKey;
+
+  /// The light of the line and its readout; the red neon light when null.
+  /// The desktop sidebar draws Railgun's sync in steel beside the wallet's.
+  final Color? glow;
+  final Color? core;
+
+  /// Puts the readout before the line, aligned to it: the desktop sidebar's
+  /// left readout, when two stand side by side.
+  final bool textFirst;
 
   @override
   State<NeonSidebarSyncReadout> createState() => _NeonSidebarSyncReadoutState();
@@ -161,36 +177,40 @@ class _NeonSidebarSyncReadoutState extends State<NeonSidebarSyncReadout>
   Widget build(BuildContext context) {
     final line = widget.line;
     final neon = context.colors.neon;
+    final glow = widget.glow ?? neon.glow;
+    final core = widget.core ?? neon.core;
+    final lineBox = SizedBox(
+      width: NeonSidebarGlyph.size,
+      height: _lineHeight,
+      child: CustomPaint(
+        painter: _SidebarSyncLinePainter(
+          breath: _breath,
+          line: line,
+          glow: glow,
+          core: core,
+        ),
+      ),
+    );
+    final readout = Expanded(
+      child: Text(
+        line.readout.toUpperCase(),
+        key: widget.textKey,
+        textAlign: widget.textFirst ? TextAlign.end : null,
+        style: kNeonHudCaptionStyle.copyWith(
+          color: glow,
+          shadows: Neon.textGlow(glow, intensity: 0.35),
+        ),
+      ),
+    );
+    const gap = SizedBox(width: AppSpacing.s);
     return Semantics(
       label: line.semanticsLabel,
       excludeSemantics: true,
       liveRegion: line.failed,
       child: Row(
-        children: [
-          SizedBox(
-            width: NeonSidebarGlyph.size,
-            height: _lineHeight,
-            child: CustomPaint(
-              painter: _SidebarSyncLinePainter(
-                breath: _breath,
-                line: line,
-                glow: neon.glow,
-                core: neon.core,
-              ),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.s),
-          Expanded(
-            child: Text(
-              line.readout.toUpperCase(),
-              key: widget.textKey,
-              style: kNeonHudCaptionStyle.copyWith(
-                color: neon.glow,
-                shadows: Neon.textGlow(neon.glow, intensity: 0.35),
-              ),
-            ),
-          ),
-        ],
+        children: widget.textFirst
+            ? [readout, gap, lineBox]
+            : [lineBox, gap, readout],
       ),
     );
   }

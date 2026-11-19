@@ -770,32 +770,49 @@ class _AppMainSidebarState extends ConsumerState<AppMainSidebar> {
                     ),
                     SizedBox(height: bottomSyncGap),
                     // The phone sidebar's sync readout: a short line that
-                    // rises with the scan under the glyphs' column, and its
-                    // readout as a red HUD caption, read from the same
-                    // [NeonSyncLine.wallet] as Home's line.
+                    // rises with the scan, and its readout as a red HUD
+                    // caption, read from the same [NeonSyncLine.wallet] as
+                    // Home's line. With Shielded USD, Railgun's sync stands
+                    // beside it in steel, with the Shielded USD page's
+                    // readouts: the wallet's on the left with its text before
+                    // the line, Railgun's on the right with its text after.
                     Padding(
                       padding: _syncReadoutPadding,
-                      child: NeonSidebarSyncReadout(
-                        key: const ValueKey('sidebar_sync_status'),
-                        textKey: const ValueKey('sidebar_sync_text'),
-                        line: _syncLine(sync, networkPrivacy),
-                      ),
+                      child: railgunSyncLine == null
+                          ? NeonSidebarSyncReadout(
+                              key: const ValueKey('sidebar_sync_status'),
+                              textKey: const ValueKey('sidebar_sync_text'),
+                              line: _syncLine(sync, networkPrivacy),
+                            )
+                          : Row(
+                              children: [
+                                Expanded(
+                                  child: NeonSidebarSyncReadout(
+                                    key: const ValueKey('sidebar_sync_status'),
+                                    textKey: const ValueKey(
+                                      'sidebar_sync_text',
+                                    ),
+                                    line: _syncLine(sync, networkPrivacy),
+                                    textFirst: true,
+                                  ),
+                                ),
+                                const SizedBox(width: AppSpacing.xxs),
+                                Expanded(
+                                  child: NeonSidebarSyncReadout(
+                                    key: const ValueKey(
+                                      'sidebar_railgun_sync_status',
+                                    ),
+                                    textKey: const ValueKey(
+                                      'sidebar_railgun_sync_text',
+                                    ),
+                                    line: railgunSyncLine,
+                                    glow: context.colors.neon.steelGlow,
+                                    core: context.colors.neon.steelCore,
+                                  ),
+                                ),
+                              ],
+                            ),
                     ),
-                    // Railgun's sync under it in the same style, with the
-                    // Shielded USD page's readouts.
-                    if (railgunSyncLine != null) ...[
-                      SizedBox(
-                        height: compact ? AppSpacing.xxs : AppSpacing.xs,
-                      ),
-                      Padding(
-                        padding: _syncReadoutPadding,
-                        child: NeonSidebarSyncReadout(
-                          key: const ValueKey('sidebar_railgun_sync_status'),
-                          textKey: const ValueKey('sidebar_railgun_sync_text'),
-                          line: railgunSyncLine,
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),

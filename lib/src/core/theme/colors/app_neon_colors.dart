@@ -11,6 +11,8 @@ import '../primitives.dart';
 /// * [grid] — floor and chart grid lines.
 /// * [frameGlow] — white light, as a headlight: the hairline between the
 ///   balance sign and the Private USD strip under it.
+/// * [steelGlow] / [steelCore] — brushed-steel light for Railgun's sync,
+///   beside the wallet's red one in the desktop sidebar.
 ///
 /// The Figma sets, which upstream's design never lights, mirror the brand
 /// crimson so a stray use still reads as the brand accent.
@@ -22,6 +24,8 @@ class AppNeonColors {
     required this.signCore,
     required this.grid,
     required this.frameGlow,
+    required this.steelGlow,
+    required this.steelCore,
   });
 
   final Color glow;
@@ -30,6 +34,8 @@ class AppNeonColors {
   final Color signCore;
   final Color grid;
   final Color frameGlow;
+  final Color steelGlow;
+  final Color steelCore;
 
   static const dark = neonDark;
   static const light = neonLight;
@@ -41,6 +47,8 @@ class AppNeonColors {
     signCore: CrimsonPrimitives.p900Dark,
     grid: CrimsonPrimitives.p300Alpha15Dark,
     frameGlow: CrimsonPrimitives.p400Dark,
+    steelGlow: NeonPrimitives.n700Dark,
+    steelCore: NeonPrimitives.white,
   );
 
   static const figmaLight = AppNeonColors(
@@ -50,6 +58,8 @@ class AppNeonColors {
     signCore: CrimsonPrimitives.p900Dark,
     grid: CrimsonPrimitives.p300Alpha15Light,
     frameGlow: CrimsonPrimitives.p400Dark,
+    steelGlow: NeonPrimitives.n400Dark,
+    steelCore: NeonPrimitives.n200Dark,
   );
 
   static const neonDark = AppNeonColors(
@@ -59,6 +69,8 @@ class AppNeonColors {
     signCore: NeonPrimitives.redCore,
     grid: NeonPrimitives.red14,
     frameGlow: NeonPrimitives.headlight,
+    steelGlow: NeonPrimitives.n700Dark,
+    steelCore: NeonPrimitives.white,
   );
 
   static const neonLight = AppNeonColors(
@@ -68,5 +80,7 @@ class AppNeonColors {
     signCore: NeonPrimitives.redCore,
     grid: NeonPrimitives.redOnLight10,
     frameGlow: NeonPrimitives.headlight,
+    steelGlow: NeonPrimitives.n400Dark,
+    steelCore: NeonPrimitives.n200Dark,
   );
 }
