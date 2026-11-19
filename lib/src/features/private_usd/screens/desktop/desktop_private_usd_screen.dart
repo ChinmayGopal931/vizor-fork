@@ -18,6 +18,8 @@ import '../../../../providers/account_provider.dart';
 import '../../../../providers/network_privacy_provider.dart';
 import '../../../../providers/privacy_mode_provider.dart';
 import '../../../../providers/zec_price_change_provider.dart';
+import '../../../../rust/api/private_usd.dart' as rust;
+import '../../../../core/widgets/app_loading_icon.dart';
 import '../../../activity/activity_feed_sections.dart'
     show compareActivityEntries;
 import '../../../activity/models/activity_row_data.dart';
@@ -38,6 +40,7 @@ import '../../providers/private_usd_receive_address_provider.dart';
 import '../../providers/private_usd_spend_status_provider.dart';
 import '../../providers/railgun_engine_provider.dart';
 import '../../services/private_usd_balance_repository.dart';
+import '../../services/private_usd_pause.dart';
 import '../../widgets/desktop/desktop_private_usd_rpc_dialog.dart';
 import '../../widgets/desktop/desktop_private_usd_widgets.dart';
 import '../../widgets/mobile/private_usd_activity_rows.dart';
@@ -294,6 +297,20 @@ class _DesktopPrivateUsdScreenState
               screening: screening,
               privacyModeEnabled: privacyModeEnabled,
               onOpen: onReceive,
+            ),
+          ),
+        ],
+        // A deposit Railgun's screening sent back to its vault, which the
+        // phone recovers from its Refunds screen: desktop starts no bridge,
+        // so this is all Refunds would hold here.
+        if (ref.watch(privateUsdDepositRescuesProvider(uuid))
+            case final rescues when rescues.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.s),
+          NeonSyncOcclude(
+            child: _DepositRescuesPanel(
+              accountUuid: uuid,
+              rescues: rescues,
+              privacyModeEnabled: privacyModeEnabled,
             ),
           ),
         ],
@@ -955,6 +972,121 @@ class _ActivitySection extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// The deposits Railgun's screening sent back to their address's vault, each
+/// with Recover, which asks first (the relayer's fee comes out of it) and then
+/// shields it again: the phone's Refunds rows for deposits. One recovery at a
+/// time.
+class _DepositRescuesPanel extends ConsumerStatefulWidget {
+  const _DepositRescuesPanel({
+    required this.accountUuid,
+    required this.rescues,
+    required this.privacyModeEnabled,
+  });
+
+  final String accountUuid;
+  final List<rust.ApiDepositRescuable> rescues;
+  final bool privacyModeEnabled;
+
+  @override
+  ConsumerState<_DepositRescuesPanel> createState() =>
+      _DepositRescuesPanelState();
+}
+
+class _DepositRescuesPanelState extends ConsumerState<_DepositRescuesPanel> {
+  /// The deposit address being recovered, and why a recovery did not go.
+  int? _recovering;
+  final _errors = <int, String>{};
+
+  Future<void> _recover(rust.ApiDepositRescuable rescue) async {
+    if (_recovering != null) return;
+    final l10n = context.l10n;
+    final confirmed = await showDesktopPrivateUsdConfirm(
+      context,
+      title: l10n.privateUsdRefundsDepositConfirmTitle,
+      body: l10n.privateUsdRefundsDepositConfirmBody(
+        formatPrivateUsd(BigInt.tryParse(rescue.fee) ?? BigInt.zero),
+      ),
+      confirmLabel: l10n.privateUsdRefundsDepositRecover,
+    );
+    if (!confirmed || !mounted) return;
+    setState(() {
+      _recovering = rescue.index;
+      _errors.remove(rescue.index);
+    });
+    String? error;
+    try {
+      await ref
+          .read(privateUsdEngineProvider)
+          .rescueDeposit(widget.accountUuid, index: rescue.index);
+    } on rust.ApiPrivateUsdError catch (failure) {
+      if (failure.code != rust.ApiPrivateUsdErrorCode.cancelled) {
+        error = l10n.privateUsdRefundsDepositRecoverFailed;
+      }
+    } catch (failure) {
+      if (failure is! PrivateUsdPause) {
+        error = l10n.privateUsdRefundsDepositRecoverFailed;
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _recovering = null;
+      if (error != null) _errors[rescue.index] = error;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return DesktopPrivateUsdPanel(
+      key: const ValueKey('desktop_private_usd_deposit_rescues'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          DesktopPrivateUsdCaption(context.l10n.privateUsdRefundsDepositTitle),
+          for (final rescue in widget.rescues) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              _recovering == rescue.index
+                  ? context.l10n.privateUsdRefundsDepositRecovering
+                  : context.l10n.privateUsdRefundsDepositBody(
+                      _masked(
+                        formatPrivateUsd(
+                          BigInt.tryParse(rescue.held) ?? BigInt.zero,
+                        ),
+                        widget.privacyModeEnabled,
+                      ),
+                    ),
+              style: AppTypography.bodySmall.copyWith(
+                color: colors.text.secondary,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: AppButton(
+                key: ValueKey('desktop_private_usd_deposit_recover_${rescue.index}'),
+                variant: AppButtonVariant.secondary,
+                size: AppButtonSize.small,
+                onPressed: _recovering == null
+                    ? () => unawaited(_recover(rescue))
+                    : null,
+                leading: _recovering == rescue.index
+                    ? const AppLoadingIcon(size: AppIconSize.medium)
+                    : null,
+                child: Text(context.l10n.privateUsdRefundsDepositRecover),
+              ),
+            ),
+            if (_errors[rescue.index] case final error?) ...[
+              const SizedBox(height: AppSpacing.xs),
+              DesktopPrivateUsdNotice(message: error, danger: true),
+            ],
+          ],
+        ],
+      ),
     );
   }
 }

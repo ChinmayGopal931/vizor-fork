@@ -71,9 +71,12 @@ the phone's widgets and painters where they fit.
   refresh's progress); Railgun's sync line in the pane
   (`privateUsdSyncLine`, `NeonSyncLineLayer` back and front, the `RAILGUN
   SYNC` readouts); Send, Withdraw and Receive with the spending note and a
-  payment in flight; the deposits; the Available, Processing (with its live
-  line), Arriving (with its estimate) and Blocked rows; the assets; the
-  activity (unfolding details); the info card.
+  payment in flight; the deposits, and any deposit Railgun's screening sent
+  back to its vault with Recover (the phone's Refunds rows for deposits, after
+  the same confirmation; desktop starts no bridge, so there are no conversion
+  refunds); the Available, Processing (with its live line), Arriving (with its
+  estimate) and Blocked rows; the assets; the activity (unfolding details);
+  the info card.
 - `/private-usd/receive`: public USDC at the deposit address (the default) and
   0zkUSDC at the 0zk address, behind the phone's switch (`NeonSwitchTabs`),
   each as a code on a lit plate (dark modules on light, and no badge: the
@@ -175,8 +178,8 @@ bridge without the wallet UI (no wallet could be unlocked here):
 Untested, for the owner's session:
 
 - Everything with a wallet: the screens, a refresh from the page, Receive,
-  deposits, a send and a withdrawal (Sepolia), Settings' RPC dialog and the
-  relayer claims switch.
+  deposits and a deposit's recovery, a send and a withdrawal (Sepolia),
+  Settings' RPC dialog and the relayer claims switch.
 - The lifecycle on the Mac: minimise, hide, a covered window, a locked screen,
   sleep and wake (that the engine pauses and resumes, and that the page resumes
   its sync), and the keep-awake assertion through a first sync

@@ -348,3 +348,104 @@ class _DesktopPrivateUsdInfoCard extends StatelessWidget {
     );
   }
 }
+
+/// Asks before a step the user cannot take back: [title], what follows
+/// ([body]), [confirmLabel] and Cancel. True only when confirmed. The phone
+/// asks the same in a sheet.
+Future<bool> showDesktopPrivateUsdConfirm(
+  BuildContext context, {
+  required String title,
+  required String body,
+  required String confirmLabel,
+}) async {
+  final theme = context.appTheme;
+  final container = ProviderScope.containerOf(context, listen: false);
+  final confirmed = await showDialog<bool>(
+    context: context,
+    barrierColor: theme.colors.background.neutralScrim,
+    builder: (dialogContext) => UncontrolledProviderScope(
+      container: container,
+      child: AppTheme(
+        data: theme,
+        child: Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          insetPadding: const EdgeInsets.all(AppSpacing.md),
+          child: _DesktopPrivateUsdConfirmCard(
+            title: title,
+            body: body,
+            confirmLabel: confirmLabel,
+            onAnswer: (answer) => Navigator.of(dialogContext).pop(answer),
+          ),
+        ),
+      ),
+    ),
+  );
+  return confirmed ?? false;
+}
+
+class _DesktopPrivateUsdConfirmCard extends StatelessWidget {
+  const _DesktopPrivateUsdConfirmCard({
+    required this.title,
+    required this.body,
+    required this.confirmLabel,
+    required this.onAnswer,
+  });
+
+  final String title;
+  final String body;
+  final String confirmLabel;
+  final ValueChanged<bool> onAnswer;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return AppModalCard(
+      key: const ValueKey('desktop_private_usd_confirm_card'),
+      width: 400,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            title,
+            style: AppTypography.headlineSmall.copyWith(
+              color: colors.text.accent,
+              fontWeight: AppFontWeight.heading,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.s),
+          Text(
+            body,
+            style: AppTypography.bodyMedium.copyWith(
+              color: colors.text.secondary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: [
+              Expanded(
+                child: AppButton(
+                  key: const ValueKey('desktop_private_usd_confirm_cancel'),
+                  variant: AppButtonVariant.secondary,
+                  expand: true,
+                  onPressed: () => onAnswer(false),
+                  child: Text(context.l10n.commonCancel),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: AppButton(
+                  key: const ValueKey('desktop_private_usd_confirm_ok'),
+                  expand: true,
+                  onPressed: () => onAnswer(true),
+                  child: Text(confirmLabel),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
