@@ -1,9 +1,6 @@
 import 'package:flutter/painting.dart';
 
-import '../../layout/app_form_factor.dart';
 import '../primitives.dart';
-
-const _mobile = kAppFormFactor == AppFormFactor.mobile;
 
 /// Icon color hierarchy retained from the OLDSemantic icon tokens.
 ///
@@ -50,8 +47,8 @@ class AppIconColors {
   final Color success;
   final Color brandCrimson;
 
-  static const dark = _mobile ? neonDark : figmaDark;
-  static const light = _mobile ? neonLight : figmaLight;
+  static const dark = neonDark;
+  static const light = neonLight;
 
   static const figmaDark = AppIconColors(
     accent: Primitives.p800Dark,

@@ -162,7 +162,7 @@ class _SwapAddressEditModalState extends State<SwapAddressEditModal> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: AppTypography.bodyLarge.copyWith(
-              fontWeight: FontWeight.w600,
+              fontWeight: AppFontWeight.semiBold,
               color: colors.text.accent,
             ),
           ),
@@ -180,7 +180,7 @@ class _SwapAddressEditModalState extends State<SwapAddressEditModal> {
                 Text(
                   fieldLabel,
                   style: AppTypography.labelLarge.copyWith(
-                    fontWeight: FontWeight.w400,
+                    fontWeight: AppFontWeight.regular,
                     color: colors.text.secondary,
                   ),
                 ),
@@ -215,7 +215,7 @@ class _SwapAddressEditModalState extends State<SwapAddressEditModal> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: AppTypography.labelLarge.copyWith(
-                            fontWeight: FontWeight.w400,
+                            fontWeight: AppFontWeight.regular,
                             color:
                                 formatFinding.severity ==
                                     AddressFormatSeverity.error
@@ -319,7 +319,7 @@ class _AddressInputField extends StatelessWidget {
                 decoration: InputDecoration.collapsed(
                   hintText: hint,
                   hintStyle: AppTypography.labelLarge.copyWith(
-                    fontWeight: FontWeight.w400,
+                    fontWeight: AppFontWeight.regular,
                     color: colors.text.muted,
                   ),
                 ),

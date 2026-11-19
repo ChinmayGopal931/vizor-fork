@@ -141,7 +141,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Review send'), findsOneWidget);
+    expect(find.text('REVIEW SEND'), findsOneWidget);
     expect(find.text('Amount'), findsOneWidget);
     expect(find.text('15.12 ZEC'), findsOneWidget);
     expect(find.text(r'$1.06K'), findsOneWidget);
@@ -177,7 +177,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Review Payment'), findsOneWidget);
+    expect(find.text('REVIEW PAYMENT'), findsOneWidget);
     expect(find.text('Review send'), findsNothing);
     expect(
       find.byKey(const ValueKey('send_review_requested_by')),
@@ -217,7 +217,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Review Payment'), findsOneWidget);
+    expect(find.text('REVIEW PAYMENT'), findsOneWidget);
     expect(find.text('Acme coffee'), findsNothing);
     expect(
       find.byKey(const ValueKey('send_review_requested_amount')),
@@ -275,7 +275,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Review Amount'), findsOneWidget);
+    expect(find.text('REVIEW AMOUNT'), findsOneWidget);
     expect(find.text('Support Veylor'), findsOneWidget);
     expect(find.text('Send'), findsNothing);
     expect(find.text('Donation'), findsNothing);
@@ -435,7 +435,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
       await tester.pump(const Duration(milliseconds: 200));
       await tester.pumpAndSettle();
-      expect(find.text('Review send'), findsOneWidget);
+      expect(find.text('REVIEW SEND'), findsOneWidget);
       expect(find.text('send-route'), findsNothing);
       final discardsBeforeRetry = rustApi.discardCalls.length;
       final refreshesBeforeRetry = syncNotifier.refreshedAccounts.length;
@@ -450,7 +450,7 @@ void main() {
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(rustApi.discardCalls, hasLength(discardsBeforeRetry + 1));
-      expect(find.text('Review send'), findsOneWidget);
+      expect(find.text('REVIEW SEND'), findsOneWidget);
       expect(find.text('send-route'), findsNothing);
       expect(syncNotifier.refreshedAccounts, hasLength(refreshesBeforeRetry));
 
@@ -507,7 +507,7 @@ void main() {
     await _flushRealAsync(tester);
     await tester.pumpAndSettle();
     expect(rustApi.proposedAccounts, ['test-account']);
-    expect(find.text('Review send'), findsOneWidget);
+    expect(find.text('REVIEW SEND'), findsOneWidget);
     expect(find.text('0.0002 ZEC'), findsOneWidget);
     expect(find.byType(KeystoneSigningModal), findsNothing);
     // A delayed event from the removed prompt cannot start a download or
@@ -629,7 +629,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 200));
     await tester.pumpAndSettle();
     expect(find.text('send-route'), findsNothing);
-    expect(find.text('Review send'), findsOneWidget);
+    expect(find.text('REVIEW SEND'), findsOneWidget);
     expect(rustApi.discardCalls, hasLength(3));
     expect(
       tester
@@ -974,7 +974,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(KeystoneSigningModal), findsNothing);
-    expect(find.text('Review send'), findsOneWidget);
+    expect(find.text('REVIEW SEND'), findsOneWidget);
     expect(container.read(externalActionGuardProvider).activeHoldCount, 1);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
@@ -999,7 +999,7 @@ void main() {
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
     expect(find.text('send-route'), findsNothing);
-    expect(find.text('Review send'), findsOneWidget);
+    expect(find.text('REVIEW SEND'), findsOneWidget);
     expect(container.read(externalActionGuardProvider).activeHoldCount, 1);
 
     discardCompleter.complete();
@@ -1850,7 +1850,7 @@ void main() {
       );
       await _flushRealAsync(tester);
       expect(find.byType(LedgerSigningModal), findsNothing);
-      expect(find.text('Review send'), findsOneWidget);
+      expect(find.text('REVIEW SEND'), findsOneWidget);
       proofs.complete(Uint8List.fromList([3, 1]));
       approval.complete([9, 1]);
       await _flushRealAsync(tester);
@@ -2840,7 +2840,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('send-route'), findsNothing);
-    expect(find.text('Review send'), findsOneWidget);
+    expect(find.text('REVIEW SEND'), findsOneWidget);
     expect(find.byType(KeystoneSigningModal), findsNothing);
     expect(rustApi.discardCalls, hasLength(1));
     expect(rustApi.createPcztCalls, 0);
@@ -2907,7 +2907,7 @@ void main() {
       await _flushRealAsync(tester);
       await tester.pumpAndSettle();
       expect(find.text('send-route'), findsNothing);
-      expect(find.text('Review send'), findsOneWidget);
+      expect(find.text('REVIEW SEND'), findsOneWidget);
       expect(find.byType(KeystoneSigningModal), findsNothing);
     },
   );
@@ -2940,7 +2940,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('send-route'), findsNothing);
-      expect(find.text('Review send'), findsOneWidget);
+      expect(find.text('REVIEW SEND'), findsOneWidget);
       expect(find.byType(KeystoneSigningModal), findsNothing);
       // createPcztFromProposal consumes the replayable proposal but retains
       // its owner-scoped DB input lock until the hardware flow finishes.

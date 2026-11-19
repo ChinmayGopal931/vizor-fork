@@ -1,15 +1,12 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/layout/app_form_factor.dart';
 import '../../../core/l10n/l10n.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/app_pane_modal_overlay.dart';
-import '../../../core/widgets/liquid_metal.dart';
 import '../../../core/widgets/mobile/neon_horizon.dart';
-import '../providers/nu7_announcement_provider.dart';
 
 /// NU7 announcement content, shown in the mobile sheet and the desktop modal.
 class Nu7AnnouncementContent extends StatelessWidget {
@@ -198,77 +195,23 @@ class _Nu7AnnouncementOverlayState extends State<Nu7AnnouncementOverlay>
 class _Nu7AnnouncementHeader extends ConsumerWidget {
   const _Nu7AnnouncementHeader({required this.onClose, required this.compact});
 
-  // The logo's bounds in the Figma header. The compact header matches the
-  // Ironwood modal's 154 hero with the logo scaled to the narrower card.
-  static const _logoAspect = 241 / 99;
-
+  // The compact header matches the Ironwood modal's 154 hero.
   final VoidCallback onClose;
   final bool compact;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.colors;
-    final isDark = context.appTheme == AppThemeData.dark;
-    final animate = ref.watch(nu7AnnouncementMotionEnabledProvider);
-    final logoWidth = compact ? 208.0 : 241.0;
     return SizedBox(
       height: compact ? 154 : 210,
       child: Stack(
         children: [
-          // The neon redesign draws no painted art on mobile: the horizon
-          // stands in for the background and the liquid-metal mark.
-          if (kAppFormFactor == AppFormFactor.mobile)
-            const Positioned.fill(
-              top: AppSpacing.md,
-              child: Center(child: NeonHorizon()),
-            )
-          else ...[
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 1,
-              child: ShaderMask(
-                blendMode: BlendMode.dstIn,
-                shaderCallback: (bounds) => LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  // The Figma mask: 18% (15% in dark) fading out downward.
-                  colors: [
-                    Color(isDark ? 0x26FFFFFF : 0x2EFFFFFF),
-                    const Color(0x00FFFFFF),
-                  ],
-                ).createShader(bounds),
-                child: Image(
-                  image: const AssetImage(
-                    'assets/illustrations/nu7_announcement_background.webp',
-                  ),
-                  fit: compact ? BoxFit.cover : BoxFit.fill,
-                ),
-              ),
-            ),
-            Positioned(
-              top: compact ? 34 : 61,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: SizedBox(
-                  width: logoWidth,
-                  height: logoWidth / _logoAspect,
-                  child: LiquidMetal(
-                    image: const AssetImage(
-                      'assets/illustrations/nu7_liquid_metal_shape.webp',
-                    ),
-                    preprocessed: true,
-                    colorBack: const Color(0x00000000),
-                    softness: 1,
-                    speed: animate ? 1 : 0,
-                    scale: 1,
-                  ),
-                ),
-              ),
-            ),
-          ],
+          // The neon look draws no painted art: the horizon stands in for
+          // the background and the liquid-metal mark.
+          const Positioned.fill(
+            top: AppSpacing.md,
+            child: Center(child: NeonHorizon()),
+          ),
           Positioned(
             top: AppSpacing.sm,
             right: AppSpacing.sm,

@@ -3,12 +3,18 @@
 /// The Figma `Fonts` variable collection has a Desktop and a Mobile mode
 /// (`3 Fonts-3.zip`). Both modes are materialized as complete const
 /// token sets — [AppTypographyDesktop] and [AppTypographyMobile] — and
-/// [AppTypography] selects between them at **compile time** via
-/// [kAppFormFactor], so call sites keep the familiar
-/// `AppTypography.bodyMedium` shape, stay const, and the unused set is
-/// tree-shaken out of release builds. Reference a mode set directly only
-/// in tooling (widgetbook galleries, token tests) that must show both
-/// modes inside one binary.
+/// [AppTypography] selects at **compile time** via [kAppFormFactor], so call
+/// sites keep the familiar `AppTypography.bodyMedium` shape, stay const, and
+/// the unused set is tree-shaken out of release builds. Reference a mode set
+/// directly only in tooling (widgetbook galleries, token tests) that must
+/// show both modes inside one binary.
+///
+/// Veylor's neon look sets its type in Gotham Thin and Light on both form
+/// factors: [AppTypographyMobile] carries the mobile metrics in those
+/// weights, and [AppTypographyDesktopNeon] the desktop metrics. Desktop
+/// builds draw [AppTypographyDesktopNeon]; [AppTypographyDesktop] keeps the
+/// Figma desktop mode, weights included, for the tooling and tests that pin
+/// upstream's design.
 ///
 /// **Every style renders in Gotham**, the app's only family (registered by
 /// `loadGothamFonts`, see `gotham_fonts.dart`). The Figma `Fonts` collection
@@ -150,8 +156,8 @@ const _codeS = TextStyle(
   letterSpacing: 0,
 );
 
-/// Figma `Code S`, Mobile mode — the [_codeS] metrics in Light.
-const _codeSMobile = TextStyle(
+/// Figma `Code S` in Light, the [_codeS] metrics: both neon sets draw it.
+const _codeSLight = TextStyle(
   fontFamily: kGothamFamily,
   fontWeight: FontWeight.w300,
   fontSize: 13,
@@ -251,6 +257,125 @@ abstract final class AppTypographyDesktop {
   static const labelSmall = labelMedium;
   static const codeMedium = _codeMDesktop;
   static const codeSmall = _codeS;
+}
+
+/// What desktop builds draw: the [AppTypographyDesktop] metrics in the neon
+/// weights, Thin (100) for headlines and display numerals and Light (300) for
+/// everything else, as [AppTypographyMobile] sets the mobile metrics. No
+/// style is Book (400) or heavier; emphasis comes from colour and size.
+abstract final class AppTypographyDesktopNeon {
+  /// Figma `Headline XL` — 45 / 48 px, letter-spacing −1.35, in Thin.
+  static const displayLarge = TextStyle(
+    fontFamily: kGothamFamily,
+    fontWeight: FontWeight.w100,
+    fontFeatures: _youngSerifCaseFigures,
+    fontSize: 45,
+    height: 48 / 45,
+    letterSpacing: -1.35,
+  );
+
+  static const displayMedium = displayLarge;
+  static const displaySmall = headlineLarge;
+
+  /// Figma desktop `Headline L` — 32 / 33 px, in Thin.
+  static const headlineLarge = TextStyle(
+    fontFamily: kGothamFamily,
+    fontWeight: FontWeight.w100,
+    fontSize: 32,
+    height: 33 / 32,
+    letterSpacing: 0,
+    fontFeatures: _youngSerifCaseFigures,
+  );
+
+  /// Figma desktop `Headline M` — 28 / 30 px, −0.28, in Thin.
+  static const headlineMedium = TextStyle(
+    fontFamily: kGothamFamily,
+    fontWeight: FontWeight.w100,
+    fontSize: 28,
+    height: 30 / 28,
+    letterSpacing: -0.28,
+    fontFeatures: _youngSerifCaseFigures,
+  );
+
+  /// Figma `Headline S` — 16 / 20 px, in Light.
+  static const headlineSmall = TextStyle(
+    fontFamily: kGothamFamily,
+    fontWeight: FontWeight.w300,
+    fontSize: 16,
+    height: 20 / 16,
+    letterSpacing: 0,
+  );
+
+  /// Figma `Body L` — 16 / 24 px, −0.24, in Light.
+  static const bodyLarge = TextStyle(
+    fontFamily: kGothamFamily,
+    fontWeight: FontWeight.w300,
+    fontSize: 16,
+    height: 24 / 16,
+    letterSpacing: -0.24,
+  );
+
+  /// Figma `Body M` — 14 / 21 px, −0.21, in Light.
+  static const bodyMedium = TextStyle(
+    fontFamily: kGothamFamily,
+    fontWeight: FontWeight.w300,
+    fontSize: 14,
+    height: 21 / 14,
+    letterSpacing: -0.21,
+  );
+
+  /// Figma `Body M Medium` — 14 / 21 px, −0.21. Light like [bodyMedium]: the
+  /// neon type has no heavier weight to emphasise with.
+  static const bodyMediumStrong = bodyMedium;
+
+  /// Figma `Body S` — 12 / 18 px, −0.12, in Light.
+  static const bodySmall = TextStyle(
+    fontFamily: kGothamFamily,
+    fontWeight: FontWeight.w300,
+    fontSize: 12,
+    height: 18 / 12,
+    letterSpacing: -0.12,
+  );
+
+  /// Figma `Body XS` — 11 / 16 px, −0.055, in Light.
+  static const bodyExtraSmall = TextStyle(
+    fontFamily: kGothamFamily,
+    fontWeight: FontWeight.w300,
+    fontSize: 11,
+    height: 16 / 11,
+    letterSpacing: -0.055,
+  );
+
+  /// Figma `Label M` — 14 / 16 px, −0.06, in Light.
+  static const labelLarge = TextStyle(
+    fontFamily: kGothamFamily,
+    fontWeight: FontWeight.w300,
+    fontSize: 14,
+    height: 16 / 14,
+    letterSpacing: -0.06,
+  );
+
+  /// Figma `Label S` — 13 / 14 px, in Light.
+  static const labelMedium = TextStyle(
+    fontFamily: kGothamFamily,
+    fontWeight: FontWeight.w300,
+    fontSize: 13,
+    height: 14 / 13,
+    letterSpacing: 0,
+  );
+
+  static const labelSmall = labelMedium;
+
+  /// Figma `Code M` — 14 / 21 px, in Light.
+  static const codeMedium = TextStyle(
+    fontFamily: kGothamFamily,
+    fontWeight: FontWeight.w300,
+    fontSize: 14,
+    height: 21 / 14,
+    letterSpacing: 0,
+  );
+
+  static const codeSmall = _codeSLight;
 }
 
 /// The Mobile mode of the Figma `Fonts` collection.
@@ -354,7 +479,7 @@ abstract final class AppTypographyMobile {
 
   static const labelSmall = labelMedium;
   static const codeMedium = _codeMMobile;
-  static const codeSmall = _codeSMobile;
+  static const codeSmall = _codeSLight;
 }
 
 const _mobile = kAppFormFactor == AppFormFactor.mobile;
@@ -362,15 +487,14 @@ const _mobile = kAppFormFactor == AppFormFactor.mobile;
 /// The typography tokens for the form factor this binary was built for.
 ///
 /// See the library doc above for the selection mechanism and
-/// [AppTypographyDesktop] / [AppTypographyMobile] for per-style Figma
-/// metrics.
+/// [AppTypographyDesktopNeon] / [AppTypographyMobile] for per-style metrics.
 abstract final class AppTypography {
   // ─── Display (legacy aliases onto the headline scale) ─────────────
 
   /// Largest onboarding/welcome headline (Figma `Headline XL`).
   static const displayLarge = _mobile
       ? AppTypographyMobile.displayLarge
-      : AppTypographyDesktop.displayLarge;
+      : AppTypographyDesktopNeon.displayLarge;
 
   /// Hero headlines (Figma `Headline XL`).
   static const displayMedium = displayLarge;
@@ -378,66 +502,66 @@ abstract final class AppTypography {
   /// Step-level headlines inside onboarding flows (Figma `Headline L`).
   static const displaySmall = _mobile
       ? AppTypographyMobile.displaySmall
-      : AppTypographyDesktop.displaySmall;
+      : AppTypographyDesktopNeon.displaySmall;
 
   // ─── Headline ─────────────────────────────────────────────────────
 
   /// Section headings inside content panes (Figma `Headline L`).
   static const headlineLarge = _mobile
       ? AppTypographyMobile.headlineLarge
-      : AppTypographyDesktop.headlineLarge;
+      : AppTypographyDesktopNeon.headlineLarge;
 
   /// Sub-section headings (Figma `Headline M`).
   static const headlineMedium = _mobile
       ? AppTypographyMobile.headlineMedium
-      : AppTypographyDesktop.headlineMedium;
+      : AppTypographyDesktopNeon.headlineMedium;
 
   /// Card titles, group labels (Figma `Headline S`).
   static const headlineSmall = _mobile
       ? AppTypographyMobile.headlineSmall
-      : AppTypographyDesktop.headlineSmall;
+      : AppTypographyDesktopNeon.headlineSmall;
 
   // ─── Body ─────────────────────────────────────────────────────────
 
   /// Comfortable paragraph copy, intro descriptions (Figma `Body L`).
   static const bodyLarge = _mobile
       ? AppTypographyMobile.bodyLarge
-      : AppTypographyDesktop.bodyLarge;
+      : AppTypographyDesktopNeon.bodyLarge;
 
   /// Default paragraph and subtitle copy (Figma `Body M`).
   static const bodyMedium = _mobile
       ? AppTypographyMobile.bodyMedium
-      : AppTypographyDesktop.bodyMedium;
+      : AppTypographyDesktopNeon.bodyMedium;
 
   /// Emphasis variant of [bodyMedium]; same metrics, medium weight. Use
   /// for inline emphasis where italic / bold would over-shout (Figma
   /// `Body M Medium`).
   static const bodyMediumStrong = _mobile
       ? AppTypographyMobile.bodyMediumStrong
-      : AppTypographyDesktop.bodyMediumStrong;
+      : AppTypographyDesktopNeon.bodyMediumStrong;
 
   /// Fine print, legal footers, metadata (Figma `Body S`).
   static const bodySmall = _mobile
       ? AppTypographyMobile.bodySmall
-      : AppTypographyDesktop.bodySmall;
+      : AppTypographyDesktopNeon.bodySmall;
 
   /// Smallest readable copy: footnotes, dense table cells, chip text
   /// (Figma `Body XS`).
   static const bodyExtraSmall = _mobile
       ? AppTypographyMobile.bodyExtraSmall
-      : AppTypographyDesktop.bodyExtraSmall;
+      : AppTypographyDesktopNeon.bodyExtraSmall;
 
   // ─── Label ────────────────────────────────────────────────────────
 
   /// Button labels and nav item text (Figma `Label M`).
   static const labelLarge = _mobile
       ? AppTypographyMobile.labelLarge
-      : AppTypographyDesktop.labelLarge;
+      : AppTypographyDesktopNeon.labelLarge;
 
   /// Compact label copy (Figma `Label S`).
   static const labelMedium = _mobile
       ? AppTypographyMobile.labelMedium
-      : AppTypographyDesktop.labelMedium;
+      : AppTypographyDesktopNeon.labelMedium;
 
   /// Micro-copy: tag pills, status badges, dense controls (Figma
   /// `Label S`).
@@ -451,16 +575,17 @@ abstract final class AppTypography {
   /// Primary monospace copy (Figma `Code M`).
   static const codeMedium = _mobile
       ? AppTypographyMobile.codeMedium
-      : AppTypographyDesktop.codeMedium;
+      : AppTypographyDesktopNeon.codeMedium;
 
   /// Secondary monospace copy: mnemonic word indices, compact numeric
   /// metadata (Figma `Code S`).
   static const codeSmall = _mobile
       ? AppTypographyMobile.codeSmall
-      : AppTypographyDesktop.codeSmall;
+      : AppTypographyDesktopNeon.codeSmall;
 }
 
-/// The Desktop weights: the Figma weight each [AppFontWeight] names.
+/// The Figma weights each [AppFontWeight] names: upstream's desktop design,
+/// kept for the tooling and tests that pin it. Veylor draws none of them.
 abstract final class AppFontWeightDesktop {
   static const regular = FontWeight.w400;
   static const medium = FontWeight.w500;
@@ -477,9 +602,9 @@ abstract final class AppFontWeightDesktop {
   static const heading = FontWeight.w500;
 }
 
-/// The Mobile weights: nothing heavier than Light, so every emphasis weight
-/// is Light, and headings are Thin.
-abstract final class AppFontWeightMobile {
+/// The neon weights: nothing heavier than Light, so every emphasis weight is
+/// Light, and headings are Thin.
+abstract final class AppFontWeightNeon {
   static const regular = FontWeight.w300;
   static const medium = FontWeight.w300;
   static const semiBold = FontWeight.w300;
@@ -489,41 +614,51 @@ abstract final class AppFontWeightMobile {
 }
 
 /// Weights for one-off overrides of a token's weight, as in
-/// `AppTypography.bodyMedium.copyWith(fontWeight: AppFontWeight.medium)`,
-/// for the form factor this binary was built for.
+/// `AppTypography.bodyMedium.copyWith(fontWeight: AppFontWeight.medium)`.
 ///
-/// The emphasis weights keep the Figma weight they name on desktop and are
-/// Light on mobile, so mobile-only code needs none of them. [heading] is the
-/// one mobile code uses: it sets a sheet title or a state's statement in
-/// Thin, as the screen titles are, over a token that is Light on mobile.
+/// Each is named for the Figma weight it stands in for, and every one is
+/// Light on both form factors ([AppFontWeightNeon]): Veylor's type is never
+/// heavier than Light, so emphasis comes from colour and size. [heading] sets
+/// a sheet title or a state's statement in Thin, as the screen titles are,
+/// over a token that is Light.
 abstract final class AppFontWeight {
-  /// Regular (`w400`) on desktop.
-  static const regular = _mobile
-      ? AppFontWeightMobile.regular
-      : AppFontWeightDesktop.regular;
+  /// Light (`w300`), where the Figma design has Regular.
+  static const regular = AppFontWeightNeon.regular;
 
-  /// Medium (`w500`) on desktop.
-  static const medium = _mobile
-      ? AppFontWeightMobile.medium
-      : AppFontWeightDesktop.medium;
+  /// Light (`w300`), where the Figma design has Medium.
+  static const medium = AppFontWeightNeon.medium;
 
-  /// SemiBold (`w600`) on desktop.
-  static const semiBold = _mobile
-      ? AppFontWeightMobile.semiBold
-      : AppFontWeightDesktop.semiBold;
+  /// Light (`w300`), where the Figma design has SemiBold.
+  static const semiBold = AppFontWeightNeon.semiBold;
 
-  /// Bold (`w700`) on desktop.
-  static const bold = _mobile
-      ? AppFontWeightMobile.bold
-      : AppFontWeightDesktop.bold;
+  /// Light (`w300`), where the Figma design has Bold.
+  static const bold = AppFontWeightNeon.bold;
 
-  /// ExtraBold (`w800`) on desktop.
-  static const extraBold = _mobile
-      ? AppFontWeightMobile.extraBold
-      : AppFontWeightDesktop.extraBold;
+  /// Light (`w300`), where the Figma design has ExtraBold.
+  static const extraBold = AppFontWeightNeon.extraBold;
 
-  /// A heading's weight: Thin (`w100`) on mobile, Medium (`w500`) on desktop.
-  static const heading = _mobile
-      ? AppFontWeightMobile.heading
-      : AppFontWeightDesktop.heading;
+  /// A heading's weight: Thin (`w100`).
+  static const heading = AppFontWeightNeon.heading;
+}
+
+/// One-off weights in widgets both form factors draw whose phone weight
+/// predates the neon look: desktop resolves them as [AppFontWeight] does
+/// (Light, so Korean and Chinese render Light too), and the phones keep the
+/// Figma weight they have always drawn.
+abstract final class AppSharedFontWeight {
+  static const _desktop = kAppFormFactor == AppFormFactor.desktop;
+
+  /// Light on desktop; Regular (`w400`) on mobile.
+  static const regular = _desktop ? AppFontWeight.regular : FontWeight.w400;
+
+  /// Light on desktop; Medium (`w500`) on mobile.
+  static const medium = _desktop ? AppFontWeight.medium : FontWeight.w500;
+
+  /// Light on desktop; SemiBold (`w600`) on mobile.
+  static const semiBold = _desktop ? AppFontWeight.semiBold : FontWeight.w600;
+
+  /// Thin on desktop, where it heads a title; SemiBold (`w600`) on mobile.
+  static const headingSemiBold = _desktop
+      ? AppFontWeight.heading
+      : FontWeight.w600;
 }

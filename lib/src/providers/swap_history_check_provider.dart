@@ -120,8 +120,9 @@ class SwapHistoryCheckNotifier extends Notifier<SwapHistoryCheck> {
     });
     ref.listen(swapRecoveryRoundsProvider, (_, _) => unawaited(_reconcile()));
     ref.listen(swapRecoveryUpdateRequiredProvider, (_, required) {
-      if (required case AsyncData(value: false)
-          when state == SwapHistoryCheck.updateRequired) {
+      if (required case AsyncData(
+        value: false,
+      ) when state == SwapHistoryCheck.updateRequired) {
         state = SwapHistoryCheck.idle;
       }
     });

@@ -25,6 +25,7 @@ import 'import_birthday_calendar_overlay.dart';
 import 'import_birthday_unknown_height_modal.dart';
 import 'import_split_view.dart';
 import '../../../core/formatting/date_format.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 enum ImportBirthdayTab { date, blockHeight }
 
@@ -546,11 +547,8 @@ class _ImportWalletBirthdayScreenState
                         children: [
                           SizedBox(
                             width: _titleWidth,
-                            child: Text(
+                            child: NeonPageTitle(
                               context.l10n.onboardingBirthdayTitle,
-                              style: AppTypography.displayLarge.copyWith(
-                                color: context.colors.text.accent,
-                              ),
                               textAlign: TextAlign.center,
                             ),
                           ),
@@ -801,7 +799,10 @@ class _DatePickerField extends StatelessWidget {
             decoration: BoxDecoration(
               color: colors.surface.input.primary,
               borderRadius: BorderRadius.circular(AppRadii.small),
-              border: Border.all(color: const Color(0x00000000), width: 1.5),
+              border: Border.all(
+                color: material.Colors.transparent,
+                width: 1.5,
+              ),
               boxShadow: _birthdayFieldSurfaceShadow(colors),
             ),
             child: Row(
@@ -811,7 +812,7 @@ class _DatePickerField extends StatelessWidget {
                     valueText ?? context.l10n.onboardingBirthdayDateHint,
                     style: AppTypography.labelLarge.copyWith(
                       color: valueColor,
-                      fontWeight: FontWeight.w400,
+                      fontWeight: AppFontWeight.regular,
                     ),
                   ),
                 ),
@@ -852,7 +853,7 @@ class _BlockHeightField extends StatelessWidget {
         ? colors.border.utilityDestructive
         : focusNode.hasFocus
         ? colors.background.inverse
-        : const Color(0x00000000);
+        : material.Colors.transparent;
 
     return Container(
       width: width,
@@ -891,14 +892,14 @@ class _BlockHeightField extends StatelessWidget {
               onChanged: onChanged,
               style: AppTypography.labelLarge.copyWith(
                 color: colors.text.accent,
-                fontWeight: FontWeight.w500,
+                fontWeight: AppFontWeight.medium,
               ),
               cursorColor: colors.text.accent,
               decoration: material.InputDecoration.collapsed(
                 hintText: context.l10n.onboardingBlockHeight,
                 hintStyle: AppTypography.labelLarge.copyWith(
                   color: colors.text.muted,
-                  fontWeight: FontWeight.w400,
+                  fontWeight: AppFontWeight.regular,
                 ),
               ),
             ),
@@ -928,7 +929,7 @@ class _InlineMessage extends StatelessWidget {
       textAlign: centered ? TextAlign.center : null,
       style: AppTypography.labelLarge.copyWith(
         color: errorColor,
-        fontWeight: FontWeight.w400,
+        fontWeight: AppFontWeight.regular,
       ),
     );
     return Row(

@@ -8,6 +8,8 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/l10n/inline_spans.dart';
 import 'onboarding_split_view.dart';
+import '../../../core/widgets/neon_page_title.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
 
 class AddressTypesScreen extends StatelessWidget {
   const AddressTypesScreen({
@@ -107,11 +109,8 @@ class _TitleBlock extends StatelessWidget {
         FittedBox(
           fit: BoxFit.scaleDown,
           alignment: Alignment.center,
-          child: Text(
+          child: NeonPageTitle(
             context.l10n.onboardingAddressTypesTitle,
-            style: AppTypography.displayLarge.copyWith(
-              color: colors.text.accent,
-            ),
             textAlign: TextAlign.center,
           ),
         ),
@@ -129,45 +128,28 @@ class _TitleBlock extends StatelessWidget {
 class _AddressTypesPanel extends StatelessWidget {
   const _AddressTypesPanel();
 
-  static const _radius = BorderRadius.all(Radius.circular(24));
-
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     final fill = colors.background.ground;
 
-    return Container(
+    return SizedBox(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.md,
-      ),
-      decoration: BoxDecoration(
-        color: fill,
-        borderRadius: _radius,
-        boxShadow: [
-          BoxShadow(color: colors.shadows.subtle, blurRadius: 1),
-          BoxShadow(
-            color: colors.shadows.subtle,
-            offset: const Offset(0, 1),
-            blurRadius: 2,
-          ),
-          BoxShadow(
-            color: colors.shadows.subtle,
-            offset: const Offset(0, 2),
-            blurRadius: 4,
-          ),
-          BoxShadow(color: colors.shadows.subtle, blurRadius: 1),
-        ],
-      ),
-      child: const Column(
-        children: [
-          _AddressTypeSection(kind: _AddressTypeKind.shielded),
-          SizedBox(height: AppSpacing.md),
-          _Divider(),
-          SizedBox(height: AppSpacing.md),
-          _AddressTypeSection(kind: _AddressTypeKind.transparent),
-        ],
+      child: NeonGlassPanel(
+        fill: fill,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.md,
+        ),
+        child: const Column(
+          children: [
+            _AddressTypeSection(kind: _AddressTypeKind.shielded),
+            SizedBox(height: AppSpacing.md),
+            _Divider(),
+            SizedBox(height: AppSpacing.md),
+            _AddressTypeSection(kind: _AddressTypeKind.transparent),
+          ],
+        ),
       ),
     );
   }
@@ -248,7 +230,7 @@ class _AddressTypeHeader extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: AppTypography.bodyLarge.copyWith(
                     color: colors.text.accent,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeight.semiBold,
                   ),
                 ),
               ),
@@ -314,8 +296,6 @@ class _AddressBadge extends StatelessWidget {
 
   bool get _isShielded => kind == _AddressTypeKind.shielded;
 
-  static const _shieldedFill = Color(0xFFC2546A);
-
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
@@ -323,9 +303,14 @@ class _AddressBadge extends StatelessWidget {
       width: 21,
       height: 21,
       alignment: Alignment.center,
+      // The shielded tag is lit in the tube's red; the transparent one is
+      // white light.
       decoration: BoxDecoration(
-        color: _isShielded ? _shieldedFill : colors.background.inverse,
-        borderRadius: BorderRadius.circular(AppSpacing.xxs),
+        color: _isShielded ? colors.neon.glow : colors.background.inverse,
+        borderRadius: BorderRadius.circular(AppRadii.small),
+        boxShadow: _isShielded
+            ? Neon.boxGlow(colors.neon.glow, intensity: 0.4)
+            : null,
       ),
       child: Text(
         _isShielded ? 'u1' : 't',

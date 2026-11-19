@@ -234,8 +234,9 @@ class _MobileAccountsSheetState extends ConsumerState<MobileAccountsSheet> {
                     right: _accountsSheetScrollbarGutter,
                   ),
                   child: ScrollConfiguration(
-                    behavior: ScrollConfiguration.of(context)
-                        .copyWith(scrollbars: false),
+                    behavior: ScrollConfiguration.of(
+                      context,
+                    ).copyWith(scrollbars: false),
                     child: ListView.separated(
                       controller: _accountsScrollController,
                       physics: const ClampingScrollPhysics(),

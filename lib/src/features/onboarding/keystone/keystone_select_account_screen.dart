@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart' show Colors;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +10,7 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../rust/wallet/keystone.dart' show KeystoneAccountInfo;
 import 'keystone_onboarding_flow.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 class KeystoneSelectAccountScreen extends ConsumerStatefulWidget {
   const KeystoneSelectAccountScreen({super.key});
@@ -158,13 +160,8 @@ class _TitleBlock extends StatelessWidget {
         FittedBox(
           fit: BoxFit.scaleDown,
           alignment: Alignment.center,
-          child: Text(
+          child: NeonPageTitle(
             context.l10n.commonSelectAccount,
-            style: AppTypography.displayLarge.copyWith(
-              fontFamily: 'Gotham',
-              fontWeight: FontWeight.w400,
-              color: colors.text.accent,
-            ),
             maxLines: 1,
             overflow: TextOverflow.visible,
             softWrap: false,
@@ -266,7 +263,7 @@ class _AccountPickerState extends State<_AccountPicker> {
               countLabel,
               style: AppTypography.labelLarge.copyWith(
                 color: colors.text.secondary,
-                fontWeight: FontWeight.w400,
+                fontWeight: AppFontWeight.regular,
               ),
             ),
           ),
@@ -314,9 +311,7 @@ class _AccountRadioCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final borderColor = selected
-        ? colors.border.strong
-        : const Color(0x00000000);
+    final borderColor = selected ? colors.border.strong : Colors.transparent;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
@@ -368,8 +363,8 @@ class _AccountRadioCard extends StatelessWidget {
                         style: AppTypography.labelLarge.copyWith(
                           color: colors.text.accent,
                           fontWeight: selected
-                              ? FontWeight.w600
-                              : FontWeight.w500,
+                              ? AppFontWeight.semiBold
+                              : AppFontWeight.medium,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -380,7 +375,7 @@ class _AccountRadioCard extends StatelessWidget {
                           color: selected
                               ? colors.text.accent
                               : colors.text.secondary,
-                          fontWeight: FontWeight.w400,
+                          fontWeight: AppFontWeight.regular,
                         ),
                       ),
                     ],
@@ -456,7 +451,8 @@ class _RadioIndicator extends StatelessWidget {
         color: selected
             ? colors.background.inverse
             : colors.background.neutralSubtleOpacity,
-        shape: BoxShape.circle,
+        // Near-square, as the neon look's corners are.
+        borderRadius: BorderRadius.circular(AppRadii.small),
       ),
       child: selected
           ? AppIcon(AppIcons.check, size: 12, color: colors.text.inverse)

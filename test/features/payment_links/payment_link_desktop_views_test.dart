@@ -618,11 +618,11 @@ void main() {
       const Offset(156, 399),
     );
     expect(closeTextStyle.fontFamily, 'Gotham');
-    expect(closeTextStyle.fontWeight, FontWeight.w500);
+    expect(closeTextStyle.fontWeight, AppTypography.labelLarge.fontWeight);
     expect(closeTextStyle.fontSize, 14);
     expect(closeTextStyle.height, 16 / 14);
     expect(closeTextStyle.letterSpacing, -0.06);
-    expect(closeTextStyle.color, const Color(0xFFC2C3C3));
+    expect(closeTextStyle.color, AppThemeData.dark.colors.button.ghost.label);
 
     expect(
       find.text(

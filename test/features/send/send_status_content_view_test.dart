@@ -28,7 +28,7 @@ void main() {
   ) async {
     await _pump(tester, _statusView(SendStatusPhase.inProgress));
 
-    expect(find.text('Send in progress...'), findsOneWidget);
+    expect(find.text('SEND IN PROGRESS...'), findsOneWidget);
     expect(find.text('Status'), findsOneWidget);
     expect(find.text('In progress'), findsOneWidget);
     expect(_icon(AppIcons.loader), findsOneWidget);
@@ -55,7 +55,7 @@ void main() {
   testWidgets('completed phase shows the green check status', (tester) async {
     await _pump(tester, _statusView(SendStatusPhase.completed));
 
-    expect(find.text('Sent successfully'), findsOneWidget);
+    expect(find.text('SENT SUCCESSFULLY'), findsOneWidget);
     expect(find.text('Completed'), findsOneWidget);
     expect(_icon(AppIcons.checkCircle), findsOneWidget);
     expect(_icon(AppIcons.arrowDown), findsOneWidget);
@@ -146,7 +146,7 @@ void main() {
     (tester) async {
       await _pump(tester, _statusView(SendStatusPhase.failed));
 
-      expect(find.text('Send failed'), findsOneWidget);
+      expect(find.text('SEND FAILED'), findsOneWidget);
       expect(find.text('Failed'), findsOneWidget);
       expect(_icon(AppIcons.cancel), findsOneWidget);
       expect(_icon(AppIcons.uturnUp), findsOneWidget);

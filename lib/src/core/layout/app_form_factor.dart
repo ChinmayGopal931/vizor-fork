@@ -5,9 +5,9 @@ import 'package:flutter/foundation.dart';
 /// Which design-token set this binary was compiled with.
 ///
 /// The Figma variable collections `Sizing` and `Fonts` each carry a
-/// Desktop / Mobile mode; [kAppFormFactor] selects between them. It also
-/// selects the colour sets: the Figma ones on desktop, the neon ones on
-/// mobile (see `AppColors.dark`).
+/// Desktop / Mobile mode; [kAppFormFactor] selects between them. The colour
+/// sets do not depend on it: both form factors draw the neon ones (see
+/// `AppColors.dark`).
 ///
 /// The form factor is a **build-time** constant driven by
 /// `--dart-define=VIZOR_FORM_FACTOR=desktop|mobile` (default: desktop).
@@ -29,6 +29,14 @@ const String _formFactorDefine = String.fromEnvironment(
 const AppFormFactor kAppFormFactor = _formFactorDefine == 'mobile'
     ? AppFormFactor.mobile
     : AppFormFactor.desktop;
+
+/// Whether this binary is the desktop form factor, as a constant.
+///
+/// Gate a desktop-only branch in code the phones also run on this rather
+/// than on an inline `kAppFormFactor == AppFormFactor.desktop`: the front
+/// end folds a constant before whole-program analysis, so the phone builds
+/// keep neither the branch nor anything only it reaches.
+const kDesktopFormFactor = kAppFormFactor == AppFormFactor.desktop;
 
 /// True on the desktop platforms that `window_manager` supports and where
 /// layout switching is meaningful.

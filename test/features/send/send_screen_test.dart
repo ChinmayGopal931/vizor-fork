@@ -39,6 +39,7 @@ import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 
 import '../../support/leading_decimal_input.dart';
 import '../../support/test_l10n.dart';
+import 'package:zcash_wallet/src/core/widgets/neon_glass_panel.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -456,7 +457,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('send_review_button')));
       await tester.pumpAndSettle();
-      expect(find.text('Review send'), findsOneWidget);
+      expect(find.text('REVIEW SEND'), findsOneWidget);
 
       syncNotifier.restoreSpendable(BigInt.zero);
       await tester.pumpAndSettle();
@@ -474,7 +475,7 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('send_review_button')));
       await tester.pumpAndSettle();
-      expect(find.text('Review send'), findsOneWidget);
+      expect(find.text('REVIEW SEND'), findsOneWidget);
       expect(rustApi.proposeSendCalls, 2);
       expect(rustApi.lastProposeAmountZatoshi, BigInt.from(100000000));
     },
@@ -714,18 +715,14 @@ void main() {
     final contactModal = tester.widget<Container>(
       find.byKey(const ValueKey('address_book_contact_picker_modal')),
     );
-    final contactDecoration = contactModal.decoration as BoxDecoration;
+    // Desktop's picker is an opaque neon glass panel.
+    final contactDecoration = contactModal.decoration as NeonGlassDecoration;
     expect(contactModal.clipBehavior, Clip.antiAlias);
     expect(
       contactModal.padding,
       const EdgeInsets.fromLTRB(AppSpacing.sm, AppSpacing.md, AppSpacing.sm, 0),
     );
-    expect(contactDecoration.color, AppThemeData.light.colors.background.base);
-    expect(
-      contactDecoration.borderRadius,
-      BorderRadius.circular(AppRadii.large),
-    );
-    expect(contactDecoration.boxShadow, _figmaModalSurfaceShadows);
+    expect(contactDecoration.fill, AppThemeData.light.colors.background.base);
     expect(find.bySemanticsLabel('Close contacts'), findsOneWidget);
     expect(find.text('Cancel'), findsNothing);
     final contactScrollbar = tester.widget<RawScrollbar>(
@@ -917,21 +914,6 @@ void main() {
     );
     expect(tester.getTopLeft(options).dy - tester.getBottomLeft(field).dy, 8);
     expect(tester.getSize(options), const Size(396, 212));
-
-    final surface = tester.widget<DecoratedBox>(
-      find.byKey(const ValueKey('send_contact_autocomplete_surface')),
-    );
-    final decoration = surface.decoration as BoxDecoration;
-    expect(decoration.color, AppThemeData.light.colors.background.ground);
-    expect(decoration.borderRadius, BorderRadius.circular(AppRadii.medium));
-    expect(
-      decoration.border,
-      Border.all(
-        color: AppThemeData.light.colors.border.subtle,
-        strokeAlign: BorderSide.strokeAlignInside,
-      ),
-    );
-    expect(decoration.boxShadow, _mnemonicPopoverShadows);
 
     final scrollbar = tester.widget<Scrollbar>(
       find.byKey(const ValueKey('send_contact_autocomplete_scrollbar')),
@@ -1977,12 +1959,6 @@ void main() {
   });
 }
 
-const _figmaModalSurfaceShadows = [
-  BoxShadow(color: Color(0x14000000), offset: Offset(0, 14), blurRadius: 28),
-  BoxShadow(color: Color(0x08000000), offset: Offset(0, -6), blurRadius: 12),
-  BoxShadow(color: Color(0x0F000000), offset: Offset(0, 2), blurRadius: 8),
-];
-
 MigrationStatus _migrationStatus(String phase) {
   return MigrationStatus(
     phase: phase,
@@ -2101,12 +2077,6 @@ Widget _sendHarness({
     ),
   );
 }
-
-const _mnemonicPopoverShadows = [
-  BoxShadow(color: Color(0x0F000000), blurRadius: 8, offset: Offset(0, 2)),
-  BoxShadow(color: Color(0x08000000), blurRadius: 12, offset: Offset(0, -6)),
-  BoxShadow(color: Color(0x14000000), blurRadius: 28, offset: Offset(0, 14)),
-];
 
 AddressBookContact _contact({
   required String id,

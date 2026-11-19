@@ -1,9 +1,6 @@
 import 'package:flutter/painting.dart';
 
-import '../../layout/app_form_factor.dart';
 import '../primitives.dart';
-
-const _mobile = kAppFormFactor == AppFormFactor.mobile;
 
 /// Text color hierarchy.
 ///
@@ -59,8 +56,8 @@ class AppTextColors {
   final Color homeCardPositive;
   final Color homeCardNegative;
 
-  static const dark = _mobile ? neonDark : figmaDark;
-  static const light = _mobile ? neonLight : figmaLight;
+  static const dark = neonDark;
+  static const light = neonLight;
 
   static const figmaDark = AppTextColors(
     accent: Primitives.p900Dark,

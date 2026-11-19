@@ -72,7 +72,7 @@ class KeystoneSigningModal extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: AppTypography.bodyLarge.copyWith(
                     color: colors.text.accent,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppSharedFontWeight.semiBold,
                   ),
                 ),
                 Text(

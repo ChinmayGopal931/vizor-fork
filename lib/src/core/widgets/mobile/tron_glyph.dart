@@ -16,6 +16,12 @@ enum TronGlyphKind {
   cancel,
   help,
   backspace,
+
+  /// Desktop's sidebar destinations that have no tab: Pay, Vote and Sign
+  /// out.
+  pay,
+  vote,
+  signOut,
 }
 
 class TronGlyph extends StatelessWidget {
@@ -160,6 +166,49 @@ class TronGlyph extends StatelessWidget {
         ], close: true);
         poly([p(11.5, 7.5), p(18.5, 14.5)]);
         poly([p(18.5, 7.5), p(11.5, 14.5)]);
+      case TronGlyphKind.pay:
+        // A cut-corner coin holding a dollar sign of straight strokes.
+        poly([
+          p(7, 2),
+          p(17, 2),
+          p(22, 7),
+          p(22, 17),
+          p(17, 22),
+          p(7, 22),
+          p(2, 17),
+          p(2, 7),
+        ], close: true);
+        poly([
+          p(15.5, 8.5),
+          p(10, 8.5),
+          p(8.5, 10),
+          p(8.5, 10.5),
+          p(10, 12),
+          p(14, 12),
+          p(15.5, 13.5),
+          p(15.5, 14),
+          p(14, 15.5),
+          p(8.5, 15.5),
+        ]);
+        poly([p(12, 6), p(12, 8.5)]);
+        poly([p(12, 15.5), p(12, 18)]);
+      case TronGlyphKind.vote:
+        // A ballot with a cut corner going into the slot of a box.
+        poly([
+          p(8, 12),
+          p(3, 12),
+          p(3, 21),
+          p(19, 21),
+          p(21, 19),
+          p(21, 12),
+          p(16, 12),
+        ]);
+        poly([p(9, 14), p(9, 3), p(13, 3), p(15, 5), p(15, 14)]);
+      case TronGlyphKind.signOut:
+        // An arrow leaving a bracket.
+        poly([p(12, 3), p(4, 3), p(4, 21), p(12, 21)]);
+        poly([p(9, 12), p(21, 12)]);
+        poly([p(17, 8), p(21, 12), p(17, 16)]);
     }
     return path;
   }

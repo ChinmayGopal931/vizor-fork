@@ -6,6 +6,7 @@ import '../../../core/layout/desktop_sidebar_spacing.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_back_link.dart';
 import '../../../core/widgets/app_icon.dart';
+import '../../../core/widgets/mobile/neon_horizon.dart';
 
 class OnboardingBackTarget {
   const OnboardingBackTarget.route({
@@ -144,6 +145,8 @@ class OnboardingSidebarStepData {
   final VoidCallback? onTap;
 }
 
+/// The onboarding sidebar: the step list on the neon glass panel, with the
+/// neon horizon at its foot.
 class OnboardingSidebarChrome extends StatelessWidget {
   const OnboardingSidebarChrome({
     required this.steps,
@@ -152,25 +155,31 @@ class OnboardingSidebarChrome extends StatelessWidget {
   });
 
   final List<OnboardingSidebarStepData> steps;
+
+  /// Ignored: upstream's painted art for the step. Veylor's neon look draws
+  /// its horizon there instead.
   final Widget illustration;
 
   @override
   Widget build(BuildContext context) {
-    final isDark = context.appTheme == AppThemeData.dark;
-    final navPanelMaterial = isDark
-        ? const Color(0xFF1A1A1A).withValues(alpha: 0.3)
-        : const Color(0xFFFFFFFF).withValues(alpha: 0.3);
-    final navPanelFill = Color.alphaBlend(
-      navPanelMaterial,
-      context.colors.background.window,
-    );
-
     return AppDesktopSidebarSurface(
       glass: true,
-      backgroundColor: navPanelFill,
       child: Stack(
         children: [
-          Positioned.fill(child: illustration),
+          const Positioned(
+            left: AppSpacing.sm,
+            right: AppSpacing.sm,
+            bottom: AppSpacing.md,
+            child: IgnorePointer(
+              child: Center(
+                child: NeonHorizon(
+                  key: ValueKey('onboarding_sidebar_horizon'),
+                  width: 224,
+                  height: 100,
+                ),
+              ),
+            ),
+          ),
           Positioned.fill(
             top: onboardingSidebarTopOffset(),
             child: Padding(
@@ -213,7 +222,7 @@ class OnboardingSidebarItem extends StatelessWidget {
 
   static const _labelStyle = TextStyle(
     fontFamily: 'Gotham',
-    fontWeight: FontWeight.w500,
+    fontWeight: AppFontWeight.medium,
     fontSize: 14,
     height: 16 / 14,
     letterSpacing: -0.06,

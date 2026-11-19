@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../layout/app_form_factor.dart';
 import '../theme/app_theme.dart';
 
 /// Decorative divider used in onboarding hero sections and similar layouts.
@@ -23,6 +24,9 @@ class AppDecorativeDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    // Desktop's divider is lit: faint red lines either side of a white-hot
+    // diamond bead, in place of upstream's ornament. The phones keep theirs.
+    if (kDesktopFormFactor) return _NeonDivider(width: width);
     final dividerColor = colors.text.primary;
     return SizedBox(
       width: width,
@@ -73,4 +77,43 @@ class _DividerColorMapper extends ColorMapper {
     String attributeName,
     Color color,
   ) => this.color;
+}
+
+class _NeonDivider extends StatelessWidget {
+  const _NeonDivider({required this.width});
+
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    final neon = context.colors.neon;
+    Widget line() => Expanded(
+      child: DecoratedBox(
+        decoration: BoxDecoration(color: neon.glow.withValues(alpha: 0.3)),
+        child: const SizedBox(height: 1),
+      ),
+    );
+    return SizedBox(
+      width: width,
+      height: 16,
+      child: Row(
+        children: [
+          line(),
+          const SizedBox(width: AppSpacing.md),
+          Transform.rotate(
+            angle: 0.785398,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: neon.core,
+                boxShadow: Neon.boxGlow(neon.glow, intensity: 0.8),
+              ),
+              child: const SizedBox.square(dimension: 6),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          line(),
+        ],
+      ),
+    );
+  }
 }

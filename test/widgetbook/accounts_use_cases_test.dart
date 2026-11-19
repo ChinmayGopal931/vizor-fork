@@ -14,7 +14,7 @@ void main() {
     await _pumpAccountsUseCase(tester, buildAccountsOtherMenuUseCase);
 
     expect(tester.takeException(), isNull);
-    expect(find.text('Accounts'), findsOneWidget);
+    expect(find.text('ACCOUNTS'), findsOneWidget);
     expect(find.text('Copy address'), findsOneWidget);
     expect(find.text('Send ZEC'), findsOneWidget);
     expect(find.text('Edit account'), findsOneWidget);
@@ -78,18 +78,18 @@ void main() {
   ) async {
     await _pumpAccountsUseCase(tester, buildAboutUtilityUseCase);
     expect(tester.takeException(), isNull);
-    expect(find.text('About Veylor Wallet'), findsOneWidget);
+    expect(find.text('ABOUT VEYLOR WALLET'), findsOneWidget);
     expect(find.text('Github'), findsOneWidget);
     expect(find.text('Website'), findsOneWidget);
 
     await _pumpAccountsUseCase(tester, buildTermsUtilityUseCase);
     expect(tester.takeException(), isNull);
-    expect(find.text('Terms of Usage'), findsOneWidget);
+    expect(find.text('TERMS OF USAGE'), findsOneWidget);
     expect(find.text('Welcome'), findsOneWidget);
 
     await _pumpAccountsUseCase(tester, buildPrivacyUtilityUseCase);
     expect(tester.takeException(), isNull);
-    expect(find.text('Privacy Policy'), findsOneWidget);
+    expect(find.text('PRIVACY POLICY'), findsOneWidget);
     expect(find.text('Welcome'), findsOneWidget);
   });
 

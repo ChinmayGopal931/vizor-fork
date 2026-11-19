@@ -42,7 +42,7 @@ void main() {
       AppThemeData.light.colors.macosUtility.window,
     );
     expect(find.byType(SendComposeView), findsOneWidget);
-    expect(find.text('Send ZEC'), findsOneWidget);
+    expect(find.text('SEND ZEC'), findsOneWidget);
     expect(find.text('Contacts'), findsOneWidget);
     expect(find.text('Add a memo'), findsOneWidget);
     expect(

@@ -1,9 +1,6 @@
 import 'package:flutter/painting.dart';
 
-import '../../layout/app_form_factor.dart';
 import '../primitives.dart';
-
-const _mobile = kAppFormFactor == AppFormFactor.mobile;
 
 /// Button colors grouped by variant.
 ///
@@ -24,8 +21,8 @@ class AppButtonColors {
   final AppDisabledButtonColors disabled;
   final AppDestructiveButtonColors destructive;
 
-  static const dark = _mobile ? neonDark : figmaDark;
-  static const light = _mobile ? neonLight : figmaLight;
+  static const dark = neonDark;
+  static const light = neonLight;
 
   static const figmaDark = AppButtonColors(
     primary: AppPrimaryButtonColors.figmaDark,
@@ -81,8 +78,8 @@ class AppPrimaryButtonColors {
   final Color label;
   final Color labelHover;
 
-  static const dark = _mobile ? neonDark : figmaDark;
-  static const light = _mobile ? neonLight : figmaLight;
+  static const dark = neonDark;
+  static const light = neonLight;
 
   static const figmaDark = AppPrimaryButtonColors(
     bg: Primitives.p800Dark,
@@ -144,8 +141,8 @@ class AppSecondaryButtonColors {
   final Color bgPressed;
   final Color label;
 
-  static const dark = _mobile ? neonDark : figmaDark;
-  static const light = _mobile ? neonLight : figmaLight;
+  static const dark = neonDark;
+  static const light = neonLight;
 
   static const figmaDark = AppSecondaryButtonColors(
     bg: Primitives.p150Dark,
@@ -192,8 +189,8 @@ class AppGhostButtonColors {
   final Color border;
   final Color label;
 
-  static const dark = _mobile ? neonDark : figmaDark;
-  static const light = _mobile ? neonLight : figmaLight;
+  static const dark = neonDark;
+  static const light = neonLight;
 
   static const figmaDark = AppGhostButtonColors(
     bg: Primitives.p0Dark,
@@ -233,8 +230,8 @@ class AppDisabledButtonColors {
   final Color bg;
   final Color label;
 
-  static const dark = _mobile ? neonDark : figmaDark;
-  static const light = _mobile ? neonLight : figmaLight;
+  static const dark = neonDark;
+  static const light = neonLight;
 
   // Solid, so content scrolling under a floating button never shows through
   // it, with a label of at least 4.5:1 against the fill (dark 5.2:1, light
@@ -279,8 +276,8 @@ class AppDestructiveButtonColors {
   final Color borderPressed;
   final Color label;
 
-  static const dark = _mobile ? neonDark : figmaDark;
-  static const light = _mobile ? neonLight : figmaLight;
+  static const dark = neonDark;
+  static const light = neonLight;
 
   static const figmaDark = AppDestructiveButtonColors(
     bg: PlumPrimitives.p200Dark,

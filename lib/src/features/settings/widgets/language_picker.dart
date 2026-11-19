@@ -73,7 +73,7 @@ class _DesktopLanguageModalState extends State<DesktopLanguageModal> {
             overflow: TextOverflow.ellipsis,
             style: AppTypography.bodyLarge.copyWith(
               color: context.colors.text.accent,
-              fontWeight: FontWeight.w600,
+              fontWeight: AppFontWeight.heading,
             ),
           ),
           const SizedBox(height: AppSpacing.md),

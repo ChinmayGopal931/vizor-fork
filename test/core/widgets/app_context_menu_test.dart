@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/widgets/app_context_menu.dart';
 import 'package:zcash_wallet/src/core/widgets/app_icon.dart';
+import 'package:zcash_wallet/src/core/widgets/neon_glass_panel.dart';
 import '../../support/localized_test_scope.dart';
 
 void main() {
@@ -27,12 +28,14 @@ void main() {
       ),
     );
 
-    final decoration = _menuDecoration(tester);
-    final border = decoration.border as Border?;
-
-    expect(decoration.color, AppThemeData.light.colors.background.inverse);
-    expect(border?.top.color, AppThemeData.light.colors.border.subtleOpacity);
-    expect(decoration.boxShadow, appContextMenuShadow);
+    // Desktop's menu is an opaque neon glass panel on the nav surface.
+    final panel = tester.widget<NeonGlassPanel>(
+      find.descendant(
+        of: find.byType(AppContextMenu),
+        matching: find.byType(NeonGlassPanel),
+      ),
+    );
+    expect(panel.fill, AppThemeData.light.colors.surface.nav);
 
     final text = tester.widget<Text>(find.text('Remove contact'));
     expect(text.style?.color, AppThemeData.light.colors.text.destructiveLight);
@@ -40,7 +43,7 @@ void main() {
     expect(icon.color, AppThemeData.light.colors.icon.destructiveLight);
   });
 
-  testWidgets('AppContextMenuDivider uses the inverse opacity border token', (
+  testWidgets('AppContextMenuDivider uses the subtle border token', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -62,12 +65,10 @@ void main() {
                 )
                 .decoration
             as BoxDecoration;
-    expect(decoration.color, AppThemeData.dark.colors.border.inverseOpacity);
+    expect(decoration.color, AppThemeData.dark.colors.border.subtle);
   });
 
-  testWidgets('AppContextMenuItem applies the inverse-surface hover token', (
-    tester,
-  ) async {
+  testWidgets('AppContextMenuItem applies the hover token', (tester) async {
     await tester.pumpWidget(
       _ThemedHarness(
         theme: AppThemeData.dark,
@@ -89,8 +90,8 @@ void main() {
     await tester.pumpAndSettle();
 
     final decoration = _itemDecoration(tester);
-    // The inverse-surface hover tint, visible on the dark menu surface.
-    expect(decoration.color, AppThemeData.dark.colors.border.inverseOpacity);
+    // The hover fill on the dark glass menu.
+    expect(decoration.color, AppThemeData.dark.colors.state.hover);
 
     await gesture.removePointer();
   });
@@ -294,27 +295,11 @@ void main() {
 /// exactly the region that would clip if containment failed).
 Rect _surfaceRect(WidgetTester tester) {
   return tester.getRect(
-    find
-        .descendant(
-          of: find.byType(AppContextMenu),
-          matching: find.byType(DecoratedBox),
-        )
-        .first,
+    find.descendant(
+      of: find.byType(AppContextMenu),
+      matching: find.byType(NeonGlassPanel),
+    ),
   );
-}
-
-BoxDecoration _menuDecoration(WidgetTester tester) {
-  return tester
-          .widget<DecoratedBox>(
-            find
-                .descendant(
-                  of: find.byType(AppContextMenu),
-                  matching: find.byType(DecoratedBox),
-                )
-                .first,
-          )
-          .decoration
-      as BoxDecoration;
 }
 
 BoxDecoration _itemDecoration(WidgetTester tester) {

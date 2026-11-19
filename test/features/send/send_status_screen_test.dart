@@ -72,7 +72,7 @@ void main() {
 
     // In-progress frame before the broadcast future resolves (the loader
     // animation repeats, so bounded pumps only).
-    expect(find.text('Send in progress...'), findsOneWidget);
+    expect(find.text('SEND IN PROGRESS...'), findsOneWidget);
     expect(find.text('In progress'), findsOneWidget);
     expect(find.text('Tx ID'), findsNothing);
     // An in-flight send must stay blocked for arriving payment URIs.
@@ -80,7 +80,7 @@ void main() {
 
     await _flushBroadcast(tester);
 
-    expect(find.text('Sent successfully'), findsOneWidget);
+    expect(find.text('SENT SUCCESSFULLY'), findsOneWidget);
     expect(find.text('Completed'), findsOneWidget);
     expect(find.text('Tx ID'), findsOneWidget);
     expect(find.text(truncatedTxid(_txid)), findsOneWidget);
@@ -105,7 +105,7 @@ void main() {
     await tester.pump();
     await _flushBroadcast(tester);
 
-    expect(find.text('Sent successfully'), findsOneWidget);
+    expect(find.text('SENT SUCCESSFULLY'), findsOneWidget);
     expect(find.text('Message'), findsOneWidget);
     expect(find.text('Whitespace only'), findsOneWidget);
   });
@@ -123,7 +123,7 @@ void main() {
 
     expect(_sidebarItem(tester, 'Home').active, isFalse);
     expect(_sidebarItem(tester, 'Settings').active, isFalse);
-    expect(find.text('Donation in progress...'), findsOneWidget);
+    expect(find.text('DONATION IN PROGRESS...'), findsOneWidget);
     expect(find.text('Send in progress...'), findsNothing);
     expect(find.text('Donating to'), findsOneWidget);
     expect(find.text('Veylor Wallet'), findsOneWidget);
@@ -134,7 +134,7 @@ void main() {
 
     await _flushBroadcast(tester);
 
-    expect(find.text('Thank you for supporting Veylor'), findsOneWidget);
+    expect(find.text('THANK YOU FOR SUPPORTING VEYLOR'), findsOneWidget);
     expect(_sidebarItem(tester, 'Home').active, isFalse);
     expect(_sidebarItem(tester, 'Settings').active, isFalse);
   });
@@ -152,7 +152,7 @@ void main() {
     await _flushBroadcast(tester);
     await tester.pumpAndSettle();
 
-    expect(find.text('Donation failed'), findsOneWidget);
+    expect(find.text('DONATION FAILED'), findsOneWidget);
     expect(find.text('Send failed'), findsNothing);
     expect(find.text('Donating to'), findsOneWidget);
     expect(find.text('Veylor Wallet'), findsOneWidget);
@@ -215,7 +215,7 @@ void main() {
     await tester.pump();
     await _flushBroadcast(tester);
 
-    expect(find.text('Send in progress...'), findsOneWidget);
+    expect(find.text('SEND IN PROGRESS...'), findsOneWidget);
     expect(find.text('In progress'), findsOneWidget);
     // Explorer affordance stays available like the legacy pending receipt.
     expect(find.text(truncatedTxid(_txid)), findsOneWidget);
@@ -236,7 +236,7 @@ void main() {
     await _flushBroadcast(tester);
     await tester.pumpAndSettle();
 
-    expect(find.text('Send failed'), findsOneWidget);
+    expect(find.text('SEND FAILED'), findsOneWidget);
     expect(find.text('Failed'), findsOneWidget);
     expect(
       find.text('The network rejected this transaction. Try again later.'),
@@ -287,7 +287,7 @@ void main() {
       // The receipt already reads as failed, but the proposal — and with it
       // the input lock a parked `zcash:` request would propose against — is
       // still held, so the drain must not be told the send is safe to leave.
-      expect(find.text('Send failed'), findsOneWidget);
+      expect(find.text('SEND FAILED'), findsOneWidget);
       expect(rustApi.discardCalls, [(BigInt.one, 'test-send-flow')]);
       expect(_sendStatusTerminal(tester), isFalse);
 
@@ -330,7 +330,7 @@ void main() {
     );
     await tester.pump();
     await _flushBroadcast(tester);
-    expect(find.text('Send failed'), findsOneWidget);
+    expect(find.text('SEND FAILED'), findsOneWidget);
     expect(_sendStatusTerminal(tester), isFalse);
 
     final published = <bool>[];
@@ -393,7 +393,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
       await tester.pump();
 
-      expect(find.text('Send failed'), findsOneWidget);
+      expect(find.text('SEND FAILED'), findsOneWidget);
       expect(rustApi.discardCalls, hasLength(3));
       expect(
         _sendStatusTerminal(tester),
@@ -473,11 +473,11 @@ void main() {
     await tester.pump();
 
     // Keystone-while-sending keeps its dedicated submitting screen.
-    expect(find.text('Scan your Keystone QR Code'), findsOneWidget);
+    expect(find.text('SCAN YOUR KEYSTONE QR CODE'), findsOneWidget);
 
     await _flushBroadcast(tester);
 
-    expect(find.text('Sent successfully'), findsOneWidget);
+    expect(find.text('SENT SUCCESSFULLY'), findsOneWidget);
     expect(rustApi.storeCalls, hasLength(1));
     expect(rustApi.storeCalls.single.$1, const [
       [3, 3, 3],
@@ -734,7 +734,7 @@ void main() {
     expect(find.text('Scan your Keystone QR Code'), findsNothing);
     await _flushBroadcast(tester);
 
-    expect(find.text('Sent successfully'), findsOneWidget);
+    expect(find.text('SENT SUCCESSFULLY'), findsOneWidget);
     expect(operationService.broadcasts, ['send:test-account:test-send-flow']);
     expect(rustApi.storeCalls, isEmpty);
   });
@@ -761,7 +761,7 @@ void main() {
     await tester.pump();
     await _flushBroadcast(tester);
 
-    expect(find.text('Sent successfully'), findsOneWidget);
+    expect(find.text('SENT SUCCESSFULLY'), findsOneWidget);
     expect(find.text(truncatedTxid(_secondTxid)), findsOneWidget);
     expect(find.text(truncatedTxid(_txid)), findsNothing);
   });
@@ -1030,7 +1030,7 @@ void main() {
           ),
         );
         await _flushBroadcast(tester);
-        expect(find.text('Sent successfully'), findsOneWidget);
+        expect(find.text('SENT SUCCESSFULLY'), findsOneWidget);
         expect(_sendStatusTerminal(tester), isTrue);
         expect(rustApi.discardCalls, isEmpty);
       },
@@ -1100,7 +1100,7 @@ void main() {
     await tester.pump();
     await _flushBroadcast(tester);
 
-    expect(find.text('Send failed'), findsOneWidget);
+    expect(find.text('SEND FAILED'), findsOneWidget);
     expect(find.text('Retry'), findsNothing);
     expect(_sendStatusTerminal(tester), isTrue);
     expect(
@@ -1178,7 +1178,7 @@ void main() {
     await tester.pump();
     await _flushBroadcast(tester);
 
-    expect(find.text('Send failed'), findsOneWidget);
+    expect(find.text('SEND FAILED'), findsOneWidget);
     expect(
       find.text(
         'The hardware signing request expired before broadcast. Return to your wallet, wait for sync, then review the payment and try again.',
@@ -1224,7 +1224,7 @@ void main() {
     await tester.pump();
     await _flushBroadcast(tester);
 
-    expect(find.text('Send failed'), findsOneWidget);
+    expect(find.text('SEND FAILED'), findsOneWidget);
     expect(find.text(networkUpgradeHoldText(testL10n)), findsOneWidget);
     expect(find.textContaining('expired before broadcast'), findsNothing);
   });

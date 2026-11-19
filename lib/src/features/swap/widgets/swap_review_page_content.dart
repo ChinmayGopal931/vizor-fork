@@ -18,6 +18,7 @@ import '../models/swap_quote_text.dart';
 import 'swap_amount_text.dart';
 import 'one_time_address_label.dart';
 import 'swap_review_info.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 /// Content width inside the 420 content area (Figma ' Review' frame).
 const double _swapReviewContentWidth = 396;
@@ -72,7 +73,6 @@ class SwapReviewPageContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
     return SizedBox(
       key: const ValueKey('swap_review_panel'),
       width: _swapReviewContentWidth,
@@ -80,16 +80,14 @@ class SwapReviewPageContent extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (showTitle) ...[
-            Text(
+            NeonPageTitle(
               payMode
                   ? context.l10n.swapReviewConfirmPaymentTitle
                   : context.l10n.commonReviewSwap,
-              key: ValueKey(payMode ? 'pay_review_title' : 'swap_review_title'),
-              textAlign: TextAlign.center,
-              style: AppTypography.bodyLarge.copyWith(
-                fontWeight: FontWeight.w600,
-                color: colors.text.accent,
+              textKey: ValueKey(
+                payMode ? 'pay_review_title' : 'swap_review_title',
               ),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppSpacing.base),
           ],
@@ -235,7 +233,7 @@ class _PayReviewCard extends StatelessWidget {
               textAlign: TextAlign.center,
               style: AppTypography.labelSmall.copyWith(
                 color: colors.text.secondary,
-                fontWeight: FontWeight.w600,
+                fontWeight: AppFontWeight.semiBold,
               ),
             ),
             const SizedBox(height: AppSpacing.xs),
@@ -294,7 +292,7 @@ class _PayReviewCard extends StatelessWidget {
                   height: 9,
                   decoration: BoxDecoration(
                     color: colors.icon.accent,
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(AppRadii.xSmall),
                   ),
                 ),
                 const SizedBox(width: AppSpacing.xs),
@@ -363,7 +361,7 @@ class _PayRecipientPill extends StatelessWidget {
           ),
           decoration: ShapeDecoration(
             color: colors.background.neutralSubtleOpacity,
-            shape: const StadiumBorder(),
+            shape: Neon.chamferBorder(cut: AppChamfer.small),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,

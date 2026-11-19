@@ -65,8 +65,9 @@ rust_sync.TransactionDetail _detail(String memo, {String kind = 'received'}) =>
 void transactionLoadingTests({required bool mobile}) {
   setUpAll(loadFigmaCompareFonts);
   // Mobile draws the receipt title uppercase in its top bar.
-  final receivedTitle = mobile ? 'RECEIVED ZEC' : 'Received successfully';
-  final sentTitle = mobile ? 'SENT ZEC' : 'Sent successfully';
+  // Desktop draws the receipt's title as a neon page title, upper-cased.
+  final receivedTitle = mobile ? 'RECEIVED ZEC' : 'RECEIVED SUCCESSFULLY';
+  final sentTitle = mobile ? 'SENT ZEC' : 'SENT SUCCESSFULLY';
   final recipientLabel = mobile ? 'Recipient' : 'To';
   // Mobile heads the receipt with the status chip and the amount, unlabelled.
   final amountAnchor = mobile

@@ -17,6 +17,12 @@
 /// resolves to Bold and `FontWeight.w200` to Thin. It has no monospace
 /// companion either; addresses and mnemonics use the same family.
 ///
+/// Desktop builds register no face heavier than Light
+/// ([gothamHeaviestWeight]): Veylor's desktop type is Thin and Light, and
+/// with no heavier face to match, a weight a desktop screen still names
+/// (`FontWeight.w500`, say) resolves to Light. Mobile registers every face;
+/// its tokens are Thin or Light already.
+///
 /// Call [loadGothamFonts] before the first frame (the app does it in
 /// `initializeZcashWalletRuntime`) and from any widget test or capture that
 /// needs real glyphs instead of the square test font.
@@ -24,6 +30,8 @@ library;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+
+import '../layout/app_form_factor.dart';
 
 /// The family name every `TextStyle` in the app uses.
 const kGothamFamily = 'Gotham'; // l10n-ignore: font family name
@@ -40,6 +48,12 @@ const gothamFaces = <({String asset, int weight})>[
   (asset: 'assets/fonts/Gotham-Black.otf', weight: 800),
   (asset: 'assets/fonts/Gotham-Ultra.otf', weight: 900),
 ];
+
+/// The heaviest of [gothamFaces] this build registers: Light on desktop,
+/// whose type is never heavier, and every face on mobile.
+const gothamHeaviestWeight = kAppFormFactor == AppFormFactor.desktop
+    ? 300
+    : 900;
 
 /// Set once the faces are registered. A plain flag rather than a cached
 /// [Future]: widget tests run each test in its own fake-async zone, and a
@@ -61,6 +75,7 @@ Future<void> loadGothamFonts({AssetBundle? bundle}) async {
 Future<void> _load(AssetBundle bundle) async {
   final loader = FontLoader(kGothamFamily);
   for (final face in gothamFaces) {
+    if (face.weight > gothamHeaviestWeight) continue;
     final data = await bundle.load(face.asset);
     final font = withOpenTypeWeightClass(
       data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),

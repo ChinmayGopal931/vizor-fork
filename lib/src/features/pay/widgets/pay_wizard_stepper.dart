@@ -109,9 +109,10 @@ class _PayWizardStepChip extends StatelessWidget {
             width: 24,
             height: 24,
             alignment: Alignment.center,
-            decoration: BoxDecoration(
+            // A cut-corner plate in place of upstream's circle.
+            decoration: ShapeDecoration(
               color: colors.background.raised,
-              shape: BoxShape.circle,
+              shape: Neon.chamferBorder(cut: AppChamfer.small),
             ),
             child: state == _PayWizardStepState.completed
                 ? AppIcon(AppIcons.check, size: 16, color: colors.icon.accent)

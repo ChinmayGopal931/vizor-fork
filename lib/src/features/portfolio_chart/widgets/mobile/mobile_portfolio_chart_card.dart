@@ -23,6 +23,7 @@ class MobilePortfolioChartCard extends StatefulWidget {
     required this.state,
     required this.onRangeSelected,
     this.plotHeight = kPortfolioChartPlotHeight,
+    this.desktopInput = false,
     super.key,
   });
 
@@ -31,6 +32,11 @@ class MobilePortfolioChartCard extends StatefulWidget {
   /// The plot's height; the full chart screen gives it most of the page.
   final double plotHeight;
   final ValueChanged<PortfolioChartRange> onRangeSelected;
+
+  /// Desktop's mouse and keyboard: the line is read under a hovering pointer
+  /// as well as a drag, and the range chips take a click cursor and keyboard
+  /// focus ([PortfolioChartRangeSelector.desktopInput]).
+  final bool desktopInput;
 
   @override
   State<MobilePortfolioChartCard> createState() =>
@@ -206,6 +212,7 @@ class _MobilePortfolioChartCardState extends State<MobilePortfolioChartCard> {
             selected: _range,
             onSelected: widget.onRangeSelected,
             keyPrefix: 'mobile_home_portfolio_chart_range',
+            desktopInput: widget.desktopInput,
           ),
         ],
       ),
@@ -251,7 +258,7 @@ class _MobilePortfolioChartCardState extends State<MobilePortfolioChartCard> {
           final size = Size(constraints.maxWidth, widget.plotHeight);
           _plotSize = size;
           final geometry = PortfolioPlotGeometry(data.points, size);
-          return GestureDetector(
+          final plot = GestureDetector(
             key: const ValueKey('mobile_home_portfolio_chart_plot'),
             behavior: HitTestBehavior.opaque,
             // Only horizontal drags: vertical ones keep scrolling the page.
@@ -272,6 +279,14 @@ class _MobilePortfolioChartCardState extends State<MobilePortfolioChartCard> {
                 scrubX: _scrubX,
               ),
             ),
+          );
+          if (!widget.desktopInput) return plot;
+          // A pointer reads the line wherever it hovers, as a finger does
+          // where it drags.
+          return MouseRegion(
+            onHover: (event) => _scrub(event.localPosition.dx),
+            onExit: (_) => _scrub(null),
+            child: plot,
           );
         },
       ),

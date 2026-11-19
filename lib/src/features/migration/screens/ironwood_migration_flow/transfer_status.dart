@@ -1,26 +1,19 @@
 part of '../ironwood_migration_flow_screen.dart';
 
-const _migrationCarouselPurple = Color(0xFF9667E2);
-const _migrationCarouselGreen = Color(0xFF00A460);
-const _migrationCarouselCrimson = Color(0xFFB90A4A);
-
 List<AppCarouselItem> _migrationPreparationCarouselItems(
   AppLocalizations l10n,
 ) => [
   AppCarouselItem.icon(
     message: l10n.migrationPreparationTipDelay,
-    tileColor: _migrationCarouselPurple,
     icon: AppIcons.history,
     iconSize: 18,
   ),
   AppCarouselItem.icon(
     message: l10n.migrationPreparationTipOrganizing,
-    tileColor: _migrationCarouselGreen,
     icon: AppIcons.wallet,
   ),
   AppCarouselItem.icon(
     message: l10n.migrationPreparationTipRounds,
-    tileColor: _migrationCarouselCrimson,
     icon: AppIcons.migrationSplit,
   ),
 ];
@@ -31,19 +24,16 @@ List<AppCarouselItem> _migrationInProgressCarouselItems(
 ) => [
   AppCarouselItem.icon(
     message: l10n.migrationProgressTipClose,
-    tileColor: _migrationCarouselPurple,
     icon: AppIcons.pause,
   ),
   AppCarouselItem.icon(
     message: l10n.migrationProgressTipBlockTime(secondsPerBlock.toString()),
-    tileColor: _migrationCarouselGreen,
     icon: AppIcons.migrationTimer,
     iconSize: 24,
   ),
-  AppCarouselItem.image(
+  AppCarouselItem.icon(
     message: l10n.migrationProgressTipKeepRunning,
-    tileColor: _migrationCarouselCrimson,
-    imageAsset: _ironwoodMigrationExpectationRunningAsset,
+    icon: AppIcons.play,
   ),
 ];
 
@@ -183,7 +173,7 @@ class _MigrationCompleteStatusContent extends StatelessWidget {
     final copy = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
+        NeonPageTitle(
           context.l10n.migrationCompleteTitle(
             _displayZecAmountCompact(
               totalZatoshi,
@@ -191,9 +181,6 @@ class _MigrationCompleteStatusContent extends StatelessWidget {
             ),
           ),
           textAlign: TextAlign.center,
-          style: AppTypography.headlineLarge.copyWith(
-            color: colors.text.accent,
-          ),
         ),
         const SizedBox(height: 12),
         Text(
@@ -226,55 +213,14 @@ class _MigrationCompleteStatusContent extends StatelessWidget {
             top: 75.5,
             width: 396,
             height: 220,
-            child: Stack(
-              key: const ValueKey('ironwood_migration_complete_hero'),
-              clipBehavior: Clip.none,
-              children: [
-                Positioned(
-                  left: 93.58984375,
-                  top: 25.9231032198,
-                  width: 226.6364541916,
-                  height: 171.011320144,
-                  child: SizedBox(
-                    key: const ValueKey('ironwood_migration_complete_ribbon'),
-                    child: Center(
-                      child: Transform.rotate(
-                        angle: -15.62 * math.pi / 180,
-                        child: SizedBox(
-                          width: 201.426,
-                          height: 121.245,
-                          child: Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              Positioned(
-                                left: -16.195,
-                                top: -30,
-                                width: 230.312,
-                                height: 169.943,
-                                child: SvgPicture.asset(
-                                  'assets/illustrations/ironwood_migration_done_ribbon.svg',
-                                  fit: BoxFit.fill,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  left: 98,
-                  top: 0,
-                  width: 200,
-                  height: 200,
-                  child: Image.asset(
-                    key: const ValueKey('ironwood_migration_complete_coins'),
-                    'assets/illustrations/ironwood_migration_done_coins.webp',
-                    fit: BoxFit.fill,
-                  ),
-                ),
-              ],
+            child: const Center(
+              key: ValueKey('ironwood_migration_complete_hero'),
+              // A lit check badge in place of upstream's ribbon and coins.
+              child: NeonGlyphBadge(
+                key: ValueKey('ironwood_migration_complete_coins'),
+                glyph: TronGlyphKind.check,
+                size: 128,
+              ),
             ),
           ),
           if (!usesLargeText) ...[
@@ -635,7 +581,7 @@ class _MigrationLiveStatusContent extends ConsumerWidget {
                                     textAlign: TextAlign.center,
                                     style: AppTypography.labelLarge.copyWith(
                                       color: colors.text.primary,
-                                      fontWeight: FontWeight.w400,
+                                      fontWeight: AppFontWeight.regular,
                                     ),
                                   ),
                                 ),
@@ -1124,7 +1070,7 @@ class _PreparationRingDetail extends StatelessWidget {
     final colors = context.colors;
     final style = AppTypography.labelLarge.copyWith(
       color: colors.text.primary,
-      fontWeight: FontWeight.w400,
+      fontWeight: AppFontWeight.regular,
     );
     if (presentation.height == null) {
       return Text(
@@ -1171,7 +1117,7 @@ class _MigrationRingDetail extends StatelessWidget {
     final color = context.colors.text.primary;
     final style = AppTypography.labelLarge.copyWith(
       color: color,
-      fontWeight: FontWeight.w400,
+      fontWeight: AppFontWeight.regular,
     );
     final scheduledHeight = presentation.scheduledHeight;
     if (scheduledHeight == null) {
@@ -1215,7 +1161,7 @@ class _MigrationSummaryMetric extends StatelessWidget {
         : context.colors.text.accent;
     final style = AppTypography.labelLarge.copyWith(
       color: color,
-      fontWeight: FontWeight.w400,
+      fontWeight: AppFontWeight.regular,
     );
     return Row(
       children: [
@@ -1801,15 +1747,19 @@ class _MigrationPreparationAnimatedRingPainter extends CustomPainter {
 }
 
 typedef _MigrationRingPalette = ({
+  Color idle,
   Color scheduled,
   Color needsInput,
   Color complete,
 });
 
+/// The ring in the neon look: unlit segments, scheduled ones faintly red,
+/// the one that needs the user in white light, and done ones lit red.
 _MigrationRingPalette _migrationRingPalette(AppColors colors) => (
-  scheduled: colors.text.positiveStrong.withValues(alpha: 0.20),
+  idle: colors.border.regular,
+  scheduled: colors.neon.glow.withValues(alpha: 0.20),
   needsInput: colors.background.inverse,
-  complete: const Color(0xFF00C875),
+  complete: colors.neon.glow,
 );
 
 enum _MigrationRingMotion { none, shimmer, blink }
@@ -1923,8 +1873,8 @@ _MigrationRingVisualSegment _migrationRingStatusSegment({
 }) {
   final (color, highlightColor, motion) = switch (status) {
     _MigrationBatchStatus.none => (
-      const Color(0xFF3F4040),
-      const Color(0xFF3F4040),
+      palette.idle,
+      palette.idle,
       _MigrationRingMotion.none,
     ),
     _MigrationBatchStatus.preparing => (

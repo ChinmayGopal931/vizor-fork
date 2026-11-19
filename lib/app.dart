@@ -57,6 +57,7 @@ import 'src/features/activity/screens/swap_activity_detail_screen.dart';
 import 'src/features/accounts/screens/accounts_screen.dart';
 import 'src/features/address_book/screens/address_book_screen.dart';
 import 'src/features/home/screens/home_screen.dart';
+import 'src/features/portfolio_chart/screens/desktop_portfolio_chart_screen.dart';
 import 'src/features/migration/services/ironwood_migration_background_credential_store.dart';
 import 'src/features/donation/donation_config.dart';
 import 'src/features/donation/screens/donation_screen.dart';
@@ -1549,6 +1550,11 @@ Page<dynamic> buildDesktopSendReviewPage(
 /// Main application routes for the desktop (large-form-factor) tree.
 List<RouteBase> _desktopRoutes(Ref ref) => [
   GoRoute(path: '/home', builder: (_, _) => const HomeScreen()),
+  // The full balance chart, opened from Home's balance sign.
+  GoRoute(
+    path: '/portfolio-chart',
+    builder: (_, _) => const DesktopPortfolioChartScreen(),
+  ),
   GoRoute(
     path: '/payment-links',
     builder: (_, state) => PaymentLinksScreen(
@@ -2965,7 +2971,7 @@ class _WindowsUpdatePrompt extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: AppTypography.labelLarge.copyWith(
                               color: colors.text.accent,
-                              fontWeight: FontWeight.w500,
+                              fontWeight: AppFontWeight.medium,
                             ),
                           ),
                           const SizedBox(height: 2),

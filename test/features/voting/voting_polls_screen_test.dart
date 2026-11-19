@@ -85,13 +85,6 @@ void main() {
       closeTo(tester.getTopLeft(rowFinder).dy - 10, 0.5),
     );
 
-    final betaImage = tester.widget<Image>(
-      find.descendant(of: betaFinder, matching: find.byType(Image)),
-    );
-    expect(
-      (betaImage.image as AssetImage).assetName,
-      'assets/illustrations/desktop/voting_beta_label.webp',
-    );
   });
 
   testWidgets('poll list reloads when screen opens and route returns', (

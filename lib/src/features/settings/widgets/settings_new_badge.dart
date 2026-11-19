@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 
 import '../../../core/l10n/l10n.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/layout/app_form_factor.dart';
 
 /// The small "New" pill rendered next to a settings row label. Shared by the
 /// desktop and mobile settings lists so both surfaces flag the same entry the
@@ -19,10 +20,15 @@ class SettingsNewBadge extends StatelessWidget {
         horizontal: AppSpacing.xxs,
         vertical: 2,
       ),
-      decoration: BoxDecoration(
-        color: brandColor.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(8),
-      ),
+      decoration: kDesktopFormFactor
+          ? ShapeDecoration(
+              color: brandColor.withValues(alpha: 0.15),
+              shape: Neon.chamferBorder(cut: AppChamfer.small),
+            )
+          : BoxDecoration(
+              color: brandColor.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
       child: Text(
         context.l10n.settingsNewBadge,
         style: AppTypography.labelLarge.copyWith(color: brandColor),

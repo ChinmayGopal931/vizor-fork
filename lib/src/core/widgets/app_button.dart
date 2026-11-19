@@ -23,18 +23,18 @@ typedef AppButtonDecorationBuilder =
 
 const _mobile = kAppFormFactor == AppFormFactor.mobile;
 
-/// How far a mobile button's corner cuts reach, by its height: a full-size
-/// button takes [AppChamfer.medium], the medium sizes a cut between that and
+/// How far a button's corner cuts reach, by its height: a full-size button
+/// takes [AppChamfer.medium], the medium sizes a cut between that and
 /// [AppChamfer.small], and the small size [AppChamfer.small].
-double _mobileChamfer(double height) => height >= _mobileFullSizeHeight
+double _chamfer(double height) => height >= _fullSizeHeight
     ? AppChamfer.medium
-    : height >= _mobileMediumHeight
-    ? _mobileMediumCut
+    : height >= _mediumHeight
+    ? _mediumCut
     : AppChamfer.small;
 
-const _mobileFullSizeHeight = 44.0;
-const _mobileMediumHeight = 30.0;
-const _mobileMediumCut = 6.0;
+const _fullSizeHeight = 44.0;
+const _mediumHeight = 30.0;
+const _mediumCut = 6.0;
 
 class _Sizing {
   const _Sizing({
@@ -96,7 +96,7 @@ const _mediumSizingDesktop = _Sizing(
   ),
   gap: AppSpacing.xxs,
   iconSize: AppIconSize.medium,
-  labelStyle: AppTypographyDesktop.labelMedium,
+  labelStyle: AppTypographyDesktopNeon.labelMedium,
 );
 
 const _mediumSizingMobile = _Sizing(
@@ -164,10 +164,8 @@ _VariantPalette _paletteFor(AppButtonVariant variant, AppColors c) {
         focusRingHover: c.button.primary.bgHover,
       );
     case AppButtonVariant.secondary:
-      // Mobile glass buttons carry a hairline edge; desktop has none.
-      final border = _mobile
-          ? c.border.subtleOpacity
-          : c.background.ground.withValues(alpha: 0);
+      // Glass buttons carry a hairline edge.
+      final border = c.border.subtleOpacity;
       return _VariantPalette(
         bg: c.button.secondary.bg,
         bgHover: c.button.secondary.bgHover,
@@ -175,7 +173,7 @@ _VariantPalette _paletteFor(AppButtonVariant variant, AppColors c) {
         border: border,
         borderHover: border,
         borderPressed: border,
-        borderWidth: _mobile ? 1 : 0,
+        borderWidth: 1,
         label: c.button.secondary.label,
         labelHover: c.button.secondary.label,
         focusRing: c.state.focusRing,
@@ -214,7 +212,7 @@ _VariantPalette _paletteFor(AppButtonVariant variant, AppColors c) {
   }
 }
 
-/// A button with a default pill shape and three style variants.
+/// A button with a default cut-corner slab shape and three style variants.
 ///
 /// Width and height are intrinsic — the button wraps the leading icon +
 /// label + trailing icon and centers them both axes. Composed rows can
@@ -281,7 +279,8 @@ class AppButton extends StatefulWidget {
   /// rows can opt in without changing the global component metrics.
   final EdgeInsets? contentPadding;
 
-  /// Optional corner radius for composed rows. Null keeps the default pill.
+  /// Optional corner radius for composed rows. Null keeps the default
+  /// cut-corner slab.
   /// The focus ring follows the same shape outside the button.
   final BorderRadius? borderRadius;
 
@@ -411,16 +410,18 @@ class _AppButtonState extends State<AppButton> {
     final borderWidth = _enabled ? palette.borderWidth : 0.0;
     final iconGap = widget.iconGap ?? sizing.gap;
     final contentPadding = widget.contentPadding ?? sizing.padding;
-    // Mobile cuts the corners at 45° instead of the desktop pill; composed
-    // rows that pass a radius keep their own shape.
-    final mobileCut = _mobileChamfer(height);
+    // The corners are cut at 45°; composed rows that pass a radius keep
+    // their own shape.
+    final cut = _chamfer(height);
     final OutlinedBorder shape = widget.borderRadius != null
         ? RoundedRectangleBorder(borderRadius: widget.borderRadius!)
-        : _mobile
-        ? Neon.chamferBorder(cut: mobileCut)
-        : const StadiumBorder();
-    final glowing =
-        _mobile && _enabled && widget.variant == AppButtonVariant.primary;
+        : Neon.chamferBorder(cut: cut);
+    final glowing = _enabled && widget.variant == AppButtonVariant.primary;
+    // Desktop's secondary buttons had no edge, so their new hairline strokes
+    // outside the slab and leaves upstream's button sizes as they were; an
+    // inner edge would pad the content. Mobile keeps its inner hairline.
+    final hairlineOutside =
+        !_mobile && widget.variant == AppButtonVariant.secondary;
 
     final rowChildren = <Widget>[];
     if (widget.leading != null) {
@@ -486,7 +487,13 @@ class _AppButtonState extends State<AppButton> {
           shape: shape.copyWith(
             side: borderWidth == 0
                 ? BorderSide.none
-                : BorderSide(color: borderColor, width: borderWidth),
+                : BorderSide(
+                    color: borderColor,
+                    width: borderWidth,
+                    strokeAlign: hairlineOutside
+                        ? BorderSide.strokeAlignOutside
+                        : BorderSide.strokeAlignInside,
+                  ),
           ),
           // A lit slab casts its colour on the black around it.
           shadows: glowing
@@ -531,9 +538,7 @@ class _AppButtonState extends State<AppButton> {
             borderRadius:
                 widget.borderRadius! + BorderRadius.circular(focusRingOutset),
           )
-        : _mobile
-        ? Neon.chamferBorder(cut: mobileCut + focusRingOutset / 2)
-        : const StadiumBorder();
+        : Neon.chamferBorder(cut: cut + focusRingOutset / 2);
 
     // Keep the stack's layout size equal to the pill's design height and
     // paint the focus ring outside via overflow. Reserving outer padding

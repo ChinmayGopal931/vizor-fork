@@ -7,6 +7,7 @@ import '../../../core/layout/app_main_sidebar.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../providers/account_provider.dart';
 import '../widgets/voting_pane_scroll_area.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 class VotingSoftwareAccountGuard extends ConsumerWidget {
   const VotingSoftwareAccountGuard({super.key, required this.child});
@@ -77,13 +78,7 @@ class _VotingGuardMessage extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: AppTypography.displaySmall.copyWith(
-                color: colors.text.accent,
-              ),
-            ),
+            NeonPageTitle(title, textAlign: TextAlign.center),
             const SizedBox(height: AppSpacing.sm),
             Text(
               message,

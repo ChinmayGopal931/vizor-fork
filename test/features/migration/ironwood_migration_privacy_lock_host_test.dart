@@ -209,7 +209,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Migration in progress'), findsOneWidget);
-    expect(find.text('Welcome back'), findsOneWidget);
+    expect(find.text('WELCOME BACK'), findsOneWidget);
     expect(
       find.text('We auto-locked Veylor after 10 minutes of inactivity.'),
       findsOneWidget,
@@ -529,7 +529,7 @@ void main() {
       await tester.pump();
 
       expect(find.text('Migration in progress'), findsNothing);
-      expect(find.text('Welcome back'), findsOneWidget);
+      expect(find.text('WELCOME BACK'), findsOneWidget);
       expect(find.text('Unlock Veylor'), findsOneWidget);
       expect(
         find.byKey(ironwoodMigrationVirtualUnlockScreenKey),

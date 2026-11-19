@@ -6,6 +6,7 @@ import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/theme/primitives.dart';
 import 'package:zcash_wallet/src/core/widgets/app_button.dart';
 import 'package:zcash_wallet/src/core/widgets/app_icon.dart';
+import 'package:zcash_wallet/src/core/widgets/neon_glass_panel.dart';
 import 'package:zcash_wallet/src/core/widgets/review_buttons_stack.dart';
 import 'package:zcash_wallet/src/core/widgets/review_info_row.dart';
 import 'package:zcash_wallet/src/core/widgets/review_list_row.dart';
@@ -224,34 +225,6 @@ void main() {
   });
 
   group('ReviewWrapCard', () {
-    testWidgets('uses the theme ground surface and 24px radius by default', (
-      tester,
-    ) async {
-      await _pump(
-        tester,
-        const ReviewWrapCard(
-          children: [
-            ReviewListRow(label: 'Message', value: 'Hello'),
-            ReviewWrapDivider(),
-            ReviewListRow(label: 'Tx fee', value: '0.012 ZEC'),
-          ],
-        ),
-      );
-
-      final container = tester.widget<Container>(
-        find
-            .descendant(
-              of: find.byType(ReviewWrapCard),
-              matching: find.byType(Container),
-            )
-            .first,
-      );
-      final decoration = container.decoration! as BoxDecoration;
-      expect(decoration.color, AppThemeData.light.colors.background.ground);
-      expect(decoration.borderRadius, BorderRadius.circular(AppRadii.large));
-      expect(find.byType(ReviewWrapDivider), findsOneWidget);
-    });
-
     testWidgets('surfaceColor pins the failed card dark in light theme', (
       tester,
     ) async {
@@ -263,17 +236,15 @@ void main() {
         ),
       );
 
-      final container = tester.widget<Container>(
-        find
-            .descendant(
-              of: find.byType(ReviewWrapCard),
-              matching: find.byType(Container),
-            )
-            .first,
+      // Desktop draws the card as a glass panel; the override is its fill.
+      final panel = tester.widget<NeonGlassPanel>(
+        find.descendant(
+          of: find.byType(ReviewWrapCard),
+          matching: find.byType(NeonGlassPanel),
+        ),
       );
-      final decoration = container.decoration! as BoxDecoration;
-      expect(decoration.color, Primitives.p50Dark);
-      expect(decoration.color, const Color(0xFF1B1F1F));
+      expect(panel.fill, Primitives.p50Dark);
+      expect(panel.fill, const Color(0xFF1B1F1F));
     });
   });
 

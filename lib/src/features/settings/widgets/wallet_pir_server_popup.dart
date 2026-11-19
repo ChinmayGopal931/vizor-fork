@@ -42,7 +42,7 @@ Future<void> showWalletPirServerPopup(BuildContext context) async {
       child: AppTheme(
         data: theme,
         child: Dialog(
-          backgroundColor: const Color(0x00000000),
+          backgroundColor: Colors.transparent,
           elevation: 0,
           insetPadding: const EdgeInsets.all(AppSpacing.md),
           child: const _DesktopServerPanel(),

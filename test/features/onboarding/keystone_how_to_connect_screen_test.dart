@@ -21,7 +21,7 @@ void main() {
     await _setDesktopViewport(tester);
     await tester.pumpWidget(_keystoneScreen());
 
-    expect(find.text('Connect Keystone'), findsOneWidget);
+    expect(find.text('CONNECT KEYSTONE'), findsOneWidget);
     expect(find.text('Prepare your Keystone wallet'), findsOneWidget);
     expect(find.text('1. Check Keystone firmware'), findsOneWidget);
     expect(find.textContaining('Make sure your Keystone'), findsOneWidget);

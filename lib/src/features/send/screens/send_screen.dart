@@ -49,6 +49,8 @@ import '../services/send_proving_key_warmup.dart';
 import '../widgets/send_recipient_resolver.dart';
 import '../widgets/send_review_layout.dart' show SendReviewContactRecipient;
 import '../widgets/spendable_wait_breakdown.dart';
+import '../../../core/widgets/neon_page_title.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
 
 final sendWalletDbPathProvider = Provider<Future<String> Function()>((ref) {
   return getWalletDbPath;
@@ -1772,11 +1774,8 @@ class _SendTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
+    return NeonPageTitle(
       context.l10n.sendTitle(kZcashDefaultCurrencyTicker),
-      style: AppTypography.headlineLarge.copyWith(
-        color: context.colors.text.accent,
-      ),
       textAlign: TextAlign.center,
     );
   }
@@ -1902,33 +1901,11 @@ class _SendContactAutocompleteOptionsState
       key: const ValueKey('send_contact_autocomplete_options'),
       width: _SendComposeLayout.fieldsWidth,
       height: popoverHeight,
-      child: DecoratedBox(
+      // An opaque neon glass panel over the form, its cut corners lit.
+      child: NeonGlassPanel(
         key: const ValueKey('send_contact_autocomplete_surface'),
-        decoration: BoxDecoration(
-          color: colors.background.ground,
-          borderRadius: BorderRadius.circular(AppRadii.medium),
-          border: Border.all(
-            color: colors.border.subtle,
-            strokeAlign: BorderSide.strokeAlignInside,
-          ),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x0F000000),
-              blurRadius: 8,
-              offset: Offset(0, 2),
-            ),
-            BoxShadow(
-              color: Color(0x08000000),
-              blurRadius: 12,
-              offset: Offset(0, -6),
-            ),
-            BoxShadow(
-              color: Color(0x14000000),
-              blurRadius: 28,
-              offset: Offset(0, 14),
-            ),
-          ],
-        ),
+        cut: AppChamfer.medium,
+        fill: colors.background.ground,
         child: Padding(
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.xxs,
@@ -2056,7 +2033,7 @@ class _SendContactAutocompleteRowState
                       overflow: TextOverflow.ellipsis,
                       style: AppTypography.labelMedium.copyWith(
                         color: colors.text.secondary,
-                        fontWeight: FontWeight.w400,
+                        fontWeight: AppFontWeight.regular,
                       ),
                     ),
                   ],
@@ -2211,7 +2188,7 @@ class _SendMaxBalanceControl extends StatelessWidget {
               children: [
                 TextSpan(
                   text: l10n.sendSpendableTooltipTitle,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  style: const TextStyle(fontWeight: AppFontWeight.bold),
                 ),
                 TextSpan(text: '\n\n${l10n.sendSpendableTooltipBody}'),
               ],
@@ -2353,7 +2330,7 @@ class _SendAmountConversionRow extends StatelessWidget {
               r'$',
               style: AppTypography.labelLarge.copyWith(
                 color: colors.text.muted,
-                fontWeight: FontWeight.w400,
+                fontWeight: AppFontWeight.regular,
               ),
             ),
             const SizedBox(width: AppSpacing.xxs),
@@ -2366,7 +2343,7 @@ class _SendAmountConversionRow extends StatelessWidget {
               key: const ValueKey('send_amount_conversion_text'),
               style: AppTypography.labelLarge.copyWith(
                 color: enabled ? colors.text.muted : colors.text.disabled,
-                fontWeight: FontWeight.w400,
+                fontWeight: AppFontWeight.regular,
               ),
             ),
         ],
@@ -2405,43 +2382,43 @@ class _SendAddMessageCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final card = Container(
+    // A neon glass panel on the input surface, its two cut corners lit.
+    final card = SizedBox(
       key: const ValueKey('send_add_memo_card'),
       width: double.infinity,
       height: 128,
-      decoration: BoxDecoration(
-        color: colors.surface.input.primary,
-        borderRadius: BorderRadius.circular(AppRadii.medium),
-        boxShadow: _sendInputSurfaceShadow(colors),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AppIcon(AppIcons.scroll, size: 16, color: colors.icon.accent),
-              const SizedBox(width: AppSpacing.xxs),
-              Text(
-                context.l10n.sendAddMemo,
-                style: AppTypography.labelLarge.copyWith(
-                  fontWeight: FontWeight.w400,
-                  color: colors.text.accent,
+      child: NeonGlassPanel(
+        cut: AppChamfer.medium,
+        fill: colors.surface.input.primary,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AppIcon(AppIcons.scroll, size: 16, color: colors.icon.accent),
+                const SizedBox(width: AppSpacing.xxs),
+                Text(
+                  context.l10n.sendAddMemo,
+                  style: AppTypography.labelLarge.copyWith(
+                    fontWeight: AppFontWeight.regular,
+                    color: colors.text.accent,
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            context.l10n.sendMemoEncryptedHint,
-            style: AppTypography.labelLarge.copyWith(
-              fontWeight: FontWeight.w400,
-              color: colors.text.muted,
+              ],
             ),
-            textAlign: TextAlign.center,
-          ),
-        ],
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              context.l10n.sendMemoEncryptedHint,
+              style: AppTypography.labelLarge.copyWith(
+                fontWeight: AppFontWeight.regular,
+                color: colors.text.muted,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
 
@@ -2455,23 +2432,6 @@ class _SendAddMessageCard extends StatelessWidget {
       ),
     );
   }
-}
-
-List<BoxShadow> _sendInputSurfaceShadow(AppColors colors) {
-  return [
-    BoxShadow(color: colors.shadows.subtle, blurRadius: 1),
-    BoxShadow(
-      color: colors.shadows.subtle,
-      offset: const Offset(0, 2),
-      blurRadius: 4,
-    ),
-    BoxShadow(
-      color: colors.shadows.subtle,
-      offset: const Offset(0, 1),
-      blurRadius: 2,
-    ),
-    BoxShadow(color: colors.shadows.subtle, blurRadius: 1),
-  ];
 }
 
 class _SendGlobalError extends StatelessWidget {

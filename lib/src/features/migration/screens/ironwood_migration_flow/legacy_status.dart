@@ -40,7 +40,7 @@ class _PrivateMigrationTransferStatusContent extends StatelessWidget {
               painter: _MigrationProgressArcPainter(
                 progress: progress,
                 trackColor: colors.icon.muted.withValues(alpha: 0.20),
-                progressColor: GreenPrimitives.p500Light,
+                progressColor: colors.neon.glow,
               ),
             ),
           ),
@@ -179,18 +179,7 @@ class _MigrationTransferBatchCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colors.background.ground,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: colors.shadows.regular,
-            blurRadius: 22,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
+    return NeonGlassPanel(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 24, 16, 24),
         child: Column(
@@ -246,10 +235,12 @@ class _MigrationTransferBatchCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
+                // A cut-corner plate in the success token in place of
+                // upstream's gold coin.
                 DecoratedBox(
-                  decoration: const ShapeDecoration(
-                    color: GoldPrimitives.p300Light,
-                    shape: OvalBorder(),
+                  decoration: ShapeDecoration(
+                    color: colors.background.utilitySuccessStrong,
+                    shape: Neon.chamferBorder(cut: AppChamfer.small),
                   ),
                   child: const SizedBox(
                     width: 18,

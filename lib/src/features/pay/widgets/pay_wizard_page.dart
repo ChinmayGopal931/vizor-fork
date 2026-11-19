@@ -8,6 +8,7 @@ import '../../../core/layout/app_pane_scroll_scaffold.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_back_link.dart';
 import 'pay_wizard_stepper.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 /// Shared desktop Pay page anatomy from the Figma PAY flow.
 ///
@@ -84,13 +85,10 @@ class PayWizardPage extends StatelessWidget {
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        Text(
+                        NeonPageTitle(
                           title,
-                          key: const ValueKey('pay_wizard_title'),
+                          textKey: const ValueKey('pay_wizard_title'),
                           textAlign: TextAlign.center,
-                          style: AppTypography.displaySmall.copyWith(
-                            color: context.colors.text.accent,
-                          ),
                         ),
                         if (headingTrailing != null)
                           Positioned(right: 0, child: headingTrailing!),

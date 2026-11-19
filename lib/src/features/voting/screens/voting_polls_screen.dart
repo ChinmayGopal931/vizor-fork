@@ -30,6 +30,9 @@ import '../widgets/voting_config_settings_panel.dart';
 import '../widgets/voting_metadata_widgets.dart';
 import '../widgets/voting_pane_scroll_area.dart';
 import '../../../core/widgets/mobile/mobile_surface_card.dart';
+import '../../../core/widgets/neon_page_title.dart';
+import '../../../core/layout/app_form_factor.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
 
 const _votingBetaLabelAsset =
     'assets/illustrations/desktop/voting_beta_label.webp';
@@ -342,14 +345,20 @@ class _VotingHeader extends StatelessWidget {
                   clipBehavior: Clip.none,
                   alignment: Alignment.topCenter,
                   children: [
-                    Text(
-                      context.l10n.navVote,
-                      key: const ValueKey('voting_header_title'),
-                      style: AppTypography.headlineLarge.copyWith(
-                        color: context.colors.text.accent,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
+                    kDesktopFormFactor
+                        ? NeonPageTitle(
+                            context.l10n.navVote,
+                            textKey: const ValueKey('voting_header_title'),
+                            textAlign: TextAlign.center,
+                          )
+                        : Text(
+                            context.l10n.navVote,
+                            key: const ValueKey('voting_header_title'),
+                            style: AppTypography.headlineLarge.copyWith(
+                              color: context.colors.text.accent,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
                     Positioned(
                       top: _votingBetaLabelTopOffset,
                       child: Transform.translate(
@@ -392,6 +401,40 @@ class _VotingBetaLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Desktop's tag is a lit cut-corner plate with a red HUD caption in
+    // place of upstream's painted label.
+    if (kDesktopFormFactor) {
+      final neon = context.colors.neon;
+      final label = context.l10n.votingBetaSemantics;
+      return SizedBox(
+        key: const ValueKey('voting_header_beta_label'),
+        width: _votingBetaLabelWidth,
+        height: _votingBetaLabelHeight,
+        child: DecoratedBox(
+          decoration: ShapeDecoration(
+            color: neon.glow.withValues(alpha: 0.07),
+            shape: Neon.chamferBorder(
+              cut: AppChamfer.small,
+              side: BorderSide(color: neon.glow.withValues(alpha: 0.55)),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                label.toUpperCase(),
+                semanticsLabel: label,
+                style: kNeonHudCaptionStyle.copyWith(
+                  color: neon.glow,
+                  shadows: Neon.textGlow(neon.glow, intensity: 0.4),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     return SizedBox(
       key: const ValueKey('voting_header_beta_label'),
       width: _votingBetaLabelWidth,
@@ -460,7 +503,11 @@ class _DesktopPollCard extends StatelessWidget {
           horizontal: AppSpacing.sm,
           vertical: AppSpacing.sm,
         ),
-        decoration: _desktopPollCardDecoration(context),
+        // Desktop's card is a neon glass panel; the phones keep the Figma
+        // card.
+        decoration: kDesktopFormFactor
+            ? NeonGlassDecoration.themed(context.colors, cut: AppChamfer.medium)
+            : _desktopPollCardDecoration(context),
         child: _PollCardContent(
           round: round,
           onAction: onAction,
@@ -696,7 +743,7 @@ class _PollCardContent extends StatelessWidget {
           title,
           style: AppTypography.headlineSmall.copyWith(
             color: colors.text.accent,
-            fontWeight: FontWeight.w600,
+            fontWeight: AppSharedFontWeight.semiBold,
             height: 24 / 16,
             letterSpacing: 0,
           ),
@@ -743,6 +790,43 @@ class _StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final label = _statusLabel(context.l10n, state);
+    // Desktop's badge is a cut-corner tag in the state's own token colour;
+    // the phones keep the Figma pill.
+    if (kDesktopFormFactor) {
+      final colors = context.colors;
+      final tone = switch (state) {
+        _PollCardState.inProgress ||
+        _PollCardState.active ||
+        _PollCardState.voted => colors.text.positiveStrong,
+        _PollCardState.tallying => colors.text.warning,
+        _PollCardState.closed => colors.text.secondary,
+      };
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+        decoration: ShapeDecoration(
+          color: tone.withValues(alpha: 0.08),
+          shape: Neon.chamferBorder(
+            cut: AppChamfer.small,
+            side: BorderSide(color: tone.withValues(alpha: 0.5)),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppIcon(_statusIcon(state), size: 14, color: tone),
+            const SizedBox(width: AppSpacing.xxs),
+            Text(
+              label,
+              style: AppTypography.labelLarge.copyWith(
+                color: tone,
+                height: 20 / 14,
+                letterSpacing: 0,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
       decoration: BoxDecoration(

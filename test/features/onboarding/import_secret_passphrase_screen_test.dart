@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart'
-    show Color, FontWeight, MaterialApp, Scaffold, Scrollbar, TextField;
+    show Color, MaterialApp, Scaffold, Scrollbar, TextField;
 import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart'
@@ -320,7 +320,7 @@ void main() {
     );
     expect(
       _textField(tester, 1).decoration?.hintStyle?.fontWeight,
-      FontWeight.w500,
+      AppTypography.labelLarge.fontWeight,
     );
     expect(
       _textField(tester, 1).decoration?.hintStyle?.color,
@@ -401,7 +401,10 @@ void main() {
       colors.text.homeCard.withValues(alpha: 0.72),
     );
     expect(_textField(tester, 2).style?.color, colors.text.homeCard);
-    expect(_textField(tester, 2).style?.fontWeight, FontWeight.w500);
+    expect(
+      _textField(tester, 2).style?.fontWeight,
+      AppTypography.labelLarge.fontWeight,
+    );
     expect(
       find.byKey(const ValueKey('import_mnemonic_invalid_underline_2')),
       findsNothing,

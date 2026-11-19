@@ -720,7 +720,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
     }
-    expect(find.text('Voting with Ledger'), findsOneWidget);
+    expect(find.text('VOTING WITH LEDGER'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('ledger_voting_signing_panel')),
       findsOneWidget,
@@ -781,9 +781,9 @@ void main() {
       UncontrolledProviderScope(container: container, child: _statusHarness()),
     );
     await tester.pumpAndSettle();
-    await _pumpUntilFound(tester, find.text('Software account required'));
+    await _pumpUntilFound(tester, find.text('SOFTWARE ACCOUNT REQUIRED'));
 
-    expect(find.text('Software account required'), findsOneWidget);
+    expect(find.text('SOFTWARE ACCOUNT REQUIRED'), findsOneWidget);
     expect(find.text('submission confirmed route'), findsNothing);
   });
 
@@ -1084,9 +1084,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await _pumpUntilFound(tester, find.text('Submission not complete'));
+    await _pumpUntilFound(tester, find.text('SUBMISSION NOT COMPLETE'));
 
-    expect(find.text('Submission confirmed!'), findsNothing);
+    expect(find.text('SUBMISSION CONFIRMED!'), findsNothing);
     expect(
       find.text(
         'This account has not completed submission for this voting round.',
@@ -1150,9 +1150,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await _pumpUntilFound(tester, find.text('Submission not complete'));
+    await _pumpUntilFound(tester, find.text('SUBMISSION NOT COMPLETE'));
 
-    expect(find.text('Submission confirmed!'), findsNothing);
+    expect(find.text('SUBMISSION CONFIRMED!'), findsNothing);
     expect(
       find.text(
         'This account has not completed submission for this voting round.',
@@ -1210,7 +1210,7 @@ void main() {
     await _pumpUntilFound(tester, find.text(message));
 
     expect(find.text(message), findsOneWidget);
-    expect(find.text('Submission confirmed!'), findsNothing);
+    expect(find.text('SUBMISSION CONFIRMED!'), findsNothing);
   });
 
   testWidgets('submitted route can retry eligibility refresh', (tester) async {
@@ -1256,7 +1256,7 @@ void main() {
     await tester.pumpAndSettle();
     await _pumpUntilFound(tester, find.text('Retry'));
 
-    expect(find.text('Submission not complete'), findsOneWidget);
+    expect(find.text('SUBMISSION NOT COMPLETE'), findsOneWidget);
     // The setup error is only logged; the screen shows the session summary.
     expect(
       find.textContaining(testL10n.votingErrorSessionFailed),
@@ -1266,9 +1266,9 @@ void main() {
 
     await tester.tap(find.text('Retry'));
     await tester.pumpAndSettle();
-    await _pumpUntilFound(tester, find.text('Submission confirmed!'));
+    await _pumpUntilFound(tester, find.text('SUBMISSION CONFIRMED!'));
 
-    expect(find.text('Submission confirmed!'), findsOneWidget);
+    expect(find.text('SUBMISSION CONFIRMED!'), findsOneWidget);
     expect(find.text('Voting power'), findsOneWidget);
     expect(find.text('0.000001 ZEC'), findsOneWidget);
     expect(notifier.refreshCalls, 2);
@@ -1342,7 +1342,7 @@ void main() {
           child: _submissionHarness(votingRoute: const VotingPollsScreen()),
         ),
       );
-      await _pumpUntilFound(tester, find.text('Submission confirmed!'));
+      await _pumpUntilFound(tester, find.text('SUBMISSION CONFIRMED!'));
 
       await tester.tap(find.text('Done'));
       await tester.pump();
@@ -2763,7 +2763,7 @@ void main() {
     final completedTitle = tester.widget<Text>(find.text('Poll'));
     expect(completedTitle.style?.fontFamily, 'Gotham');
     expect(completedTitle.style?.fontSize, 20);
-    expect(completedTitle.style?.fontWeight, FontWeight.w600);
+    expect(completedTitle.style?.fontWeight, AppFontWeight.semiBold);
     final completedSnapshot = tester.widget<Text>(find.text('#123'));
     expect(completedSnapshot.style?.fontFamily, 'Gotham');
     expect(completedSnapshot.style?.fontSize, 20);
@@ -3115,7 +3115,7 @@ void main() {
         child: _submissionHarness(),
       ),
     );
-    await _pumpUntilFound(tester, find.text('Submission confirmed!'));
+    await _pumpUntilFound(tester, find.text('SUBMISSION CONFIRMED!'));
 
     expect(find.text('Voting power'), findsOneWidget);
     expect(
@@ -3442,7 +3442,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await _pumpUntilFound(tester, find.text('Review your answers'));
+    await _pumpUntilFound(tester, find.text('REVIEW YOUR ANSWERS'));
 
     final submitButton = tester.widget<AppButton>(
       find.widgetWithText(AppButton, 'Confirm & submit'),
@@ -3452,7 +3452,7 @@ void main() {
     await tester.tap(find.text('Confirm & submit'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Review your answers'), findsOneWidget);
+    expect(find.text('REVIEW YOUR ANSWERS'), findsOneWidget);
     expect(find.textContaining('status account:'), findsNothing);
   });
 
@@ -3701,7 +3701,7 @@ void main() {
     await tester.tap(find.text('Continue to review'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Review your answers'), findsOneWidget);
+    expect(find.text('REVIEW YOUR ANSWERS'), findsOneWidget);
     expect(find.text('Confirm & submit'), findsOneWidget);
     expect(find.text('ZIP-233'), findsOneWidget);
     expect(find.text('Forum discussion'), findsNWidgets(2));
@@ -3763,7 +3763,7 @@ void main() {
       find.byKey(const ValueKey('voting_review_answers_button')),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Review your answers'), findsOneWidget);
+    expect(find.text('REVIEW YOUR ANSWERS'), findsOneWidget);
     GoRouter.of(tester.element(find.byType(VotingReviewView))).pop();
     await tester.pumpAndSettle();
     expect(scroll.offset, offset);
@@ -3836,7 +3836,7 @@ void main() {
     await tester.tap(find.text('Review answers').hitTestable());
     await tester.pumpAndSettle();
 
-    expect(find.text('Review your answers'), findsOneWidget);
+    expect(find.text('REVIEW YOUR ANSWERS'), findsOneWidget);
     expect(find.text('Preserve halvings'), findsOneWidget);
     expect(find.text(longQuestionDescription), findsOneWidget);
     expect(find.text('View more'), findsNothing);
@@ -3890,12 +3890,16 @@ void main() {
     await tester.tap(find.text('Review answers').hitTestable());
     await tester.pumpAndSettle();
 
-    expect(find.text('Review your answers'), findsOneWidget);
-    final reviewTitle = tester.widget<Text>(find.text('Review your answers'));
+    expect(find.text('REVIEW YOUR ANSWERS'), findsOneWidget);
+    final reviewTitle = tester.widget<Text>(find.text('REVIEW YOUR ANSWERS'));
     expect(reviewTitle.textAlign, TextAlign.center);
     expect(reviewTitle.style?.fontFamily, 'Gotham');
-    expect(reviewTitle.style?.fontSize, 32);
-    expect(reviewTitle.style?.letterSpacing, 0);
+    // The review's title is the neon page title.
+    expect(reviewTitle.style?.fontSize, kNeonPageTitleStyle.fontSize);
+    expect(
+      reviewTitle.style?.letterSpacing,
+      kNeonPageTitleStyle.letterSpacing,
+    );
     expect(find.text(longRoundDescription), findsNothing);
     expect(find.text('View more'), findsNothing);
   });
@@ -3941,7 +3945,7 @@ void main() {
     await tester.tap(find.text('Review answers').hitTestable());
     await tester.pumpAndSettle();
 
-    expect(find.text('Review your answers'), findsOneWidget);
+    expect(find.text('REVIEW YOUR ANSWERS'), findsOneWidget);
     expect(find.text(longProposalTitle), findsOneWidget);
     expect(find.text('View more'), findsOneWidget);
 
@@ -4180,7 +4184,7 @@ void main() {
 
     expect(starts, [staleKey, currentKey]);
     expect(find.text('stale key selected'), findsNothing);
-    expect(find.text('Submitting votes'), findsOneWidget);
+    expect(find.text('SUBMITTING VOTES'), findsOneWidget);
   });
 
   testWidgets('status screen navigates after successful submission', (
@@ -4490,7 +4494,7 @@ void main() {
     expect(find.text('Scan signature'), findsOneWidget);
     await tester.pump();
     expect(find.text('Scanning issues?'), findsOneWidget);
-    expect(find.text('Software account required'), findsNothing);
+    expect(find.text('SOFTWARE ACCOUNT REQUIRED'), findsNothing);
     await tester.tap(find.text('Scan signature'));
     await tester.pumpAndSettle();
 
@@ -4571,7 +4575,7 @@ void main() {
         find.byKey(const ValueKey('ledger_voting_signing_panel')),
         findsOneWidget,
       );
-      expect(find.text('Voting with Ledger'), findsOneWidget);
+      expect(find.text('VOTING WITH LEDGER'), findsOneWidget);
       expect(
         container.read(externalActionGuardProvider).activeHoldCount,
         greaterThan(0),

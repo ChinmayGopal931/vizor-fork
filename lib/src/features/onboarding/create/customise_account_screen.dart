@@ -32,6 +32,7 @@ import '../shared/account_persona_randomise_button.dart';
 import 'onboarding_split_view.dart';
 import '../../payment_links/services/gift_claim_setup_coordinator.dart';
 import '../../payment_links/widgets/desktop_gift_setup_shell.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 typedef CustomiseAccountFinishCallback =
     Future<void> Function(String accountName, String profilePictureId);
@@ -384,7 +385,9 @@ class _CustomiseAccountScreenState
   Widget build(BuildContext context) {
     final profilePictureOverlay = _showProfilePicturePicker
         ? AppPaneModalOverlay(
-            borderRadius: const BorderRadius.all(Radius.circular(20)),
+            borderRadius: const BorderRadius.all(
+              Radius.circular(AppRadii.large),
+            ),
             onDismiss: _closeProfilePicturePicker,
             child: AppProfilePicturePickerModal(
               title: context.l10n.profilePictureSelect,
@@ -569,12 +572,9 @@ class _CustomiseAccountTitle extends StatelessWidget {
       children: [
         FittedBox(
           fit: BoxFit.scaleDown,
-          child: Text(
+          child: NeonPageTitle(
             context.l10n.commonCustomiseAccount,
             textAlign: TextAlign.center,
-            style: AppTypography.displayLarge.copyWith(
-              color: colors.text.accent,
-            ),
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
@@ -649,7 +649,7 @@ class _AccountProfileCard extends StatelessWidget {
                         context.l10n.accountNameLabel,
                         style: AppTypography.labelLarge.copyWith(
                           color: cardTextColor.withValues(alpha: 0.5),
-                          fontWeight: FontWeight.w400,
+                          fontWeight: AppFontWeight.regular,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -760,7 +760,8 @@ class _EditableProfilePicture extends StatelessWidget {
                     height: 24,
                     decoration: BoxDecoration(
                       color: colors.text.homeCard,
-                      shape: BoxShape.circle,
+                      // Near-square, as the neon look's corners are.
+                      borderRadius: BorderRadius.circular(AppRadii.small),
                       border: Border.all(
                         color: colors.background.homeCard,
                         width: 3,

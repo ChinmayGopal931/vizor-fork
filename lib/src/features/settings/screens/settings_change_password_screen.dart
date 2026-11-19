@@ -17,6 +17,7 @@ import '../../../core/widgets/password_text_field.dart';
 import '../../../providers/app_security_provider.dart';
 import '../widgets/confirm_access_card.dart';
 import '../widgets/settings_pane_backdrop.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 class SettingsChangePasswordScreen extends ConsumerStatefulWidget {
   const SettingsChangePasswordScreen({super.key});
@@ -329,12 +330,9 @@ class _NewPasswordView extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
+          NeonPageTitle(
             context.l10n.settingsUpdatePasswordTitle,
             textAlign: TextAlign.center,
-            style: AppTypography.headlineLarge.copyWith(
-              color: colors.text.accent,
-            ),
           ),
           const SizedBox(height: AppSpacing.s),
           SizedBox(

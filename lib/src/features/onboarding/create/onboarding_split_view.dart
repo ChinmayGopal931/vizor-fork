@@ -146,7 +146,8 @@ class OnboardingSplitViewShell extends ConsumerWidget {
 
     return AppDesktopShell(
       sidebarWidth: kAppDesktopSidebarWidth,
-      background: _OnboardingWindowBackground(activeStep: activeStep),
+      // The neon look paints no backdrop behind the steps.
+      background: const SizedBox.shrink(),
       sidebar: SlideTransition(
         position: sidebarOffset,
         child: _Sidebar(
@@ -157,39 +158,6 @@ class OnboardingSplitViewShell extends ConsumerWidget {
         ),
       ),
       pane: FadeTransition(opacity: entrance, child: child),
-    );
-  }
-}
-
-class _OnboardingWindowBackground extends StatelessWidget {
-  const _OnboardingWindowBackground({required this.activeStep});
-
-  final OnboardingStep activeStep;
-
-  @override
-  Widget build(BuildContext context) {
-    final asset = switch (activeStep) {
-      OnboardingStep.secretPassphrase =>
-        'assets/illustrations/desktop/onboarding_secret_passphrase_background.webp',
-      // Figma uses the same castle line-art for both themes (alpha-only
-      // strokes composite against the window color), so one asset serves
-      // light and dark.
-      OnboardingStep.setPassword =>
-        'assets/illustrations/desktop/onboarding_set_password_background_light.webp',
-      _ => null,
-    };
-
-    if (asset == null) {
-      return const SizedBox.shrink();
-    }
-
-    return DecoratedBox(
-      decoration: BoxDecoration(color: context.colors.background.window),
-      child: Image.asset(
-        asset,
-        fit: BoxFit.cover,
-        alignment: Alignment.topCenter,
-      ),
     );
   }
 }

@@ -1,10 +1,7 @@
 import 'package:flutter/widgets.dart';
 
-import '../layout/app_form_factor.dart';
 import '../profile_pictures.dart';
 import '../theme/app_theme.dart';
-
-const _mobile = kAppFormFactor == AppFormFactor.mobile;
 
 enum AppProfilePictureSize {
   medium(24),
@@ -40,36 +37,28 @@ class AppProfilePicture extends StatelessWidget {
       fit: BoxFit.cover,
     );
 
-    if (_mobile) {
-      // Mobile frames a portrait as a cut-corner plate with a lit red edge,
-      // not a circle.
-      final cut = size.dimension * 0.24;
-      final colors = context.colors;
-      return SizedBox(
-        width: size.dimension,
-        height: size.dimension,
-        child: DecoratedBox(
-          position: DecorationPosition.foreground,
-          decoration: ShapeDecoration(
-            shape: Neon.chamferBorder(
-              cut: cut,
-              side: BorderSide(
-                color: colors.border.brandCrimsonStrong.withValues(alpha: 0.8),
-              ),
-            ),
-          ),
-          child: ClipPath(
-            clipper: ShapeBorderClipper(shape: Neon.chamferBorder(cut: cut)),
-            child: ColoredBox(color: colors.background.raised, child: image),
-          ),
-        ),
-      );
-    }
-
+    // A portrait sits in a cut-corner plate with a lit red edge, not a
+    // circle.
+    final cut = size.dimension * 0.24;
+    final colors = context.colors;
     return SizedBox(
       width: size.dimension,
       height: size.dimension,
-      child: ClipOval(child: image),
+      child: DecoratedBox(
+        position: DecorationPosition.foreground,
+        decoration: ShapeDecoration(
+          shape: Neon.chamferBorder(
+            cut: cut,
+            side: BorderSide(
+              color: colors.border.brandCrimsonStrong.withValues(alpha: 0.8),
+            ),
+          ),
+        ),
+        child: ClipPath(
+          clipper: ShapeBorderClipper(shape: Neon.chamferBorder(cut: cut)),
+          child: ColoredBox(color: colors.background.raised, child: image),
+        ),
+      ),
     );
   }
 }

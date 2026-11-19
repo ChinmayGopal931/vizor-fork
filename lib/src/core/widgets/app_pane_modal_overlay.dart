@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import '../layout/app_form_factor.dart';
 import '../theme/app_theme.dart';
 
 class AppPaneModalOverlay extends StatelessWidget {
@@ -14,8 +15,15 @@ class AppPaneModalOverlay extends StatelessWidget {
     super.key,
   });
 
+  /// The pane's corner: near-square on desktop, as `AppDesktopPane`'s is,
+  /// and the Figma pane corner on mobile, where the Ledger signing flows host
+  /// this overlay.
   static const defaultBorderRadius = BorderRadius.all(
-    Radius.circular(AppWindowSizing.paneRadius),
+    Radius.circular(
+      kAppFormFactor == AppFormFactor.desktop
+          ? AppRadii.large
+          : AppWindowSizing.paneRadius,
+    ),
   );
 
   final Widget child;

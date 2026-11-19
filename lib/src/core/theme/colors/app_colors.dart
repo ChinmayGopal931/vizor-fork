@@ -1,4 +1,3 @@
-import '../../layout/app_form_factor.dart';
 import 'app_background_colors.dart';
 import 'app_border_colors.dart';
 import 'app_button_colors.dart';
@@ -26,8 +25,6 @@ export 'app_state_colors.dart';
 export 'app_surface_colors.dart';
 export 'app_sync_colors.dart';
 export 'app_text_colors.dart';
-
-const _mobile = kAppFormFactor == AppFormFactor.mobile;
 
 /// Aggregated semantic color palette for the app. Sourced from the Zcash
 /// design system Figma spec; organized into semantic categories that mirror
@@ -67,11 +64,11 @@ class AppColors {
   final AppMacosUtilityColors macosUtility;
   final AppNeonColors neon;
 
-  /// The Figma sets on desktop builds, the neon sets on mobile builds. Every
-  /// colour group selects the same way. Tests that must pin one design
-  /// regardless of lane read the named sets below.
-  static const dark = _mobile ? neonDark : figmaDark;
-  static const light = _mobile ? neonLight : figmaLight;
+  /// Veylor draws the neon sets on both form factors, and every colour group
+  /// selects the same way. The Figma sets stay for the tooling and tests that
+  /// pin upstream's design.
+  static const dark = neonDark;
+  static const light = neonLight;
 
   static const figmaDark = AppColors(
     background: AppBackgroundColors.figmaDark,
@@ -105,7 +102,7 @@ class AppColors {
     neon: AppNeonColors.figmaLight,
   );
 
-  /// Veylor's mobile look: true black, neon red, white light.
+  /// Veylor's look: true black, neon red, white light.
   static const neonDark = AppColors(
     background: AppBackgroundColors.neonDark,
     surface: AppSurfaceColors.neonDark,

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:flutter/material.dart' show Colors, Scaffold;
 import 'package:flutter/widgets.dart';
@@ -8,7 +7,11 @@ import '../theme/app_theme.dart';
 import '../widgets/app_back_link.dart';
 import '../widgets/app_icon.dart';
 import '../widgets/app_toast.dart';
+import '../widgets/mobile/tron_glyph.dart';
+import '../widgets/neon_glass_panel.dart';
 import 'content_overlay_inset.dart';
+import 'mobile/app_mobile_tab_bar.dart';
+import 'mobile/neon_sidebar.dart';
 
 /// Width the desktop shell reserves for its main sidebar.
 ///
@@ -87,55 +90,28 @@ class AppDesktopSidebarSurface extends StatelessWidget {
   final Widget child;
   final Color? backgroundColor;
   final Clip clipBehavior;
+
+  /// Draws the sidebar's neon glass panel: its top-left and bottom-right
+  /// corners cut and lit, its content clipped to the same outline.
   final bool glass;
 
-  static const glassRadius = 20.0;
-  static const _glassBlur = 17.5;
+  /// The corner radius of the surfaces that follow the sidebar's shape, such
+  /// as the onboarding modals: near-square, as the neon look's corners are.
+  static const glassRadius = AppRadii.large;
+
+  /// How far the glass panel's corner cuts reach: the panel's own cut, short
+  /// of mobile's sidebar cut so the lit top-left corner clears the macOS
+  /// window controls above the sidebar's content.
+  static const glassCut = AppChamfer.large;
 
   @override
   Widget build(BuildContext context) {
     if (glass) {
-      final colors = context.colors;
-      final radius = BorderRadius.circular(glassRadius);
-      final fill = backgroundColor ?? colors.macosUtility.navPanel;
-      final thinBorderColor = colors.macosUtility.thinBorder;
-      final innerHighlightColor = colors.macosUtility.innerBorder;
-
-      return DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: radius,
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF000000).withValues(alpha: 0.12),
-              blurRadius: 44,
-            ),
-            BoxShadow(color: thinBorderColor, blurRadius: 0, spreadRadius: 1),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: radius,
-          clipBehavior: clipBehavior,
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: _glassBlur, sigmaY: _glassBlur),
-            child: DecoratedBox(
-              decoration: BoxDecoration(color: fill, borderRadius: radius),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  child,
-                  IgnorePointer(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        borderRadius: radius,
-                        border: Border.all(color: innerHighlightColor),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
+      return NeonGlassPanel(
+        cut: glassCut,
+        fill: backgroundColor,
+        clipBehavior: clipBehavior,
+        child: child,
       );
     }
 
@@ -169,7 +145,9 @@ class AppDesktopPane extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: paintBackground ? backgroundColor ?? Colors.transparent : null,
-        borderRadius: BorderRadius.circular(AppWindowSizing.paneRadius),
+        // Near-square, as the neon look's corners are; the Figma pane
+        // corner is [AppWindowSizing.paneRadius].
+        borderRadius: BorderRadius.circular(AppRadii.large),
       ),
       clipBehavior: Clip.antiAlias,
       child: AppToastHost(
@@ -234,6 +212,10 @@ class AppPaneToolbar extends StatelessWidget {
   }
 }
 
+/// A main sidebar destination in the neon look: its line glyph (the phone
+/// sidebar's [NeonSidebarGlyph]) beside a Light label. The active row is lit
+/// rather than filled: its glyph and red label glow over a pool of light,
+/// which crossfades from the row lit before ([wasActive]).
 class AppSidebarItem extends StatelessWidget {
   const AppSidebarItem({
     required this.label,
@@ -241,6 +223,7 @@ class AppSidebarItem extends StatelessWidget {
     this.leading,
     this.trailing,
     this.active = false,
+    this.wasActive,
     this.onTap,
     this.leadingGap = AppSpacing.sm,
     this.inactiveOpacity = 1,
@@ -253,50 +236,102 @@ class AppSidebarItem extends StatelessWidget {
   final Widget? leading;
   final Widget? trailing;
   final bool active;
+
+  /// Whether this row was lit on the page before: desktop builds a new
+  /// sidebar on every page, so the light starts there and crossfades to
+  /// [active]. Null starts at [active].
+  final bool? wasActive;
   final VoidCallback? onTap;
   final double leadingGap;
   final double inactiveOpacity;
   final bool iconAnimated;
 
+  /// The glyph's square: upstream's icon size, so the rows keep their
+  /// geometry.
+  static const glyphSize = 20.0;
+
+  /// Where a row's glyph starts inside the row.
+  static const glyphInset = AppSpacing.sm;
+
+  /// The line glyph of a destination's icon; null keeps the icon (the
+  /// importing loader).
+  static TronGlyphKind? glyphFor(String iconName) => switch (iconName) {
+    AppIcons.home => TronGlyphKind.home,
+    AppIcons.swapArrows => TronGlyphKind.swap,
+    AppIcons.paid => TronGlyphKind.pay,
+    AppIcons.vote => TronGlyphKind.vote,
+    AppIcons.history => TronGlyphKind.activity,
+    AppIcons.cog => TronGlyphKind.settings,
+    AppIcons.logOut => TronGlyphKind.signOut,
+    _ => null,
+  };
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     final disabled = onTap == null && !active;
-    final itemOpacity = active ? 1.0 : inactiveOpacity;
-    final iconColor = active
-        ? colors.navPanel.activeIcon
-        : colors.icon.accent.withValues(alpha: itemOpacity);
-    final textColor = active
-        ? colors.navPanel.activeLabel
-        : colors.text.accent.withValues(alpha: itemOpacity);
-    final row = AnimatedContainer(
-      duration: const Duration(milliseconds: 160),
-      curve: Curves.easeOut,
+    final light = colors.navPanel.activeIcon;
+    final motion = !(MediaQuery.maybeDisableAnimationsOf(context) ?? false);
+    final unlitLabel = colors.text.accent.withValues(alpha: inactiveOpacity);
+    final iconName = this.iconName;
+    final glyph = iconName == null ? null : glyphFor(iconName);
+    final Widget leadingWidget;
+    if (leading case final leading?) {
+      leadingWidget = leading;
+    } else if (glyph != null) {
+      leadingWidget = NeonSidebarGlyph(
+        item: AppMobileTabItem(iconName: iconName!, label: label),
+        glyph: glyph,
+        dimension: glyphSize,
+        selected: active,
+        wasSelected: wasActive,
+      );
+    } else {
+      leadingWidget = AppIcon(
+        iconName!,
+        size: glyphSize,
+        color: active
+            ? light
+            : colors.icon.accent.withValues(alpha: inactiveOpacity),
+        animated: iconAnimated,
+      );
+    }
+    final row = SizedBox(
       height: 40,
-      padding: const EdgeInsets.only(left: AppSpacing.sm, right: AppSpacing.xs),
-      decoration: BoxDecoration(
-        color: active ? colors.navPanel.activeBg : null,
-        borderRadius: BorderRadius.circular(AppRadii.small),
-      ),
-      child: Row(
-        children: [
-          leading ??
-              AppIcon(
-                iconName!,
-                size: 20,
-                color: iconColor,
-                animated: iconAnimated,
+      child: Padding(
+        padding: const EdgeInsets.only(left: glyphInset, right: AppSpacing.xs),
+        child: Row(
+          children: [
+            leadingWidget,
+            SizedBox(width: leadingGap),
+            Expanded(
+              // The label lights with the glyph: red, with a glow.
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(
+                  begin: switch (wasActive) {
+                    null => null,
+                    final lit => lit ? 1.0 : 0.0,
+                  },
+                  end: active ? 1 : 0,
+                ),
+                duration: motion
+                    ? AppMobileTabBar.selectDuration
+                    : Duration.zero,
+                builder: (context, lit, _) => Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.labelLarge.copyWith(
+                    color: Color.lerp(unlitLabel, light, lit),
+                    shadows: lit > 0
+                        ? Neon.textGlow(light, intensity: 0.3 * lit)
+                        : null,
+                  ),
+                ),
               ),
-          SizedBox(width: leadingGap),
-          Expanded(
-            child: Text(
-              label,
-              overflow: TextOverflow.ellipsis,
-              style: AppTypography.labelLarge.copyWith(color: textColor),
             ),
-          ),
-          ?trailing,
-        ],
+            ?trailing,
+          ],
+        ),
       ),
     );
 

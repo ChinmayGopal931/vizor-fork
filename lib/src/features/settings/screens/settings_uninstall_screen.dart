@@ -5,7 +5,6 @@ import 'package:flutter/material.dart' show Colors, Scaffold;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -25,6 +24,9 @@ import '../../payment_links/services/payment_link_received_store.dart';
 import '../../swap/providers/swap_activity_store.dart';
 import '../widgets/confirm_access_card.dart';
 import '../widgets/settings_pane_backdrop.dart';
+import '../../../core/widgets/neon_page_title.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
+import '../../../core/widgets/mobile/neon_glyph_badge.dart';
 
 /// Full-window uninstall flow: confirm -> password gate -> removing -> done.
 ///
@@ -408,55 +410,48 @@ class _UninstallCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    return Container(
+    // A neon glass panel, its two cut corners lit.
+    return SizedBox(
       width: 396,
       height: 520,
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        AppSpacing.xl,
-        AppSpacing.md,
-        AppSpacing.lg,
-      ),
-      decoration: BoxDecoration(
-        color: colors.background.ground,
-        borderRadius: BorderRadius.circular(AppRadii.large),
-      ),
-      child: Center(
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: SizedBox(
-            width: 348,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _UninstallBadge(helmetOpacity: helmetOpacity),
-                const SizedBox(height: AppSpacing.base),
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      title,
-                      textAlign: TextAlign.center,
-                      style: AppTypography.displayMedium.copyWith(
-                        color: colors.text.accent,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    SizedBox(
-                      width: subtitleWidth,
-                      child: Text(
-                        subtitle,
-                        textAlign: TextAlign.center,
-                        style: AppTypography.bodyMedium.copyWith(
-                          color: colors.text.accent,
+      child: NeonGlassPanel(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.xl,
+          AppSpacing.md,
+          AppSpacing.lg,
+        ),
+        child: Center(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: SizedBox(
+              width: 348,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _UninstallBadge(helmetOpacity: helmetOpacity),
+                  const SizedBox(height: AppSpacing.base),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      NeonPageTitle(title, textAlign: TextAlign.center),
+                      const SizedBox(height: AppSpacing.sm),
+                      SizedBox(
+                        width: subtitleWidth,
+                        child: Text(
+                          subtitle,
+                          textAlign: TextAlign.center,
+                          style: AppTypography.bodyMedium.copyWith(
+                            color: colors.text.accent,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.base),
-                action,
-              ],
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.base),
+                  action,
+                ],
+              ),
             ),
           ),
         ),
@@ -473,30 +468,37 @@ class _UninstallBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final neon = context.colors.neon;
+    const size = 50.0;
+    // A NeonGlyphBadge's lit plate in place of upstream's shield and helmet:
+    // the plate stays lit, and its glyph fades once the data is gone.
     return SizedBox(
       key: const ValueKey('settings_uninstall_badge'),
-      width: 50,
-      height: 50,
+      width: size,
+      height: size,
       child: Stack(
         alignment: Alignment.center,
         children: [
           Positioned.fill(
-            child: SvgPicture.asset(
+            child: DecoratedBox(
               key: const ValueKey('settings_uninstall_badge_shield'),
-              'assets/illustrations/uninstall_badge_shield.svg',
+              decoration: ShapeDecoration(
+                color: neon.glow.withValues(alpha: 0.07),
+                shape: Neon.chamferBorder(
+                  cut: size * NeonGlyphBadge.cutScale,
+                  side: BorderSide(color: neon.glow.withValues(alpha: 0.55)),
+                ),
+                shadows: Neon.boxGlow(neon.glow, intensity: 0.35),
+              ),
             ),
           ),
           FadeTransition(
             key: const ValueKey('settings_uninstall_badge_helmet'),
             opacity: helmetOpacity,
-            child: Transform.translate(
-              offset: const Offset(-0.63, -3.13),
-              child: Image.asset(
-                'assets/illustrations/desktop/uninstall_badge_helmet.webp',
-                width: 38.75,
-                height: 38.75,
-                fit: BoxFit.contain,
-              ),
+            child: AppIcon(
+              AppIcons.trash,
+              size: size * NeonGlyphBadge.markScale,
+              color: neon.core,
             ),
           ),
         ],
@@ -537,7 +539,7 @@ class _UninstallConfirmView extends StatelessWidget {
               textAlign: TextAlign.center,
               style: AppTypography.bodyMedium.copyWith(
                 color: colors.text.destructive,
-                fontWeight: FontWeight.w500,
+                fontWeight: AppFontWeight.medium,
               ),
             ),
             const SizedBox(height: AppSpacing.md),
@@ -726,13 +728,7 @@ class _UninstallDataRemovalViewState extends State<_UninstallDataRemovalView>
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              title,
-                              textAlign: TextAlign.center,
-                              style: AppTypography.displayMedium.copyWith(
-                                color: colors.text.accent,
-                              ),
-                            ),
+                            NeonPageTitle(title, textAlign: TextAlign.center),
                             const SizedBox(height: AppSpacing.sm),
                             SizedBox(
                               width: 240,
@@ -817,13 +813,15 @@ class _UninstallProgressBar extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppRadii.full),
       ),
       alignment: Alignment.centerLeft,
+      // The filled part is lit red.
       child: FractionallySizedBox(
         widthFactor: value,
         heightFactor: 1,
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: colors.background.inverse,
+            color: colors.neon.glow,
             borderRadius: BorderRadius.circular(AppRadii.full),
+            boxShadow: Neon.boxGlow(colors.neon.glow, intensity: 0.5),
           ),
         ),
       ),

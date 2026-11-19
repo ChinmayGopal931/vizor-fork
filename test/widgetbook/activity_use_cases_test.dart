@@ -46,8 +46,9 @@ void main() {
       expect(backTopLeft.dx, paneTopLeft.dx + AppSpacing.sm);
       expect(backTopLeft.dy, paneTopLeft.dy + AppSpacing.xs);
 
-      expect(find.text('This week'), findsOneWidget);
-      expect(find.text('April 2026'), findsOneWidget);
+      // Month heads are HUD captions, upper-cased where drawn.
+      expect(find.text('THIS WEEK'), findsOneWidget);
+      expect(find.text('APRIL 2026'), findsOneWidget);
       // The redesigned fixture shows a completed swap group, not an in-flight
       // one, and the duplicate standalone 'Received ZEC' row is gone.
       expect(find.text('Swapping...'), findsNothing);

@@ -611,23 +611,26 @@ class _SelectionDot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    // A cut-corner radio: lit red with a dark square when selected.
     return DecoratedBox(
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
+      decoration: ShapeDecoration(
         color: selected ? colors.icon.brandCrimson : colors.background.ground,
-        border: Border.all(
-          color: selected ? colors.icon.brandCrimson : colors.border.medium,
+        shape: Neon.chamferBorder(
+          cut: AppChamfer.small,
+          side: BorderSide(
+            color: selected ? colors.icon.brandCrimson : colors.border.medium,
+          ),
         ),
+        shadows: selected
+            ? Neon.boxGlow(colors.icon.brandCrimson, intensity: 0.4)
+            : null,
       ),
       child: SizedBox.square(
         dimension: 20,
         child: Center(
           child: selected
               ? DecoratedBox(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: colors.background.ground,
-                  ),
+                  decoration: BoxDecoration(color: colors.background.ground),
                   child: const SizedBox.square(dimension: 8),
                 )
               : null,

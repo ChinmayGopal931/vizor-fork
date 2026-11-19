@@ -59,7 +59,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('About Veylor'), findsNothing);
-    expect(find.text('About Veylor Wallet'), findsOneWidget);
+    expect(find.text('ABOUT VEYLOR WALLET'), findsOneWidget);
     expect(find.text('Version: 0.0.0 Public Beta'), findsOneWidget);
     expect(find.text('Built by the Keplr team'), findsOneWidget);
     expect(find.text('Designed for shielded Zcash'), findsOneWidget);
@@ -106,7 +106,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('About Veylor'), findsNothing);
-    expect(find.text('About Veylor Wallet'), findsOneWidget);
+    expect(find.text('ABOUT VEYLOR WALLET'), findsOneWidget);
     final backLink = find.byType(AppRouteBackLink);
     expect(
       find.descendant(of: backLink, matching: find.text('Home')),
@@ -250,13 +250,13 @@ void main() {
     await tester.pumpWidget(_appHarness(_emptyBootstrap('/terms')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Terms of Usage'), findsOneWidget);
+    expect(find.text('TERMS OF USAGE'), findsOneWidget);
     expect(find.text('Private money. By default.'), findsNothing);
 
     await tester.pumpWidget(_appHarness(_emptyBootstrap('/privacy')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Privacy Policy'), findsOneWidget);
+    expect(find.text('PRIVACY POLICY'), findsOneWidget);
     expect(find.text('Private money. By default.'), findsNothing);
   });
 }
@@ -337,7 +337,8 @@ void _expectUtilityContentCentered(
   final scrollbarRect = tester.getRect(
     find.byKey(AppPaneScrollScaffold.scrollbarKey),
   );
-  final titleRect = tester.getRect(find.text(titleText));
+  // The title is a page title, upper-cased where drawn.
+  final titleRect = tester.getRect(find.text(titleText.toUpperCase()));
   expect(titleRect.center.dx, moreOrLessEquals(scrollbarRect.center.dx));
 
   final headingRect = tester.getRect(find.text(headingText).first);

@@ -453,7 +453,7 @@ class _AddressQrScanTitle extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: AppTypography.bodyLarge.copyWith(
-              fontWeight: FontWeight.w600,
+              fontWeight: AppFontWeight.semiBold,
               color: colors.text.accent,
             ),
           ),

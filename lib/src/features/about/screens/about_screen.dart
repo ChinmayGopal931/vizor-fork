@@ -20,6 +20,8 @@ import '../../../core/widgets/app_icon.dart';
 import '../../../providers/wallet_provider.dart';
 import '../../onboarding/shared/onboarding_welcome_art.dart';
 import '../about_content.dart';
+import '../../../core/widgets/neon_page_title.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
 
 const _utilityContentWidth = 420.0;
 
@@ -281,13 +283,7 @@ class _UtilityPageTitle extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          title,
-          textAlign: TextAlign.center,
-          style: AppTypography.headlineLarge.copyWith(
-            color: colors.text.accent,
-          ),
-        ),
+        NeonPageTitle(title, textAlign: TextAlign.center),
         const SizedBox(height: AppSpacing.s),
         Text(
           subtitle,
@@ -325,42 +321,18 @@ class _UtilitySurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
-    return Container(
+    // A neon glass panel, its two cut corners lit.
+    return SizedBox(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.base,
+      child: NeonGlassPanel(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.base,
+        ),
+        child: child,
       ),
-      decoration: BoxDecoration(
-        // Figma: semantic/foreground/neutral/ground in both modes
-        // (#ffffff light, #1b1f1f dark).
-        color: colors.background.ground,
-        borderRadius: BorderRadius.circular(AppRadii.large),
-        boxShadow: _utilitySurfaceShadow(colors),
-      ),
-      child: child,
     );
   }
-}
-
-// Figma "Shadow Surface" — four layers of Semantic/Shadows/Subtle
-// (alpha 0 in dark mode, so the card reads from fill contrast alone).
-List<BoxShadow> _utilitySurfaceShadow(AppColors colors) {
-  return [
-    BoxShadow(color: colors.shadows.subtle, blurRadius: 1),
-    BoxShadow(
-      color: colors.shadows.subtle,
-      offset: const Offset(0, 1),
-      blurRadius: 2,
-    ),
-    BoxShadow(
-      color: colors.shadows.subtle,
-      offset: const Offset(0, 2),
-      blurRadius: 4,
-    ),
-    BoxShadow(color: colors.shadows.subtle, blurRadius: 1),
-  ];
 }
 
 class _UtilityParagraph extends StatelessWidget {

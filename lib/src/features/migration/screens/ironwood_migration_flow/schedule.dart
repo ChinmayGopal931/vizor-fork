@@ -416,7 +416,7 @@ class _MigrationManageModal extends StatelessWidget {
           context.l10n.migrationManageTitle,
           style: AppTypography.bodyLarge.copyWith(
             color: colors.text.accent,
-            fontWeight: FontWeight.w600,
+            fontWeight: AppFontWeight.semiBold,
           ),
         ),
         const SizedBox(height: AppSpacing.md),
@@ -468,7 +468,7 @@ class _MigrationManageModal extends StatelessWidget {
           context.l10n.migrationManageSwitchImmediate,
           style: AppTypography.bodyLarge.copyWith(
             color: colors.text.accent,
-            fontWeight: FontWeight.w600,
+            fontWeight: AppFontWeight.semiBold,
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
@@ -526,7 +526,7 @@ class _MigrationManageModal extends StatelessWidget {
           context.l10n.migrationManageStopTitle,
           style: AppTypography.bodyLarge.copyWith(
             color: colors.text.accent,
-            fontWeight: FontWeight.w600,
+            fontWeight: AppFontWeight.semiBold,
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
@@ -945,7 +945,7 @@ class _MigrationPreparationRoundSection extends StatelessWidget {
                 ),
                 style: AppTypography.labelLarge.copyWith(
                   color: colors.text.accent,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: AppFontWeight.medium,
                 ),
               ),
             ),
@@ -1019,7 +1019,7 @@ class _MigrationPreparationStageCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: AppTypography.labelLarge.copyWith(
                           color: colors.text.accent,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: AppFontWeight.medium,
                         ),
                       ),
                     ),
@@ -1165,9 +1165,9 @@ class _MigrationPreparationScheduleStatus extends StatelessWidget {
       color: completed
           ? colors.text.positiveStrong
           : awaiting
-          ? const Color(0xFFB83AD9)
+          ? colors.neon.glow
           : colors.text.secondary,
-      fontWeight: FontWeight.w400,
+      fontWeight: AppFontWeight.regular,
     );
 
     return Row(
@@ -1185,7 +1185,7 @@ class _MigrationPreparationScheduleStatus extends StatelessWidget {
           color: completed
               ? colors.icon.success
               : awaiting
-              ? const Color(0xFFB83AD9)
+              ? colors.neon.glow
               : active
               ? colors.icon.accent
               : colors.icon.regular,
@@ -1504,14 +1504,14 @@ class _MigrationScheduleRow extends StatelessWidget {
                           '$number. ${_displayZecAmountCompact(value, privacyModeEnabled: privacyModeEnabled)} ZEC ', // l10n-ignore: amount format
                       style: AppTypography.labelLarge.copyWith(
                         color: colors.text.accent,
-                        fontWeight: FontWeight.w500,
+                        fontWeight: AppFontWeight.medium,
                       ),
                       children: [
                         TextSpan(
                           text: _migrationPercentage(value, total),
                           style: AppTypography.labelLarge.copyWith(
                             color: colors.text.secondary,
-                            fontWeight: FontWeight.w500,
+                            fontWeight: AppFontWeight.medium,
                           ),
                         ),
                       ],
@@ -1598,9 +1598,9 @@ class _MigrationSchedulePartStatus extends StatelessWidget {
       color: completed
           ? colors.text.positiveStrong
           : needsInput
-          ? const Color(0xFFB83AD9)
+          ? colors.neon.glow
           : colors.text.secondary,
-      fontWeight: FontWeight.w400,
+      fontWeight: AppFontWeight.regular,
     );
     final icon = completed
         ? AppIcons.checkCircle
@@ -1612,7 +1612,7 @@ class _MigrationSchedulePartStatus extends StatelessWidget {
     final iconColor = completed
         ? colors.icon.success
         : needsInput
-        ? const Color(0xFFB83AD9)
+        ? colors.neon.glow
         : active
         ? colors.icon.accent
         : colors.icon.regular;

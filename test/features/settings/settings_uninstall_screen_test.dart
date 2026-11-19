@@ -195,19 +195,19 @@ Future<void> _runUninstallFlow(
     );
     await tester.tap(find.widgetWithText(AppButton, 'Uninstall Veylor'));
     await tester.pumpAndSettle();
-    expect(find.text('Confirm access'), findsOneWidget);
+    expect(find.text('CONFIRM ACCESS'), findsOneWidget);
 
     await tester.enterText(find.byType(EditableText), _validPassword);
     await tester.pump();
     await tester.tap(find.bySemanticsLabel('Confirm password'));
 
-    await _pumpUntilPresent(tester, find.text('Removing data...'));
+    await _pumpUntilPresent(tester, find.text('REMOVING DATA...'));
     final removingBadgeCenter = tester.getCenter(
       find.byKey(const ValueKey('settings_uninstall_badge')),
     );
     expect(_helmetOpacity(tester), 1);
 
-    await _pumpUntilPresent(tester, find.text('Your data has been removed'));
+    await _pumpUntilPresent(tester, find.text('YOUR DATA HAS BEEN REMOVED'));
     final doneBadgeCenter = tester.getCenter(
       find.byKey(const ValueKey('settings_uninstall_badge')),
     );
@@ -219,7 +219,7 @@ Future<void> _runUninstallFlow(
     expect(_helmetOpacity(tester), 0);
 
     expect(accountNotifier.resetWalletCalled, isTrue);
-    expect(find.text('Your data has been removed'), findsOneWidget);
+    expect(find.text('YOUR DATA HAS BEEN REMOVED'), findsOneWidget);
     expect(find.text('Close Veylor'), findsOneWidget);
     expect(find.byType(WelcomeScreen), findsNothing);
   } finally {

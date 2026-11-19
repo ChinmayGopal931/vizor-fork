@@ -28,7 +28,7 @@ void main() {
     expect(find.byType(AppDesktopShell), findsOneWidget);
     expect(find.byType(PayWizardPage), findsOneWidget);
     expect(find.byType(PayAmountStep), findsOneWidget);
-    expect(find.text('Pay in USDC'), findsOneWidget);
+    expect(find.text('PAY IN USDC'), findsOneWidget);
     expect(find.text(r'$ 0'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('pay_amount_counterpart_loading')),
@@ -48,7 +48,7 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.byType(PayRecipientStep), findsOneWidget);
-    expect(find.text('Select Recipient'), findsOneWidget);
+    expect(find.text('SELECT RECIPIENT'), findsOneWidget);
     expect(find.text('Recently sent'), findsOneWidget);
     expect(find.text('Contacts'), findsOneWidget);
     expect(find.text('Mike'), findsWidgets);
@@ -94,7 +94,7 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.byType(PayReviewStep), findsOneWidget);
-    expect(find.text('Review Payment'), findsOneWidget);
+    expect(find.text('REVIEW PAYMENT'), findsOneWidget);
     expect(find.textContaining('Quote expires in'), findsOneWidget);
     expect(find.text('Confirm & pay'), findsOneWidget);
     expect(find.text('Refresh the quote'), findsNothing);

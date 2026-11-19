@@ -1,11 +1,8 @@
 import 'package:flutter/painting.dart';
 
-import '../../layout/app_form_factor.dart';
 import '../primitives.dart';
 
-const _mobile = kAppFormFactor == AppFormFactor.mobile;
-
-/// Light for the mobile look's lit elements.
+/// Light for the neon look's lit elements.
 ///
 /// * [glow] / [core] — a lit tube on the page: its coloured halo and its
 ///   white-hot centre. Light mode keeps them dark enough to read on steel.
@@ -15,8 +12,8 @@ const _mobile = kAppFormFactor == AppFormFactor.mobile;
 /// * [frameGlow] — white light, as a headlight: the hairline between the
 ///   balance sign and the Private USD strip under it.
 ///
-/// Desktop has no neon elements; its set mirrors the brand crimson so a
-/// stray use still reads as the brand accent.
+/// The Figma sets, which upstream's design never lights, mirror the brand
+/// crimson so a stray use still reads as the brand accent.
 class AppNeonColors {
   const AppNeonColors({
     required this.glow,
@@ -34,8 +31,8 @@ class AppNeonColors {
   final Color grid;
   final Color frameGlow;
 
-  static const dark = _mobile ? neonDark : figmaDark;
-  static const light = _mobile ? neonLight : figmaLight;
+  static const dark = neonDark;
+  static const light = neonLight;
 
   static const figmaDark = AppNeonColors(
     glow: CrimsonPrimitives.p400Dark,

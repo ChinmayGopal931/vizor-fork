@@ -110,9 +110,9 @@ const _darkColorScheme = ColorScheme(
 // ---------------------------------------------------------------------------
 // Text themes
 //
-// Weights go through [AppFontWeight]: desktop keeps the weights named below,
-// and the mobile form factor, whose type is never heavier than Light, draws
-// every one of them in Light. Unstyled text inherits `bodyMedium` here.
+// Weights go through [AppFontWeight], which draws every weight named below in
+// Light: Veylor's type is never heavier than Light on either form factor.
+// Unstyled text inherits `bodyMedium` here.
 // ---------------------------------------------------------------------------
 
 const _bodyFamily = kGothamFamily;

@@ -42,7 +42,7 @@ class _AppBackLinkState extends State<AppBackLink> {
 
   static const _labelStyle = TextStyle(
     fontFamily: kGothamFamily,
-    fontWeight: FontWeight.w500,
+    fontWeight: AppSharedFontWeight.medium,
     fontSize: 14,
     height: 16 / 14,
     letterSpacing: -0.06,

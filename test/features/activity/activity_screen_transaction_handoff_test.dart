@@ -245,7 +245,7 @@ void main() {
       await tester.pump();
       await tester.pump();
       expect(find.byType(ActivityTransactionStatusScreen), findsOneWidget);
-      expect(find.text('Received successfully'), findsOneWidget);
+      expect(find.text('RECEIVED SUCCESSFULLY'), findsOneWidget);
       expect(history.isCompleted, isFalse);
       expect(reads, 1);
       expect(suppliedArgs!.sourceAccountUuid, 'account-1');

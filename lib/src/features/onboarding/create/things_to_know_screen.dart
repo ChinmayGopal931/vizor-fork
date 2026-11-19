@@ -6,6 +6,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_icon.dart';
 import 'onboarding_split_view.dart';
+import '../../../core/widgets/neon_page_title.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
 
 class ThingsToKnowScreen extends StatelessWidget {
   const ThingsToKnowScreen({
@@ -105,11 +107,8 @@ class _TitleBlock extends StatelessWidget {
         FittedBox(
           fit: BoxFit.scaleDown,
           alignment: Alignment.center,
-          child: Text(
+          child: NeonPageTitle(
             context.l10n.onboardingThingsToKnow,
-            style: AppTypography.displayLarge.copyWith(
-              color: colors.text.accent,
-            ),
             textAlign: TextAlign.center,
           ),
         ),
@@ -129,7 +128,6 @@ class _TitleBlock extends StatelessWidget {
 class _ThingsToKnowPanel extends StatelessWidget {
   const _ThingsToKnowPanel();
 
-  static const _radius = BorderRadius.all(Radius.circular(24));
   static const double _verticalPadding = 32;
 
   @override
@@ -137,46 +135,31 @@ class _ThingsToKnowPanel extends StatelessWidget {
     final colors = context.colors;
     final fill = colors.background.ground;
 
-    return Container(
+    return SizedBox(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: _verticalPadding,
-      ),
-      decoration: BoxDecoration(
-        color: fill,
-        borderRadius: _radius,
-        boxShadow: [
-          BoxShadow(color: colors.shadows.subtle, blurRadius: 1),
-          BoxShadow(
-            color: colors.shadows.subtle,
-            offset: const Offset(0, 1),
-            blurRadius: 2,
-          ),
-          BoxShadow(
-            color: colors.shadows.subtle,
-            offset: const Offset(0, 2),
-            blurRadius: 4,
-          ),
-          BoxShadow(color: colors.shadows.subtle, blurRadius: 1),
-        ],
-      ),
-      child: Column(
-        children: [
-          _InfoSection(
-            title: context.l10n.onboardingThingsTimeToSyncTitle,
-            body: context.l10n.onboardingThingsTimeToSyncBody,
-            iconName: AppIcons.time,
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          const _Divider(),
-          const SizedBox(height: AppSpacing.sm),
-          _InfoSection(
-            title: context.l10n.onboardingThingsKeepPrivacyTitle,
-            body: context.l10n.onboardingThingsKeepPrivacyBody,
-            iconName: AppIcons.shieldKeyhole,
-          ),
-        ],
+      child: NeonGlassPanel(
+        fill: fill,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: _verticalPadding,
+        ),
+        child: Column(
+          children: [
+            _InfoSection(
+              title: context.l10n.onboardingThingsTimeToSyncTitle,
+              body: context.l10n.onboardingThingsTimeToSyncBody,
+              iconName: AppIcons.time,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            const _Divider(),
+            const SizedBox(height: AppSpacing.sm),
+            _InfoSection(
+              title: context.l10n.onboardingThingsKeepPrivacyTitle,
+              body: context.l10n.onboardingThingsKeepPrivacyBody,
+              iconName: AppIcons.shieldKeyhole,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -226,7 +209,7 @@ class _InfoSection extends StatelessWidget {
                   title,
                   style: AppTypography.bodyLarge.copyWith(
                     color: colors.text.accent,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeight.semiBold,
                   ),
                 ),
               ),

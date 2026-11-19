@@ -12,6 +12,7 @@ import '../../swap/domain/swap_quote.dart';
 import '../../swap/models/swap_address_formatting.dart';
 import '../../swap/models/swap_quote_text.dart';
 import '../../swap/widgets/swap_asset_icon.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
 
 /// Step 3 "Review Payment" of the desktop pay wizard — Figma 6245:108761.
 /// Paying/To card, quote-expiry divider, converted-amount card, and the
@@ -80,15 +81,10 @@ class PayReviewStep extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
+          NeonGlassPanel(
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.sm,
               vertical: AppSpacing.md,
-            ),
-            decoration: BoxDecoration(
-              color: colors.background.ground,
-              borderRadius: BorderRadius.circular(AppRadii.xLarge),
-              boxShadow: appSurfaceShadow(colors),
             ),
             child: Column(
               children: [
@@ -174,13 +170,8 @@ class PayReviewStep extends StatelessWidget {
           Opacity(
             key: const ValueKey('pay_review_converted_opacity'),
             opacity: expired ? 0.5 : 1,
-            child: Container(
+            child: NeonGlassPanel(
               padding: const EdgeInsets.all(AppSpacing.sm),
-              decoration: BoxDecoration(
-                color: colors.background.ground,
-                borderRadius: BorderRadius.circular(AppRadii.xLarge),
-                boxShadow: appSurfaceShadow(colors),
-              ),
               child: ReviewInfoRow(
                 key: const ValueKey('pay_review_converted_row'),
                 rowHeight: 76,

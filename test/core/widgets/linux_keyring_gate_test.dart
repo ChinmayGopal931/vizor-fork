@@ -41,7 +41,7 @@ void main() {
     var appBuilds = 0;
     Future<Widget> loadApp() {
       loadCalls++;
-      expect(find.text('Opening Veylor'), findsOneWidget);
+      expect(find.text('OPENING VEYLOR'), findsOneWidget);
       expect(
         SchedulerBinding.instance.schedulerPhase,
         SchedulerPhase.postFrameCallbacks,
@@ -56,7 +56,7 @@ void main() {
       const LinuxKeyringState(phase: LinuxKeyringPhase.retrying),
     );
     await tester.pump();
-    expect(find.text('Trying secure storage'), findsOneWidget);
+    expect(find.text('TRYING SECURE STORAGE'), findsOneWidget);
     await tester.pump(const Duration(minutes: 5));
     expect(loadCalls, 1);
     expect(appBuilds, 0);
@@ -96,7 +96,7 @@ void main() {
         ),
       );
       await tester.pump();
-      expect(find.text('Unable to open Veylor'), findsOneWidget);
+      expect(find.text('UNABLE TO OPEN VEYLOR'), findsOneWidget);
       expect(find.textContaining('Private native'), findsNothing);
       expect(find.text('Quit'), findsOneWidget);
       await tester.pump(const Duration(minutes: 5));
@@ -154,7 +154,7 @@ void main() {
     await tester.pump();
     expect(taps, 1);
     expect(escapeEvents, 0);
-    expect(find.text('Trying secure storage'), findsOneWidget);
+    expect(find.text('TRYING SECURE STORAGE'), findsOneWidget);
     expect(find.text('Unlock keyring'), findsNothing);
     expect(find.byType(TextField), findsNothing);
     expect(find.byType(EditableText), findsNothing);
@@ -207,7 +207,7 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pump();
     expect(router.routeInformationProvider.value.uri.path, '/details');
-    expect(find.text('Unlock your keyring'), findsOneWidget);
+    expect(find.text('UNLOCK YOUR KEYRING'), findsOneWidget);
 
     coordinator.setStateForTesting(const LinuxKeyringState());
     await tester.pump();
@@ -229,7 +229,7 @@ void main() {
       }, isRead: true);
       await tester.pumpWidget(_app(coordinator));
       await tester.pump();
-      expect(find.text('Unlock your keyring'), findsOneWidget);
+      expect(find.text('UNLOCK YOUR KEYRING'), findsOneWidget);
       await tester.pump(const Duration(minutes: 5));
       expect(calls, 1);
       await tester.tap(find.text('Retry'));
@@ -237,7 +237,7 @@ void main() {
       expect(calls, 2);
       expect(find.text('Retry'), findsNothing);
       expect(find.text('Cancel'), findsNothing);
-      expect(find.text('Trying secure storage'), findsOneWidget);
+      expect(find.text('TRYING SECURE STORAGE'), findsOneWidget);
       reply.complete('same wallet');
       await tester.pump();
       expect(await pending, 'same wallet');
@@ -305,7 +305,7 @@ void main() {
         ),
       );
       await tester.pump();
-      expect(find.text('Unable to confirm the save'), findsOneWidget);
+      expect(find.text('UNABLE TO CONFIRM THE SAVE'), findsOneWidget);
       expect(find.text('Retry'), findsNothing);
       expect(find.text('Quit'), findsOneWidget);
       expect(find.text('Cancel'), findsNothing);
@@ -338,7 +338,7 @@ void main() {
         ),
       );
       await tester.pumpWidget(_app(coordinator));
-      expect(find.text('Secure storage is unavailable'), findsOneWidget);
+      expect(find.text('SECURE STORAGE IS UNAVAILABLE'), findsOneWidget);
       expect(find.text('Retry'), findsOneWidget);
       expect(find.text('Reset wallet'), findsNothing);
       await tester.tap(find.text('Quit'));

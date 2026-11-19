@@ -27,6 +27,8 @@ import '../../../core/widgets/app_text_field.dart';
 import '../../../rust/api/wallet.dart' as rust_wallet;
 import '../shared/onboarding_flow_args.dart';
 import 'import_split_view.dart';
+import '../../../core/widgets/neon_page_title.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
 
 const _kBip39PassphraseMaxCharacters = 100;
 
@@ -707,13 +709,13 @@ class _ImportSecretTitle extends StatelessWidget {
         FittedBox(
           fit: BoxFit.scaleDown,
           alignment: Alignment.center,
-          child: Text(
+          child: NeonPageTitle(
             context.l10n.onboardingImportWalletTitle,
-            style: AppTypography.displayLarge.copyWith(color: textColor),
             maxLines: 1,
             overflow: TextOverflow.visible,
             softWrap: false,
             textAlign: TextAlign.center,
+            color: textColor,
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
@@ -1680,32 +1682,11 @@ class _MnemonicSuggestionPopoverState
     return SizedBox(
       width: _MnemonicWordCellState._suggestionWidth,
       height: popoverHeight,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: colors.background.ground,
-          borderRadius: BorderRadius.circular(AppRadii.medium),
-          border: Border.all(
-            color: colors.border.subtle,
-            strokeAlign: BorderSide.strokeAlignInside,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0x0F000000),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-            const BoxShadow(
-              color: Color(0x08000000),
-              blurRadius: 12,
-              offset: Offset(0, -6),
-            ),
-            const BoxShadow(
-              color: Color(0x14000000),
-              blurRadius: 28,
-              offset: Offset(0, 14),
-            ),
-          ],
-        ),
+      // An opaque neon glass panel over the phrase grid, its cut corners
+      // lit.
+      child: NeonGlassPanel(
+        cut: AppChamfer.medium,
+        fill: colors.background.ground,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           child: ScrollbarTheme(

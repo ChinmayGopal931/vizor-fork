@@ -1,9 +1,5 @@
 import 'package:flutter/painting.dart';
 
-import '../../layout/app_form_factor.dart';
-
-const _mobile = kAppFormFactor == AppFormFactor.mobile;
-
 /// macOS utility colors from the Desktop color-token export.
 class AppMacosUtilityColors {
   const AppMacosUtilityColors({
@@ -22,8 +18,8 @@ class AppMacosUtilityColors {
   final Color thinBorder;
   final Color innerBorder;
 
-  static const dark = _mobile ? neonDark : figmaDark;
-  static const light = _mobile ? neonLight : figmaLight;
+  static const dark = neonDark;
+  static const light = neonLight;
 
   static const figmaDark = AppMacosUtilityColors(
     window: Color(0xFF0F0F0F),

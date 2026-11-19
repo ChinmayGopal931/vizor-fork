@@ -1,9 +1,6 @@
 import 'package:flutter/painting.dart';
 
-import '../../layout/app_form_factor.dart';
 import '../primitives.dart';
-
-const _mobile = kAppFormFactor == AppFormFactor.mobile;
 
 /// Interaction-state colors from the Figma `Semantic/State` group.
 ///
@@ -45,8 +42,8 @@ class AppStateColors {
   final Color focusRingBrand;
   final Color focusRingDestructive;
 
-  static const dark = _mobile ? neonDark : figmaDark;
-  static const light = _mobile ? neonLight : figmaLight;
+  static const dark = neonDark;
+  static const light = neonLight;
 
   static const figmaDark = AppStateColors(
     hover: Primitives.p100Dark,

@@ -35,6 +35,7 @@ import '../voting_progress_presentation.dart';
 import '../voting_resume_plan.dart';
 import '../voting_routes.dart';
 import '../widgets/voting_pane_scroll_area.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 // The step enum moved next to the projections the ratchet compares it against.
 // It is re-exported so the platform progress screens keep importing it from the
@@ -981,15 +982,22 @@ class VotingStatusContent extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                awaitingLedgerApproval
-                    ? context.l10n.votingStatusTitleLedger
-                    : context.l10n.votingStatusTitleSubmitting,
-                textAlign: TextAlign.center,
-                style: AppTypography.displaySmall.copyWith(
-                  color: context.colors.text.accent,
-                ),
-              ),
+              kDesktopFormFactor
+                  ? NeonPageTitle(
+                      awaitingLedgerApproval
+                          ? context.l10n.votingStatusTitleLedger
+                          : context.l10n.votingStatusTitleSubmitting,
+                      textAlign: TextAlign.center,
+                    )
+                  : Text(
+                      awaitingLedgerApproval
+                          ? context.l10n.votingStatusTitleLedger
+                          : context.l10n.votingStatusTitleSubmitting,
+                      textAlign: TextAlign.center,
+                      style: AppTypography.displaySmall.copyWith(
+                        color: context.colors.text.accent,
+                      ),
+                    ),
               const SizedBox(height: AppSpacing.sm),
               Text(
                 awaitingLedgerApproval
@@ -1843,13 +1851,18 @@ class _SoftwareAccountRequiredContent extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              context.l10n.votingSoftwareRequiredTitle,
-              textAlign: TextAlign.center,
-              style: AppTypography.displaySmall.copyWith(
-                color: context.colors.text.accent,
-              ),
-            ),
+            kDesktopFormFactor
+                ? NeonPageTitle(
+                    context.l10n.votingSoftwareRequiredTitle,
+                    textAlign: TextAlign.center,
+                  )
+                : Text(
+                    context.l10n.votingSoftwareRequiredTitle,
+                    textAlign: TextAlign.center,
+                    style: AppTypography.displaySmall.copyWith(
+                      color: context.colors.text.accent,
+                    ),
+                  ),
             const SizedBox(height: AppSpacing.sm),
             Text(
               context.l10n.votingSoftwareRequiredBody,

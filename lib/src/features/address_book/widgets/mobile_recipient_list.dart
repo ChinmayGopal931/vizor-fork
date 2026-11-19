@@ -144,10 +144,7 @@ class MobileRecipientRow extends StatelessWidget {
                 _RecipientLine(title ?? addressText, color: colors.text.accent),
                 if (title != null) ...[
                   const SizedBox(height: AppSpacing.xxs),
-                  _RecipientLine(
-                    addressText,
-                    color: colors.text.secondary,
-                  ),
+                  _RecipientLine(addressText, color: colors.text.secondary),
                 ] else if (isShielded != null) ...[
                   const SizedBox(height: AppSpacing.xxs),
                   // Unscaled like the lines above, so the fixed-height row
@@ -247,8 +244,9 @@ class _RecipientLine extends StatelessWidget {
       child: Align(
         alignment: Alignment.centerLeft,
         child: MediaQuery(
-          data: MediaQuery.of(context)
-              .copyWith(textScaler: TextScaler.noScaling),
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.noScaling),
           child: Text(
             text,
             maxLines: 1,

@@ -127,7 +127,7 @@ class NearIntentsServiceNoticeContent extends StatelessWidget {
                   child: Text(
                     title,
                     style: AppTypography.labelLarge.copyWith(
-                      fontWeight: FontWeight.w400,
+                      fontWeight: AppSharedFontWeight.regular,
                       color: context.colors.text.accent,
                     ),
                   ),

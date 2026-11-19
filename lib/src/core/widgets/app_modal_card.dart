@@ -5,9 +5,11 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter/foundation.dart';
 
 import '../l10n/l10n.dart';
+import '../layout/app_form_factor.dart';
 import '../theme/app_theme.dart';
 import 'app_button.dart';
 import 'app_modal_shape.dart';
+import 'neon_glass_panel.dart';
 
 const kAppModalCardWidth = 312.0;
 const kAppModalButtonHeight = 36.0;
@@ -19,6 +21,9 @@ const _kAppModalActionLabelMaxWidth = 156.0;
 /// Pane modals render this card centered above an `AppPaneModalOverlay`
 /// scrim. Width defaults to the design-system modal width (312) but can be
 /// overridden for wider content such as asset pickers.
+///
+/// Desktop draws it as an opaque [NeonGlassPanel]; the few mobile flows that
+/// host it keep the rounded card.
 class AppModalCard extends StatelessWidget {
   const AppModalCard({
     required this.child,
@@ -45,20 +50,40 @@ class AppModalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final insets =
+        padding ??
+        EdgeInsets.fromLTRB(
+          AppSpacing.sm,
+          AppSpacing.md,
+          AppSpacing.sm,
+          bottomPadding,
+        );
+    if (kAppFormFactor == AppFormFactor.desktop) {
+      // Desktop draws the neon panel, opaque because it floats over the
+      // pane: two corners cut and lit, and no shadow on the black.
+      final panel = SizedBox(
+        width: width,
+        child: NeonGlassPanel(
+          fill: colors.background.base,
+          padding: insets,
+          clipBehavior: Clip.antiAlias,
+          child: child,
+        ),
+      );
+      if (!highlight) return panel;
+      return CustomPaint(
+        key: const ValueKey('app_modal_inner_highlight'),
+        foregroundPainter: _AppModalInnerHighlightPainter(Neon.wedgeBorder()),
+        child: panel,
+      );
+    }
     final ios = defaultTargetPlatform == TargetPlatform.iOS;
     final radius = BorderRadius.circular(AppRadii.large);
     final shape = appModalShape(radius);
     final card = Container(
       width: width,
       clipBehavior: Clip.antiAlias,
-      padding:
-          padding ??
-          EdgeInsets.fromLTRB(
-            AppSpacing.sm,
-            AppSpacing.md,
-            AppSpacing.sm,
-            bottomPadding,
-          ),
+      padding: insets,
       decoration: ios
           ? ShapeDecoration(
               color: colors.background.base,

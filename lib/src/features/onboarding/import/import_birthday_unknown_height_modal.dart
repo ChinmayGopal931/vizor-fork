@@ -45,7 +45,8 @@ class ImportBirthdayUnknownHeightModal extends StatelessWidget {
                   height: 32,
                   decoration: BoxDecoration(
                     color: colors.background.neutralSubtleOpacity,
-                    shape: BoxShape.circle,
+                    // Near-square, as the neon look's corners are.
+                    borderRadius: BorderRadius.circular(AppRadii.small),
                   ),
                   child: Center(
                     child: AppIcon(
@@ -61,7 +62,7 @@ class ImportBirthdayUnknownHeightModal extends StatelessWidget {
                     context.l10n.onboardingUnknownHeightTitle,
                     style: AppTypography.bodyLarge.copyWith(
                       color: colors.text.accent,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: AppFontWeight.medium,
                     ),
                   ),
                 ),

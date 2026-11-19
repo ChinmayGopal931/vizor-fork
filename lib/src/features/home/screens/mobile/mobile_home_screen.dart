@@ -66,7 +66,6 @@ import '../../../activity/swap_activity_row_mapper.dart';
 import '../../../activity/widgets/activity_feed.dart';
 import '../../../portfolio_chart/models/portfolio_chart_models.dart';
 import '../../../portfolio_chart/providers/portfolio_chart_provider.dart';
-import '../../../portfolio_chart/widgets/mobile/neon_plot.dart';
 import '../../../migration/models/mobile_ironwood_migration_status_entry.dart';
 import '../../../migration/models/mobile_ironwood_migration_attention_state.dart';
 import '../../../migration/providers/ironwood_migration_announcement_provider.dart';
@@ -88,6 +87,7 @@ import '../../providers/backup_reminder_provider.dart';
 import '../../providers/nu7_announcement_provider.dart';
 import '../../widgets/nu7_announcement.dart';
 import '../../widgets/mobile_home_carousel.dart';
+import '../../widgets/neon_balance_sign.dart';
 
 /// Mobile home tab: shielded balance card, send/receive actions, and
 /// up to ten recent activity rows — Figma `HOME` section frames
@@ -1867,7 +1867,7 @@ class _BalanceCard extends StatelessWidget {
                         key: const ValueKey('mobile_home_balance_fiat_text'),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: _neonSignCaptionStyle.copyWith(
+                        style: kNeonSignCaptionStyle.copyWith(
                           color: cardText.withValues(
                             alpha: balanceDisabled ? 0.4 : 0.75,
                           ),
@@ -1881,7 +1881,7 @@ class _BalanceCard extends StatelessWidget {
                         key: const ValueKey(
                           'mobile_home_balance_price_change_text',
                         ),
-                        style: _neonSignCaptionStyle.copyWith(
+                        style: kNeonSignCaptionStyle.copyWith(
                           color: priceChangeColor,
                         ),
                       ),
@@ -1901,14 +1901,14 @@ class _BalanceCard extends StatelessWidget {
                           key: const ValueKey('mobile_home_shielded_balance'),
                           // Hiding or showing the balance re-encrypts it.
                           text: balanceText,
-                          style: _neonBalanceAmountStyle.copyWith(
+                          style: kNeonBalanceAmountStyle.copyWith(
                             color: neon.signCore,
                             shadows: Neon.textGlow(
                               neon.signGlow,
                               intensity: lit,
                             ),
                           ),
-                          cipherStyle: _neonBalanceAmountStyle.copyWith(
+                          cipherStyle: kNeonBalanceAmountStyle.copyWith(
                             color: neon.signGlow,
                             shadows: Neon.textGlow(
                               neon.signGlow,
@@ -1917,7 +1917,7 @@ class _BalanceCard extends StatelessWidget {
                           ),
                           trailing: TextSpan(
                             text: ' $kZcashDefaultCurrencyTicker',
-                            style: _neonBalanceTickerStyle.copyWith(
+                            style: kNeonBalanceTickerStyle.copyWith(
                               color: neon.signGlow,
                               shadows: Neon.textGlow(
                                 neon.signGlow,
@@ -1937,7 +1937,7 @@ class _BalanceCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: AppSpacing.xs),
-              _NeonBalanceTrail(
+              NeonBalanceTrail(
                 chartState: chartState,
                 light: lit,
                 showOpenHint: onOpenChart != null,
@@ -1987,130 +1987,6 @@ class _BalanceCard extends StatelessWidget {
       },
     );
   }
-}
-
-const _neonSignCaptionStyle = TextStyle(
-  fontFamily: 'Gotham',
-  fontWeight: FontWeight.w300,
-  fontSize: 13,
-  height: 16 / 13,
-  letterSpacing: 0.4,
-);
-
-/// Neon numerals: Gotham Thin, whose hairline strokes read as tubes.
-const _neonBalanceAmountStyle = TextStyle(
-  fontFamily: 'Gotham',
-  fontWeight: FontWeight.w100,
-  fontSize: 60,
-  height: 1.1,
-  letterSpacing: -0.5,
-);
-
-const _neonBalanceTickerStyle = TextStyle(
-  fontFamily: 'Gotham',
-  fontWeight: FontWeight.w300,
-  fontSize: 22,
-  height: 1.1,
-  letterSpacing: 2.4,
-);
-
-/// The sign's light trail: the balance history's line when the chart has one,
-/// otherwise a steady tail-light bar. Never drawn from data in privacy mode
-/// (the chart state is private then).
-class _NeonBalanceTrail extends StatelessWidget {
-  const _NeonBalanceTrail({
-    required this.chartState,
-    required this.light,
-    required this.showOpenHint,
-  });
-
-  final PortfolioChartViewState chartState;
-  final double light;
-  final bool showOpenHint;
-
-  static const _height = 72.0;
-
-  @override
-  Widget build(BuildContext context) {
-    final neon = context.colors.neon;
-    final data = switch (chartState) {
-      PortfolioChartReady(:final data) when data.points.length > 1 => data,
-      _ => null,
-    };
-    return SizedBox(
-      height: _height,
-      child: Row(
-        children: [
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final size = Size(constraints.maxWidth, _height);
-                return CustomPaint(
-                  size: size,
-                  painter: data == null
-                      ? _TailLightPainter(
-                          glow: neon.signGlow,
-                          core: neon.signCore,
-                          light: light,
-                        )
-                      : NeonPlotPainter(
-                          geometry: PortfolioPlotGeometry(data.points, size),
-                          glow: neon.signGlow,
-                          core: neon.signCore,
-                          gridColor: neon.grid,
-                          grid: false,
-                          light: light,
-                        ),
-                );
-              },
-            ),
-          ),
-          if (showOpenHint) ...[
-            const SizedBox(width: AppSpacing.xs),
-            AppIcon(
-              AppIcons.chevronForward,
-              size: 18,
-              color: neon.signCore.withValues(alpha: 0.85),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-/// The trail without a chart line: a steady lit bar.
-class _TailLightPainter extends CustomPainter {
-  _TailLightPainter({
-    required this.glow,
-    required this.core,
-    required this.light,
-  });
-
-  final Color glow;
-  final Color core;
-  final double light;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final y = size.height / 2;
-    Neon.strokeTube(
-      canvas,
-      Path()
-        ..moveTo(4, y)
-        ..lineTo(size.width - 4, y),
-      glow: glow,
-      core: core,
-      width: 2,
-      intensity: light,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_TailLightPainter oldDelegate) =>
-      oldDelegate.glow != glow ||
-      oldDelegate.core != core ||
-      oldDelegate.light != light;
 }
 
 // Bare amount: the banner appends its own ` ZEC`.

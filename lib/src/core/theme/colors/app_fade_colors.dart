@@ -1,9 +1,6 @@
 import 'package:flutter/painting.dart';
 
-import '../../layout/app_form_factor.dart';
 import '../primitives.dart';
-
-const _mobile = kAppFormFactor == AppFormFactor.mobile;
 
 /// Fade / scrim tokens retained from the OLDSemantic fade group.
 ///
@@ -17,8 +14,8 @@ class AppFadeColors {
 
   final Color illustration;
 
-  static const dark = _mobile ? neonDark : figmaDark;
-  static const light = _mobile ? neonLight : figmaLight;
+  static const dark = neonDark;
+  static const light = neonLight;
 
   static const figmaDark = AppFadeColors(
     illustration: Primitives.p0Alpha50Dark,

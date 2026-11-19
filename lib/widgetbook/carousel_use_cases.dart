@@ -6,9 +6,6 @@ import '../src/core/theme/app_theme.dart';
 import '../src/core/widgets/app_carousel.dart';
 import '../src/core/widgets/app_icon.dart';
 
-const _historyTile = Color(0xFF9667E2);
-const _walletTile = Color(0xFF00A460);
-const _helmetTile = Color(0xFFB90A4A);
 const _helmetAsset =
     'assets/illustrations/desktop/ironwood_migration_expect_running.webp';
 
@@ -17,7 +14,6 @@ const _preparationItems = [
     message:
         'Once preparation finishes, your migration will begin automatically '
         'after a long intentional delay.',
-    tileColor: _historyTile,
     icon: AppIcons.history,
     iconSize: 18,
   ),
@@ -25,14 +21,12 @@ const _preparationItems = [
     message:
         'We’re organizing your balance into common-sized parts. This makes '
         'your migration harder to link.',
-    tileColor: _walletTile,
     icon: AppIcons.wallet,
   ),
   AppCarouselItem.icon(
     message:
         'We may have to do multiple rounds of note splitting depending on '
         'your balance.',
-    tileColor: _helmetTile,
     icon: AppIcons.migrationSplit,
   ),
 ];
@@ -42,14 +36,12 @@ const _migrationItems = [
     message:
         'You can close Veylor anytime. Migration will pause, and you can '
         'resume it when you return.',
-    tileColor: _historyTile,
     icon: AppIcons.pause,
   ),
   AppCarouselItem.icon(
     message:
         'Each Zcash block takes about 75 seconds to create, but timing can '
         'vary with network conditions.',
-    tileColor: _walletTile,
     icon: AppIcons.migrationTimer,
     iconSize: 24,
   ),
@@ -57,7 +49,6 @@ const _migrationItems = [
     message:
         'Keep Veylor running and the migration will automatically run in the '
         'background.',
-    tileColor: _helmetTile,
     imageAsset: _helmetAsset,
   ),
 ];

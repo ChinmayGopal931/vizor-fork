@@ -1,12 +1,16 @@
-import 'dart:math' as math;
-
 import 'package:flutter/widgets.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
 
 const onboardingAuthBackgroundAsset =
     'assets/illustrations/onboarding_auth_background.webp';
 
+/// The full-window frame of the desktop auth screens (unlock, the lock over a
+/// migration, the Gift Card claim): [card] on the window's black.
+///
+/// Upstream paints [onboardingAuthBackgroundAsset] behind the card; Veylor's
+/// neon look paints no backgrounds.
 class OnboardingAuthShell extends StatelessWidget {
   const OnboardingAuthShell({super.key, required this.card});
 
@@ -27,7 +31,6 @@ class OnboardingAuthShell extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
-          const Positioned.fill(child: _AuthBackgroundIllustration()),
           Positioned.fill(
             top: _contentTopInset,
             child: Center(child: card),
@@ -38,6 +41,7 @@ class OnboardingAuthShell extends StatelessWidget {
   }
 }
 
+/// The auth screens' card: a neon glass panel, two corners cut and lit.
 class OnboardingAuthCard extends StatelessWidget {
   const OnboardingAuthCard({
     super.key,
@@ -50,76 +54,26 @@ class OnboardingAuthCard extends StatelessWidget {
 
   final double width;
   final double height;
+
+  /// Ignored: the glass panel's corners are cut, not rounded.
   final double borderRadius;
   final EdgeInsetsGeometry padding;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
     // [height] is a minimum so a longer translation grows the card instead
     // of overflowing it.
-    return Container(
+    return SizedBox(
       width: width,
-      constraints: BoxConstraints(minHeight: height),
-      padding: padding,
-      decoration: BoxDecoration(
-        color: colors.background.ground,
-        borderRadius: BorderRadius.circular(borderRadius),
-        boxShadow: [
-          BoxShadow(color: colors.shadows.subtle, blurRadius: 1),
-          BoxShadow(
-            color: colors.shadows.subtle,
-            offset: const Offset(0, 1),
-            blurRadius: 2,
-          ),
-          BoxShadow(
-            color: colors.shadows.subtle,
-            offset: const Offset(0, 2),
-            blurRadius: 4,
-          ),
-          BoxShadow(color: colors.shadows.subtle, blurRadius: 1),
-        ],
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: height),
+        child: NeonGlassPanel(
+          cut: AppChamfer.xLarge,
+          padding: padding,
+          child: child,
+        ),
       ),
-      child: child,
-    );
-  }
-}
-
-class _AuthBackgroundIllustration extends StatelessWidget {
-  const _AuthBackgroundIllustration();
-
-  static const double _baselineWindowWidth = 1080;
-  static const double _baselineWindowHeight = 720;
-  static const double _left = -264;
-  static const double _top = 0;
-  static const double _width = 1344;
-  static const double _height = 720;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final scale = math.max(
-          constraints.maxWidth / _baselineWindowWidth,
-          constraints.maxHeight / _baselineWindowHeight,
-        );
-        return Stack(
-          clipBehavior: Clip.hardEdge,
-          children: [
-            Positioned(
-              left: _left * scale,
-              top: _top * scale,
-              width: _width * scale,
-              height: _height * scale,
-              child: Image.asset(
-                onboardingAuthBackgroundAsset,
-                fit: BoxFit.fill,
-              ),
-            ),
-          ],
-        );
-      },
     );
   }
 }

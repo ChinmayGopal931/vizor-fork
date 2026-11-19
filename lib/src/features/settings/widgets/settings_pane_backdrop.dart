@@ -9,46 +9,17 @@ enum SettingsBackdropArt {
   final String assetPath;
 }
 
-/// Etched illustration behind settings sub-screens, in both light and
-/// dark mode.
+/// The full-window backdrop behind settings sub-screens.
 ///
-/// Spans the full window width at the design's 1080x520 aspect,
-/// top-anchored, washed to 15% alpha and fading out toward its
-/// bottom edge. The PNGs are RGBA with a transparent background, so the
-/// same artwork and wash render correctly over either theme. Mount it as
-/// the `background` of an `AppDesktopBackdropShell` (or any full-window
-/// Stack) so it bleeds behind the glass sidebar and the window margins
-/// like the design.
+/// Upstream etches [art] there. Veylor's neon look paints no backgrounds, so
+/// it draws nothing and the window's black shows behind the glass sidebar
+/// and the pane. Mount it as the `background` of an `AppDesktopBackdropShell`
+/// (or any full-window Stack), as upstream does.
 class SettingsPaneBackdrop extends StatelessWidget {
   const SettingsPaneBackdrop({required this.art, super.key});
 
   final SettingsBackdropArt art;
 
-  static const _imageAspectRatio = 1080 / 520;
-
-  // Alpha mask: constant 15% until y=143 of the 520-tall artwork, then
-  // linear fade to fully transparent at its bottom edge.
-  static const _fadeStartStop = 143 / 520;
-
   @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: AspectRatio(
-          aspectRatio: _imageAspectRatio,
-          child: ShaderMask(
-            shaderCallback: (rect) => const LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0x26FFFFFF), Color(0x26FFFFFF), Color(0x00FFFFFF)],
-              stops: [0, _fadeStartStop, 1],
-            ).createShader(rect),
-            blendMode: BlendMode.dstIn,
-            child: Image.asset(art.assetPath, fit: BoxFit.fill),
-          ),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => const SizedBox.shrink();
 }

@@ -18,6 +18,7 @@ import '../../../rust/api/wallet.dart' as rust_wallet;
 import 'onboarding_split_view.dart';
 import '../shared/onboarding_chrome.dart';
 import '../shared/onboarding_flow_args.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 class SecretPassphraseScreen extends ConsumerStatefulWidget {
   const SecretPassphraseScreen({
@@ -344,11 +345,8 @@ class _TitleBlock extends StatelessWidget {
         FittedBox(
           fit: BoxFit.scaleDown,
           alignment: Alignment.center,
-          child: Text(
+          child: NeonPageTitle(
             context.l10n.secretPassphraseTitle,
-            style: AppTypography.displayLarge.copyWith(
-              color: colors.text.accent,
-            ),
             textAlign: TextAlign.center,
           ),
         ),
@@ -562,7 +560,7 @@ class _SeedGrid extends StatelessWidget {
                 context.l10n.secretPassphraseTitle,
                 style: AppTypography.bodyLarge.copyWith(
                   color: textColor,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppFontWeight.semiBold,
                 ),
               ),
             ),

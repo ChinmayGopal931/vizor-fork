@@ -126,7 +126,7 @@ void main() {
       ),
       description: 'migration options for the remainder',
     );
-    expect(find.text('How to move the rest'), findsOneWidget);
+    expect(find.text('HOW TO MOVE THE REST'), findsOneWidget);
     await tapAppWidget(
       tester,
       const ValueKey('ironwood_migration_private_option'),

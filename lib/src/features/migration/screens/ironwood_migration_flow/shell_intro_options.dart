@@ -411,12 +411,9 @@ class _IronwoodMigrationHowItWorksContentState
             left: 152,
             top: 78,
             width: 396,
-            child: Text(
+            child: NeonPageTitle(
               context.l10n.migrationHowTitle,
               textAlign: TextAlign.center,
-              style: AppTypography.headlineLarge.copyWith(
-                color: colors.text.accent,
-              ),
             ),
           ),
           Positioned(
@@ -808,54 +805,27 @@ class _IronwoodMigrationHowStepIllustration extends StatelessWidget {
 
   final int index;
 
+  /// Each step's mark, drawn as a lit glyph badge in place of upstream's
+  /// painted art.
+  static const _icons = [
+    AppIcons.migrationSplit,
+    AppIcons.shieldKeyhole,
+    AppIcons.migrationTimer,
+  ];
+
   @override
   Widget build(BuildContext context) {
-    final geometry = switch (index) {
-      0 => (
-        containerLeft: 226.0,
-        containerWidth: 170.0,
-        imageLeft: -11.764,
-        imageTop: 8.672,
-        imageWidth: 199.529,
-        imageHeight: 131.728,
-      ),
-      1 => (
-        containerLeft: 226.0,
-        containerWidth: 170.0,
-        imageLeft: -42.007,
-        imageTop: -4.8,
-        imageWidth: 254.507,
-        imageHeight: 169.664,
-      ),
-      _ => (
-        containerLeft: 174.0,
-        containerWidth: 160.0,
-        imageLeft: -51.92,
-        imageTop: 0.0,
-        imageWidth: 264.24,
-        imageHeight: 174.0,
-      ),
-    };
-
+    final containerLeft = index < 2 ? 226.0 : 174.0;
+    final containerWidth = index < 2 ? 170.0 : 160.0;
     return Positioned(
-      left: geometry.containerLeft,
+      left: containerLeft,
       top: 0,
-      width: geometry.containerWidth,
+      width: containerWidth,
       height: 160,
-      child: ClipRect(
-        child: Stack(
-          children: [
-            Positioned(
-              left: geometry.imageLeft,
-              top: geometry.imageTop,
-              width: geometry.imageWidth,
-              height: geometry.imageHeight,
-              child: Image.asset(
-                _ironwoodMigrationHowStepAssets[index],
-                fit: BoxFit.fill,
-              ),
-            ),
-          ],
+      child: Center(
+        child: NeonGlyphBadge(
+          iconName: _icons[index.clamp(0, _icons.length - 1)],
+          size: 88,
         ),
       ),
     );
@@ -892,12 +862,9 @@ class _IronwoodMigrationWhatToExpectContent extends StatelessWidget {
             left: 12,
             top: 60,
             width: 396,
-            child: Text(
+            child: NeonPageTitle(
               context.l10n.migrationExpectTitle,
               textAlign: TextAlign.center,
-              style: AppTypography.headlineLarge.copyWith(
-                color: colors.text.accent,
-              ),
             ),
           ),
           Positioned(
@@ -911,10 +878,7 @@ class _IronwoodMigrationWhatToExpectContent extends StatelessWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _MigrationExpectationIllustration(
-                        index: index,
-                        asset: _ironwoodMigrationExpectationAssets[index],
-                      ),
+                      _MigrationExpectationIllustration(index: index),
                       const SizedBox(width: 16),
                       SizedBox(
                         width: 320,
@@ -967,73 +931,27 @@ class _IronwoodMigrationWhatToExpectContent extends StatelessWidget {
 }
 
 class _MigrationExpectationIllustration extends StatelessWidget {
-  const _MigrationExpectationIllustration({
-    required this.index,
-    required this.asset,
-  });
+  const _MigrationExpectationIllustration({required this.index});
 
   final int index;
-  final String asset;
+
+  /// Each expectation's mark, as a lit glyph badge in place of upstream's
+  /// painted tile.
+  static const _icons = [
+    AppIcons.migrationTimer,
+    AppIcons.wallet,
+    AppIcons.incognito,
+    AppIcons.play,
+  ];
 
   @override
   Widget build(BuildContext context) {
-    final background = switch (index) {
-      0 => const Color(0xFF9667E2),
-      1 => const Color(0xFFDBB013),
-      2 => const Color(0xFF00A460),
-      _ => const Color(0xFFB90A4A),
-    };
-    final viewportTop = switch (index) {
-      1 || 2 => -6.0,
-      _ => 0.0,
-    };
-    final viewportHeight = index == 3 ? 48.0 : 54.0;
-    final imageRect = switch (index) {
-      0 => const Rect.fromLTWH(-27.12, -8.70, 102.39, 68.70),
-      1 => const Rect.fromLTWH(-9.75, -5.43, 69.19, 69.13),
-      2 => const Rect.fromLTWH(-18.11, -6.50, 84, 84),
-      _ => const Rect.fromLTWH(0, 0, 48, 48),
-    };
-    final image = Stack(
-      children: [
-        Positioned.fromRect(
-          rect: imageRect,
-          child: Image.asset(asset, fit: BoxFit.fill),
-        ),
-      ],
-    );
-    final clippedImage = index == 0
-        ? ClipRect(child: image)
-        : ClipRRect(
-            borderRadius: BorderRadius.circular(AppRadii.small),
-            child: image,
-          );
-
     return SizedBox.square(
       key: ValueKey('ironwood_migration_expectation_tile_$index'),
       dimension: 48,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: background,
-                borderRadius: BorderRadius.circular(AppRadii.small),
-              ),
-            ),
-          ),
-          Positioned(
-            left: 0,
-            top: viewportTop,
-            width: 48,
-            height: viewportHeight,
-            child: SizedBox(
-              key: ValueKey('ironwood_migration_expectation_viewport_$index'),
-              child: clippedImage,
-            ),
-          ),
-        ],
+      child: NeonGlyphBadge(
+        iconName: _icons[index.clamp(0, _icons.length - 1)],
+        size: 48,
       ),
     );
   }
@@ -1092,14 +1010,11 @@ class _IronwoodMigrationOptionsContentState
             width: 322,
             child: Column(
               children: [
-                Text(
+                NeonPageTitle(
                   widget.movingRest
                       ? context.l10n.migrationOptionsTitleMoveRest
                       : context.l10n.migrationOptionsTitle,
                   textAlign: TextAlign.center,
-                  style: AppTypography.headlineLarge.copyWith(
-                    color: colors.text.accent,
-                  ),
                 ),
                 const SizedBox(height: 16),
                 SizedBox(

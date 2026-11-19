@@ -23,11 +23,17 @@ class NeonScrambleText extends StatefulWidget {
     this.overflow,
     this.duration = const Duration(milliseconds: 650),
     this.decryptOnAppear = false,
+    this.textKey,
     super.key,
   });
 
   /// Also decrypt in when first shown, not only when [text] changes.
   final bool decryptOnAppear;
+
+  /// Keys the drawn text. Settled and without [trailing], it is then a plain
+  /// `Text` of [text], so a reader of that key gets the value whole (desktop
+  /// Home's balance, which its end-to-end tests read). Null keys nothing.
+  final Key? textKey;
 
   final String text;
   final TextStyle style;
@@ -84,6 +90,7 @@ class _NeonScrambleTextState extends State<NeonScrambleText>
 
   Widget _line(List<InlineSpan> spans, {String? semanticsLabel}) => Text.rich(
     TextSpan(children: [...spans, ?widget.trailing]),
+    key: widget.textKey,
     semanticsLabel: semanticsLabel,
     maxLines: 1,
     overflow: widget.overflow,
@@ -92,6 +99,16 @@ class _NeonScrambleTextState extends State<NeonScrambleText>
   @override
   Widget build(BuildContext context) {
     final t = _controller.value;
+    if (t >= 1 && widget.textKey != null && widget.trailing == null) {
+      return Text(
+        widget.text,
+        key: widget.textKey,
+        style: widget.style,
+        semanticsLabel: widget.semanticsLabel,
+        maxLines: 1,
+        overflow: widget.overflow,
+      );
+    }
     if (t >= 1) {
       return _line([
         TextSpan(text: widget.text, style: widget.style),

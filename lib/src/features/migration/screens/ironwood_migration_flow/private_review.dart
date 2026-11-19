@@ -599,7 +599,7 @@ class _MigrationAnalyzingShimmerText extends StatelessWidget {
         textAlign: TextAlign.center,
         style: AppTypography.labelLarge.copyWith(
           color: const Color(0xFFFFFFFF),
-          fontWeight: FontWeight.w600,
+          fontWeight: AppFontWeight.semiBold,
         ),
       ),
     );
@@ -714,24 +714,11 @@ class _MigrationReviewContent extends StatelessWidget {
               key: const ValueKey('ironwood_migration_keep_running_content'),
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                DecoratedBox(
-                  key: const ValueKey(
-                    'ironwood_migration_keep_running_icon_tile',
-                  ),
-                  decoration: BoxDecoration(
-                    color: _migrationCarouselCrimson,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: SizedBox.square(
-                      dimension: 48,
-                      child: Image.asset(
-                        _ironwoodMigrationExpectationRunningAsset,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                  ),
+                // A lit glyph badge in place of upstream's painted tile.
+                const NeonGlyphBadge(
+                  key: ValueKey('ironwood_migration_keep_running_icon_tile'),
+                  iconName: AppIcons.play,
+                  size: 48,
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -742,7 +729,7 @@ class _MigrationReviewContent extends StatelessWidget {
                         context.l10n.migrationReviewKeepRunningTitle,
                         style: AppTypography.bodyMedium.copyWith(
                           color: colors.text.accent,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: AppFontWeight.medium,
                         ),
                       ),
                       const SizedBox(height: 4),

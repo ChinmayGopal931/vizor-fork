@@ -8,16 +8,18 @@ import '../l10n/l10n.dart';
 import '../layout/app_form_factor.dart';
 import '../theme/app_theme.dart';
 import 'app_icon.dart';
+import 'mobile/neon_glyph_badge.dart';
+import 'neon_glass_panel.dart';
 
 /// A single informational card rendered by [AppCarousel].
 ///
 /// The two constructors keep decorative vector and raster treatments explicit
 /// while the carousel owns their shared surface, typography, and geometry.
+/// Both sit on the same lit cut-corner plate.
 @immutable
 class AppCarouselItem {
   const AppCarouselItem.icon({
     required this.message,
-    required this.tileColor,
     required this.icon,
     this.iconSize = 20,
     this.onTap,
@@ -25,7 +27,6 @@ class AppCarouselItem {
 
   const AppCarouselItem.image({
     required this.message,
-    required this.tileColor,
     required this.imageAsset,
     this.onTap,
   }) : icon = null,
@@ -33,7 +34,6 @@ class AppCarouselItem {
 
   final VoidCallback? onTap;
   final String message;
-  final Color tileColor;
   final String? icon;
   final double iconSize;
   final String? imageAsset;
@@ -89,9 +89,7 @@ class _AppCarouselState extends State<AppCarousel> with WidgetsBindingObserver {
   static const _activeIndicatorWidth = 40.0;
   static const _inactiveIndicatorWidth = 20.0;
   static const _indicatorDuration = Duration(milliseconds: 240);
-  static const _iconTileRadius = 8.875;
-  static const _iconColor = Color(0xFFF7F7F7);
-  static const _inactiveIndicatorColor = Color(0xFF393E3E);
+  static const _iconTileSize = 32.0;
   static const _loopSeedMultiplier = 1000;
 
   late PageController _pageController;
@@ -416,13 +414,21 @@ class _AppCarouselState extends State<AppCarousel> with WidgetsBindingObserver {
                                   ? _activeIndicatorWidth
                                   : _inactiveIndicatorWidth,
                               height: _indicatorHeight,
+                              // The page indicator's slabs: the current one
+                              // lit red, the rest unlit.
                               decoration: BoxDecoration(
                                 color: index == _activeLogicalPage
-                                    ? colors.icon.accent
-                                    : _inactiveIndicatorColor,
+                                    ? colors.neon.glow
+                                    : colors.border.regular,
                                 borderRadius: BorderRadius.circular(
                                   AppRadii.full,
                                 ),
+                                boxShadow: index == _activeLogicalPage
+                                    ? Neon.boxGlow(
+                                        colors.neon.glow,
+                                        intensity: 0.4,
+                                      )
+                                    : null,
                               ),
                             ),
                           ),
@@ -459,6 +465,12 @@ class _AppCarouselCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
+    const tile = _AppCarouselState._iconTileSize;
+    final plateShape = Neon.chamferBorder(
+      cut: tile * NeonGlyphBadge.cutScale,
+      side: BorderSide(color: colors.neon.glow.withValues(alpha: 0.55)),
+    );
     return MouseRegion(
       cursor: item.onTap == null ? MouseCursor.defer : SystemMouseCursors.click,
       child: GestureDetector(
@@ -466,55 +478,50 @@ class _AppCarouselCard extends StatelessWidget {
         child: SizedBox(
           width: _AppCarouselState._cardWidth,
           height: _AppCarouselState._cardHeight,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(AppRadii.large),
-            child: ColoredBox(
-              color: context.colors.background.ground,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-                child: Row(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(
-                        _AppCarouselState._iconTileRadius,
-                      ),
-                      child: ColoredBox(
-                        color: item.tileColor,
-                        child: SizedBox.square(
-                          dimension: 32,
-                          child: ExcludeSemantics(
-                            child: item.imageAsset != null
-                                ? Image.asset(
-                                    item.imageAsset!,
-                                    width: 32,
-                                    height: 32,
-                                    fit: BoxFit.cover,
-                                  )
-                                : Center(
-                                    child: AppIcon(
-                                      item.icon!,
-                                      size: item.iconSize,
-                                      color: _AppCarouselState._iconColor,
-                                    ),
-                                  ),
+          // A neon glass panel; the mark sits on a lit cut-corner plate, as
+          // a NeonGlyphBadge's does.
+          child: NeonGlassPanel(
+            cut: AppChamfer.large,
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+            child: Row(
+              children: [
+                Container(
+                  width: tile,
+                  height: tile,
+                  alignment: Alignment.center,
+                  clipBehavior: Clip.antiAlias,
+                  decoration: ShapeDecoration(
+                    color: colors.neon.glow.withValues(alpha: 0.07),
+                    shape: plateShape,
+                    shadows: Neon.boxGlow(colors.neon.glow, intensity: 0.35),
+                  ),
+                  child: ExcludeSemantics(
+                    child: item.imageAsset != null
+                        ? Image.asset(
+                            item.imageAsset!,
+                            width: tile,
+                            height: tile,
+                            fit: BoxFit.cover,
+                          )
+                        : AppIcon(
+                            item.icon!,
+                            size: item.iconSize,
+                            color: colors.neon.core,
                           ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.xs),
-                    Expanded(
-                      child: Text(
-                        item.message,
-                        maxLines: 2,
-                        overflow: TextOverflow.clip,
-                        style: AppTypography.bodyMedium.copyWith(
-                          color: context.colors.text.accent,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    item.message,
+                    maxLines: 2,
+                    overflow: TextOverflow.clip,
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: colors.text.accent,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),

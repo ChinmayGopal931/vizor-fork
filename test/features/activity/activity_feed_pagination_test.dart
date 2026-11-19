@@ -71,8 +71,8 @@ void main() {
     expect(find.byType(ActivitySkeletonRow), findsNothing);
     final header = find
         .ancestor(
-          of: find.text('This week'),
-          matching: find.byType(DecoratedBox),
+          of: find.text('THIS WEEK'),
+          matching: find.byType(CustomPaint),
         )
         .first;
     expect(

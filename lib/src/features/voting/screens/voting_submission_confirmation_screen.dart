@@ -27,6 +27,8 @@ import '../voting_formatters.dart';
 import '../voting_message.dart';
 import '../voting_resume_plan.dart';
 import '../widgets/voting_pane_scroll_area.dart';
+import '../../../core/widgets/neon_page_title.dart';
+import '../../../core/layout/app_form_factor.dart';
 
 typedef VotingConfirmationContentWrapper =
     Widget Function(BuildContext context, Widget content);
@@ -600,12 +602,14 @@ class _ConfirmationScaffold extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: AppSpacing.sm),
-                        Text(
-                          title,
-                          style: AppTypography.headlineMedium.copyWith(
-                            color: colors.text.accent,
-                          ),
-                        ),
+                        kDesktopFormFactor
+                            ? NeonPageTitle(title)
+                            : Text(
+                                title,
+                                style: AppTypography.headlineMedium.copyWith(
+                                  color: colors.text.accent,
+                                ),
+                              ),
                         const SizedBox(height: AppSpacing.xxs),
                         Text(
                           message,

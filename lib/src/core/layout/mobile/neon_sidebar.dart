@@ -16,11 +16,27 @@ class NeonSidebarGlyph extends StatelessWidget {
   const NeonSidebarGlyph({
     required this.item,
     required this.selected,
+    this.glyph,
+    this.dimension = size,
+    this.wasSelected,
     super.key,
   });
 
   final AppMobileTabItem item;
   final bool selected;
+
+  /// The glyph to draw; null draws [item]'s ([AppMobileTabItem.glyph]). The
+  /// desktop sidebar names glyphs for destinations the tab bar does not have.
+  final TronGlyphKind? glyph;
+
+  /// The glyph's square; its pool of light scales with it.
+  final double dimension;
+
+  /// Whether the row was lit when this glyph first showed. Desktop builds a
+  /// new sidebar on every page, so it passes the last page's light here and
+  /// the light crossfades from the row that had it. Null starts as
+  /// [selected].
+  final bool? wasSelected;
 
   static const size = 24.0;
   static const _poolSize = 56.0;
@@ -30,22 +46,29 @@ class NeonSidebarGlyph extends StatelessWidget {
     final colors = context.colors;
     final light = colors.navPanel.activeIcon;
     final motion = !(MediaQuery.maybeDisableAnimationsOf(context) ?? false);
+    final poolSize = _poolSize * dimension / size;
     return TweenAnimationBuilder<double>(
-      tween: Tween(end: selected ? 1 : 0),
+      tween: Tween(
+        begin: switch (wasSelected) {
+          null => null,
+          final lit => lit ? 1.0 : 0.0,
+        },
+        end: selected ? 1 : 0,
+      ),
       duration: motion ? AppMobileTabBar.selectDuration : Duration.zero,
       builder: (context, lit, _) {
         final color = Color.lerp(colors.icon.muted, light, lit)!;
-        final glyph = item.glyph;
+        final glyph = this.glyph ?? item.glyph;
         return SizedBox.square(
-          dimension: size,
+          dimension: dimension,
           child: Stack(
             clipBehavior: Clip.none,
             children: [
               Positioned(
-                left: (size - _poolSize) / 2,
-                top: (size - _poolSize) / 2,
-                width: _poolSize,
-                height: _poolSize,
+                left: (dimension - poolSize) / 2,
+                top: (dimension - poolSize) / 2,
+                width: poolSize,
+                height: poolSize,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: RadialGradient(
@@ -58,14 +81,14 @@ class NeonSidebarGlyph extends StatelessWidget {
                 ),
               ),
               if (glyph == null)
-                AppIcon(item.iconName, size: size, color: color)
+                AppIcon(item.iconName, size: dimension, color: color)
               else
                 TronGlyph(
                   glyph,
                   color: color,
                   core: colors.neon.core,
                   lit: lit,
-                  size: size,
+                  size: dimension,
                 ),
             ],
           ),
@@ -81,9 +104,13 @@ class NeonSidebarGlyph extends StatelessWidget {
 ///
 /// The line breathes while it climbs, and holds still under reduced motion.
 class NeonSidebarSyncReadout extends StatefulWidget {
-  const NeonSidebarSyncReadout({required this.line, super.key});
+  const NeonSidebarSyncReadout({required this.line, this.textKey, super.key});
 
   final NeonSyncLine line;
+
+  /// Keys the readout's text; the desktop sidebar keeps the key its sync
+  /// status had, which its end-to-end tests read.
+  final Key? textKey;
 
   @override
   State<NeonSidebarSyncReadout> createState() => _NeonSidebarSyncReadoutState();
@@ -156,6 +183,7 @@ class _NeonSidebarSyncReadoutState extends State<NeonSidebarSyncReadout>
           Expanded(
             child: Text(
               line.readout.toUpperCase(),
+              key: widget.textKey,
               style: kNeonHudCaptionStyle.copyWith(
                 color: neon.glow,
                 shadows: Neon.textGlow(neon.glow, intensity: 0.35),

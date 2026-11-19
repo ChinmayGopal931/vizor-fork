@@ -8,6 +8,7 @@ import '../../../core/widgets/review_list_row.dart';
 import '../../../core/widgets/review_wrap_card.dart';
 import '../../send/widgets/send_review_layout.dart';
 import '../../../core/l10n/l10n.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 /// Display status of a transparent-balance shielding transaction.
 enum ShieldedReceiptStatus { inProgress, completed, failed }
@@ -84,14 +85,7 @@ class ShieldedReceiptView extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          title,
-          textAlign: TextAlign.center,
-          style: AppTypography.bodyLarge.copyWith(
-            color: colors.text.accent,
-            fontWeight: AppFontWeight.semiBold,
-          ),
-        ),
+        NeonPageTitle(title, textAlign: TextAlign.center),
         const SizedBox(height: AppSpacing.base),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),

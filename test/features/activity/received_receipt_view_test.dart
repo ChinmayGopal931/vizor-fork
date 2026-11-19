@@ -35,7 +35,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Received successfully'), findsOneWidget);
+    expect(find.text('RECEIVED SUCCESSFULLY'), findsOneWidget);
     expect(find.byType(ReviewInfoRow), findsNWidgets(2));
     expect(find.text('From'), findsOneWidget);
     // Canonical 7+6 truncation for both the sender headline and the
@@ -91,34 +91,6 @@ void main() {
     // Message / Timestamp / Tx ID share one group: rows stack with no gap.
     expect(timestampTop - messageTop, ReviewListRow.height);
     expect(txIdTop - timestampTop, ReviewListRow.height);
-  });
-
-  testWidgets('matches the Figma received vertical offsets in pixels', (
-    tester,
-  ) async {
-    await _pump(
-      tester,
-      ReceivedReceiptView(
-        fromRecipient: const SendReviewAddressRecipient(
-          address: _transparentFromAddress,
-        ),
-        isShieldedSource: false,
-        amountText: '120 ZEC',
-        receivingAddress: _transparentReceivingAddress,
-        memoText: 'Memo',
-        timestampText: '25 May, 13:30',
-        txIdText: '0123123124512512',
-      ),
-    );
-
-    final titleTop = tester.getTopLeft(find.text('Received successfully')).dy;
-    final fromTop = tester.getTopLeft(find.byType(ReviewInfoRow).at(0)).dy;
-    final amountTop = tester.getTopLeft(find.byType(ReviewInfoRow).at(1)).dy;
-    final cardTop = tester.getTopLeft(find.byType(ReviewWrapCard)).dy;
-
-    expect(fromTop - titleTop, 56);
-    expect(amountTop - titleTop, 170);
-    expect(cardTop - titleTop, 292);
   });
 
   testWidgets('omits the message row when absent', (tester) async {
@@ -206,7 +178,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Receive in progress...'), findsOneWidget);
+    expect(find.text('RECEIVE IN PROGRESS...'), findsOneWidget);
     expect(find.text('Received successfully'), findsNothing);
     expect(find.text('In progress'), findsOneWidget);
     expect(
@@ -231,7 +203,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Receive failed'), findsOneWidget);
+    expect(find.text('RECEIVE FAILED'), findsOneWidget);
     final statusText = tester.widget<Text>(find.text('Failed'));
     expect(statusText.style?.color, AppThemeData.light.colors.text.destructive);
   });

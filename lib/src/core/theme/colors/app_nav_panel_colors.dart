@@ -1,9 +1,6 @@
 import 'package:flutter/painting.dart';
 
-import '../../layout/app_form_factor.dart';
 import '../primitives.dart';
-
-const _mobile = kAppFormFactor == AppFormFactor.mobile;
 
 /// Navigation-panel colors from the Figma `Semantic/Nav Panel` tokens.
 ///
@@ -33,8 +30,8 @@ class AppNavPanelColors {
   final Color tabBarActiveBg;
   final Color tabBarActiveIcon;
 
-  static const dark = _mobile ? neonDark : figmaDark;
-  static const light = _mobile ? neonLight : figmaLight;
+  static const dark = neonDark;
+  static const light = neonLight;
 
   static const figmaDark = AppNavPanelColors(
     badgeBg: CrimsonPrimitives.p300Dark,

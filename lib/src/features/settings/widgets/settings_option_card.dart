@@ -4,6 +4,7 @@ import '../../../core/l10n/locale_typography.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/mobile/mobile_radio_card.dart';
+import '../../../core/widgets/neon_option_panel.dart';
 
 /// Applies [labelLocale]'s glyphs to a label written in another language,
 /// such as a language's own name in a picker.
@@ -39,27 +40,13 @@ class SettingsOptionCard extends StatelessWidget {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        child: Container(
-          height: 40,
+        child: NeonOptionPanel(
+          selected: selected,
+          constraints: const BoxConstraints.tightFor(height: 40),
           padding: EdgeInsets.only(
             left: iconName == null ? AppSpacing.s : AppSpacing.xs,
             right: AppSpacing.s,
           ),
-          decoration: BoxDecoration(
-            color: colors.background.ground,
-            borderRadius: BorderRadius.circular(AppRadii.medium),
-            boxShadow: appSurfaceShadow(colors),
-          ),
-          foregroundDecoration: selected
-              ? BoxDecoration(
-                  borderRadius: BorderRadius.circular(AppRadii.medium),
-                  border: Border.all(
-                    color: colors.border.strong,
-                    width: 2,
-                    strokeAlign: BorderSide.strokeAlignInside,
-                  ),
-                )
-              : null,
           child: Row(
             children: [
               if (iconName != null) ...[
@@ -86,7 +73,9 @@ class SettingsOptionCard extends StatelessWidget {
                   style: _labelStyle(
                     AppTypography.labelMedium.copyWith(
                       color: colors.text.accent,
-                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                      fontWeight: selected
+                          ? AppFontWeight.semiBold
+                          : AppFontWeight.medium,
                     ),
                     labelLocale,
                   ),
@@ -108,26 +97,7 @@ class _SettingsOptionIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
-    return Container(
-      width: 16,
-      height: 16,
-      decoration: BoxDecoration(
-        color: selected
-            ? colors.background.inverse
-            : colors.background.neutralSubtleOpacity,
-        shape: BoxShape.circle,
-      ),
-      child: selected
-          ? Center(
-              child: AppIcon(
-                AppIcons.check,
-                size: 12,
-                color: colors.background.ground,
-              ),
-            )
-          : null,
-    );
+    return NeonOptionCheck(selected: selected);
   }
 }
 

@@ -9,8 +9,8 @@
 ///
 /// The `Spacing`, `Units`, and `Window` token groups are identical across
 /// both Figma modes, so `AppSpacing` and [AppWindowSizing] stay single-mode
-/// constants. `AppRadii` selects per mode like these: mobile builds use
-/// their own near-square corners.
+/// constants. `AppRadii` is single-mode too: both form factors draw the
+/// near-square neon corners.
 library;
 
 import '../layout/app_form_factor.dart';
@@ -65,7 +65,7 @@ abstract final class AppInputSizingMobile {
   /// Figma `Input/Radii` aliases `Radii.SM` on mobile. Note the Figma
   /// radii scale gained an `SM` step, shifting its names one tier against
   /// Dart's: Figma `SM`/`M`/`L` = Dart `medium`/`large`/`xLarge`.
-  static const double radius = AppRadiiMobile.medium;
+  static const double radius = AppRadiiNeon.medium;
 }
 
 const _mobile = kAppFormFactor == AppFormFactor.mobile;
@@ -104,9 +104,10 @@ abstract final class AppInputSizing {
   static const iconSize = _mobile
       ? AppInputSizingMobile.iconSize
       : AppInputSizingDesktop.iconSize;
-  static const radius = _mobile
-      ? AppInputSizingMobile.radius
-      : AppInputSizingDesktop.radius;
+
+  /// The neon corner on both form factors, the mobile token's value;
+  /// [AppInputSizingDesktop.radius] keeps the Figma alias.
+  static const radius = AppInputSizingMobile.radius;
 }
 
 /// Window sizing tokens — desktop-only by nature and identical across

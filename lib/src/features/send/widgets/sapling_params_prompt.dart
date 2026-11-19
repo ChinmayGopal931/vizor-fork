@@ -76,7 +76,7 @@ class SaplingParamsPrompt extends StatelessWidget {
                           context.l10n.sendSaplingDownloadTitle,
                           style: AppTypography.bodyLarge.copyWith(
                             color: colors.text.accent,
-                            fontWeight: FontWeight.w500,
+                            fontWeight: AppSharedFontWeight.medium,
                           ),
                         ),
                       ),

@@ -11,6 +11,7 @@ import '../../../core/widgets/review_list_row.dart';
 import '../../../core/widgets/review_wrap_card.dart';
 import '../../../core/zcash/spendable_wait.dart';
 import '../../send/widgets/send_review_layout.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 /// Display status of a received transaction on the redesigned receipt.
 ///
@@ -155,14 +156,7 @@ class ReceivedReceiptView extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          title,
-          textAlign: TextAlign.center,
-          style: AppTypography.bodyLarge.copyWith(
-            color: colors.text.accent,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        NeonPageTitle(title, textAlign: TextAlign.center),
         const SizedBox(height: AppSpacing.base),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),

@@ -19,6 +19,13 @@ import '../domain/swap_contract.dart';
 import '../models/swap_address_formatting.dart';
 import '../models/swap_deposit_qr_payload.dart';
 import 'swap_support_notice.dart';
+import '../../../core/widgets/neon_page_title.dart';
+import '../../../core/widgets/mobile/neon_glyph_badge.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
+
+/// Desktop draws this page's title, timeout badge and QR card in the neon
+/// look; the phones keep theirs.
+const _desktop = kAppFormFactor == AppFormFactor.desktop;
 
 class SwapDepositTokensPageContent extends StatelessWidget {
   const SwapDepositTokensPageContent({
@@ -196,12 +203,19 @@ class _SwapDepositPageShell extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            context.l10n.swapDepositTitle,
-            key: const ValueKey('swap_deposit_tokens_title'),
-            textAlign: TextAlign.center,
-            style: appSerifDisplayStyle(color: colors.text.accent),
-          ),
+          // Desktop's page title; the phones keep their headline.
+          _desktop
+              ? NeonPageTitle(
+                  context.l10n.swapDepositTitle,
+                  textKey: const ValueKey('swap_deposit_tokens_title'),
+                  textAlign: TextAlign.center,
+                )
+              : Text(
+                  context.l10n.swapDepositTitle,
+                  key: const ValueKey('swap_deposit_tokens_title'),
+                  textAlign: TextAlign.center,
+                  style: appSerifDisplayStyle(color: colors.text.accent),
+                ),
           const SizedBox(height: AppSpacing.lg),
           KeyedSubtree(
             key: const ValueKey('swap_activity_deposit_qr_panel'),
@@ -273,7 +287,7 @@ class _DepositNetworkGuidance extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: AppTypography.labelLarge.copyWith(
                   color: colors.text.warning,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppSharedFontWeight.semiBold,
                 ),
               ),
             ),
@@ -325,7 +339,7 @@ class _DepositRecoveryHelp extends StatelessWidget {
             l10n.swapDepositRecoveryTitle,
             style: AppTypography.bodyLarge.copyWith(
               color: colors.text.accent,
-              fontWeight: FontWeight.w600,
+              fontWeight: AppSharedFontWeight.semiBold,
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -647,13 +661,21 @@ class SwapDepositTimeoutPageContent extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Image.asset(
-            _illustration,
-            key: const ValueKey('swap_deposit_timeout_illustration'),
-            width: 340,
-            height: 220,
-            fit: BoxFit.contain,
-          ),
+          // Desktop draws a lit glyph badge in the art's place.
+          _desktop
+              ? const SizedBox(
+                  key: ValueKey('swap_deposit_timeout_illustration'),
+                  width: 340,
+                  height: 220,
+                  child: Center(child: NeonGlyphBadge(iconName: AppIcons.time)),
+                )
+              : Image.asset(
+                  _illustration,
+                  key: const ValueKey('swap_deposit_timeout_illustration'),
+                  width: 340,
+                  height: 220,
+                  fit: BoxFit.contain,
+                ),
           const SizedBox(height: AppSpacing.base),
           SizedBox(
             width: 300,
@@ -681,14 +703,22 @@ class SwapDepositTimeoutPageContent extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: AppSpacing.xs),
-                Text(
-                  context.l10n.commonSwapFailed,
-                  key: const ValueKey('swap_deposit_timeout_title'),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: appSerifDisplayStyle(color: colors.text.accent),
-                ),
+                _desktop
+                    ? NeonPageTitle(
+                        context.l10n.commonSwapFailed,
+                        textKey: const ValueKey('swap_deposit_timeout_title'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                      )
+                    : Text(
+                        context.l10n.commonSwapFailed,
+                        key: const ValueKey('swap_deposit_timeout_title'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: appSerifDisplayStyle(color: colors.text.accent),
+                      ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
                   context.l10n.swapDepositTimeoutBody,
@@ -756,10 +786,13 @@ class _DepositQrCard extends StatelessWidget {
       width: 396,
       height: 210,
       padding: const EdgeInsets.all(AppSpacing.xs),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(AppRadii.large),
-      ),
+      // Desktop's card is a neon glass panel; the phones keep the plain card.
+      decoration: _desktop
+          ? NeonGlassDecoration.themed(colors, fill: cardColor)
+          : BoxDecoration(
+              color: cardColor,
+              borderRadius: BorderRadius.circular(AppRadii.large),
+            ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

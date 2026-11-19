@@ -11,11 +11,7 @@ class _PrivateReviewUnavailable extends StatelessWidget {
     final colors = context.colors;
     return SizedBox(
       height: 254,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: colors.background.ground,
-          borderRadius: BorderRadius.circular(28),
-        ),
+      child: NeonGlassPanel(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(28, 32, 28, 32),
           child: Column(

@@ -22,6 +22,7 @@ import '../../../core/widgets/app_profile_picture.dart';
 import '../../../core/widgets/app_profile_picture_picker_modal.dart';
 import '../../../core/widgets/app_tappable.dart';
 import '../../../core/widgets/app_text_field.dart';
+import '../../../core/widgets/mobile/neon_horizon.dart';
 import '../../send/models/send_prefill_args.dart';
 import '../../address_scan/widgets/address_qr_scan_modal.dart';
 import '../../address_scan/widgets/address_scan_resolver.dart';
@@ -29,6 +30,8 @@ import '../models/address_book_contact.dart';
 import '../models/address_format_validator.dart';
 import '../providers/address_book_provider.dart';
 import '../widgets/address_book_network_icon.dart';
+import '../../../core/widgets/neon_page_title.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
 
 /// Fixed content column width for the group cards (Figma contacts design).
 const double _kContactsContentWidth = 352;
@@ -414,7 +417,6 @@ class _AddressBookPane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
     final showEmptySearch = state.hasContacts && state.filteredContacts.isEmpty;
     final wantsCenteredState = !state.hasContacts || showEmptySearch;
 
@@ -439,12 +441,9 @@ class _AddressBookPane extends StatelessWidget {
               // serif "No contacts yet" headline takes that role (Figma
               // 4098:554201 shows only the back link above the empty block).
               if (state.hasContacts) ...[
-                Text(
+                NeonPageTitle(
                   context.l10n.commonContacts,
                   textAlign: TextAlign.center,
-                  style: AppTypography.headlineLarge.copyWith(
-                    color: colors.text.accent,
-                  ),
                 ),
                 const SizedBox(height: AppSpacing.md),
               ],
@@ -617,13 +616,9 @@ class _ContactGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return Container(
+    return NeonGlassPanel(
+      fill: colors.background.base,
       padding: const EdgeInsets.all(AppSpacing.sm),
-      decoration: BoxDecoration(
-        color: colors.background.base,
-        borderRadius: BorderRadius.circular(AppRadii.large),
-        boxShadow: appSurfaceShadow(colors),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -955,11 +950,11 @@ class _AddressBookNoContacts extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Image.asset(
-          _addressBookEmptyContactsAsset,
+        // The neon horizon, in the slot of upstream's illustration.
+        const SizedBox(
           width: 340,
           height: 220,
-          fit: BoxFit.contain,
+          child: Center(child: NeonHorizon(width: 340, height: 150)),
         ),
         const SizedBox(height: AppSpacing.base),
         Text(
@@ -1000,11 +995,10 @@ class _EmptySearchResult extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Image.asset(
-          _addressBookEmptySearchAsset,
+        const SizedBox(
           width: 170,
           height: 170,
-          fit: BoxFit.contain,
+          child: Center(child: NeonHorizon(width: 200, height: 88)),
         ),
         const SizedBox(height: AppSpacing.base),
         Text(
@@ -1267,9 +1261,10 @@ class _EditableContactAvatar extends StatelessWidget {
               child: Container(
                 width: 24,
                 height: 24,
-                decoration: BoxDecoration(
+                // A cut-corner plate in place of upstream's circle.
+                decoration: ShapeDecoration(
                   color: context.colors.background.inverse,
-                  shape: BoxShape.circle,
+                  shape: Neon.chamferBorder(cut: AppChamfer.small),
                 ),
                 child: Center(
                   child: AppIcon(
@@ -1437,7 +1432,7 @@ class _NetworkSelectorModalState extends State<_NetworkSelectorModal> {
               context.l10n.addressBookSelectNetwork,
               style: AppTypography.bodyLarge.copyWith(
                 color: context.colors.text.accent,
-                fontWeight: FontWeight.w600,
+                fontWeight: AppFontWeight.semiBold,
               ),
             ),
           ),
@@ -1606,7 +1601,7 @@ class _RemoveContactModal extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: AppTypography.bodyLarge.copyWith(
               color: context.colors.text.accent,
-              fontWeight: FontWeight.w600,
+              fontWeight: AppFontWeight.semiBold,
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -1672,8 +1667,3 @@ class _AddressBookError extends StatelessWidget {
     );
   }
 }
-
-const _addressBookEmptyContactsAsset =
-    'assets/illustrations/address_book_empty_contacts.webp';
-const _addressBookEmptySearchAsset =
-    'assets/illustrations/address_book_empty_search.webp';

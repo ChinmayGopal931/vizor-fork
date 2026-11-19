@@ -36,6 +36,7 @@ import 'package:zcash_wallet/src/providers/sync_provider.dart';
 import 'package:zcash_wallet/src/rust/api/sync.dart' as rust_sync;
 import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 import 'package:zcash_wallet/src/core/l10n/app_language.dart';
+import 'package:zcash_wallet/src/core/widgets/mobile/neon_glyph_badge.dart';
 
 void main() {
   setUpAll(() async {
@@ -59,7 +60,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('How the Migration Works'), findsOneWidget);
+      expect(find.text('HOW THE MIGRATION WORKS'), findsOneWidget);
       expect(
         tester.getSize(
           find.byKey(
@@ -302,15 +303,14 @@ void main() {
     );
     expect(find.textContaining('continues while minimized'), findsNothing);
 
+    // Each expectation's mark is a lit glyph badge.
     for (var index = 0; index < 4; index++) {
       expect(
         find.descendant(
           of: find.byKey(
-            ValueKey('ironwood_migration_expectation_viewport_$index'),
+            ValueKey('ironwood_migration_expectation_tile_$index'),
           ),
-          matching: find.byWidgetPredicate(
-            (widget) => widget is Image && widget.image is AssetImage,
-          ),
+          matching: find.byType(NeonGlyphBadge),
         ),
         findsOneWidget,
       );
@@ -321,63 +321,6 @@ void main() {
     expect(find.text('Private'), findsOneWidget);
     expect(find.text('Immediate'), findsOneWidget);
   });
-
-  testWidgets(
-    'what-to-expect illustrations preserve the Figma overflow geometry',
-    (tester) async {
-      tester.view.devicePixelRatio = 1;
-      tester.view.physicalSize = const Size(1080, 720);
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-
-      await tester.pumpWidget(
-        _migrationOptionsHarness(initialLocation: '/migration/what-to-expect'),
-      );
-      await tester.pumpAndSettle();
-
-      for (var index = 0; index < 4; index++) {
-        expect(
-          tester.getSize(
-            find.byKey(ValueKey('ironwood_migration_expectation_tile_$index')),
-          ),
-          const Size.square(48),
-        );
-      }
-
-      final firstTile = tester.getRect(
-        find.byKey(const ValueKey('ironwood_migration_expectation_tile_0')),
-      );
-      final firstViewport = tester.getRect(
-        find.byKey(const ValueKey('ironwood_migration_expectation_viewport_0')),
-      );
-      expect(firstViewport.top, firstTile.top);
-      expect(firstViewport.bottom, firstTile.bottom + 6);
-
-      for (final index in [1, 2]) {
-        final tile = tester.getRect(
-          find.byKey(ValueKey('ironwood_migration_expectation_tile_$index')),
-        );
-        final viewport = tester.getRect(
-          find.byKey(
-            ValueKey('ironwood_migration_expectation_viewport_$index'),
-          ),
-        );
-        expect(viewport.top, tile.top - 6);
-        expect(viewport.bottom, tile.bottom);
-      }
-
-      expect(
-        tester.getRect(
-          find.byKey(
-            const ValueKey('ironwood_migration_expectation_viewport_3'),
-          ),
-        ),
-        tester.getRect(
-          find.byKey(const ValueKey('ironwood_migration_expectation_tile_3')),
-        ),
-      );
-    },
-  );
 
   testWidgets('migration options use the exact Figma shield and fast icons', (
     tester,
@@ -926,10 +869,7 @@ void main() {
         const ValueKey('ironwood_migration_keep_running_icon_tile'),
       );
       expect(tester.getSize(iconTile), const Size.square(48));
-      final tileDecoration =
-          tester.widget<DecoratedBox>(iconTile).decoration as BoxDecoration;
-      expect(tileDecoration.color, const Color(0xFFB90A4A));
-      expect(tileDecoration.borderRadius, BorderRadius.circular(12));
+      expect(tester.widget(iconTile), isA<NeonGlyphBadge>());
       expect(find.text('Keep Veylor running'), findsOneWidget);
       expect(
         find.text(
@@ -1278,7 +1218,7 @@ void main() {
 
       expect(find.text('Step 1 of 2'), findsNothing);
       expect(find.text('Round 1 of 2'), findsOneWidget);
-      expect(find.text('Scan request with Keystone'), findsOneWidget);
+      expect(find.text('SCAN REQUEST WITH KEYSTONE'), findsOneWidget);
       expect(find.text('Scanning issues?'), findsOneWidget);
       expect(
         find.text(
@@ -1319,7 +1259,7 @@ void main() {
 
       expect(find.text('Step 2 of 2'), findsNothing);
       expect(find.text('Round 1 of 2'), findsOneWidget);
-      expect(find.text('Scan Keystone signature'), findsOneWidget);
+      expect(find.text('SCAN KEYSTONE SIGNATURE'), findsOneWidget);
       expect(
         find.text('Scan the new signed QR shown on Keystone.'),
         findsOneWidget,
@@ -1332,7 +1272,7 @@ void main() {
       await tester.pump();
 
       expect(find.text('Step 1 of 2'), findsNothing);
-      expect(find.text('Scan request with Keystone'), findsOneWidget);
+      expect(find.text('SCAN REQUEST WITH KEYSTONE'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('ironwood_migration_review_screen')),
         findsNothing,
@@ -1735,7 +1675,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('How to move the rest'), findsOneWidget);
+    expect(find.text('HOW TO MOVE THE REST'), findsOneWidget);
     expect(
       find.text(
         '0.1 ZEC is still in Orchard. Choose between more privacy over time '
@@ -2803,7 +2743,17 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
 
-      expect(find.text(uiCase.title), findsOneWidget);
+      // A status title is a neon page title (upper-cased where drawn) or a
+      // status heading.
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is Text &&
+              (widget.data == uiCase.title ||
+                  widget.data == uiCase.title.toUpperCase()),
+        ),
+        findsOneWidget,
+      );
       if (uiCase.buttonLabel == null) {
         expect(find.widgetWithText(AppButton, 'Back to Home'), findsNothing);
         expect(
@@ -2838,7 +2788,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Migration status unavailable'), findsOneWidget);
+    expect(find.text('MIGRATION STATUS UNAVAILABLE'), findsOneWidget);
     expect(find.text('intro-route'), findsNothing);
   });
 
@@ -2881,7 +2831,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Your\n0.6 ZEC\nare on Ironwood!'), findsOneWidget);
+    expect(find.text('YOUR\n0.6 ZEC\nARE ON IRONWOOD!'), findsOneWidget);
     final completeRoot = find.byKey(
       const ValueKey('ironwood_migration_complete_content'),
     );
@@ -2906,28 +2856,24 @@ void main() {
         220,
       ),
     );
+    // The hero is a lit check badge, centred in its slot.
     expect(
-      tester.getRect(
-        find.byKey(const ValueKey('ironwood_migration_complete_coins')),
-      ),
-      Rect.fromLTWH(
-        completeRootRect.left + 110,
-        completeRootRect.top + 75.5,
-        200,
-        200,
-      ),
+      tester
+          .getCenter(
+            find.byKey(const ValueKey('ironwood_migration_complete_coins')),
+          )
+          .dx,
+      closeTo(completeRootRect.left + 12 + 396 / 2, 0.01),
+    );
+    // The copy keeps its slot; its height follows the page title's lines.
+    final completeCopyRect = tester.getRect(
+      find.byKey(const ValueKey('ironwood_migration_complete_copy')),
     );
     expect(
-      tester.getRect(
-        find.byKey(const ValueKey('ironwood_migration_complete_copy')),
-      ),
-      Rect.fromLTWH(
-        completeRootRect.left + 65,
-        completeRootRect.top + 343.5,
-        290,
-        153,
-      ),
+      completeCopyRect.topLeft,
+      completeRootRect.topLeft + const Offset(65, 343.5),
     );
+    expect(completeCopyRect.width, 290);
     expect(
       tester
               .getRect(
@@ -3711,10 +3657,7 @@ void main() {
       );
       final dynamic ringPainter = ringPaint.painter;
       final dynamic segment = (ringPainter.segments as List<dynamic>).single;
-      expect(
-        segment.color,
-        theme.colors.text.positiveStrong.withValues(alpha: 0.20),
-      );
+      expect(segment.color, theme.colors.neon.glow.withValues(alpha: 0.20));
       expect(segment.motion.toString(), contains('none'));
       expect(ringPainter.motionPhase, 0);
     }
@@ -5159,7 +5102,10 @@ void main() {
     final scheduleDecoration =
         tester.widget<DecoratedBox>(firstScheduleSurface).decoration
             as BoxDecoration;
-    expect(scheduleDecoration.borderRadius, BorderRadius.circular(16));
+    expect(
+      scheduleDecoration.borderRadius,
+      BorderRadius.circular(AppRadii.medium),
+    );
     final completedStatus = find.byKey(
       const ValueKey('ironwood_migration_schedule_status_0'),
     );
@@ -5538,7 +5484,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Migration status unavailable'), findsOneWidget);
+    expect(find.text('MIGRATION STATUS UNAVAILABLE'), findsOneWidget);
     expect(find.text('intro-route'), findsNothing);
     expect(find.text('home-route'), findsNothing);
   });
@@ -6059,14 +6005,14 @@ void main() {
       );
       await tester.pumpWidget(_privateStatusHarness(status: status));
       await tester.pumpAndSettle();
-      expect(find.text('Your\n0.6 ZEC\nare on Ironwood!'), findsOneWidget);
+      expect(find.text('YOUR\n0.6 ZEC\nARE ON IRONWOOD!'), findsOneWidget);
 
       await remount(
         tester,
         _privateStatusHarness(status: status, privacyModeEnabled: true),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Your\n•••••• ZEC\nare on Ironwood!'), findsOneWidget);
+      expect(find.text('YOUR\n•••••• ZEC\nARE ON IRONWOOD!'), findsOneWidget);
       expect(find.textContaining('0.6'), findsNothing);
       _expectNoDoubledDenomination();
     });

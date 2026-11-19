@@ -40,6 +40,7 @@ import '../widgets/swap_confidential_ui.dart';
 import '../widgets/swap_near_intents_attribution.dart';
 import '../widgets/swap_slippage_modal.dart';
 import '../widgets/near_intents_service_notice_host.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 class SwapScreen extends ConsumerStatefulWidget {
   const SwapScreen({super.key});
@@ -489,12 +490,10 @@ class _SwapPageTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
-    return Text(
+    return NeonPageTitle(
       context.l10n.swapPageTitle,
-      key: const ValueKey('swap_page_title'),
+      textKey: const ValueKey('swap_page_title'),
       textAlign: TextAlign.center,
-      style: appSerifDisplayStyle(color: colors.text.accent),
     );
   }
 }

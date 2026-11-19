@@ -134,12 +134,15 @@ class _PayAddContactModalState extends State<PayAddContactModal> {
                         width: 24,
                         height: 24,
                         alignment: Alignment.center,
-                        decoration: BoxDecoration(
+                        // A cut-corner plate in place of upstream's circle.
+                        decoration: ShapeDecoration(
                           color: colors.background.inverse,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: colors.background.base,
-                            width: 3,
+                          shape: Neon.chamferBorder(
+                            cut: AppChamfer.small,
+                            side: BorderSide(
+                              color: colors.background.base,
+                              width: 3,
+                            ),
                           ),
                         ),
                         child: AppIcon(

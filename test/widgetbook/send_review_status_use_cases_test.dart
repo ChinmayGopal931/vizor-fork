@@ -18,7 +18,7 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.byType(SendReviewContentView), findsOneWidget);
-    expect(find.text('Review send'), findsOneWidget);
+    expect(find.text('REVIEW SEND'), findsOneWidget);
     expect(find.text('u195091 ... 190591'), findsOneWidget);
     expect(find.text('Shielded'), findsOneWidget);
     expect(find.text('Confirm & send'), findsOneWidget);
@@ -44,7 +44,7 @@ void main() {
     await _pumpUseCase(tester, buildSendStatusInProgressUseCase);
 
     expect(tester.takeException(), isNull);
-    expect(find.text('Send in progress...'), findsOneWidget);
+    expect(find.text('SEND IN PROGRESS...'), findsOneWidget);
     expect(find.text('In progress'), findsOneWidget);
     expect(find.byType(ReviewButtonsStack), findsNothing);
   });
@@ -53,7 +53,7 @@ void main() {
     await _pumpUseCase(tester, buildSendStatusCompletedUseCase);
 
     expect(tester.takeException(), isNull);
-    expect(find.text('Sent successfully'), findsOneWidget);
+    expect(find.text('SENT SUCCESSFULLY'), findsOneWidget);
     expect(find.text('Completed'), findsOneWidget);
     expect(find.text('Tx ID'), findsOneWidget);
   });
@@ -64,7 +64,7 @@ void main() {
     await _pumpUseCase(tester, buildSendStatusFailedUseCase);
 
     expect(tester.takeException(), isNull);
-    expect(find.text('Send failed'), findsOneWidget);
+    expect(find.text('SEND FAILED'), findsOneWidget);
     expect(find.text('Failed'), findsOneWidget);
     final card = tester.widget<ReviewWrapCard>(find.byType(ReviewWrapCard));
     expect(card.surfaceColor, Primitives.p50Dark);

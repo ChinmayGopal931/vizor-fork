@@ -245,7 +245,7 @@ class _AccountHeader extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: AppTypography.labelMedium.copyWith(
                   color: colors.text.accent,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppFontWeight.semiBold,
                 ),
               ),
               const SizedBox(height: AppSpacing.xxs),
@@ -255,7 +255,7 @@ class _AccountHeader extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: AppTypography.labelMedium.copyWith(
                   color: colors.text.secondary,
-                  fontWeight: FontWeight.w400,
+                  fontWeight: AppFontWeight.regular,
                 ),
               ),
             ],
@@ -331,7 +331,7 @@ class _SyncStatus extends StatelessWidget {
           '34% Syncing…',
           style: AppTypography.labelMedium.copyWith(
             color: colors.sync.textSyncing,
-            fontWeight: FontWeight.w400,
+            fontWeight: AppFontWeight.regular,
           ),
         ),
       ],
@@ -668,7 +668,7 @@ class _PreviewReceiveTab extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: AppTypography.labelMedium.copyWith(
                   color: color,
-                  fontWeight: FontWeight.w400,
+                  fontWeight: AppFontWeight.regular,
                 ),
               ),
             ),
@@ -1157,7 +1157,7 @@ class _ReceiveInfoModal extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: AppTypography.bodyLarge.copyWith(
                     color: colors.text.accent,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeight.semiBold,
                   ),
                 ),
                 Text(

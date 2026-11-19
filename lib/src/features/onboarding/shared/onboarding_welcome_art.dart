@@ -1,7 +1,5 @@
 import 'package:flutter/widgets.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
-import '../../../core/layout/app_form_factor.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/mobile/veylor_wordmark.dart';
 
@@ -27,11 +25,11 @@ class OnboardingWelcomeBackdrop extends StatelessWidget {
 
 const _vizorWordmarkFrameWidth = 140.0;
 const _vizorWordmarkFrameHeight = 52.83;
-const _vizorWordmarkArtworkWidth = 127.748;
-const _vizorWordmarkArtworkHeight = 36.758;
 
+/// The VEYLOR wordmark, drawn as a lit tube, or as plain lines in [color]
+/// where a caller sets one. The 140×52.83 frame is upstream's Figma frame for
+/// its wordmark, which Veylor no longer draws.
 class VizorWordmark extends StatelessWidget {
-  /// Figma frame is 140×52.83; the centered SVG artwork is 127.748×36.758.
   const VizorWordmark({
     super.key,
     this.width = _vizorWordmarkFrameWidth,
@@ -46,34 +44,14 @@ class VizorWordmark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    // The neon redesign (mobile) has its own Veylor wordmark: lit, or plain
-    // lines in [color] where a caller sets one. Desktop keeps the artwork.
-    if (kAppFormFactor == AppFormFactor.mobile) {
-      return SizedBox(
-        width: width,
-        height: height,
-        child: CustomPaint(
-          painter: VeylorWordmarkPainter(
-            glow: color ?? colors.neon.glow,
-            core: colors.neon.core,
-            lit: color == null,
-          ),
-        ),
-      );
-    }
     return SizedBox(
       width: width,
       height: height,
-      child: Center(
-        child: SvgPicture.asset(
-          'assets/icons/vizor_logo.svg',
-          width: width * _vizorWordmarkArtworkWidth / _vizorWordmarkFrameWidth,
-          height:
-              height * _vizorWordmarkArtworkHeight / _vizorWordmarkFrameHeight,
-          colorFilter: ColorFilter.mode(
-            color ?? colors.text.accent,
-            BlendMode.srcIn,
-          ),
+      child: CustomPaint(
+        painter: VeylorWordmarkPainter(
+          glow: color ?? colors.neon.glow,
+          core: colors.neon.core,
+          lit: color == null,
         ),
       ),
     );

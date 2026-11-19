@@ -22,6 +22,7 @@ import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/app_pane_modal_overlay.dart';
 import '../../../core/widgets/app_profile_picture.dart';
 import '../../../core/widgets/app_toast.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
 import '../../../core/widgets/untranslated_details.dart';
 import '../../../providers/account_provider.dart';
 import '../../../providers/enhance_pir_provider.dart';
@@ -40,6 +41,7 @@ import '../settings_platform.dart';
 import '../widgets/near_swap_privacy_info.dart';
 import '../widgets/network_privacy_control.dart';
 import '../widgets/hide_balance_on_unlock_control.dart';
+import '../widgets/portfolio_chart_settings_control.dart';
 import '../widgets/enhance_pir_privacy_control.dart';
 import '../widgets/private_queries_turn_off.dart';
 import '../widgets/language_picker.dart';
@@ -47,6 +49,7 @@ import '../widgets/settings_new_badge.dart';
 import '../widgets/settings_sub_option.dart';
 import '../widgets/settings_option_card.dart';
 import '../widgets/windows_update_download_flow.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 const _settingsRowActivationShortcuts = <ShortcutActivator, Intent>{
   SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
@@ -459,8 +462,6 @@ class _SettingsPane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
-
     return Align(
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
@@ -472,12 +473,9 @@ class _SettingsPane extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: AppSpacing.sm),
-              Text(
+              NeonPageTitle(
                 context.l10n.navSettings,
                 textAlign: TextAlign.center,
-                style: AppTypography.headlineLarge.copyWith(
-                  color: colors.text.accent,
-                ),
               ),
               const SizedBox(height: AppSpacing.base),
               _SettingsList(
@@ -645,6 +643,14 @@ class _SettingsList extends ConsumerWidget {
           ],
         ),
         const SizedBox(height: AppSpacing.md),
+        // Home's balance chart: where the phone's Settings has it, after the
+        // account.
+        _SettingsBlock(
+          key: const ValueKey('settings_portfolio_chart_block'),
+          title: context.l10n.portfolioChartSettingsTitle,
+          rows: const [PortfolioChartSettingsControl()],
+        ),
+        const SizedBox(height: AppSpacing.md),
         _SettingsBlock(
           title: context.l10n.settingsSectionSystem,
           rows: [
@@ -660,12 +666,14 @@ class _SettingsList extends ConsumerWidget {
               value: explorerLabel,
               onTap: onExplorer,
             ),
-            _SettingsRow(
-              iconName: AppIcons.theme,
-              label: context.l10n.settingsThemeTitle,
-              value: themeLabel,
-              onTap: onTheme,
-            ),
+            // Veylor is dark only for now.
+            if (!kThemeLockedToDark)
+              _SettingsRow(
+                iconName: AppIcons.theme,
+                label: context.l10n.settingsThemeTitle,
+                value: themeLabel,
+                onTap: onTheme,
+              ),
             if (languageLabel case final languageLabel?)
               _SettingsRow(
                 key: const ValueKey('settings_language_row'),
@@ -847,7 +855,7 @@ class _ThemeModalState extends State<_ThemeModal> {
             overflow: TextOverflow.ellipsis,
             style: AppTypography.bodyLarge.copyWith(
               color: context.colors.text.accent,
-              fontWeight: FontWeight.w600,
+              fontWeight: AppFontWeight.heading,
             ),
           ),
           const SizedBox(height: AppSpacing.md),
@@ -915,7 +923,7 @@ class _WindowsUpdateModal extends ConsumerWidget {
             overflow: TextOverflow.ellipsis,
             style: AppTypography.bodyLarge.copyWith(
               color: context.colors.text.accent,
-              fontWeight: FontWeight.w600,
+              fontWeight: AppFontWeight.heading,
             ),
           ),
           const SizedBox(height: AppSpacing.md),
@@ -1104,7 +1112,7 @@ class _UpdateProgressBar extends StatelessWidget {
 }
 
 class _SettingsBlock extends StatelessWidget {
-  const _SettingsBlock({required this.title, required this.rows});
+  const _SettingsBlock({required this.title, required this.rows, super.key});
 
   final String title;
   final List<Widget> rows;
@@ -1113,16 +1121,13 @@ class _SettingsBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    return Container(
+    // A neon glass panel under a red HUD caption, as mobile's settings
+    // groups are.
+    return NeonGlassPanel(
       clipBehavior: Clip.antiAlias,
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.sm,
         vertical: AppSpacing.md,
-      ),
-      decoration: BoxDecoration(
-        color: colors.background.ground,
-        borderRadius: BorderRadius.circular(AppRadii.large),
-        boxShadow: _settingsSurfaceShadow(colors),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1130,11 +1135,8 @@ class _SettingsBlock extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(AppSpacing.xxs),
             child: Text(
-              title,
-              style: AppTypography.labelLarge.copyWith(
-                fontWeight: FontWeight.w400,
-                color: colors.text.secondary,
-              ),
+              title.toUpperCase(),
+              style: kNeonHudCaptionStyle.copyWith(color: colors.neon.glow),
             ),
           ),
           const SizedBox(height: AppSpacing.s),
@@ -1342,6 +1344,3 @@ Color _settingsRowHoverBackgroundColor(BuildContext context) {
   final isDark = AppTheme.of(context) == AppThemeData.dark;
   return isDark ? colors.background.raised : colors.background.base;
 }
-
-List<BoxShadow> _settingsSurfaceShadow(AppColors colors) =>
-    appSurfaceShadow(colors);

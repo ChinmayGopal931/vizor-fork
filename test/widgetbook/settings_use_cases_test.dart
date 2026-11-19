@@ -40,7 +40,7 @@ void main() {
     );
 
     _expectNoCrash(errors);
-    expect(find.text('Endpoint'), findsOneWidget);
+    expect(find.text('ENDPOINT'), findsOneWidget);
   });
 
   testWidgets('settings explorer use case renders the explorer header', (
@@ -52,7 +52,7 @@ void main() {
     );
 
     _expectNoCrash(errors);
-    expect(find.text('Explorer'), findsOneWidget);
+    expect(find.text('EXPLORER'), findsOneWidget);
     expect(find.text('ZecBlock'), findsOneWidget);
   });
 
@@ -65,7 +65,7 @@ void main() {
     );
 
     _expectNoCrash(errors);
-    expect(find.text('Explorer'), findsOneWidget);
+    expect(find.text('EXPLORER'), findsOneWidget);
     expect(find.text('Custom'), findsOneWidget);
     expect(
       find.text('https://zcashblockexplorer.com/tx/{txid}'),
@@ -94,7 +94,7 @@ void main() {
     );
 
     _expectNoCrash(errors);
-    expect(find.text('Confirm access'), findsOneWidget);
+    expect(find.text('CONFIRM ACCESS'), findsOneWidget);
     expect(find.text('To view the secret passphrase.'), findsOneWidget);
   });
 
@@ -107,7 +107,7 @@ void main() {
     );
 
     _expectNoCrash(errors);
-    expect(find.text('Confirm access'), findsOneWidget);
+    expect(find.text('CONFIRM ACCESS'), findsOneWidget);
     expect(find.text('To view the viewing key.'), findsOneWidget);
   });
 
@@ -121,7 +121,7 @@ void main() {
 
     _expectNoCrash(errors);
     expect(find.text('Viewing key'), findsOneWidget);
-    expect(find.text('Full viewing key'), findsOneWidget);
+    expect(find.text('FULL VIEWING KEY'), findsOneWidget);
     expect(find.text(_en.settingsViewingKeyExplanation), findsOneWidget);
     expect(find.text(_en.settingsViewingKeyWarningTitle), findsOneWidget);
   });
@@ -205,7 +205,7 @@ void main() {
     );
 
     _expectNoCrash(errors);
-    expect(find.text('Confirm access'), findsOneWidget);
+    expect(find.text('CONFIRM ACCESS'), findsOneWidget);
     expect(find.text('Enter your current password first.'), findsOneWidget);
   });
 
@@ -234,7 +234,7 @@ void main() {
     );
 
     _expectNoCrash(errors);
-    expect(find.text('Your data has been removed'), findsOneWidget);
+    expect(find.text('YOUR DATA HAS BEEN REMOVED'), findsOneWidget);
   });
 
   testWidgets('settings wallet link initial use case renders the CTA', (
@@ -246,7 +246,7 @@ void main() {
     );
 
     _expectNoCrash(errors);
-    expect(find.text('Link Veylor Mobile'), findsOneWidget);
+    expect(find.text('LINK VEYLOR MOBILE'), findsOneWidget);
     expect(find.text('Start linking'), findsOneWidget);
   });
 
@@ -259,7 +259,7 @@ void main() {
     );
 
     _expectNoCrash(errors);
-    expect(find.text('Confirm access'), findsOneWidget);
+    expect(find.text('CONFIRM ACCESS'), findsOneWidget);
     expect(find.text('To link Veylor Mobile.'), findsOneWidget);
   });
 
@@ -272,7 +272,7 @@ void main() {
     );
 
     _expectNoCrash(errors);
-    expect(find.text('Scan with Veylor mobile'), findsOneWidget);
+    expect(find.text('SCAN WITH VEYLOR MOBILE'), findsOneWidget);
     expect(
       find.text(
         'Open Veylor on your phone → Add a wallet → Link Veylor Desktop',
@@ -291,7 +291,7 @@ void main() {
     );
 
     _expectNoCrash(errors);
-    expect(find.text('Veylor Mobile linked successfully'), findsOneWidget);
+    expect(find.text('VEYLOR MOBILE LINKED SUCCESSFULLY'), findsOneWidget);
     expect(
       find.text('6 accounts and 20 contacts were imported on mobile.'),
       findsOneWidget,
@@ -307,7 +307,7 @@ void main() {
     );
 
     _expectNoCrash(errors);
-    expect(find.text('Time’s up'), findsOneWidget);
+    expect(find.text('TIME’S UP'), findsOneWidget);
     expect(find.text('Generate new code'), findsOneWidget);
   });
 }

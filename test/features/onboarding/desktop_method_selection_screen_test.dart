@@ -69,7 +69,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('Import Account\nto Veylor'), findsOneWidget);
+    expect(find.text('IMPORT ACCOUNT\nTO VEYLOR'), findsOneWidget);
     expect(find.text('Select the method you want.'), findsOneWidget);
     expect(find.text('Import secret passphrase'), findsOneWidget);
     expect(find.text('Veylor or any other Zcash wallet'), findsOneWidget);
@@ -77,12 +77,6 @@ void main() {
     expect(find.text('Ledger or Keystone wallet'), findsOneWidget);
     expect(find.text('Link Veylor Desktop'), findsNothing);
     expect(find.text('Cancel'), findsOneWidget);
-
-    final background = find.byKey(
-      const ValueKey('desktop_method_selection_background'),
-    );
-    expect(tester.getTopLeft(background), const Offset(-264, 0));
-    expect(tester.getSize(background), const Size(1344, 520));
 
     expect(
       tester.getSize(
@@ -124,7 +118,7 @@ void main() {
       find.byKey(const ValueKey('desktop_import_hardware_card')),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Connect\nHardware Wallet'), findsOneWidget);
+    expect(find.text('CONNECT\nHARDWARE WALLET'), findsOneWidget);
   });
 
   testWidgets('desktop import picker honors its cancel destination', (
@@ -142,11 +136,11 @@ void main() {
       find.byKey(const ValueKey('desktop_import_hardware_card')),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Connect\nHardware Wallet'), findsOneWidget);
+    expect(find.text('CONNECT\nHARDWARE WALLET'), findsOneWidget);
 
     await tester.tap(find.text('Back'));
     await tester.pumpAndSettle();
-    expect(find.text('Import Account\nto Veylor'), findsOneWidget);
+    expect(find.text('IMPORT ACCOUNT\nTO VEYLOR'), findsOneWidget);
 
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
@@ -164,7 +158,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Connect\nHardware Wallet'), findsOneWidget);
+    expect(find.text('CONNECT\nHARDWARE WALLET'), findsOneWidget);
     expect(find.text('Select your hardware wallet.'), findsOneWidget);
     expect(find.text('Connect Keystone'), findsOneWidget);
     expect(find.text('Import from Keystone wallet'), findsOneWidget);
@@ -206,7 +200,7 @@ void main() {
 
     await tester.tap(find.text('Back'));
     await tester.pumpAndSettle();
-    expect(find.text('Import Account\nto Veylor'), findsOneWidget);
+    expect(find.text('IMPORT ACCOUNT\nTO VEYLOR'), findsOneWidget);
   });
 }
 

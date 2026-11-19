@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../main.dart' show log;
-import '../../core/layout/app_form_factor.dart';
 import '../../core/l10n/l10n.dart';
 import '../../core/l10n/locale_typography.dart';
 import '../../core/theme/app_theme.dart';
@@ -21,6 +20,8 @@ import '../../providers/wallet_mutation_guard.dart';
 import '../../services/device_owner_auth.dart';
 import 'shared/onboarding_auth_shell.dart';
 import '../../core/l10n/inline_spans.dart';
+import '../../core/widgets/neon_page_title.dart';
+import '../../core/layout/app_form_factor.dart';
 
 class LostPasswordScreen extends ConsumerStatefulWidget {
   const LostPasswordScreen({
@@ -265,28 +266,28 @@ class _LostPasswordContent extends StatelessWidget {
         // Figma: this screen's badge sits on a 30% gray shield, unlike the
         // crimson welcome/unlock badge. The neon (mobile) look has no
         // illustrated badges: a lit lock takes the same slot.
-        if (kAppFormFactor == AppFormFactor.mobile)
-          const NeonGlyphBadge(iconName: AppIcons.lock, size: 50)
-        else
-          Image.asset(
-            'assets/illustrations/lost_password_badge.webp',
-            width: 50,
-            height: 50,
-          ),
+        const NeonGlyphBadge(iconName: AppIcons.lock, size: 50),
         const SizedBox(height: AppSpacing.base),
         Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              l10n.onboardingLostPasswordTitle,
-              style: AppTypography.displayMedium.copyWith(
-                color: colors.text.accent,
-                height: 48 / 45,
-              ),
-              maxLines: 1,
-              softWrap: false,
-              textAlign: TextAlign.center,
-            ),
+            kDesktopFormFactor
+                ? NeonPageTitle(
+                    l10n.onboardingLostPasswordTitle,
+                    maxLines: 1,
+                    softWrap: false,
+                    textAlign: TextAlign.center,
+                  )
+                : Text(
+                    l10n.onboardingLostPasswordTitle,
+                    style: AppTypography.displayMedium.copyWith(
+                      color: colors.text.accent,
+                      height: 48 / 45,
+                    ),
+                    maxLines: 1,
+                    softWrap: false,
+                    textAlign: TextAlign.center,
+                  ),
             const SizedBox(height: AppSpacing.sm),
             // Line breaks pinned to the design's rendered wrap (348px box).
             Text.rich(

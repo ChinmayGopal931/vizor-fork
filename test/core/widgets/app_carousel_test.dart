@@ -10,17 +10,14 @@ import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 const _items = [
   AppCarouselItem.icon(
     message: 'First carousel message uses two lines when rendered.',
-    tileColor: Color(0xFF9667E2),
     icon: AppIcons.history,
   ),
   AppCarouselItem.icon(
     message: 'Second carousel message.',
-    tileColor: Color(0xFF00A460),
     icon: AppIcons.wallet,
   ),
   AppCarouselItem.image(
     message: 'Third carousel message.',
-    tileColor: Color(0xFFB90A4A),
     imageAsset:
         'assets/illustrations/desktop/ironwood_migration_expect_running.webp',
   ),
@@ -40,13 +37,11 @@ void main() {
         items: [
           AppCarouselItem.icon(
             message: 'Back up your wallet.',
-            tileColor: const Color(0xFF00A460),
             icon: AppIcons.key,
             onTap: () => activated.add(0),
           ),
           AppCarouselItem.icon(
             message: 'Learn about Zcash.',
-            tileColor: const Color(0xFF9667E2),
             icon: AppIcons.zcash,
             onTap: () => activated.add(1),
           ),
@@ -175,7 +170,6 @@ void main() {
         items: const [
           AppCarouselItem.icon(
             message: 'Only carousel message.',
-            tileColor: Color(0xFF9667E2),
             icon: AppIcons.history,
           ),
         ],

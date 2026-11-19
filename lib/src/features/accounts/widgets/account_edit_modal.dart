@@ -222,13 +222,16 @@ class _EditableAccountAvatar extends StatelessWidget {
                   child: Container(
                     width: 24,
                     height: 24,
-                    decoration: BoxDecoration(
+                    // A cut-corner plate in place of upstream's circle.
+                    decoration: ShapeDecoration(
                       color: colors.background.inverse,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: colors.background.base,
-                        width: 3,
-                        strokeAlign: BorderSide.strokeAlignOutside,
+                      shape: Neon.chamferBorder(
+                        cut: AppChamfer.small,
+                        side: BorderSide(
+                          color: colors.background.base,
+                          width: 3,
+                          strokeAlign: BorderSide.strokeAlignOutside,
+                        ),
                       ),
                     ),
                     child: Center(

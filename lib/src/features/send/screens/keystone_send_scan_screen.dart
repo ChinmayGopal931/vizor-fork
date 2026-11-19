@@ -16,6 +16,7 @@ import '../../../core/zcash/wallet_error_code.dart';
 import '../../../rust/api/keystone.dart' as rust_keystone;
 import '../../../services/qr_scanner.dart';
 import '../../keystone/widgets/keystone_qr_scanner_card.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 class KeystoneSendScanArgs {
   const KeystoneSendScanArgs({
@@ -147,11 +148,8 @@ class _KeystoneSendScanScreenState extends ConsumerState<KeystoneSendScanScreen>
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
+                      NeonPageTitle(
                         context.l10n.commonScanQrCode,
-                        style: AppTypography.displaySmall.copyWith(
-                          color: colors.text.accent,
-                        ),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: AppSpacing.sm),

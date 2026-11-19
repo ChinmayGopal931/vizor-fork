@@ -179,7 +179,8 @@ class _ImportAccountDiscoveryModalState
                   height: 32,
                   decoration: BoxDecoration(
                     color: colors.background.neutralSubtleOpacity,
-                    shape: BoxShape.circle,
+                    // Near-square, as the neon look's corners are.
+                    borderRadius: BorderRadius.circular(AppRadii.small),
                   ),
                   child: Center(
                     child: AppIcon(
@@ -195,7 +196,7 @@ class _ImportAccountDiscoveryModalState
                     context.l10n.onboardingDiscoveryTitle,
                     style: AppTypography.bodyLarge.copyWith(
                       color: colors.text.accent,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: AppFontWeight.medium,
                     ),
                   ),
                 ),
@@ -499,14 +500,17 @@ class _AccountToggle extends StatelessWidget {
       padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
         color: trackColor,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(AppRadii.small),
       ),
       child: Align(
         alignment: selected ? Alignment.centerRight : Alignment.centerLeft,
         child: Container(
           width: 16,
           height: 16,
-          decoration: BoxDecoration(color: knobColor, shape: BoxShape.circle),
+          decoration: BoxDecoration(
+            color: knobColor,
+            borderRadius: BorderRadius.circular(AppRadii.xSmall),
+          ),
         ),
       ),
     );
