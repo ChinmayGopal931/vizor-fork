@@ -242,7 +242,8 @@ otherwise.
     ghost button.
   - The Keystone QR stays black on white with its quiet zone.
 - **Sync line.** `NeonSyncBackdrop` replaces the top bar's sync label on
-  Home. A Tron floor lies behind the content and flows only while
+  Home (desktop Home's pane draws it too: see "Desktop"). A Tron floor
+  lies behind the content and flows only while
   something scans (idle, nothing moves and no frame is drawn), and a red
   line at 85% of the width (Railgun's on the Private USD screen too, since
   2026-10-19) rises from the bottom with the progress,
@@ -400,9 +401,58 @@ otherwise.
     card the lit wordmark, and Home's and the address book's empty states a
     horizon. The wallet link outcomes are `NeonGlyphBadge`s.
   - Page titles are upstream's per-screen headlines in the Thin tokens, not
-    `kNeonPageTitleStyle`: desktop has no shared page title. The neon
-    signature pieces (the sync line, the balance sign with its chart, a
-    neon sidebar) are not on desktop yet.
+    `kNeonPageTitleStyle`: desktop has no shared page title.
+  - The neon signature pieces (2026-11-19) are the phone's widgets placed in
+    upstream's desktop screens; a phone widget that needed a desktop size or
+    input took a parameter whose default keeps the phone as it was. Every
+    desktop page builds its own sidebar, and Home is built again on each
+    return to it, so `DesktopNeonSession` (`desktop_neon_session.dart`) keeps
+    what their light needs between pages: the sidebar row lit last, and
+    whether the balance sign has switched on since the unlock.
+  - **Sync line.** Home's pane draws the phone's line in its two layers
+    (`NeonSyncBackdrop` back and front around the pane's content, under
+    `NeonSyncScrolled` on the pane's own scroll view), at 85% of the pane's
+    width. Home's blocks (the balance sign and its transparent tray, the action
+    buttons and the migration button, the recent activity) are backed by
+    `NeonSyncOcclude`; the empty state and the setup cards are not, as on the
+    phone. The phone's rules hold: the floor flows only while something scans
+    and draws no frame idle, and a scan from at most 20 blocks behind reads as
+    synced.
+  - **Balance sign.** The balance card is the phone's frameless sign
+    (`_HomeDesktopBalanceSign` in `home_screen.dart`): `NeonScrambleText`
+    digits in the shared `kNeonBalanceAmountStyle` and
+    `kNeonBalanceTickerStyle`, the fiat line in `kNeonSignCaptionStyle`, the
+    privacy eye a bare glyph to their right, and `NeonBalanceTrail` (the
+    chart's line, `NeonPlotPainter`) below; the styles and the trail live in
+    `home/widgets/neon_balance_sign.dart`, which the phone's Home draws too.
+    It flickers on (`NeonIgnition`) the first time Home shows after an
+    unlock, not on every return. A click, or Enter with the sign focused,
+    opens `/portfolio-chart` (`DesktopPortfolioChartScreen`: the phone's chart
+    card, read under the pointer as well as by a drag, with range chips that
+    take a click cursor and the keyboard, then `MobileHoldingsPanel`, under
+    the pane's back link). Without Private USD the holdings are the shielded
+    pools, their total and the transparent ZEC. A hidden chart (off, or no
+    history) leaves the sign inert. The Send, Receive and Pay buttons under
+    it are still upstream's pills. The end-to-end tests' keys stay:
+    `home_desktop_balance_amount_text` is a plain `Text` of the amount once
+    the digits settle (`NeonScrambleText.textKey`), and the ticker is its own
+    `Text`.
+  - **Chart settings.** Settings has a Portfolio chart block after Account
+    with the phone card's two switches, "Show on home" and "Use market
+    prices" (`PortfolioChartSettingsControl`), on the same settings and
+    storage, so the same defaults; the prices switch shows only where market
+    prices are available, and holds still while the chart is off.
+  - **Sidebar.** The main sidebar's rows are lit, not filled
+    (`AppSidebarItem`): the phone sidebar's `NeonSidebarGlyph` at upstream's
+    20 px icon size beside Light labels, and the active glyph and red label
+    glowing over a pool of light that crossfades from the row the last page
+    lit. Home, Activity and Settings are the tab bar's glyphs and Swap its
+    `TronGlyph` swap; Pay, Vote and Sign out are `TronGlyph`s drawn for
+    desktop (`pay`, `vote`, `signOut`). The importing loader keeps its icon.
+    Its foot is the phone sidebar's `NeonSidebarSyncReadout`, built by
+    `NeonSyncLine.wallet` as Home's line is, in place of upstream's status
+    row and its block height; its text keeps the `sidebar_sync_text` key,
+    upper-cased.
 
 ## Google Play opt-out (VIZOR_DEGOOGLED)
 
@@ -1164,9 +1214,11 @@ Key files:
 
 ### Home portfolio chart
 
-Mobile Home draws the chart's line as the balance sign's light trail, and a
-tap on the sign opens the full chart at `/portfolio-chart`
-(`lib/src/features/portfolio_chart/`). Its wallet side is read from the local
+Home draws the chart's line as the balance sign's light trail on both form
+factors, and a tap (a click on desktop) on the sign opens the full chart at
+`/portfolio-chart` (`lib/src/features/portfolio_chart/`:
+`MobilePortfolioChartScreen`, and `DesktopPortfolioChartScreen` on desktop).
+Its wallet side is read from the local
 wallet DB alone: `getAccountBalanceDeltas`, each mined transaction's
 `account_balance_delta` once (Activity rows will not do: a transaction can show
 as two rows with its whole delta each, and a ZIP 320 funding step as none),
@@ -1183,7 +1235,8 @@ the chart no longer reads that define.
   fresh install makes no chart request and the chart is the ZEC balance. A
   saved choice is kept as written, and an unreadable "Use market prices" reads
   as off. The mobile settings card has no explanatory text under its
-  switches (the owner removed it on 2026-10-17).
+  switches (the owner removed it on 2026-10-17), and desktop Settings'
+  Portfolio chart block has none either.
 - **What a request carries.** The coin (`asset=ZEC`), the currency
   (`fiat=USD`), `resolution=1d`, two UTC dates (`from`, `to`) and `limit=1000`,
   in that order (the order is part of the server's cache key), and nothing
@@ -1205,9 +1258,13 @@ the chart no longer reads that define.
   the active account through Private USD) and there is a usable server, the
   wallet is unlocked, privacy mode is off, and the app is in the foreground
   (`appInForegroundProvider`). While any of these does not hold nothing is
-  requested; only an already cached series is drawn. An empty, non-https or
-  invalid `VIZOR_PRICING_ENGINE_BASE_URL` has the same effect for good: no
-  price switch in Settings and no request.
+  requested; only an already cached series is drawn. On desktop the
+  foreground is a window on screen, focused or not (`inactive` counts); a
+  window that is minimised, hidden or on another Space is `hidden`, and from
+  then the gate stays shut until the app is active again (`resumed`), however
+  many syncs complete meanwhile. Locking ("Sign out") shuts it too. An
+  empty, non-https or invalid `VIZOR_PRICING_ENGINE_BASE_URL` has the same
+  effect for good: no price switch in Settings and no request.
 - **The answer is untrusted data.** `parsePricingEnginePage` and
   `assemblePriceSeries` accept a series only when it is the documented
   document for the same asset, currency, resolution and dates; its
