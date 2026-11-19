@@ -1743,7 +1743,7 @@ void main() {
     expect(find.byKey(const ValueKey('home_notice_card')), findsOneWidget);
     expect(
       find.text(
-        "We couldn't verify the previous password change. Try again or restart Vizor.",
+        "We couldn't verify the previous password change. Try again or restart Veylor.",
       ),
       findsOneWidget,
     );

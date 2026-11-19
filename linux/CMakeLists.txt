@@ -9,13 +9,48 @@ set(APP_DISPLAY_NAME "Vizor")
 # Flutter tool reads BINARY_NAME without evaluating CMake variable expansion
 # when launching `flutter run`, so keep the default executable name literal.
 set(BINARY_NAME "vizor")
+set(FLUTTER_RUN_BINARY_NAME "${BINARY_NAME}")
 # The unique GTK application identifier for this application. See:
 # https://wiki.gnome.org/HowDoI/ChooseApplicationID
 set(APPLICATION_ID "app.keplr.${APP_IDENTIFIER}")
 
+# The VIZOR_APPLICATION_ID environment variable selects Veylor's identity
+# (AGENTS.md, "Desktop identity"); without it the build keeps upstream's. The
+# identity renames the executable too: path_provider_linux names the support
+# directory after the executable when it cannot load libgio-2.0.so, so a shared
+# name would share the wallet data of an installed Vizor.
+set(VIZOR_APPLICATION_ID "$ENV{VIZOR_APPLICATION_ID}")
+if(NOT VIZOR_APPLICATION_ID STREQUAL "")
+  if(NOT VIZOR_APPLICATION_ID MATCHES "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$")
+    message(FATAL_ERROR
+      "VIZOR_APPLICATION_ID must be a package name such as com.veylor.desktop, "
+      "not '${VIZOR_APPLICATION_ID}'.")
+  elseif(VIZOR_APPLICATION_ID STREQUAL "com.veylor.desktop")
+    set(APP_IDENTIFIER "veylor")
+    set(APP_DISPLAY_NAME "Veylor")
+  elseif(VIZOR_APPLICATION_ID STREQUAL "com.veylor.desktop.testnet")
+    set(APP_IDENTIFIER "veylor-testnet")
+    set(APP_DISPLAY_NAME "Veylor Testnet")
+  else()
+    message(FATAL_ERROR
+      "No Linux identity is defined for VIZOR_APPLICATION_ID "
+      "'${VIZOR_APPLICATION_ID}'. Use com.veylor.desktop or "
+      "com.veylor.desktop.testnet.")
+  endif()
+  set(BINARY_NAME "${APP_IDENTIFIER}")
+  set(APPLICATION_ID "${VIZOR_APPLICATION_ID}")
+endif()
+
 # Build scripts can provide per-flavor Linux identity overrides here. Keep this
-# generated file out of version control.
-include("${CMAKE_CURRENT_SOURCE_DIR}/FlavorOverrides.cmake" OPTIONAL)
+# generated file out of version control. It and VIZOR_APPLICATION_ID must not
+# both pick an identity.
+set(FLAVOR_OVERRIDES_FILE "${CMAKE_CURRENT_SOURCE_DIR}/FlavorOverrides.cmake")
+if(NOT VIZOR_APPLICATION_ID STREQUAL "" AND EXISTS "${FLAVOR_OVERRIDES_FILE}")
+  message(FATAL_ERROR
+    "VIZOR_APPLICATION_ID and linux/FlavorOverrides.cmake both select an "
+    "identity. Unset one of them.")
+endif()
+include("${FLAVOR_OVERRIDES_FILE}" OPTIONAL)
 
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent
 # versions of CMake.
@@ -104,6 +139,21 @@ configure_file("${CMAKE_CURRENT_SOURCE_DIR}/vizor.desktop.in" "${APP_DESKTOP_FIL
 
 install(TARGETS ${BINARY_NAME} RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
   COMPONENT Runtime)
+
+# `flutter run` starts the literal BINARY_NAME above, so an executable renamed
+# by VIZOR_APPLICATION_ID gets a link under that name. The process still sees
+# its own executable name, which keeps its support directory apart.
+if(NOT VIZOR_APPLICATION_ID STREQUAL "" AND
+   NOT BINARY_NAME STREQUAL FLUTTER_RUN_BINARY_NAME)
+  install(CODE "
+    execute_process(COMMAND \"${CMAKE_COMMAND}\" -E create_symlink
+      \"${BINARY_NAME}\" \"${CMAKE_INSTALL_PREFIX}/${FLUTTER_RUN_BINARY_NAME}\"
+      RESULT_VARIABLE flutter_run_link_result)
+    if(NOT flutter_run_link_result EQUAL 0)
+      message(FATAL_ERROR \"Could not link ${FLUTTER_RUN_BINARY_NAME} to ${BINARY_NAME}\")
+    endif()
+    " COMPONENT Runtime)
+endif()
 
 install(FILES "${APP_DESKTOP_FILE}"
   DESTINATION "${INSTALL_BUNDLE_DATA_DIR}/applications"

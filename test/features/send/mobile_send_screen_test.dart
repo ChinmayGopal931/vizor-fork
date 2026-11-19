@@ -1005,7 +1005,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('REVIEW DONATION'), findsOneWidget);
       expect(find.byKey(const ValueKey('mobile_send_cancel')), findsNothing);
-      expect(find.text('Vizor Wallet'), findsOneWidget);
+      expect(find.text('Veylor Wallet'), findsOneWidget);
       expect(find.text('Total'), findsOneWidget);
       expect(find.byKey(const ValueKey('mobile_send_memo_row')), findsNothing);
       await tester.tap(find.byKey(const ValueKey('mobile_send_confirm')));
@@ -1037,7 +1037,7 @@ void main() {
       expect(_proposeCalls, 1);
       expect(find.text('DONATION FAILED'), findsOneWidget);
       expect(find.text('Donation failed'), findsOneWidget);
-      expect(find.textContaining('to Vizor Wallet'), findsOneWidget);
+      expect(find.textContaining('to Veylor Wallet'), findsOneWidget);
       expect(find.text('Send failed'), findsNothing);
       expect(find.text('Donation failed. Try again.'), findsOneWidget);
       expect(find.text('Send failed. Try again.'), findsNothing);
@@ -1078,7 +1078,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('mobile_send_try_again')));
     await tester.pumpAndSettle();
     expect(find.text('REVIEW DONATION'), findsOneWidget);
-    expect(find.text('Vizor Wallet'), findsOneWidget);
+    expect(find.text('Veylor Wallet'), findsOneWidget);
 
     _proposeSendSucceeds = true;
     await tester.tap(find.byKey(const ValueKey('mobile_send_confirm')));

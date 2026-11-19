@@ -49,6 +49,28 @@ MACOS_RELEASE_FLAVOR_CONFIGS = {
     sparkle_private_key_env: "SPARKLE_PRIVATE_ED_KEY_TESTNET",
     zcash_default_network: "test",
     volume_name: "Install Vizor Testnet Wallet"
+  },
+  # Veylor's identity (AGENTS.md, "Desktop identity"). No Sparkle feed or key,
+  # and no release signing, until Veylor has release keys of its own.
+  "veylor" => {
+    app_name: "Veylor",
+    artifact_name: "Veylor",
+    bundle_id: "com.veylor.desktop",
+    bundle_id_name: "Veylor",
+    app_icon_file: "VeylorAppIcon",
+    release_signing: false,
+    zcash_default_network: "main",
+    volume_name: "Install Veylor Wallet"
+  },
+  "veylor-testnet" => {
+    app_name: "Veylor Testnet",
+    artifact_name: "Veylor-Testnet",
+    bundle_id: "com.veylor.desktop.testnet",
+    bundle_id_name: "Veylor Testnet",
+    app_icon_file: "VeylorAppIcon",
+    release_signing: false,
+    zcash_default_network: "test",
+    volume_name: "Install Veylor Testnet Wallet"
   }
 }.freeze
 
@@ -114,6 +136,7 @@ def release_metadata(flavor: "mainnet")
 
   app_name = flavor_config.fetch(:app_name)
   artifact_name = flavor_config.fetch(:artifact_name)
+  sparkle_feed_asset_name = flavor_config[:sparkle_feed_asset_name]
   dist_dir = File.join(workspace_root, "dist", "macos")
   sparkle_dir = File.join(dist_dir, "sparkle", flavor)
   app_path = File.join(workspace_root, "build", "macos", "Build", "Products", "Release", "#{app_name}.app")
@@ -130,6 +153,8 @@ def release_metadata(flavor: "mainnet")
     dart_defines: flavor_config.fetch(:dart_defines, {}),
     rustflags: flavor_config[:rustflags],
     volume_name: flavor_config.fetch(:volume_name),
+    release_signing: flavor_config.fetch(:release_signing, true),
+    sparkle_enabled: !sparkle_feed_asset_name.nil?,
     version: version,
     asset_version: asset_version,
     is_prerelease: tag_info.fetch(:is_prerelease),
@@ -140,11 +165,11 @@ def release_metadata(flavor: "mainnet")
     sparkle_dir: sparkle_dir,
     app_path: app_path,
     dmg_path: File.join(dist_dir, dmg_asset_name),
-    appcast_path: File.join(sparkle_dir, flavor_config.fetch(:sparkle_feed_asset_name)),
-    sparkle_feed_url: "https://github.com/#{ENV.fetch("RELEASE_REPOSITORY")}/releases/latest/download/#{flavor_config.fetch(:sparkle_feed_asset_name)}",
+    appcast_path: sparkle_feed_asset_name && File.join(sparkle_dir, sparkle_feed_asset_name),
+    sparkle_feed_url: sparkle_feed_asset_name && "https://github.com/#{ENV.fetch("RELEASE_REPOSITORY")}/releases/latest/download/#{sparkle_feed_asset_name}",
     sparkle_release_notes_path: File.join(sparkle_dir, "#{artifact_name}-macos.md"),
-    sparkle_public_key_env: flavor_config.fetch(:sparkle_public_key_env),
-    sparkle_private_key_env: flavor_config.fetch(:sparkle_private_key_env)
+    sparkle_public_key_env: flavor_config[:sparkle_public_key_env],
+    sparkle_private_key_env: flavor_config[:sparkle_private_key_env]
   }
 end
 
@@ -176,7 +201,7 @@ def match_certificate_password
 end
 
 def sparkle_enabled_for_release?(metadata)
-  !metadata.fetch(:is_prerelease)
+  metadata.fetch(:sparkle_enabled) && !metadata.fetch(:is_prerelease)
 end
 
 def sparkle_public_ed_key(metadata)
@@ -929,6 +954,9 @@ platform :mac do
 
   private_lane :prepare_signing do |options|
     metadata = release_metadata(flavor: single_macos_release_flavor(options))
+    unless metadata.fetch(:release_signing)
+      UI.user_error!("#{metadata[:app_name]} has no release signing yet; it must not be signed with this lane's team.")
+    end
     keychain = setup_signing_keychain
     readonly = options.fetch(:readonly, match_readonly?)
     validate_signing_environment(readonly: readonly)

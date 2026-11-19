@@ -3,6 +3,9 @@ param(
   [string]$Version = "",
   [ValidateSet("mainnet", "testnet")]
   [string]$Network = "mainnet",
+  # Veylor's identity (AGENTS.md, "Desktop identity"): com.veylor.desktop or
+  # com.veylor.desktop.testnet. Empty keeps upstream's identity.
+  [string]$ApplicationId = $env:VIZOR_APPLICATION_ID,
   [string]$PackId = "",
   [string]$PackTitle = "",
   [string]$Channel = "",
@@ -304,6 +307,31 @@ if ([string]::IsNullOrWhiteSpace($Version)) {
   $Version = Get-PubspecVersion
 }
 
+$ApplicationId = "$ApplicationId".Trim()
+$VeylorIdentity = $null
+if (-not [string]::IsNullOrEmpty($ApplicationId)) {
+  # The same rule as VIZOR_APPLICATION_ID in android/app/build.gradle.kts.
+  if ($ApplicationId -cnotmatch '^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$') {
+    throw "VIZOR_APPLICATION_ID must be a package name such as com.veylor.desktop, not '$ApplicationId'."
+  }
+  $VeylorIdentity = switch -CaseSensitive ($ApplicationId) {
+    "com.veylor.desktop" { @{ Network = "mainnet"; Title = "Veylor"; StoragePrefix = "Veylor" } }
+    "com.veylor.desktop.testnet" { @{ Network = "testnet"; Title = "Veylor Testnet"; StoragePrefix = "VeylorTestnet" } }
+    default { throw "No Windows identity is defined for VIZOR_APPLICATION_ID '$ApplicationId'. Use com.veylor.desktop or com.veylor.desktop.testnet." }
+  }
+  if (-not $PSBoundParameters.ContainsKey("Network")) {
+    $Network = $VeylorIdentity.Network
+  } elseif ($Network -ne $VeylorIdentity.Network) {
+    throw "VIZOR_APPLICATION_ID $ApplicationId is a $($VeylorIdentity.Network) identity, not $Network."
+  }
+  if ([string]::IsNullOrWhiteSpace($PackId)) {
+    $PackId = $ApplicationId
+  }
+  if ([string]::IsNullOrWhiteSpace($PackTitle)) {
+    $PackTitle = $VeylorIdentity.Title
+  }
+}
+
 Write-Host "Packaging Windows $Arch $Network release."
 
 if ($Network -eq "mainnet") {
@@ -338,12 +366,30 @@ if ($Network -eq "mainnet") {
   $WindowsStoragePrefix = "VizorTestnet"
 }
 
-$env:VIZOR_WINDOWS_COMPANY_NAME = "com.keplr"
+$CompanyName = "com.keplr"
+$CopyrightHolder = "com.keplr"
+$ProductName = $PackTitle
+$AppIconPath = Join-Path $repoRoot "windows\runner\resources\app_icon.ico"
+if ($VeylorIdentity) {
+  # The package, app data, secure storage and single-instance lock all follow
+  # the identity, so nothing is shared with an installed Vizor. CMake checks
+  # that these values match VIZOR_APPLICATION_ID.
+  $CompanyName = "com.veylor"
+  $CopyrightHolder = "Zapp LLC"
+  $ProductName = $VeylorIdentity.Title
+  $WindowsStoragePrefix = $VeylorIdentity.StoragePrefix
+  $AppIconPath = Join-Path $repoRoot "windows\runner\resources\veylor_app_icon.ico"
+  $env:VIZOR_APPLICATION_ID = $ApplicationId
+} else {
+  Remove-Item Env:VIZOR_APPLICATION_ID -ErrorAction SilentlyContinue
+}
+
+$env:VIZOR_WINDOWS_COMPANY_NAME = $CompanyName
 $env:VIZOR_WINDOWS_FILE_DESCRIPTION = $PackTitle
 $env:VIZOR_WINDOWS_INTERNAL_NAME = $PackTitle
-$env:VIZOR_WINDOWS_LEGAL_COPYRIGHT = "Copyright (C) 2026 com.keplr. All rights reserved."
+$env:VIZOR_WINDOWS_LEGAL_COPYRIGHT = "Copyright (C) 2026 $CopyrightHolder. All rights reserved."
 $env:VIZOR_WINDOWS_ORIGINAL_FILENAME = "Vizor.exe"
-$env:VIZOR_WINDOWS_PRODUCT_NAME = $PackTitle
+$env:VIZOR_WINDOWS_PRODUCT_NAME = $ProductName
 $env:VIZOR_WINDOWS_STORAGE_PREFIX = $WindowsStoragePrefix
 
 if (-not [string]::IsNullOrWhiteSpace($UpdateFeedSigningKey)) {
@@ -421,7 +467,7 @@ $packArgs = @(
   "--packDir", $packDir,
   "--mainExe", "Vizor.exe",
   "--outputDir", $resolvedOutputDir,
-  "--icon", (Join-Path $repoRoot "windows\runner\resources\app_icon.ico"),
+  "--icon", $AppIconPath,
   "--delta", "None",
   "--noPortable",
   "--skipVeloAppCheck"

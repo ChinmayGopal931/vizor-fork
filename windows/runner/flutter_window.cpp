@@ -18,6 +18,7 @@
 #include "flutter/generated_plugin_registrant.h"
 #include "payment_uri_handoff.h"
 #include "password_input_source.h"
+#include "resource_values.h"
 #include "single_instance.h"
 #include "utils.h"
 #include "velopack_update.h"
@@ -220,16 +221,23 @@ void CompleteNoLocalCredential(SharedMethodResult result) {
       "Windows local credential verification is not available.");
 }
 
+// The version resource's product name, which follows the build identity.
+std::wstring AppName() {
+  return Utf16FromUtf8(VIZOR_WINDOWS_PRODUCT_NAME);
+}
+
 void PromptForWindowsPassword(HWND window,
                               SharedMethodResult result) {
+  const std::wstring caption = L"Confirm reset " + AppName();
+  const std::wstring message_text =
+      L"Enter your Windows account password to reset " + AppName() + L".";
   DWORD auth_error = ERROR_SUCCESS;
   for (;;) {
     CREDUI_INFOW ui_info = {};
     ui_info.cbSize = sizeof(ui_info);
     ui_info.hwndParent = window;
-    ui_info.pszCaptionText = L"Confirm reset Vizor";
-    ui_info.pszMessageText =
-        L"Enter your Windows account password to reset Vizor.";
+    ui_info.pszCaptionText = caption.c_str();
+    ui_info.pszMessageText = message_text.c_str();
 
     ULONG auth_package = 0;
     LPVOID auth_buffer = nullptr;
@@ -330,7 +338,7 @@ void VerifyDeviceOwner(
   }
 
   if (reason.empty()) {
-    reason = L"Confirm reset Vizor";
+    reason = L"Confirm reset " + AppName();
   }
 
   ScopedHString message(reason);

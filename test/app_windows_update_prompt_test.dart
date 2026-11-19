@@ -242,7 +242,7 @@ void main() {
     expect(events, ['disable']);
     expect(find.text("Couldn't turn off Tor"), findsOneWidget);
     expect(
-      find.textContaining('Tor remains on, so Vizor kept the update blocked.'),
+      find.textContaining('Tor remains on, so Veylor kept the update blocked.'),
       findsOneWidget,
     );
     expect(downloadsFrom(events), isEmpty);

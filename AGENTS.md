@@ -393,6 +393,68 @@ number above the last upload, and the keyed RPC JSON through
 the id, but app-link verification (`assetlinks.json`) and zecSwap's token
 issuer allowlist name the shipped id.
 
+## Desktop identity (VIZOR_APPLICATION_ID)
+
+Veylor's desktop apps are `com.veylor.desktop` ("Veylor") and
+`com.veylor.desktop.testnet` ("Veylor Testnet", built with
+`--dart-define=ZCASH_DEFAULT_NETWORK=test`), with the phone's icon (master:
+the 1024 px image in `ios/Runner/Assets.xcassets/AppIcon.appiconset`). As on
+the phones, the tracked files keep upstream's identity (`com.keplr.vizor`;
+`app.keplr.vizor` on Linux) and a build-time switch selects Veylor's. Desktop
+builds cannot read dart-defines natively, so each platform takes the id its
+own way, and a malformed or unknown id fails the build:
+
+- **macOS**: `scripts/macos-identity.sh com.veylor.desktop` writes the ignored
+  `macos/Runner/Configs/FlavorOverrides.xcconfig` (name, bundle id,
+  `VeylorAppIcon`, copyright, signing). It stays until
+  `scripts/macos-identity.sh --clear`, and a fastlane run replaces it. Then
+  `fvm flutter run -d macos` or `fvm flutter build macos --release`.
+  - **Signing:** Veylor builds sign with Zapp LLC's team (`63UVRFCV97`): its
+    Apple Development certificate and the Mac development profile "Veylor
+    Desktop Mac Development". The profile lists the Macs a build runs on. To
+    add a Mac, register it and regenerate the profile through the App Store
+    Connect API.
+  - **Testnet:** the testnet id has no profile yet.
+  - **Where signing lives:** the Runner target's signing is set in
+    `AppInfo.xcconfig`, not the project file, so the overrides can replace it.
+    Upstream's release lane still writes its own settings into the project.
+- **Linux**: `VIZOR_APPLICATION_ID=com.veylor.desktop fvm flutter run -d linux`
+  (or `fvm flutter build linux --release`). CMake sets the GTK application id,
+  the desktop entry, the hicolor icons (named by the id) and the executable
+  `veylor`, which a `vizor` link serves to `flutter run` (`BINARY_NAME` stays a
+  literal). The rename keeps the data apart: path_provider_linux names the
+  support directory after the executable when it cannot load `libgio-2.0.so`,
+  as on most machines without development packages.
+- **Windows**: `$env:VIZOR_APPLICATION_ID = "com.veylor.desktop"`, then
+  `fvm flutter run -d windows` (or `fvm flutter build windows --release`).
+  CMake sets the version resource (company `com.veylor`, product `Veylor`,
+  copyright Zapp LLC), the
+  window title, `veylor_app_icon.ico` and the storage prefix `Veylor`, and
+  fails if an inherited `VIZOR_WINDOWS_STORAGE_PREFIX`, `_COMPANY_NAME` or
+  `_PRODUCT_NAME` disagrees. `Vizor.exe` keeps its name.
+
+Every store follows from the identity, never from a renamed key, so nothing is
+shared with an installed Vizor: the macOS container and Keychain access group,
+the support directory (wallet DB and companions, Tor, Private USD,
+diagnostics, Linux and Windows preferences), libsecret's
+`<id>/FlutterSecureStorage` schema, the Windows Credential Manager prefix, and
+the single-instance locks (D-Bus name and `$XDG_RUNTIME_DIR` lock on Linux, the
+`%LOCALAPPDATA%` lock and activation message on Windows). Both apps register
+`zcash:`; the OS hands a link to one of them. Code identifiers (`vizor_*` keys,
+`VIZOR_*` flags, `Vizor*` names, `vizor.cash` domains) stay.
+
+Packaging follows the same switch: the `veylor` and `veylor-testnet` flavors of
+`fastlane mac|linux|windows` (`VIZOR_MACOS_FLAVOR`, `VIZOR_LINUX_FLAVOR`,
+`VIZOR_WINDOWS_FLAVOR`), `scripts/build-linux-release.sh --flavor veylor` and
+`scripts/package-windows-velopack.ps1 -ApplicationId com.veylor.desktop` make
+`Veylor-macos.dmg`, `Veylor-linux-<arch>.AppImage` and the
+`com.veylor.desktop` Velopack package. Until Veylor has release keys of its own
+there are no updates: Sparkle stays compiled out with no key, the Linux check
+is off, and Windows hides its updater in a build without a feed key. Signing,
+the Apple team, match and the release targets are unchanged (upstream's), and
+the macOS lane refuses to sign a Veylor flavor; on a Mac without upstream's
+team a local build needs an uncommitted signing override.
+
 ## Deep-link Host (VIZOR_DEEPLINK_BASE_URL)
 
 The HTTPS origin Veylor claims for incoming links has **one** knob on
@@ -578,15 +640,18 @@ Ledger accounts keep the decorative dot style.
   proper-noun acronyms in their canonical form (`ZEC`, `USDC`, `USDT`, `NEAR`,
   `Veylor`, `Keystone`, `Zcash`, `Ethereum`).
 - Figma-authored display headings may keep title case.
-- **Which brand.** Mobile copy names the app Veylor. The desktop builds still
-  ship as Vizor (macOS, Linux and Windows product names), so desktop-only
-  copy keeps Vizor, and so do the links to upstream's GitHub and website.
-  Donations go to the owner's address (`kVizorDonationAddress`, kept equal to
-  README.md's by a test); only desktop Settings offers them, so their copy
-  says Vizor. Strings
-  live in the ARB files (`lib/l10n`) and both forms are do-not-translate
-  glossary terms. When an upstream merge brings a string that names the app,
-  give it the brand of where it shows, in English, Korean and Chinese.
+- **Which brand.** Copy names the app Veylor on mobile and desktop alike:
+  desktop now ships as Veylor (see "Desktop identity"). Only the links to
+  upstream's GitHub and website keep Vizor (`aboutOpenGithub`,
+  `aboutOpenWebsite`). Donations go to the owner's address
+  (`kVizorDonationAddress`, kept equal to README.md's by a test); only
+  desktop Settings offers them, and their copy says Veylor. Strings live in
+  the ARB files (`lib/l10n`) and both forms are do-not-translate glossary
+  terms. When an upstream merge brings a string that names the app, make it
+  Veylor in English, Korean and Chinese, unless it links to upstream.
+  Native copy that names the app follows the build's identity instead where
+  it can (Windows message boxes and window title, macOS menus), and the
+  macOS permission prompts say Veylor.
 - This applies to interpolated labels too: `'$symbol deposit tx'`, not
   `'$symbol Deposit tx'`. The asset symbol carries its own casing; the rest of
   the label is sentence case.

@@ -411,7 +411,7 @@ class MobileDonationReviewContent extends StatelessWidget {
             const SizedBox(height: AppSpacing.md),
             ReviewInfoRow(
               label: context.l10n.donationDonatingTo,
-              value: 'Vizor Wallet', // l10n-ignore: product name
+              value: 'Veylor Wallet', // l10n-ignore: product name
               leading: const DonationVizorBadge(size: 40),
               valueFit: BoxFit.scaleDown,
               bottomLeftText: 'u15kdl…8tg3y',

@@ -32,6 +32,7 @@
 		LEDGERMAC010000000000002 /* BleTransport in Frameworks */ = {isa = PBXBuildFile; productRef = LEDGERMAC030000000000001 /* BleTransport */; };
 		8A0F5C532F8B001200A1C001 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 8A0F5C522F8B001200A1C001 /* AppIcon.icon */; };
 		8A0F5C542F8B001200A1C001 /* TestnetAppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 8A0F5C552F8B001200A1C001 /* TestnetAppIcon.icon */; };
+		8A0F5C572F8B001200A1C001 /* VeylorAppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 8A0F5C562F8B001200A1C001 /* VeylorAppIcon.icon */; };
 		86D631C82662CFADA25E93A1 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 34FFD12E0E0D09282CBC1131 /* Pods_Runner.framework */; };
 		CB9BE22086B38194355E9C44 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = CD78EC47695D0CDAA4C59781 /* Sparkle */; };
 		LEDGERMAC010000000000003 /* LedgerMobileHandlerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = LEDGERMAC000000000000003 /* LedgerMobileHandlerTests.swift */; };
@@ -79,6 +80,7 @@
 		33CC10F02044A3C60003C045 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		8A0F5C522F8B001200A1C001 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; name = AppIcon.icon; path = Runner/AppIcon.icon; sourceTree = "<group>"; };
 		8A0F5C552F8B001200A1C001 /* TestnetAppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; name = TestnetAppIcon.icon; path = Runner/TestnetAppIcon.icon; sourceTree = "<group>"; };
+		8A0F5C562F8B001200A1C001 /* VeylorAppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; name = VeylorAppIcon.icon; path = Runner/VeylorAppIcon.icon; sourceTree = "<group>"; };
 		33CC10F52044A3C60003C045 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/MainMenu.xib; sourceTree = "<group>"; };
 		33CC10F72044A3C60003C045 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = Info.plist; path = Runner/Info.plist; sourceTree = "<group>"; };
 		33CC11122044BFA00003C045 /* MainFlutterWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainFlutterWindow.swift; sourceTree = "<group>"; };
@@ -184,6 +186,7 @@
 			children = (
 				8A0F5C522F8B001200A1C001 /* AppIcon.icon */,
 				8A0F5C552F8B001200A1C001 /* TestnetAppIcon.icon */,
+				8A0F5C562F8B001200A1C001 /* VeylorAppIcon.icon */,
 				33CC10F42044A3C60003C045 /* MainMenu.xib */,
 				33CC10F72044A3C60003C045 /* Info.plist */,
 			);
@@ -347,6 +350,7 @@
 				L10NPLIST000000000000001 /* InfoPlist.strings in Resources */,
 				8A0F5C532F8B001200A1C001 /* AppIcon.icon in Resources */,
 				8A0F5C542F8B001200A1C001 /* TestnetAppIcon.icon in Resources */,
+				8A0F5C572F8B001200A1C001 /* VeylorAppIcon.icon in Resources */,
 				33CC10F62044A3C60003C045 /* MainMenu.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -615,16 +619,12 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "$(MACOS_APP_ICON_FILE)";
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/DebugProfile.entitlements;
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = SZTB68DXM4;
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Profile;
@@ -749,16 +749,12 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "$(MACOS_APP_ICON_FILE)";
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/DebugProfile.entitlements;
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = SZTB68DXM4;
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 			};
@@ -771,11 +767,8 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "$(MACOS_APP_ICON_FILE)";
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/Release.entitlements;
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
-				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = SZTB68DXM4;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -783,7 +776,6 @@
 					"@executable_path/../Frameworks",
 				);
 				OTHER_CODE_SIGN_FLAGS = "--timestamp";
-				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;

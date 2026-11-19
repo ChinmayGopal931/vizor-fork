@@ -141,7 +141,7 @@ class _ComposeState extends State<_Compose> {
       child: Column(
         children: [
           const SizedBox(height: AppSpacing.s),
-          MobileTopNav.back(title: 'Support Vizor', onBack: () {}),
+          MobileTopNav.back(title: 'Support Veylor', onBack: () {}),
           Expanded(
             child: MobileBottomSafeArea(
               bottomPadding: kMobileFooterGap,

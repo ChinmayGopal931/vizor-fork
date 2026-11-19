@@ -571,7 +571,7 @@ void main() {
       );
       expect(procedure.currentStep, 1);
       expect(procedure.steps[procedure.currentStep].busy, isTrue);
-      expect(find.text('Vizor is checking the Zcash app.'), findsOneWidget);
+      expect(find.text('Veylor is checking the Zcash app.'), findsOneWidget);
       expect(
         tester
             .widget<AppTextField>(
@@ -679,7 +679,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('ledger_connect_button')));
     await tester.pump();
 
-    expect(find.text('Vizor is checking the Zcash app.'), findsOneWidget);
+    expect(find.text('Veylor is checking the Zcash app.'), findsOneWidget);
     expect(find.text('Connect Ledger'), findsWidgets);
     expect(find.text('home-route'), findsNothing);
 

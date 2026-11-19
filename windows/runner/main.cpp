@@ -8,6 +8,7 @@
 #include "flutter_window.h"
 #include "payment_uri_handoff.h"
 #include "payment_uri_protocol.h"
+#include "resource_values.h"
 #include "single_instance.h"
 #include "utils.h"
 #include "velopack_uninstall.h"
@@ -37,6 +38,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
                       _In_ wchar_t *command_line, _In_ int show_command) {
   RunVelopackHooks();
 
+  // The version resource's product name, which follows the build identity.
+  const std::wstring app_name = Utf16FromUtf8(VIZOR_WINDOWS_PRODUCT_NAME);
+
   std::vector<std::string> command_line_arguments =
       GetCommandLineArguments();
   std::vector<std::string> initial_payment_uris =
@@ -53,31 +57,34 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
       return EXIT_SUCCESS;
     }
     if (!ActivateExistingInstance(single_instance.activation_message())) {
-      ::MessageBoxW(
-          nullptr,
-          L"Vizor is already running. It may be starting, not responding, or "
-          L"running in another Windows session.",
-          L"Vizor", MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND);
+      const std::wstring message =
+          app_name +
+          L" is already running. It may be starting, not responding, or "
+          L"running in another Windows session.";
+      ::MessageBoxW(nullptr, message.c_str(), app_name.c_str(),
+                    MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND);
     } else if (!initial_payment_uris.empty()) {
       // The running instance answered the activation but never accepted the
       // payment URI. Say so instead of dropping the link silently -- but do
       // not promise the window is in front: an activation the shell declines
       // to honor only flashes the taskbar button, so tell the user to switch
-      // to Vizor themselves.
-      ::MessageBoxW(
-          nullptr,
-          L"Vizor could not open this payment link because Vizor is already "
-          L"running. Switch to Vizor and open the link again.",
-          L"Vizor", MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND);
+      // to the app themselves.
+      const std::wstring message =
+          app_name + L" could not open this payment link because " +
+          app_name + L" is already running. Switch to " + app_name +
+          L" and open the link again.";
+      ::MessageBoxW(nullptr, message.c_str(), app_name.c_str(),
+                    MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND);
     }
     return EXIT_SUCCESS;
   }
   if (instance_result == SingleInstanceAcquireResult::kError) {
     const std::wstring error_message =
-        L"Vizor could not establish its single-instance lock and will close "
+        app_name +
+        L" could not establish its single-instance lock and will close "
         L"to protect wallet data.\n\nWindows error: " +
         std::to_wstring(single_instance.last_error());
-    ::MessageBoxW(nullptr, error_message.c_str(), L"Vizor",
+    ::MessageBoxW(nullptr, error_message.c_str(), app_name.c_str(),
                   MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
     return EXIT_FAILURE;
   }
@@ -103,7 +110,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
                        std::move(initial_payment_uris));
   Win32Window::Point origin(10, 10);
   Win32Window::Size size(1095, 726);
-  if (!window.Create(L"Vizor", origin, size)) {
+  if (!window.Create(app_name, origin, size)) {
     return EXIT_FAILURE;
   }
   window.SetQuitOnClose(true);

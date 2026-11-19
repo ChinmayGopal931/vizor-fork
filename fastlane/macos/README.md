@@ -37,6 +37,13 @@ Flavor별 앱 이름, bundle id, 기본 네트워크, macOS 앱 아이콘은
 `fastlane/macos/Fastfile`의 `MACOS_RELEASE_FLAVOR_CONFIGS`에서 선택합니다.
 testnet 빌드는 `macos/Runner/TestnetAppIcon.icon`을 사용합니다.
 
+`veylor`, `veylor-testnet` flavor는 Veylor의 identity(`com.veylor.desktop`,
+`com.veylor.desktop.testnet`, `macos/Runner/VeylorAppIcon.icon`)로 빌드하고
+`Veylor-macos.dmg`, `Veylor-Testnet-macos.dmg`를 만듭니다(AGENTS.md의
+"Desktop identity"). Veylor 자체 release key가 생길 때까지 Sparkle feed와 key가
+없고, release signing lane(`release`, `sync_signing`)은 이 flavor를 거부합니다.
+기본 flavor 목록에는 들어가지 않습니다.
+
 기본 release flavor는 `mainnet,testnet`입니다. 단일 flavor만 빌드하려면:
 
 ```bash

@@ -93,6 +93,19 @@ class WindowsUpdateService {
     }
   }
 
+  /// Whether this build was compiled with a signed update feed key. A build
+  /// without one has nothing to update from, so it offers no update controls.
+  Future<bool> isFeedConfigured() async {
+    if (!Platform.isWindows) return false;
+    try {
+      return await _channel.invokeMethod<bool>('isFeedConfigured') ?? false;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
   Future<String?> getUpdateBaseUrl() async {
     if (!Platform.isWindows) return null;
     try {

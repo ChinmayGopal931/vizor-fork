@@ -211,10 +211,10 @@ void main() {
     expect(find.text('Migration in progress'), findsOneWidget);
     expect(find.text('Welcome back'), findsOneWidget);
     expect(
-      find.text('We auto-locked Vizor after 10 minutes of inactivity.'),
+      find.text('We auto-locked Veylor after 10 minutes of inactivity.'),
       findsOneWidget,
     );
-    expect(find.text('Enter your password to open Vizor.'), findsNothing);
+    expect(find.text('Enter your password to open Veylor.'), findsNothing);
     expect(find.text('Unlock Veylor'), findsOneWidget);
     expect(find.text('Forgot password?'), findsNothing);
     expect(find.byKey(ironwoodMigrationVirtualUnlockScreenKey), findsOneWidget);

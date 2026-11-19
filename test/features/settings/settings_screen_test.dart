@@ -273,7 +273,7 @@ void main() {
     expect(find.text('New'), findsOneWidget);
     expect(
       tester.getTopLeft(find.text('My gift cards')).dy,
-      lessThan(tester.getTopLeft(find.text('Link Vizor mobile')).dy),
+      lessThan(tester.getTopLeft(find.text('Link Veylor mobile')).dy),
     );
 
     await tester.tap(row);
@@ -432,7 +432,7 @@ void main() {
     expect(sectionTop('Address book'), lessThan(sectionTop('Account')));
 
     // Account keeps the renamed mobile-link row.
-    expect(find.text('Link Vizor mobile'), findsOneWidget);
+    expect(find.text('Link Veylor mobile'), findsOneWidget);
     expect(find.text('Link mobile'), findsNothing);
   });
 
@@ -444,7 +444,7 @@ void main() {
       await tester.pump();
 
       expect(find.text('Danger zone'), findsNothing);
-      expect(find.text('Uninstall Vizor'), findsNothing);
+      expect(find.text('Uninstall Veylor'), findsNothing);
     } finally {
       _resetPlatformOverride();
     }
@@ -465,6 +465,9 @@ void main() {
             status: NetworkPrivacyConnectionStatus.connected,
           ),
           extraOverrides: [
+            windowsUpdateFeedConfiguredProvider.overrideWithValue(
+              const AsyncData(true),
+            ),
             windowsUpdateProvider.overrideWith(
               () => _RecordingWindowsUpdateNotifier(downloads),
             ),
@@ -503,6 +506,9 @@ void main() {
       await tester.pumpWidget(
         _settingsHarness(
           extraOverrides: [
+            windowsUpdateFeedConfiguredProvider.overrideWithValue(
+              const AsyncData(true),
+            ),
             windowsUpdateProvider.overrideWith(
               () => _FailedWindowsUpdateNotifier(),
             ),
@@ -540,7 +546,7 @@ void main() {
     await tester.pumpWidget(_settingsHarness());
     await tester.pump();
 
-    expect(find.text('About Vizor'), findsOneWidget);
+    expect(find.text('About Veylor'), findsOneWidget);
     expect(find.text('Privacy policy'), findsNothing);
     expect(find.text('Terms of usage'), findsNothing);
     expect(find.text('Use Tor'), findsOneWidget);
@@ -1713,7 +1719,7 @@ void main() {
         await tester.pump();
 
         expect(find.text('Danger zone'), findsOneWidget);
-        expect(find.text('Uninstall Vizor'), findsOneWidget);
+        expect(find.text('Uninstall Veylor'), findsOneWidget);
       }
     } finally {
       _resetPlatformOverride();

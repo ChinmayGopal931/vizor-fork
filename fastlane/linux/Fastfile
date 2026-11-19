@@ -20,6 +20,24 @@ LINUX_RELEASE_FLAVOR_CONFIGS = {
     app_id: "app.keplr.vizor.testnet",
     binary_name: "vizor-testnet",
     zcash_default_network: "test"
+  },
+  # Veylor's identity (AGENTS.md, "Desktop identity"). No update feed until
+  # Veylor has release keys of its own.
+  "veylor" => {
+    app_name: "Veylor",
+    artifact_name: "Veylor-linux",
+    app_id: "com.veylor.desktop",
+    binary_name: "veylor",
+    zcash_default_network: "main",
+    update_check: false
+  },
+  "veylor-testnet" => {
+    app_name: "Veylor Testnet",
+    artifact_name: "Veylor-Testnet-linux",
+    app_id: "com.veylor.desktop.testnet",
+    binary_name: "veylor-testnet",
+    zcash_default_network: "test",
+    update_check: false
   }
 }.freeze
 
@@ -71,7 +89,7 @@ def linux_release_metadata(flavor: "mainnet")
   asset_version = tag_info.fetch(:asset_version)
   build_number = VizorRelease.release_build_number
   arch = linux_release_arch
-  update_enabled = !tag_info.fetch(:is_prerelease)
+  update_enabled = flavor_config.fetch(:update_check, true) && !tag_info.fetch(:is_prerelease)
   dist_dir = File.join(VizorRelease.workspace_root, "dist", "linux")
   appimage_dir = File.join(dist_dir, "appimage")
   appimage_asset_name = "#{flavor_config.fetch(:artifact_name)}-#{arch}.AppImage"

@@ -126,7 +126,7 @@ void main() {
     expect(find.text('Donation in progress...'), findsOneWidget);
     expect(find.text('Send in progress...'), findsNothing);
     expect(find.text('Donating to'), findsOneWidget);
-    expect(find.text('Vizor Wallet'), findsOneWidget);
+    expect(find.text('Veylor Wallet'), findsOneWidget);
     expect(find.byType(DonationVizorBadge), findsOneWidget);
     expect(find.text(truncatedAddress(_address)), findsNothing);
     expect(find.text('Shielded'), findsNothing);
@@ -134,7 +134,7 @@ void main() {
 
     await _flushBroadcast(tester);
 
-    expect(find.text('Thank you for supporting Vizor'), findsOneWidget);
+    expect(find.text('Thank you for supporting Veylor'), findsOneWidget);
     expect(_sidebarItem(tester, 'Home').active, isFalse);
     expect(_sidebarItem(tester, 'Settings').active, isFalse);
   });
@@ -155,7 +155,7 @@ void main() {
     expect(find.text('Donation failed'), findsOneWidget);
     expect(find.text('Send failed'), findsNothing);
     expect(find.text('Donating to'), findsOneWidget);
-    expect(find.text('Vizor Wallet'), findsOneWidget);
+    expect(find.text('Veylor Wallet'), findsOneWidget);
     expect(find.byType(DonationVizorBadge), findsOneWidget);
     expect(find.text(truncatedAddress(_address)), findsNothing);
   });
