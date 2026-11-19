@@ -5,14 +5,14 @@ import IOKit.pwr_mgt
 /// `com.zcash.wallet/screen_awake` on the Mac (`setEnabled {enabled}`), the flag `SyncKeepAwakeNativeHost` owns: while
 /// it is on, an IOKit assertion keeps the display, and so the Mac, from sleeping on idle, as the phones keep their
 /// screen on. A display that sleeps would lock the Mac and hide the app, and a hidden app pauses Private USD (plan
-/// D9), so a Railgun first sync would stall. It never stops the user locking the screen or closing the lid, and the
-/// system drops the assertion with the process.
+/// D9), so a Railgun first sync, or a bridge with a key step to come, would stall. It never stops the user locking
+/// the screen or closing the lid, and the system drops the assertion with the process.
 final class ScreenAwakeChannel {
   private static var channel: FlutterMethodChannel?
   private static var assertion: IOPMAssertionID?
 
   /// Shown by `pmset -g assertions`, never in the app.
-  private static let reason = "Keeping the display awake while the wallet syncs" as CFString
+  private static let reason = "Keeping the display awake while Shielded USD syncs or bridges" as CFString
 
   static func register(messenger: FlutterBinaryMessenger) {
     let methodChannel = FlutterMethodChannel(

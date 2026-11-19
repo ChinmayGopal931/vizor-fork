@@ -9540,6 +9540,14 @@ class AppLocalizationsKo extends AppLocalizations {
   String get privateUsdRelayerClaimsSetting => '릴‍레‍이‍어‍가 대‍신 수‍령';
 
   @override
+  String get privateUsdRemoveMoreUnfinished =>
+      '완‍료‍되‍지 않‍은 비‍공‍개 USD 브‍리‍지‍가 더 늘‍었‍어‍요. 경‍고‍를 검‍토‍하‍고 다‍시 확‍인‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdRemoveRecheckFailed =>
+      '비‍공‍개 USD 브‍리‍지‍를 다‍시 확‍인‍하‍지 못‍했‍어‍요. 경‍고‍를 검‍토‍하‍고 다‍시 확‍인‍해 주‍세‍요.';
+
+  @override
   String get privateUsdResetAnyway => '그‍래‍도 초‍기‍화';
 
   @override

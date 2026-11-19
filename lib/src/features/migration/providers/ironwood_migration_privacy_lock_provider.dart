@@ -4,6 +4,8 @@ import '../../../core/config/ironwood_migration_privacy_lock_config.dart';
 import '../../../core/layout/app_form_factor.dart';
 import '../../../providers/account_provider.dart';
 import '../../../providers/app_security_provider.dart';
+import '../../private_usd/providers/private_usd_keep_awake_provider.dart'
+    show privateUsdBridgeAwaitsUserProvider;
 import '../models/ironwood_migration_phases.dart';
 import 'ironwood_migration_coordinator_provider.dart';
 
@@ -67,7 +69,14 @@ final ironwoodMigrationPrivacyLockRequiredProvider = Provider<bool>((ref) {
 
 final ironwoodMigrationPrivacyLockEligibleProvider = Provider<bool>((ref) {
   return ref.watch(ironwoodMigrationPrivacyLockRequiredProvider) &&
-      ref.watch(ironwoodMigrationPrivacyLockSuppressionProvider) == null;
+      ref.watch(ironwoodMigrationPrivacyLockSuppressionProvider) == null &&
+      // Desktop: a Shielded USD bridge that needs the user's approval, now or
+      // next, is never covered, so "Authorize settlement" never shows behind
+      // the lock, as the phone's sync privacy lock does for it. Once it no
+      // longer does, the idle window starts again.
+      (kDesktopFormFactor
+          ? !ref.watch(privateUsdBridgeAwaitsUserProvider)
+          : true);
 });
 
 class IronwoodMigrationPrivacyLockState {

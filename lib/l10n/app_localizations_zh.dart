@@ -8970,6 +8970,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get privateUsdRelayerClaimsSetting => '由中继者代为领取';
 
   @override
+  String get privateUsdRemoveMoreUnfinished => '又有隐私 USD 跨链尚未完成。请查看警告并再次确认。';
+
+  @override
+  String get privateUsdRemoveRecheckFailed => '无法重新检查隐私 USD 跨链。请查看警告并再次确认。';
+
+  @override
   String get privateUsdResetAnyway => '仍然重置';
 
   @override

@@ -9686,6 +9686,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get privateUsdRelayerClaimsSetting => 'Let the relayer claim for me';
 
   @override
+  String get privateUsdRemoveMoreUnfinished =>
+      'More shielded USD bridges are unfinished. Review the warning and confirm again.';
+
+  @override
+  String get privateUsdRemoveRecheckFailed =>
+      'Couldn\'t recheck shielded USD bridges. Review the warning and confirm again.';
+
+  @override
   String get privateUsdResetAnyway => 'Reset anyway';
 
   @override

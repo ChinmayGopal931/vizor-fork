@@ -1285,6 +1285,9 @@ class MainFlutterWindow: NSWindow {
     ScreenAwakeChannel.register(
       messenger: flutterViewController.engine.binaryMessenger
     )
+    SettlementAttentionChannel.register(
+      messenger: flutterViewController.engine.binaryMessenger
+    )
     sessionLifecycle = MacSessionLifecycle(
       messenger: flutterViewController.engine.binaryMessenger
     )

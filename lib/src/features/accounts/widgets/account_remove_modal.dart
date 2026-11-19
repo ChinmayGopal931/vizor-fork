@@ -11,6 +11,8 @@ import '../../../core/widgets/app_text_field.dart';
 import '../../../core/widgets/password_text_field.dart';
 import '../../../providers/account_provider.dart'
     show UnsharedGiftCardsChangedException;
+import '../../../providers/private_usd_lifecycle_provider.dart'
+    show PrivateUsdUnfinishedConversionsException;
 import '../../payment_links/services/payment_link_recovery_store.dart';
 import 'account_modal_card.dart';
 import '../../../core/widgets/neon_glass_panel.dart';
@@ -32,6 +34,8 @@ class AccountRemoveModal extends StatefulWidget {
     this.checkingReceivingGiftCards = false,
     this.receivingGiftCardCheckFailed = false,
     this.unsharedGiftCardCount = 0,
+    this.privateUsdUnfinishedCount = 0,
+    this.checkingPrivateUsd = false,
     required this.onCancel,
     required this.onConfirmPassword,
     required this.onRemove,
@@ -50,6 +54,15 @@ class AccountRemoveModal extends StatefulWidget {
 
   /// Null when the unshared gift card check failed or is still running.
   final int? unsharedGiftCardCount;
+
+  /// Shielded USD bridges under way that only this account (or, for the last
+  /// one, this wallet) can finish or refund: warned about, never blocked
+  /// (plan §3.5 invariant 15). Null when the check failed.
+  final int? privateUsdUnfinishedCount;
+
+  /// The bridge count is still being read: removal waits for it, so it never
+  /// goes ahead unwarned.
+  final bool checkingPrivateUsd;
   final VoidCallback onCancel;
   final Future<bool> Function(String password) onConfirmPassword;
   final Future<void> Function(AccountRemoveProgressCallback onProgress)
@@ -70,8 +83,14 @@ class _AccountRemoveModalState extends State<AccountRemoveModal> {
 
   bool get _canSubmit =>
       !_isSubmitting &&
+      !widget.checkingPrivateUsd &&
       _removalBlockMessage == null &&
       isWalletPasswordValid(_passwordController.text);
+
+  /// Bridges under way, or a count that could not be read (not while it is
+  /// still being read).
+  bool get _warnsOfBridges =>
+      !widget.checkingPrivateUsd && widget.privateUsdUnfinishedCount != 0;
 
   String? get _passwordMessage {
     if (_passwordError != null) return _passwordError;
@@ -109,7 +128,7 @@ class _AccountRemoveModalState extends State<AccountRemoveModal> {
 
   Future<void> _submit() async {
     if (_isSubmitting) return;
-    if (_removalBlockMessage != null) return;
+    if (_removalBlockMessage != null || widget.checkingPrivateUsd) return;
     final passwordError = validateRequiredWalletPassword(
       context.l10n,
       _passwordController.text,
@@ -168,6 +187,16 @@ class _AccountRemoveModalState extends State<AccountRemoveModal> {
             ? context.l10n.accountsRemoveGiftCardsRecheckFailed
             : context.l10n.accountsRemoveGiftCardsMoreFunded,
       );
+    } on PrivateUsdUnfinishedConversionsException catch (error) {
+      // More bridges than the user was warned about, or a recheck that
+      // failed: nothing was deleted, and the warning above shows the fresh
+      // count to confirm again.
+      if (!mounted) return;
+      setState(
+        () => _submitError = error.count == null
+            ? context.l10n.privateUsdRemoveRecheckFailed
+            : context.l10n.privateUsdRemoveMoreUnfinished,
+      );
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -215,6 +244,7 @@ class _AccountRemoveModalState extends State<AccountRemoveModal> {
       widget.unsharedGiftCardCount,
       walletReset: widget.isLastAccount,
     );
+    final privateUsdCount = widget.privateUsdUnfinishedCount;
 
     return AccountModalCard(
       child: Column(
@@ -245,6 +275,29 @@ class _AccountRemoveModalState extends State<AccountRemoveModal> {
             _AccountRemoveWarningPanel(
               key: const ValueKey('account_remove_unshared_gift_card_warning'),
               message: unsharedGiftCardWarning,
+            ),
+          ],
+          // Shielded USD bridges under way: their funds can only be recovered
+          // by this account (or, for the last one, this wallet). Warn, then
+          // allow, as the phone's removal sheet does.
+          if (_warnsOfBridges) ...[
+            const SizedBox(height: AppSpacing.sm),
+            _AccountRemoveWarningPanel(
+              key: const ValueKey('account_remove_private_usd_warning'),
+              title: privateUsdCount == null
+                  ? null
+                  : context.l10n.privateUsdDeleteUnfinishedTitle,
+              message: privateUsdCount == null
+                  ? (widget.isLastAccount
+                        ? context.l10n.privateUsdResetUncheckedBody
+                        : context.l10n.privateUsdDeleteUncheckedBody)
+                  : (widget.isLastAccount
+                        ? context.l10n.privateUsdResetUnfinishedBody(
+                            privateUsdCount,
+                          )
+                        : context.l10n.privateUsdDeleteUnfinishedBody(
+                            privateUsdCount,
+                          )),
             ),
           ],
           // Leave clearance above the label row for the Caps Lock warning.
@@ -312,9 +365,12 @@ class _AccountRemoveModalState extends State<AccountRemoveModal> {
 
   String get _submitButtonLabel {
     if (!_isSubmitting) {
-      return widget.isLastAccount
-          ? context.l10n.commonResetVizor
-          : context.l10n.commonRemove;
+      return switch ((widget.isLastAccount, _warnsOfBridges)) {
+        (true, true) => context.l10n.privateUsdResetAnyway,
+        (true, false) => context.l10n.commonResetVizor,
+        (false, true) => context.l10n.privateUsdDeleteAnyway,
+        (false, false) => context.l10n.commonRemove,
+      };
     }
 
     return switch (_submitPhase) {
@@ -335,9 +391,16 @@ class _AccountRemoveModalState extends State<AccountRemoveModal> {
 }
 
 class _AccountRemoveWarningPanel extends StatelessWidget {
-  const _AccountRemoveWarningPanel({required this.message, super.key});
+  const _AccountRemoveWarningPanel({
+    required this.message,
+    this.title,
+    super.key,
+  });
 
   final String message;
+
+  /// Over the message, for a warning that names what is at stake.
+  final String? title;
 
   @override
   Widget build(BuildContext context) {
@@ -357,11 +420,25 @@ class _AccountRemoveWarningPanel extends StatelessWidget {
           ),
           const SizedBox(width: AppSpacing.xs),
           Expanded(
-            child: Text(
-              message,
-              style: AppTypography.bodySmall.copyWith(
-                color: colors.text.warning,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (title case final title?) ...[
+                  Text(
+                    title,
+                    style: AppTypography.labelMedium.copyWith(
+                      color: colors.text.warning,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xxs),
+                ],
+                Text(
+                  message,
+                  style: AppTypography.bodySmall.copyWith(
+                    color: colors.text.warning,
+                  ),
+                ),
+              ],
             ),
           ),
         ],

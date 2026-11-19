@@ -2608,6 +2608,8 @@
   "privateUsdRefundsTitle": "退款",
   "privateUsdRefundsView": "查看退款",
   "privateUsdRelayerClaimsSetting": "由中继者代为领取",
+  "privateUsdRemoveMoreUnfinished": "又有隐私 USD 跨链尚未完成。请查看警告并再次确认。",
+  "privateUsdRemoveRecheckFailed": "无法重新检查隐私 USD 跨链。请查看警告并再次确认。",
   "privateUsdResetAnyway": "仍然重置",
   "privateUsdResetUncheckedBody": "无法检查是否有未完成的隐私 USD 跨链。只有此钱包能找回其资金，现在重置可能会造成资金损失。",
   "privateUsdResetUnfinishedBody": "你的钱包有 {count} 笔隐私 USD 跨链尚未完成。只有此钱包能找回这些资金，现在重置可能会造成资金损失。",

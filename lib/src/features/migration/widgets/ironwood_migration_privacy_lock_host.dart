@@ -13,6 +13,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../providers/app_security_provider.dart';
 import '../../../providers/hide_balance_on_unlock_provider.dart';
+import '../../private_usd/providers/private_usd_keep_awake_provider.dart'
+    show privateUsdBridgeAwaitsUserProvider;
 import '../../onboarding/shared/onboarding_auth_shell.dart';
 import '../../onboarding/unlock_screen.dart';
 import '../providers/ironwood_migration_privacy_lock_provider.dart';
@@ -204,6 +206,15 @@ class _IronwoodMigrationPrivacyLockHostState
         !ref.read(ironwoodMigrationPrivacyLockRequiredProvider) ||
         ref.read(ironwoodMigrationPrivacyLockProvider).isLocked) {
       return;
+    }
+    // A Shielded USD bridge awaiting the user's approval is never covered,
+    // after an absence either: coming back counts as use, and the idle window
+    // starts again once the bridge no longer waits.
+    if (kDesktopFormFactor) {
+      if (ref.read(privateUsdBridgeAwaitsUserProvider)) {
+        _lastInteractionAt = _now();
+        return;
+      }
     }
     if (_now().difference(_lastInteractionAt) < widget.idleTimeout) {
       if (ref.read(ironwoodMigrationPrivacyLockEligibleProvider)) {

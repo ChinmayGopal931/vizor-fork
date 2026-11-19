@@ -12432,6 +12432,14 @@
   "@privateUsdRelayerClaimsSetting": {
     "description": "Switch in Settings: whether a new bridge to shielded USD lets the relayer claim the dollars on the user's behalf, so the user can leave once the market maker confirms the deposit."
   },
+  "privateUsdRemoveMoreUnfinished": "More shielded USD bridges are unfinished. Review the warning and confirm again.",
+  "@privateUsdRemoveMoreUnfinished": {
+    "description": "[security] Error in the Mac app's remove-account and reset dialogs when more Shielded USD bridges became unfinished while the removal was pending; nothing was removed."
+  },
+  "privateUsdRemoveRecheckFailed": "Couldn't recheck shielded USD bridges. Review the warning and confirm again.",
+  "@privateUsdRemoveRecheckFailed": {
+    "description": "[security] Error in the Mac app's remove-account and reset dialogs when the unfinished Shielded USD bridges could not be rechecked before removal; nothing was removed."
+  },
   "privateUsdResetAnyway": "Reset anyway",
   "@privateUsdResetAnyway": {
     "description": "[security] Destructive button in the reset sheet that erases every account and all wallet data despite unfinished Shielded USD bridges, whose funds can be lost."

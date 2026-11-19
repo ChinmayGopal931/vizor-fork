@@ -24,6 +24,8 @@ import '../../../core/widgets/app_profile_picture.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../providers/account_provider.dart';
 import '../../../providers/app_security_provider.dart';
+import '../../../providers/private_usd_lifecycle_provider.dart'
+    show PrivateUsdUnfinishedConversionsException;
 import '../../../providers/receive_address_provider.dart';
 import '../../../providers/sync_provider.dart';
 import '../../../providers/voting/voting_submission_guard_provider.dart';
@@ -31,6 +33,7 @@ import '../../../providers/wallet_mutation_guard.dart';
 import '../../send/models/send_prefill_args.dart';
 import '../../payment_links/services/payment_link_received_store.dart';
 import '../../payment_links/services/payment_link_recovery_reconciler.dart';
+import '../../private_usd/providers/private_usd_unfinished_provider.dart';
 import '../../swap/providers/swap_activity_store.dart';
 import '../widgets/account_edit_modal.dart';
 import '../widgets/account_profile_picture_modal.dart';
@@ -97,6 +100,9 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
   /// shows the "couldn't check" warning and skips the recheck next time.
   String? _unsharedRecheckFailedUuid;
 
+  /// The same for the Shielded USD bridges under way.
+  String? _privateUsdRecheckFailedUuid;
+
   @override
   void initState() {
     super.initState();
@@ -131,6 +137,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
       _editDraftProfilePictureId = null;
       _pfpPickerFromEdit = false;
       _unsharedRecheckFailedUuid = null;
+      _privateUsdRecheckFailedUuid = null;
     });
   }
 
@@ -191,6 +198,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
     String uuid, {
     required bool isLastAccount,
     required int? confirmedUnsharedGiftCardCount,
+    required int? confirmedPrivateUsdUnfinishedCount,
     AccountRemoveProgressCallback? onProgress,
   }) async {
     try {
@@ -198,6 +206,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
         uuid,
         isLastAccount: isLastAccount,
         confirmedUnsharedGiftCardCount: confirmedUnsharedGiftCardCount,
+        confirmedPrivateUsdUnfinishedCount: confirmedPrivateUsdUnfinishedCount,
         onProgress: onProgress,
       );
     } on UnsharedGiftCardsChangedException catch (error) {
@@ -208,6 +217,16 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
         ref.invalidate(paymentLinkUnsharedFundedCountProvider(uuid));
       }
       rethrow;
+    } on PrivateUsdUnfinishedConversionsException catch (error) {
+      // As for Gift Cards: the modal stays open with the fresh count, or the
+      // "couldn't check" warning, before the user reconfirms.
+      if (error.count == null) {
+        if (mounted) setState(() => _privateUsdRecheckFailedUuid = uuid);
+      } else {
+        ref.invalidate(privateUsdUnfinishedCountProvider(uuid));
+        ref.invalidate(privateUsdUnfinishedTotalProvider);
+      }
+      rethrow;
     }
   }
 
@@ -215,6 +234,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
     String uuid, {
     required bool isLastAccount,
     required int? confirmedUnsharedGiftCardCount,
+    required int? confirmedPrivateUsdUnfinishedCount,
     AccountRemoveProgressCallback? onProgress,
   }) async {
     if (_blockDestructiveWalletChangeIfVotingSubmissionInProgress()) return;
@@ -222,6 +242,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
       await _resetWalletFromAccountRemoval(
         onProgress,
         confirmedUnsharedGiftCardCount: confirmedUnsharedGiftCardCount,
+        confirmedPrivateUsdUnfinishedCount: confirmedPrivateUsdUnfinishedCount,
       );
       return;
     }
@@ -254,6 +275,8 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
         await accountNotifier.removeAccount(
           uuid,
           confirmedUnsharedGiftCardCount: confirmedUnsharedGiftCardCount,
+          confirmedPrivateUsdUnfinishedCount:
+              confirmedPrivateUsdUnfinishedCount,
         );
         log(
           'removeAccountFlow: account mutation complete in '
@@ -286,6 +309,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
   Future<void> _resetWalletFromAccountRemoval(
     AccountRemoveProgressCallback? onProgress, {
     required int? confirmedUnsharedGiftCardCount,
+    required int? confirmedPrivateUsdUnfinishedCount,
   }) async {
     if (_blockDestructiveWalletChangeIfVotingSubmissionInProgress()) return;
     final accountNotifier = ref.read(accountProvider.notifier);
@@ -295,6 +319,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
       ref,
       () => accountNotifier.resetWallet(
         confirmedUnsharedGiftCardCount: confirmedUnsharedGiftCardCount,
+        confirmedPrivateUsdUnfinishedCount: confirmedPrivateUsdUnfinishedCount,
       ),
       onResetting: () {
         onProgress?.call(AccountRemoveProgress.removingAccount);
@@ -338,6 +363,23 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
                 modalAccount.uuid == _unsharedRecheckFailedUuid)
         ? null
         : modalUnsharedGiftCardCount.value;
+    // Shielded USD bridges under way: only this account (or, for the last
+    // one, this wallet) can finish or refund them. Warned about, never
+    // blocked; a count that cannot be read warns as "couldn't check".
+    final modalPrivateUsdUnfinished =
+        modalAccount != null && _activeModal == _AccountModalType.removeAccount
+        ? ref.watch(
+            isLastModalAccount
+                ? privateUsdUnfinishedTotalProvider
+                : privateUsdUnfinishedCountProvider(modalAccount.uuid),
+          )
+        : const AsyncValue<int>.data(0);
+    final modalPrivateUsdUnfinishedValue =
+        modalPrivateUsdUnfinished.hasError ||
+            (modalAccount != null &&
+                modalAccount.uuid == _privateUsdRecheckFailedUuid)
+        ? null
+        : modalPrivateUsdUnfinished.value;
     // Kept for the last account too: its removal is a full reset, which
     // `resetWallet` refuses over an in-flight claim while unlocked.
     final modalReceivingGiftCardCount =
@@ -437,6 +479,10 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
                     receivingGiftCardCheckFailed:
                         modalReceivingGiftCardCount.hasError,
                     unsharedGiftCardCount: modalUnsharedGiftCardCountValue,
+                    privateUsdUnfinishedCount: modalPrivateUsdUnfinishedValue,
+                    checkingPrivateUsd:
+                        modalPrivateUsdUnfinished.isLoading &&
+                        !modalPrivateUsdUnfinished.hasValue,
                     onCancel: _closeModal,
                     onConfirmPassword: (password) => ref
                         .read(appSecurityProvider.notifier)
@@ -446,6 +492,8 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
                       isLastAccount: isLastModalAccount,
                       confirmedUnsharedGiftCardCount:
                           modalUnsharedGiftCardCountValue,
+                      confirmedPrivateUsdUnfinishedCount:
+                          modalPrivateUsdUnfinishedValue,
                       onProgress: onProgress,
                     ),
                   ),

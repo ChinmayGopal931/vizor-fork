@@ -15818,6 +15818,18 @@ abstract class AppLocalizations {
   /// **'Let the relayer claim for me'**
   String get privateUsdRelayerClaimsSetting;
 
+  /// [security] Error in the Mac app's remove-account and reset dialogs when more Shielded USD bridges became unfinished while the removal was pending; nothing was removed.
+  ///
+  /// In en, this message translates to:
+  /// **'More shielded USD bridges are unfinished. Review the warning and confirm again.'**
+  String get privateUsdRemoveMoreUnfinished;
+
+  /// [security] Error in the Mac app's remove-account and reset dialogs when the unfinished Shielded USD bridges could not be rechecked before removal; nothing was removed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t recheck shielded USD bridges. Review the warning and confirm again.'**
+  String get privateUsdRemoveRecheckFailed;
+
   /// [security] Destructive button in the reset sheet that erases every account and all wallet data despite unfinished Shielded USD bridges, whose funds can be lost.
   ///
   /// In en, this message translates to:
