@@ -340,7 +340,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Review send'), findsOneWidget);
+    expect(find.text('REVIEW SEND'), findsOneWidget);
     expect(find.byKey(const ValueKey('send_confirm_button')), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('send_confirm_button')));
@@ -430,7 +430,7 @@ void main() {
       timeout: const Duration(minutes: 2),
     );
     expect(await signingApproval, isTrue);
-    expect(find.text('Sent successfully'), findsOneWidget);
+    expect(find.text('SENT SUCCESSFULLY'), findsOneWidget);
     expect(pcztCreations, 1, reason: 'Rejection must reuse the original PCZT.');
     expect(operationService.checkpointCount, 1);
     expect(operationService.broadcastCount, 1);
@@ -1256,7 +1256,7 @@ Future<void> _runLedgerTexSendScenario(WidgetTester tester) async {
     ),
   );
   await tester.pumpAndSettle();
-  expect(find.text('Review send'), findsOneWidget);
+  expect(find.text('REVIEW SEND'), findsOneWidget);
   expect(find.text('TEX'), findsOneWidget);
 
   final firstApproval = approveNextSpeculosReview(fixture.signingApiUrl);
@@ -1283,7 +1283,7 @@ Future<void> _runLedgerTexSendScenario(WidgetTester tester) async {
     timeout: const Duration(minutes: 2),
   );
   expect(await secondApproval, isTrue);
-  expect(find.text('Sent successfully'), findsOneWidget);
+  expect(find.text('SENT SUCCESSFULLY'), findsOneWidget);
   expect(operationService.checkpointCount, 1);
   expect(operationService.batchCheckpointCount, 1);
   expect(operationService.broadcastCount, 1);

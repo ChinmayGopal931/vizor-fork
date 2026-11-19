@@ -61,7 +61,7 @@ void main() {
     await tester.pumpAndSettle();
     // Mobile draws the page title as an uppercase caption.
     expect(
-      find.text(_mobile ? 'REVIEW PAYMENT' : 'Review Payment'),
+      find.text('REVIEW PAYMENT'),
       findsOneWidget,
     );
     expect(_route, findsOneWidget);
@@ -77,7 +77,7 @@ void main() {
     await tester.pumpAndSettle();
     // Mobile draws the page title as an uppercase caption.
     expect(
-      find.text(_mobile ? 'REVIEW PAYMENT' : 'Review Payment'),
+      find.text('REVIEW PAYMENT'),
       findsOneWidget,
     );
     expect(_route, findsNothing);

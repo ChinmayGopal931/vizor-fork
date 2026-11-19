@@ -17,7 +17,7 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.byType(ReceivedReceiptView), findsOneWidget);
-    expect(find.text('Received successfully'), findsOneWidget);
+    expect(find.text('RECEIVED SUCCESSFULLY'), findsOneWidget);
     expect(find.text('t1PV7ny ... GVSpEX'), findsOneWidget);
     expect(find.text('Transparent'), findsOneWidget);
     expect(find.text('120 ZEC'), findsOneWidget);
@@ -73,7 +73,7 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.byType(ReceivedReceiptView), findsOneWidget);
-    expect(find.text('Receive in progress...'), findsOneWidget);
+    expect(find.text('RECEIVE IN PROGRESS...'), findsOneWidget);
     expect(find.text('In progress'), findsOneWidget);
     expect(find.text('From'), findsOneWidget);
     expect(find.text('Unknown sender'), findsOneWidget);
