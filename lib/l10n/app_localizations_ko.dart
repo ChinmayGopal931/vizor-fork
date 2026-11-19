@@ -9390,6 +9390,10 @@ class AppLocalizationsKo extends AppLocalizations {
       '시‍간‍이 걸‍릴 수 있‍어‍요. 완‍료‍될 때‍까‍지 Veylor‍가 열‍려 있‍고 온‍라‍인 상‍태‍여‍야 해‍요. 화‍면‍이 꺼‍지‍면 돌‍아‍올 때‍까‍지 일‍시 중‍지‍돼‍요.';
 
   @override
+  String get privateUsdKeepOpenBodyDesktop =>
+      '시‍간‍이 걸‍릴 수 있‍어‍요. 완‍료‍될 때‍까‍지 Veylor‍를 열‍고 창‍을 화‍면‍에 띄‍워 두‍세‍요. 창‍을 숨‍기‍거‍나 최‍소‍화‍하‍거‍나 Mac‍이 잠‍자‍기 상‍태‍가 되‍면 돌‍아‍올 때‍까‍지 일‍시 중‍지‍돼‍요.';
+
+  @override
   String get privateUsdKeepOpenTitle => 'Veylor‍를 열‍어 두‍세‍요';
 
   @override
@@ -9656,6 +9660,10 @@ class AppLocalizationsKo extends AppLocalizations {
       '휴‍대‍폰‍에‍서 결‍제‍에 대‍한 영‍지‍식 증‍명‍을 만‍들‍고 있‍어‍요. 몇 분 걸‍릴 수 있‍어‍요. Veylor‍를 열‍어 두‍세‍요.';
 
   @override
+  String get privateUsdReverseProvingNoteDesktop =>
+      'Mac‍에‍서 결‍제‍에 대‍한 영‍지‍식 증‍명‍을 만‍들‍고 있‍어‍요. 몇 분 걸‍릴 수 있‍어‍요. Veylor‍를 열‍고 창‍을 화‍면‍에 띄‍워 두‍세‍요.';
+
+  @override
   String get privateUsdReverseRailgunFee => 'Railgun 공‍개 전‍환 수‍수‍료';
 
   @override
@@ -9740,6 +9748,11 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String privateUsdReverseStepPayDetail(String debit) {
     return '에‍스‍크‍로‍에 비‍공‍개 USD $debit‍만‍큼 보‍내‍려‍면 결‍제 버‍튼‍을 탭‍하‍세‍요.';
+  }
+
+  @override
+  String privateUsdReverseStepPayDetailDesktop(String debit) {
+    return '에‍스‍크‍로‍에 비‍공‍개 USD $debit‍만‍큼 보‍내‍려‍면 결‍제 버‍튼‍을 클‍릭‍하‍세‍요.';
   }
 
   @override

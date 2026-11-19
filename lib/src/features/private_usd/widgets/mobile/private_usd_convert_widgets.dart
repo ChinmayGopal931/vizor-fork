@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart' show InputDecoration, TextField;
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter/widgets.dart';
 
 import '../../../../core/formatting/zec_amount.dart';
@@ -323,10 +324,20 @@ class _UnderAmountLine extends StatelessWidget {
 /// switching is unavailable ([onTap] null), dimmed, and its edge breathes
 /// while a quote is on its way ([busy]).
 class PrivateUsdDirectionToggle extends StatefulWidget {
-  const PrivateUsdDirectionToggle({this.onTap, this.busy = false, super.key});
+  const PrivateUsdDirectionToggle({
+    this.onTap,
+    this.busy = false,
+    this.desktopInput = false,
+    super.key,
+  });
 
   final VoidCallback? onTap;
   final bool busy;
+
+  /// Desktop's convert screen: the plate takes a click cursor and the
+  /// keyboard (Tab, then Enter or Space), its edge fully lit while focused.
+  /// Off (the phone) the plate is built exactly as before.
+  final bool desktopInput;
 
   @override
   State<PrivateUsdDirectionToggle> createState() =>
@@ -339,6 +350,9 @@ class _PrivateUsdDirectionToggleState extends State<PrivateUsdDirectionToggle>
     vsync: this,
     duration: const Duration(milliseconds: 900),
   );
+
+  /// Desktop only: the plate has the keyboard focus.
+  var _focused = false;
 
   @override
   void didChangeDependencies() {
@@ -374,6 +388,75 @@ class _PrivateUsdDirectionToggleState extends State<PrivateUsdDirectionToggle>
     final onTap = widget.onTap;
     final enabled = onTap != null;
     final glow = colors.neon.glow;
+    // Only desktop's focus ever sets [_focused], so the phone draws as before.
+    final focused = enabled && _focused;
+    Widget plate = GestureDetector(
+      key: const ValueKey('mobile_private_usd_convert_direction'),
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: AnimatedBuilder(
+        animation: _breath,
+        builder: (context, child) {
+          final double breath = widget.busy ? 0.25 + 0.75 * _breath.value : 0;
+          final edge = enabled
+              ? glow.withValues(alpha: focused ? 1 : 0.75)
+              : Color.lerp(
+                  colors.border.subtleOpacity,
+                  glow.withValues(alpha: 0.6),
+                  breath,
+                )!;
+          return Container(
+            width: 40,
+            height: 40,
+            alignment: Alignment.center,
+            decoration: ShapeDecoration(
+              color: colors.background.window,
+              shape: Neon.chamferBorder(side: BorderSide(color: edge)),
+              shadows: enabled || breath > 0
+                  ? Neon.boxGlow(
+                      glow,
+                      intensity: enabled
+                          ? (focused ? 0.45 : 0.25)
+                          : 0.35 * breath,
+                    )
+                  : null,
+            ),
+            child: child,
+          );
+        },
+        child: RotatedBox(
+          quarterTurns: 1,
+          child: TronGlyph(
+            TronGlyphKind.swap,
+            color: enabled ? glow : colors.icon.disabled,
+            core: colors.neon.core,
+            lit: enabled ? 0.6 : 0,
+            size: 20,
+          ),
+        ),
+      ),
+    );
+    if (widget.desktopInput) {
+      plate = MouseRegion(
+        cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+        child: FocusableActionDetector(
+          enabled: enabled,
+          shortcuts: _desktopActivationShortcuts,
+          actions: <Type, Action<Intent>>{
+            ActivateIntent: CallbackAction<Intent>(
+              onInvoke: (_) {
+                widget.onTap?.call();
+                return null;
+              },
+            ),
+          },
+          onShowFocusHighlight: (shown) {
+            if (shown != _focused) setState(() => _focused = shown);
+          },
+          child: plate,
+        ),
+      );
+    }
     return SizedBox(
       height: 56,
       child: Stack(
@@ -391,58 +474,19 @@ class _PrivateUsdDirectionToggleState extends State<PrivateUsdDirectionToggle>
             enabled: enabled,
             label: context.l10n.privateUsdConvertSwapDirection,
             excludeSemantics: true,
-            child: GestureDetector(
-              key: const ValueKey('mobile_private_usd_convert_direction'),
-              behavior: HitTestBehavior.opaque,
-              onTap: onTap,
-              child: AnimatedBuilder(
-                animation: _breath,
-                builder: (context, child) {
-                  final double breath = widget.busy
-                      ? 0.25 + 0.75 * _breath.value
-                      : 0;
-                  final edge = enabled
-                      ? glow.withValues(alpha: 0.75)
-                      : Color.lerp(
-                          colors.border.subtleOpacity,
-                          glow.withValues(alpha: 0.6),
-                          breath,
-                        )!;
-                  return Container(
-                    width: 40,
-                    height: 40,
-                    alignment: Alignment.center,
-                    decoration: ShapeDecoration(
-                      color: colors.background.window,
-                      shape: Neon.chamferBorder(side: BorderSide(color: edge)),
-                      shadows: enabled || breath > 0
-                          ? Neon.boxGlow(
-                              glow,
-                              intensity: enabled ? 0.25 : 0.35 * breath,
-                            )
-                          : null,
-                    ),
-                    child: child,
-                  );
-                },
-                child: RotatedBox(
-                  quarterTurns: 1,
-                  child: TronGlyph(
-                    TronGlyphKind.swap,
-                    color: enabled ? glow : colors.icon.disabled,
-                    core: colors.neon.core,
-                    lit: enabled ? 0.6 : 0,
-                    size: 20,
-                  ),
-                ),
-              ),
-            ),
+            child: plate,
           ),
         ],
       ),
     );
   }
 }
+
+/// Enter and Space switch the direction on desktop.
+const _desktopActivationShortcuts = <ShortcutActivator, Intent>{
+  SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
+  SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
+};
 
 /// The quote's countdown, or that it expired, between two hairlines that
 /// light up toward it.

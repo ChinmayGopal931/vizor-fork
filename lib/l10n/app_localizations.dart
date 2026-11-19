@@ -15560,6 +15560,12 @@ abstract class AppLocalizations {
   /// **'This can take a while. Veylor needs to stay open and online until it\'s done: if your screen turns off, it pauses until you\'re back.'**
   String get privateUsdKeepOpenBody;
 
+  /// Body of the 'Keep Veylor open' card on a bridge's progress screen in the Mac app: the bridge can take a while, Veylor must stay open with its window visible, and it pauses while the window is hidden or minimized or the Mac sleeps.
+  ///
+  /// In en, this message translates to:
+  /// **'This can take a while. Keep Veylor open, with its window showing, until it\'s done: if the window is hidden or minimized, or your Mac sleeps, it pauses until you\'re back.'**
+  String get privateUsdKeepOpenBodyDesktop;
+
   /// Caption of the card on a bridge's progress screen, in either direction, while the bridge needs Veylor to stay open; drawn in uppercase.
   ///
   /// In en, this message translates to:
@@ -15998,6 +16004,12 @@ abstract class AppLocalizations {
   /// **'Your phone builds a zero-knowledge proof of the payment. This can take a few minutes. Keep Veylor open.'**
   String get privateUsdReverseProvingNote;
 
+  /// Note under the progress steps of a shielded-USD-to-ZEC bridge in the Mac app while the Mac builds the zero-knowledge proof for the escrow payment, which can take minutes; the window must stay visible meanwhile.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Mac builds a zero-knowledge proof of the payment. This can take a few minutes. Keep Veylor open, with its window showing.'**
+  String get privateUsdReverseProvingNoteDesktop;
+
   /// Row label on the shielded-USD-to-ZEC review and in its activity details: Railgun's fee for moving the dollars out of the shielded balance (unshielding) into escrow.
   ///
   /// In en, this message translates to:
@@ -16147,6 +16159,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Tap Pay to send {debit} of shielded USD to escrow.'**
   String privateUsdReverseStepPayDetail(String debit);
+
+  /// Detail under the 'Pay shielded USD to escrow' step in the Mac app: clicking the Pay button sends the shown amount of shielded USD into escrow; {debit} is a dollar amount such as $25.10.
+  ///
+  /// In en, this message translates to:
+  /// **'Click Pay to send {debit} of shielded USD to escrow.'**
+  String privateUsdReverseStepPayDetailDesktop(String debit);
 
   /// Fifth step of the shielded-USD-to-ZEC progress timeline: the bridge is being settled.
   ///

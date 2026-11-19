@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/l10n/l10n.dart';
 import '../../../../core/layout/app_desktop_shell.dart';
 import '../../../../core/layout/app_main_sidebar.dart';
+import '../../../../core/layout/app_pane_floating_bar.dart';
 import '../../../../core/layout/app_pane_scroll_scaffold.dart';
 import '../../../../core/layout/mobile/neon_sync_backdrop.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -15,6 +16,7 @@ import '../../../../core/widgets/app_modal_card.dart';
 import '../../../../core/widgets/neon_glass_panel.dart';
 import '../../../../core/widgets/neon_page_title.dart';
 import '../../../activity/activity_feed_sections.dart' show ActivityEntry;
+import '../../models/private_usd_record_key.dart';
 import '../../providers/private_usd_activity_provider.dart';
 import '../mobile/private_usd_activity_details.dart';
 import '../mobile/private_usd_activity_rows.dart';
@@ -25,35 +27,35 @@ const kDesktopPrivateUsdContentWidth = 560.0;
 
 /// [activity]'s rows for desktop Home's recent activity and the Activity
 /// feed, to sort in with the wallet's by time: the phone's rows for the
-/// account's deposits, sends, withdrawals and what it received, each
-/// unfolding into its details on a click, as on the phone. Bridge rows are
-/// left out, and the wallet transactions they stand in for on the phone stay
-/// as they are: desktop starts no bridge until its screens come (step 3b).
-/// [details] is read only when there is a row to unfold.
+/// account's bridges, deposits, sends, withdrawals and what it received. A
+/// bridge row opens its progress ([onOpenConversion]) and a refunded one can
+/// open Refunds ([onOpenRefunds]); the others unfold into their details on a
+/// click, as on the phone. The wallet transactions a bridge row stands in for
+/// (its deposit and sweeps, [PrivateUsdActivity.txids]) are the caller's to
+/// leave out, as the phone's feeds do. [details] is read only when there is a
+/// row to build.
 List<ActivityEntry> desktopPrivateUsdFeedEntries({
   required BuildContext context,
   required PrivateUsdActivity activity,
   required bool privacyModeEnabled,
   required PrivateUsdActivityDetailsConfig Function() details,
+  required ValueChanged<PrivateUsdRoutePath> onOpenConversion,
+  VoidCallback? onOpenRefunds,
 }) {
-  if (activity.depositRecords.isEmpty &&
+  if (activity.records.isEmpty &&
+      activity.reverseRecords.isEmpty &&
+      activity.depositRecords.isEmpty &&
       activity.sends.isEmpty &&
       activity.receipts.isEmpty) {
     return const [];
   }
   return privateUsdFeedEntries(
     context: context,
-    activity: PrivateUsdActivity(
-      depositRecords: activity.depositRecords,
-      sends: activity.sends,
-      receipts: activity.receipts,
-      zcashConfirmations: activity.zcashConfirmations,
-      screening: activity.screening,
-    ),
+    activity: activity,
     privacyModeEnabled: privacyModeEnabled,
-    // No bridge row is left to open a conversion.
-    onOpenConversion: (_) {},
+    onOpenConversion: onOpenConversion,
     details: details(),
+    onOpenRefunds: onOpenRefunds,
   );
 }
 
@@ -65,18 +67,26 @@ List<ActivityEntry> desktopPrivateUsdFeedEntries({
 /// wallet's: the floor and the synced line behind the content, the climbing
 /// line and its readout in front, ignoring the pointer. Blocks that should
 /// hide a synced line behind them wrap themselves in [NeonSyncOcclude].
+///
+/// With an [action], the step's button is pinned at the foot of the pane, as
+/// the phone pins it under its flow screens, so it shows however far the
+/// column scrolls (a bridge's "Authorize settlement" among them).
 class DesktopPrivateUsdPage extends StatelessWidget {
   const DesktopPrivateUsdPage({
     required this.title,
     required this.children,
     this.onInfo,
     this.syncLine,
+    this.action,
     this.canGoBack = true,
     this.onBeforeBack,
     this.contentKey,
     this.titleKey,
     super.key,
-  });
+  }) : assert(
+         syncLine == null || action == null,
+         'A page with a sync line pins no action.',
+       );
 
   final String title;
   final List<Widget> children;
@@ -84,6 +94,9 @@ class DesktopPrivateUsdPage extends StatelessWidget {
   /// Opens the page's info; null hides the button.
   final VoidCallback? onInfo;
   final NeonSyncLine? syncLine;
+
+  /// The step's button, pinned at the foot of the pane; null pins none.
+  final Widget? action;
 
   /// False while a step holds the page (a send proving): no back link, and
   /// the sidebar is veiled and takes neither the pointer nor the keyboard, as
@@ -100,7 +113,8 @@ class DesktopPrivateUsdPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final onInfo = this.onInfo;
     final syncLine = this.syncLine;
-    Widget column(bool occlude) {
+    final action = this.action;
+    Widget column(bool occlude, {double bottomReserve = 0}) {
       Widget title = NeonPageTitle(
         this.title,
         textKey: titleKey,
@@ -124,11 +138,11 @@ class DesktopPrivateUsdPage extends StatelessWidget {
                   ),
                 ),
         ),
-        padding: const EdgeInsets.fromLTRB(
+        padding: EdgeInsets.fromLTRB(
           AppSpacing.s,
           AppSpacing.sm,
           AppSpacing.s,
-          AppSpacing.lg,
+          AppSpacing.lg + bottomReserve,
         ),
         child: Align(
           alignment: Alignment.topCenter,
@@ -147,7 +161,24 @@ class DesktopPrivateUsdPage extends StatelessWidget {
     }
 
     final Widget pane = syncLine == null
-        ? column(false)
+        ? action == null
+              ? column(false)
+              : AppPaneFloatingBar(
+                  bar: ConstrainedBox(
+                    key: const ValueKey('desktop_private_usd_action_bar'),
+                    constraints: const BoxConstraints(
+                      maxWidth: kDesktopPrivateUsdContentWidth,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.s,
+                      ),
+                      child: action,
+                    ),
+                  ),
+                  builder: (context, bottomReserve) =>
+                      column(false, bottomReserve: bottomReserve),
+                )
         : NeonSyncScrolled(
             builder: (context, scrolled) => Stack(
               fit: StackFit.expand,
@@ -388,13 +419,16 @@ class _DesktopPrivateUsdInfoCard extends StatelessWidget {
 }
 
 /// Asks before a step the user cannot take back: [title], what follows
-/// ([body]), [confirmLabel] and Cancel. True only when confirmed. The phone
-/// asks the same in a sheet.
+/// ([body]), [confirmLabel] and the way out ([dismissLabel], Cancel when
+/// null). True only when confirmed. The phone asks the same in a sheet; a
+/// [destructive] step's button is the destructive slab there too.
 Future<bool> showDesktopPrivateUsdConfirm(
   BuildContext context, {
   required String title,
   required String body,
   required String confirmLabel,
+  String? dismissLabel,
+  bool destructive = false,
 }) async {
   final theme = context.appTheme;
   final container = ProviderScope.containerOf(context, listen: false);
@@ -413,6 +447,8 @@ Future<bool> showDesktopPrivateUsdConfirm(
             title: title,
             body: body,
             confirmLabel: confirmLabel,
+            dismissLabel: dismissLabel ?? context.l10n.commonCancel,
+            destructive: destructive,
             onAnswer: (answer) => Navigator.of(dialogContext).pop(answer),
           ),
         ),
@@ -427,12 +463,16 @@ class _DesktopPrivateUsdConfirmCard extends StatelessWidget {
     required this.title,
     required this.body,
     required this.confirmLabel,
+    required this.dismissLabel,
+    required this.destructive,
     required this.onAnswer,
   });
 
   final String title;
   final String body;
   final String confirmLabel;
+  final String dismissLabel;
+  final bool destructive;
   final ValueChanged<bool> onAnswer;
 
   @override
@@ -468,13 +508,16 @@ class _DesktopPrivateUsdConfirmCard extends StatelessWidget {
                   variant: AppButtonVariant.secondary,
                   expand: true,
                   onPressed: () => onAnswer(false),
-                  child: Text(context.l10n.commonCancel),
+                  child: Text(dismissLabel),
                 ),
               ),
               const SizedBox(width: AppSpacing.xs),
               Expanded(
                 child: AppButton(
                   key: const ValueKey('desktop_private_usd_confirm_ok'),
+                  variant: destructive
+                      ? AppButtonVariant.destructive
+                      : AppButtonVariant.primary,
                   expand: true,
                   onPressed: () => onAnswer(true),
                   child: Text(confirmLabel),

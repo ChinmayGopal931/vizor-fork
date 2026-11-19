@@ -31,12 +31,10 @@ BigInt? privateUsdRelayerFeeCap(rust_private_usd.ApiDeployment? deployment) =>
 
 /// Whether this build's network pins a windows contract, so bridging runs.
 /// Off, Bridge is hidden and its screens redirect; the balance, deposits,
-/// sends and withdrawals work either way.
+/// sends and withdrawals work either way. The phones and the Mac alike.
 final privateUsdBridgeAvailableProvider = Provider<bool>((ref) {
   // Const, so builds without the define drop the rest.
   if (!kPrivateUsdBuildEnabled) return false;
-  // Desktop has no bridge screens yet: nothing there starts a conversion.
-  if (kDesktopFormFactor) return false;
   return ref.watch(privateUsdCurrentDeploymentProvider)?.bridgeAvailable ??
       false;
 });

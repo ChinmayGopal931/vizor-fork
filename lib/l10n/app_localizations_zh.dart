@@ -8828,6 +8828,10 @@ class AppLocalizationsZh extends AppLocalizations {
       '这可能需要一段时间。完成前，Veylor 需要保持打开并联网：如果屏幕关闭，流程会暂停，直到你回来。';
 
   @override
+  String get privateUsdKeepOpenBodyDesktop =>
+      '这可能需要一段时间。完成前，请保持 Veylor 打开并让其窗口保持可见：如果窗口被隐藏或最小化，或 Mac 进入睡眠，流程会暂停，直到你回来。';
+
+  @override
   String get privateUsdKeepOpenTitle => '请保持 Veylor 打开';
 
   @override
@@ -9080,6 +9084,10 @@ class AppLocalizationsZh extends AppLocalizations {
       '你的手机正在为此付款生成零知识证明，可能需要几分钟。请保持 Veylor 打开。';
 
   @override
+  String get privateUsdReverseProvingNoteDesktop =>
+      '你的 Mac 正在为此付款生成零知识证明，可能需要几分钟。请保持 Veylor 打开并让其窗口保持可见。';
+
+  @override
   String get privateUsdReverseRailgunFee => 'Railgun 转为公开手续费';
 
   @override
@@ -9162,6 +9170,11 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String privateUsdReverseStepPayDetail(String debit) {
     return '点按“支付”，将价值 $debit 的隐私 USD 发送到托管。';
+  }
+
+  @override
+  String privateUsdReverseStepPayDetailDesktop(String debit) {
+    return '点击“支付”，将价值 $debit 的隐私 USD 发送到托管。';
   }
 
   @override

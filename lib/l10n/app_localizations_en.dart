@@ -9536,6 +9536,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'This can take a while. Veylor needs to stay open and online until it\'s done: if your screen turns off, it pauses until you\'re back.';
 
   @override
+  String get privateUsdKeepOpenBodyDesktop =>
+      'This can take a while. Keep Veylor open, with its window showing, until it\'s done: if the window is hidden or minimized, or your Mac sleeps, it pauses until you\'re back.';
+
+  @override
   String get privateUsdKeepOpenTitle => 'Keep Veylor open';
 
   @override
@@ -9811,6 +9815,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Your phone builds a zero-knowledge proof of the payment. This can take a few minutes. Keep Veylor open.';
 
   @override
+  String get privateUsdReverseProvingNoteDesktop =>
+      'Your Mac builds a zero-knowledge proof of the payment. This can take a few minutes. Keep Veylor open, with its window showing.';
+
+  @override
   String get privateUsdReverseRailgunFee => 'Railgun unshield fee';
 
   @override
@@ -9897,6 +9905,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String privateUsdReverseStepPayDetail(String debit) {
     return 'Tap Pay to send $debit of shielded USD to escrow.';
+  }
+
+  @override
+  String privateUsdReverseStepPayDetailDesktop(String debit) {
+    return 'Click Pay to send $debit of shielded USD to escrow.';
   }
 
   @override
