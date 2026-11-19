@@ -126,7 +126,10 @@ class _DesktopPrivateUsdConvertScreenState
           : PrivateUsdDirection.reverse;
       _amount.clear();
     });
-    _focus.requestFocus();
+    // The other panel's field takes the keyboard once it is built.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focus.requestFocus();
+    });
   }
 
   void _syncAmount(String text) {
