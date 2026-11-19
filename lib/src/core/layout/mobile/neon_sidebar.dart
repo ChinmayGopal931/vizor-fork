@@ -110,6 +110,7 @@ class NeonSidebarSyncReadout extends StatefulWidget {
     this.glow,
     this.core,
     this.textFirst = false,
+    this.compact = false,
     super.key,
   });
 
@@ -128,6 +129,10 @@ class NeonSidebarSyncReadout extends StatefulWidget {
   /// left readout, when two stand side by side.
   final bool textFirst;
 
+  /// A narrower line column and a smaller caption, wrapping to two lines at
+  /// most: two readouts side by side, both drawn compact so they match.
+  final bool compact;
+
   @override
   State<NeonSidebarSyncReadout> createState() => _NeonSidebarSyncReadoutState();
 }
@@ -135,6 +140,11 @@ class NeonSidebarSyncReadout extends StatefulWidget {
 class _NeonSidebarSyncReadoutState extends State<NeonSidebarSyncReadout>
     with SingleTickerProviderStateMixin {
   static const _lineHeight = 28.0;
+  static const _compactLineWidth = 12.0;
+  static final _compactCaptionStyle = kNeonHudCaptionStyle.copyWith(
+    fontSize: 9,
+    letterSpacing: 1.2,
+  );
 
   late final AnimationController _breath = AnimationController(
     vsync: this,
@@ -179,8 +189,9 @@ class _NeonSidebarSyncReadoutState extends State<NeonSidebarSyncReadout>
     final neon = context.colors.neon;
     final glow = widget.glow ?? neon.glow;
     final core = widget.core ?? neon.core;
+    final compact = widget.compact;
     final lineBox = SizedBox(
-      width: NeonSidebarGlyph.size,
+      width: compact ? _compactLineWidth : NeonSidebarGlyph.size,
       height: _lineHeight,
       child: CustomPaint(
         painter: _SidebarSyncLinePainter(
@@ -196,13 +207,15 @@ class _NeonSidebarSyncReadoutState extends State<NeonSidebarSyncReadout>
         line.readout.toUpperCase(),
         key: widget.textKey,
         textAlign: widget.textFirst ? TextAlign.end : null,
-        style: kNeonHudCaptionStyle.copyWith(
-          color: glow,
-          shadows: Neon.textGlow(glow, intensity: 0.35),
-        ),
+        maxLines: compact ? 2 : null,
+        style: (compact ? _compactCaptionStyle : kNeonHudCaptionStyle)
+            .copyWith(
+              color: glow,
+              shadows: Neon.textGlow(glow, intensity: 0.35),
+            ),
       ),
     );
-    const gap = SizedBox(width: AppSpacing.s);
+    final gap = SizedBox(width: compact ? AppSpacing.xs : AppSpacing.s);
     return Semantics(
       label: line.semanticsLabel,
       excludeSemantics: true,

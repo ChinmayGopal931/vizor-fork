@@ -777,40 +777,18 @@ class _AppMainSidebarState extends ConsumerState<AppMainSidebar> {
                     // readouts: the wallet's on the left with its text before
                     // the line, Railgun's on the right with its text after.
                     Padding(
-                      padding: _syncReadoutPadding,
+                      padding: railgunSyncLine == null
+                          ? _syncReadoutPadding
+                          : EdgeInsets.zero,
                       child: railgunSyncLine == null
                           ? NeonSidebarSyncReadout(
                               key: const ValueKey('sidebar_sync_status'),
                               textKey: const ValueKey('sidebar_sync_text'),
                               line: _syncLine(sync, networkPrivacy),
                             )
-                          : Row(
-                              children: [
-                                Expanded(
-                                  child: NeonSidebarSyncReadout(
-                                    key: const ValueKey('sidebar_sync_status'),
-                                    textKey: const ValueKey(
-                                      'sidebar_sync_text',
-                                    ),
-                                    line: _syncLine(sync, networkPrivacy),
-                                    textFirst: true,
-                                  ),
-                                ),
-                                const SizedBox(width: AppSpacing.xxs),
-                                Expanded(
-                                  child: NeonSidebarSyncReadout(
-                                    key: const ValueKey(
-                                      'sidebar_railgun_sync_status',
-                                    ),
-                                    textKey: const ValueKey(
-                                      'sidebar_railgun_sync_text',
-                                    ),
-                                    line: railgunSyncLine,
-                                    glow: context.colors.neon.steelGlow,
-                                    core: context.colors.neon.steelCore,
-                                  ),
-                                ),
-                              ],
+                          : _SideBySideSyncReadouts(
+                              wallet: _syncLine(sync, networkPrivacy),
+                              railgun: railgunSyncLine,
                             ),
                     ),
                   ],
@@ -1912,6 +1890,65 @@ class _SidebarPopoverHoverTargetState
           child: widget.builder(context, _hovered),
         ),
       ),
+    );
+  }
+}
+
+/// The wallet's sync and Railgun's side by side at the sidebar's foot, both
+/// compact so their captions match: the wallet's red on the left with its
+/// readout before the line, Railgun's steel on the right with its readout
+/// after. Once both are synced they read the same "Synced"; Railgun's keeps
+/// its own semantics label, so a screen reader still hears which is which.
+class _SideBySideSyncReadouts extends StatelessWidget {
+  const _SideBySideSyncReadouts({required this.wallet, required this.railgun});
+
+  final NeonSyncLine wallet;
+  final NeonSyncLine railgun;
+
+  @override
+  Widget build(BuildContext context) {
+    final neon = context.colors.neon;
+    final synced = NeonSyncReadout.synced(context.l10n);
+    final bothSynced =
+        wallet.readout == synced &&
+        !railgun.climbing &&
+        !railgun.failed &&
+        railgun.progress >= 1;
+    final railgunLine = bothSynced
+        ? NeonSyncLine(
+            progress: railgun.progress,
+            readout: synced,
+            semanticsLabel: railgun.semanticsLabel,
+            climbing: railgun.climbing,
+            failed: railgun.failed,
+            scanning: railgun.scanning,
+            lineX: railgun.lineX,
+            readoutStyle: railgun.readoutStyle,
+          )
+        : railgun;
+    return Row(
+      children: [
+        Expanded(
+          child: NeonSidebarSyncReadout(
+            key: const ValueKey('sidebar_sync_status'),
+            textKey: const ValueKey('sidebar_sync_text'),
+            line: wallet,
+            textFirst: true,
+            compact: true,
+          ),
+        ),
+        const SizedBox(width: AppSpacing.xxs),
+        Expanded(
+          child: NeonSidebarSyncReadout(
+            key: const ValueKey('sidebar_railgun_sync_status'),
+            textKey: const ValueKey('sidebar_railgun_sync_text'),
+            line: railgunLine,
+            glow: neon.steelGlow,
+            core: neon.steelCore,
+            compact: true,
+          ),
+        ),
+      ],
     );
   }
 }
