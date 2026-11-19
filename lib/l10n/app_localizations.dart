@@ -103,13 +103,13 @@ abstract class AppLocalizations {
   /// Body of the first paragraph of the About screen.
   ///
   /// In en, this message translates to:
-  /// **'We built Keplr, the wallet used by millions across Cosmos, Ethereum, and Bitcoin. Veylor is our take on what a Zcash wallet should feel like.'**
+  /// **'Veylor is a fork of Vizor, the open-source Zcash wallet from the Keplr team. We like Vizor a lot, so we built Veylor on it, with our own look and features.'**
   String get aboutBuiltByBody;
 
   /// Heading of the first paragraph of the About screen.
   ///
   /// In en, this message translates to:
-  /// **'Built by the Keplr team'**
+  /// **'A fork of Vizor'**
   String get aboutBuiltByHeading;
 
   /// Body of the placeholder paragraphs on the Terms and Privacy Policy screens.
@@ -121,7 +121,7 @@ abstract class AppLocalizations {
   /// Heading of the placeholder paragraphs on the Terms and Privacy Policy screens.
   ///
   /// In en, this message translates to:
-  /// **'From the team that brought you Keplr Wallet.'**
+  /// **'Built on Vizor, from the Keplr team.'**
   String get aboutLegalPlaceholderHeading;
 
   /// Accessibility label of a link button on mobile About; {label} is the visible button label.
@@ -14840,6 +14840,12 @@ abstract class AppLocalizations {
   /// **'The quote had expired by the time it arrived. Check that your phone\'s clock is right, then try again.'**
   String get privateUsdConvertQuoteClockAhead;
 
+  /// In the Mac app: the message on the bridge screens when a quote arrived already expired, which usually means the Mac's clock is wrong.
+  ///
+  /// In en, this message translates to:
+  /// **'The quote had expired by the time it arrived. Check that your Mac\'s clock is right, then try again.'**
+  String get privateUsdConvertQuoteClockAheadDesktop;
+
   /// Countdown caption under the quote on the bridge amount screen, drawn in uppercase in English; {minutesSeconds} is the time left in minutes and seconds, such as 4:59.
   ///
   /// In en, this message translates to:
@@ -15554,11 +15560,23 @@ abstract class AppLocalizations {
   /// **'Withdraw: move shielded USD to a public Ethereum address. The destination and amount are visible on Ethereum.'**
   String get privateUsdInfoWithdraw;
 
+  /// Label of the switch in the Mac app's slim keep-Veylor-visible row on a bridge's progress screen: while on, the Mac's display (and so the Mac) is kept awake until the bridge no longer needs Veylor. The phone's card calls it 'Keep screen on'.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep display awake'**
+  String get privateUsdKeepDisplayAwakeDesktop;
+
   /// Body of the 'Keep Veylor open' card on a bridge's progress screen: the bridge can take a while, Veylor must stay open and online, and it pauses if the screen turns off.
   ///
   /// In en, this message translates to:
   /// **'This can take a while. Veylor needs to stay open and online until it\'s done: if your screen turns off, it pauses until you\'re back.'**
   String get privateUsdKeepOpenBody;
+
+  /// Body of the 'Keep Veylor open' card on a bridge's progress screen in the Mac app: the bridge can take a while, Veylor must stay open with its window visible, and it pauses while the window is hidden or minimized or the Mac sleeps.
+  ///
+  /// In en, this message translates to:
+  /// **'This can take a while. Keep Veylor open, with its window showing, until it\'s done: if the window is hidden or minimized, or your Mac sleeps, it pauses until you\'re back.'**
+  String get privateUsdKeepOpenBodyDesktop;
 
   /// Caption of the card on a bridge's progress screen, in either direction, while the bridge needs Veylor to stay open; drawn in uppercase.
   ///
@@ -15571,6 +15589,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Keep screen on'**
   String get privateUsdKeepScreenOn;
+
+  /// The one line of the Mac app's slim row on a bridge's progress screen, shown while the bridge needs Veylor: its window must stay visible until the bridge ends.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep Veylor visible until the bridge is done.'**
+  String get privateUsdKeepVisibleDesktop;
+
+  /// Tooltip of the glyph in the Mac app's slim keep-Veylor-visible row on a bridge's progress screen: the bridge pauses while Veylor's window is covered or minimised or the Mac sleeps, and goes on when the user is back.
+  ///
+  /// In en, this message translates to:
+  /// **'If it\'s covered, minimised or your Mac sleeps, the bridge pauses until you\'re back.'**
+  String get privateUsdKeepVisibleDetailDesktop;
 
   /// Error on the Shielded USD screen, also read by screen readers, when the balance could not be loaded at all.
   ///
@@ -15812,6 +15842,18 @@ abstract class AppLocalizations {
   /// **'Let the relayer claim for me'**
   String get privateUsdRelayerClaimsSetting;
 
+  /// [security] Error in the Mac app's remove-account and reset dialogs when more Shielded USD bridges became unfinished while the removal was pending; nothing was removed.
+  ///
+  /// In en, this message translates to:
+  /// **'More shielded USD bridges are unfinished. Review the warning and confirm again.'**
+  String get privateUsdRemoveMoreUnfinished;
+
+  /// [security] Error in the Mac app's remove-account and reset dialogs when the unfinished Shielded USD bridges could not be rechecked before removal; nothing was removed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t recheck shielded USD bridges. Review the warning and confirm again.'**
+  String get privateUsdRemoveRecheckFailed;
+
   /// [security] Destructive button in the reset sheet that erases every account and all wallet data despite unfinished Shielded USD bridges, whose funds can be lost.
   ///
   /// In en, this message translates to:
@@ -15998,6 +16040,12 @@ abstract class AppLocalizations {
   /// **'Your phone builds a zero-knowledge proof of the payment. This can take a few minutes. Keep Veylor open.'**
   String get privateUsdReverseProvingNote;
 
+  /// Note under the progress steps of a shielded-USD-to-ZEC bridge in the Mac app while the Mac builds the zero-knowledge proof for the escrow payment, which can take minutes; the window must stay visible meanwhile.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Mac builds a zero-knowledge proof of the payment. This can take a few minutes. Keep Veylor open, with its window showing.'**
+  String get privateUsdReverseProvingNoteDesktop;
+
   /// Row label on the shielded-USD-to-ZEC review and in its activity details: Railgun's fee for moving the dollars out of the shielded balance (unshielding) into escrow.
   ///
   /// In en, this message translates to:
@@ -16147,6 +16195,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Tap Pay to send {debit} of shielded USD to escrow.'**
   String privateUsdReverseStepPayDetail(String debit);
+
+  /// Detail under the 'Pay shielded USD to escrow' step in the Mac app: clicking the Pay button sends the shown amount of shielded USD into escrow; {debit} is a dollar amount such as $25.10.
+  ///
+  /// In en, this message translates to:
+  /// **'Click Pay to send {debit} of shielded USD to escrow.'**
+  String privateUsdReverseStepPayDetailDesktop(String debit);
 
   /// Fifth step of the shielded-USD-to-ZEC progress timeline: the bridge is being settled.
   ///
@@ -16520,6 +16574,12 @@ abstract class AppLocalizations {
   /// **'Your phone builds a zero-knowledge proof. This takes a few seconds.'**
   String get privateUsdSendInfoStepProof;
 
+  /// In the Mac app: the second step in the send info card, where the Mac builds a zero-knowledge proof.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Mac builds a zero-knowledge proof. This takes a few seconds.'**
+  String get privateUsdSendInfoStepProofDesktop;
+
   /// Title of the info sheet on the Shielded USD send screens explaining how a send works.
   ///
   /// In en, this message translates to:
@@ -16567,6 +16627,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your phone builds a zero-knowledge proof so nobody can see what you send. This takes a few seconds. Keep Veylor open.'**
   String get privateUsdSendProvingDetail;
+
+  /// In the Mac app: the body of the send and withdraw progress screen while the zero-knowledge proof is built. The window must stay showing, because the Mac pauses the proof while it's hidden.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Mac builds a zero-knowledge proof so nobody can see what you send. This takes a few seconds. Keep Veylor open, with its window showing.'**
+  String get privateUsdSendProvingDetailDesktop;
 
   /// Title of the send and withdraw progress screen while the phone builds the proof, with its progress; {percent} is a whole number from 0 to 100.
   ///
@@ -16819,6 +16885,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your phone builds a proof, and the dollars leave Railgun for that address.'**
   String get privateUsdWithdrawInfoStepProof;
+
+  /// In the Mac app: the second step in the withdraw info card, where the Mac builds a proof and the dollars leave Railgun for the address.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Mac builds a proof, and the dollars leave Railgun for that address.'**
+  String get privateUsdWithdrawInfoStepProofDesktop;
 
   /// Title of the info sheet on the withdraw screens: a withdrawal moves the dollars to a public Ethereum address.
   ///

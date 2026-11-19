@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app_bootstrap.dart';
+import '../../../core/layout/app_form_factor.dart' show kDesktopFormFactor;
 import '../../../core/storage/app_secure_store.dart';
 import 'private_usd_available_provider.dart';
 import 'private_usd_switch_setting.dart';
@@ -17,10 +18,18 @@ final privateUsdArchiveSyncStoreProvider = Provider<PrivateUsdArchiveSyncStore>(
 );
 
 /// Whether the Railgun page can read Railgun's history from Anon's archive
-/// here: Ethereum's archive, which only Android's host fetches for the page.
-/// An OS difference, not a layout one.
+/// here: Ethereum's archive, which Android's host fetches for the page, and
+/// the Mac's where it hosts the page (macOS 14 and later); iOS's host starts
+/// the page without it. Which host fetches it is an OS difference, not a
+/// layout one; the Mac's is desktop's alone.
 final privateUsdArchiveAvailableProvider = Provider<bool>((ref) {
-  if (defaultTargetPlatform != TargetPlatform.android) return false;
+  final fetched = switch (defaultTargetPlatform) {
+    TargetPlatform.android => true,
+    TargetPlatform.macOS =>
+      kDesktopFormFactor && ref.watch(railgunHostSupportedProvider),
+    _ => false,
+  };
+  if (!fetched) return false;
   final network = ref.watch(appBootstrapProvider).network;
   return ref.watch(privateUsdDeploymentProvider(network))?.railgunNetwork ==
       'mainnet';

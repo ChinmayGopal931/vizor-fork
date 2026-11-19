@@ -14,6 +14,7 @@ import '../../core/widgets/app_icon.dart';
 import '../../core/widgets/mobile/neon_glyph_badge.dart';
 import '../../providers/account_provider.dart';
 import '../payment_links/services/payment_link_received_store.dart';
+import '../private_usd/providers/private_usd_unfinished_provider.dart';
 import '../../providers/device_owner_auth_provider.dart';
 import '../../providers/sync_provider.dart';
 import '../../providers/wallet_mutation_guard.dart';
@@ -181,13 +182,27 @@ class _LostPasswordScreenState extends ConsumerState<LostPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Desktop: Shielded USD bridges under way are warned about with their
+    // count, never blocked (plan §3.5 invariant 15), as the phone's
+    // forgot-passcode sheet does: only this wallet can finish or refund them,
+    // and reset is the only way back into a wallet whose password is lost.
+    final bridges = kDesktopFormFactor
+        ? (ref.watch(privateUsdUnfinishedTotalProvider).value ?? 0)
+        : 0;
+    final bridgeWarning = bridges > 0
+        ? context.l10n.privateUsdResetUnfinishedBody(bridges)
+        : null;
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: SafeArea(
         child: OnboardingAuthShell(
           card: OnboardingAuthCard(
             width: _LostPasswordContent.cardWidth,
-            height: _LostPasswordContent.cardHeight,
+            height:
+                _LostPasswordContent.cardHeight +
+                (bridgeWarning == null
+                    ? 0
+                    : _LostPasswordContent.bridgeWarningHeight),
             borderRadius: AppSpacing.md,
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.md,
@@ -206,6 +221,7 @@ class _LostPasswordScreenState extends ConsumerState<LostPasswordScreen> {
                   (ref.watch(paymentLinkClaimsInFlightProvider).value ?? 0) > 0
                   ? context.l10n.walletResetGiftCardWarning
                   : null,
+              bridgeWarning: bridgeWarning,
               onBack: _handleBack,
               onReset: _handleReset,
             ),
@@ -224,12 +240,17 @@ class _LostPasswordContent extends StatelessWidget {
     required this.warning,
     required this.onBack,
     required this.onReset,
+    this.bridgeWarning,
   });
 
   final int remainingSeconds;
   final bool canReset;
   final String? error;
   final String? warning;
+
+  /// Shielded USD bridges under way (desktop): said over the other warning,
+  /// on as many lines as it takes, in a card [bridgeWarningHeight] taller.
+  final String? bridgeWarning;
   final VoidCallback onBack;
   final VoidCallback onReset;
 
@@ -239,6 +260,9 @@ class _LostPasswordContent extends StatelessWidget {
   static const double cardHeight = 568;
   static const double _buttonGroupWidth = 348;
   static const double _destructiveButtonWidth = 232;
+
+  /// What [bridgeWarning]'s lines add to the card.
+  static const double bridgeWarningHeight = 96;
 
   @override
   Widget build(BuildContext context) {
@@ -255,7 +279,11 @@ class _LostPasswordContent extends StatelessWidget {
     final buttonLabel = remainingSeconds > 0
         ? l10n.onboardingLostPasswordResetCountdown(remainingSeconds)
         : l10n.commonResetVizor;
-    final statusText = error ?? warning ?? l10n.commonCannotBeUndone;
+    final bridgeWarning = this.bridgeWarning;
+    final warnings = bridgeWarning == null
+        ? warning
+        : [bridgeWarning, ?warning].join('\n');
+    final statusText = error ?? warnings ?? l10n.commonCannotBeUndone;
     final resetAction = l10n.onboardingLostPasswordResetAction;
     final importAction = l10n.onboardingLostPasswordImportAction;
 
@@ -314,7 +342,7 @@ class _LostPasswordContent extends StatelessWidget {
                 style: AppTypography.bodyMediumStrong.copyWith(
                   color: colors.text.destructive,
                 ),
-                maxLines: 1,
+                maxLines: bridgeWarning == null ? 1 : 6,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
               ),

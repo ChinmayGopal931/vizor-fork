@@ -108,10 +108,14 @@ import 'src/features/payment_links/providers/payment_link_intake_provider.dart';
 import 'src/features/payment_links/providers/gift_claim_flow_provider.dart';
 import 'src/features/payment_links/screens/gift_claim_screen.dart';
 import 'src/features/payment_links/screens/desktop_payment_link_scan_screen.dart';
+import 'src/features/private_usd/models/private_usd_record_key.dart';
 import 'src/features/private_usd/models/private_usd_send.dart'
     show PrivateUsdSendMode;
 import 'src/features/private_usd/providers/private_usd_available_provider.dart';
+import 'src/features/private_usd/screens/desktop/desktop_private_usd_conversion_screens.dart';
+import 'src/features/private_usd/screens/desktop/desktop_private_usd_convert_screens.dart';
 import 'src/features/private_usd/screens/desktop/desktop_private_usd_receive_screen.dart';
+import 'src/features/private_usd/screens/desktop/desktop_private_usd_refunds_screen.dart';
 import 'src/features/private_usd/screens/desktop/desktop_private_usd_screen.dart';
 import 'src/features/private_usd/screens/desktop/desktop_private_usd_send_screens.dart';
 import 'src/features/private_usd/providers/private_usd_unfinished_provider.dart';
@@ -1561,11 +1565,34 @@ List<RouteBase> _desktopRoutes(Ref ref) => [
     builder: (_, _) => const DesktopPortfolioChartScreen(),
   ),
   // Shielded USD, opened from Home's balance and the chart's holdings. The
-  // shared redirect sends these home while it is unavailable; desktop has no
-  // bridge yet, so the bridge's routes lead back to `/private-usd`.
+  // shared redirect sends these home while it is unavailable, except a
+  // bridge's progress while that bridge is unfinished, and the bridge's
+  // screens to `/private-usd` while bridging is off.
   GoRoute(
     path: '/private-usd',
     builder: (_, _) => const DesktopPrivateUsdScreen(),
+  ),
+  GoRoute(
+    path: '/private-usd/convert',
+    // `?to=zec` opens the reverse direction (shielded USD → ZEC).
+    builder: (_, state) => DesktopPrivateUsdConvertScreen(
+      initialDirection: state.uri.queryParameters['to'] == 'zec'
+          ? PrivateUsdDirection.reverse
+          : PrivateUsdDirection.forward,
+    ),
+  ),
+  GoRoute(
+    path: '/private-usd/convert/review',
+    redirect: (_, state) =>
+        state.extra is PrivateUsdDirection ? null : '/private-usd/convert',
+    // `extra` does not survive a lock, and the quote is dropped on lock
+    // anyway, so the review starts over from the convert screen.
+    builder: (_, state) {
+      final direction = state.extra;
+      return direction is PrivateUsdDirection
+          ? DesktopPrivateUsdConvertReviewScreen(direction: direction)
+          : const DesktopPrivateUsdConvertScreen();
+    },
   ),
   GoRoute(
     path: '/private-usd/receive',
@@ -1608,12 +1635,24 @@ List<RouteBase> _desktopRoutes(Ref ref) => [
           : const DesktopPrivateUsdScreen();
     },
   ),
-  // Refunds and conversions come from bridges, which desktop does not start
-  // yet: a link to one opens the page.
-  GoRoute(path: '/private-usd/refunds', redirect: (_, _) => '/private-usd'),
+  GoRoute(
+    path: '/private-usd/refunds',
+    builder: (_, _) => const DesktopPrivateUsdRefundsScreen(),
+  ),
   GoRoute(
     path: '/private-usd/conversion/:direction/:index',
-    redirect: (_, _) => '/private-usd',
+    // The key is in the path, so a restart, the banner and an activity row
+    // all open it, in either direction.
+    redirect: (_, state) =>
+        PrivateUsdRoutePath.tryParse(state.pathParameters) == null
+        ? '/private-usd'
+        : null,
+    builder: (_, state) {
+      final path = PrivateUsdRoutePath.tryParse(state.pathParameters)!;
+      return path.direction == PrivateUsdDirection.reverse
+          ? DesktopPrivateUsdReverseConversionScreen(path: path)
+          : DesktopPrivateUsdConversionScreen(path: path);
+    },
   ),
   GoRoute(
     path: '/payment-links',

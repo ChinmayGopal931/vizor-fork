@@ -10,17 +10,18 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get aboutBuiltByBody =>
-      '저‍희‍는 Cosmos, Ethereum, Bitcoin‍에‍서 수‍백‍만 명‍이 쓰‍는 지‍갑 Keplr‍를 만‍들‍었‍어‍요. Veylor‍는 Zcash 지‍갑‍이‍라‍면 이‍래‍야 한‍다‍는 저‍희‍의 답‍이‍에‍요.';
+      'Veylor‍는 Keplr 팀‍이 만‍든 오‍픈 소‍스 Zcash 지‍갑 Vizor‍의 포‍크‍예‍요. Vizor‍가 정‍말 마‍음‍에 들‍어‍서, 그 위‍에 Veylor‍만‍의 디‍자‍인‍과 기‍능‍을 더‍해 만‍들‍었‍어‍요.';
 
   @override
-  String get aboutBuiltByHeading => 'Keplr 팀‍이 만‍들‍었‍어‍요';
+  String get aboutBuiltByHeading => 'Vizor‍의 포‍크';
 
   @override
   String get aboutLegalPlaceholderBody =>
       'Bitcoin‍이‍나 Ethereum‍과 달‍리 비‍공‍개 Zcash 거‍래‍는 보‍낸 사‍람, 받‍는 사‍람, 금‍액‍을 숨‍겨‍요.';
 
   @override
-  String get aboutLegalPlaceholderHeading => 'Keplr 지‍갑‍을 만‍든 팀‍이 만‍들‍었‍어‍요.';
+  String get aboutLegalPlaceholderHeading =>
+      'Keplr 팀‍의 Vizor‍를 바‍탕‍으‍로 만‍들‍었‍어‍요.';
 
   @override
   String aboutLinkSemantics(String label) {
@@ -8933,6 +8934,10 @@ class AppLocalizationsKo extends AppLocalizations {
       '견‍적‍이 도‍착‍했‍을 때 이‍미 만‍료‍된 상‍태‍였‍어‍요. 휴‍대‍폰 시‍계‍가 맞‍는‍지 확‍인‍한 뒤 다‍시 시‍도‍해 주‍세‍요.';
 
   @override
+  String get privateUsdConvertQuoteClockAheadDesktop =>
+      '견‍적‍이 도‍착‍했‍을 때 이‍미 만‍료‍된 상‍태‍였‍어‍요. Mac 시‍계‍가 맞‍는‍지 확‍인‍한 뒤 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
   String privateUsdConvertQuoteExpires(String minutesSeconds) {
     return '견‍적 만‍료‍까‍지 $minutesSeconds';
   }
@@ -9386,14 +9391,29 @@ class AppLocalizationsKo extends AppLocalizations {
       '출‍금: 비‍공‍개 USD‍를 공‍개 Ethereum 주‍소‍로 옮‍겨‍요. 받‍는 주‍소‍와 금‍액‍이 Ethereum‍에 공‍개‍돼‍요.';
 
   @override
+  String get privateUsdKeepDisplayAwakeDesktop => '디‍스‍플‍레‍이 켜 두‍기';
+
+  @override
   String get privateUsdKeepOpenBody =>
       '시‍간‍이 걸‍릴 수 있‍어‍요. 완‍료‍될 때‍까‍지 Veylor‍가 열‍려 있‍고 온‍라‍인 상‍태‍여‍야 해‍요. 화‍면‍이 꺼‍지‍면 돌‍아‍올 때‍까‍지 일‍시 중‍지‍돼‍요.';
+
+  @override
+  String get privateUsdKeepOpenBodyDesktop =>
+      '시‍간‍이 걸‍릴 수 있‍어‍요. 완‍료‍될 때‍까‍지 Veylor‍를 열‍고 창‍을 화‍면‍에 띄‍워 두‍세‍요. 창‍을 숨‍기‍거‍나 최‍소‍화‍하‍거‍나 Mac‍이 잠‍자‍기 상‍태‍가 되‍면 돌‍아‍올 때‍까‍지 일‍시 중‍지‍돼‍요.';
 
   @override
   String get privateUsdKeepOpenTitle => 'Veylor‍를 열‍어 두‍세‍요';
 
   @override
   String get privateUsdKeepScreenOn => '화‍면 켜 두‍기';
+
+  @override
+  String get privateUsdKeepVisibleDesktop =>
+      '브‍리‍지‍가 끝‍날 때‍까‍지 Veylor‍를 화‍면‍에 띄‍워 두‍세‍요.';
+
+  @override
+  String get privateUsdKeepVisibleDetailDesktop =>
+      '창‍이 가‍려‍지‍거‍나 최‍소‍화‍되‍거‍나 Mac‍이 잠‍자‍기 상‍태‍가 되‍면 돌‍아‍올 때‍까‍지 브‍리‍지‍가 일‍시 중‍지‍돼‍요.';
 
   @override
   String get privateUsdLoadFailed =>
@@ -9536,6 +9556,14 @@ class AppLocalizationsKo extends AppLocalizations {
   String get privateUsdRelayerClaimsSetting => '릴‍레‍이‍어‍가 대‍신 수‍령';
 
   @override
+  String get privateUsdRemoveMoreUnfinished =>
+      '완‍료‍되‍지 않‍은 비‍공‍개 USD 브‍리‍지‍가 더 늘‍었‍어‍요. 경‍고‍를 검‍토‍하‍고 다‍시 확‍인‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdRemoveRecheckFailed =>
+      '비‍공‍개 USD 브‍리‍지‍를 다‍시 확‍인‍하‍지 못‍했‍어‍요. 경‍고‍를 검‍토‍하‍고 다‍시 확‍인‍해 주‍세‍요.';
+
+  @override
   String get privateUsdResetAnyway => '그‍래‍도 초‍기‍화';
 
   @override
@@ -9656,6 +9684,10 @@ class AppLocalizationsKo extends AppLocalizations {
       '휴‍대‍폰‍에‍서 결‍제‍에 대‍한 영‍지‍식 증‍명‍을 만‍들‍고 있‍어‍요. 몇 분 걸‍릴 수 있‍어‍요. Veylor‍를 열‍어 두‍세‍요.';
 
   @override
+  String get privateUsdReverseProvingNoteDesktop =>
+      'Mac‍에‍서 결‍제‍에 대‍한 영‍지‍식 증‍명‍을 만‍들‍고 있‍어‍요. 몇 분 걸‍릴 수 있‍어‍요. Veylor‍를 열‍고 창‍을 화‍면‍에 띄‍워 두‍세‍요.';
+
+  @override
   String get privateUsdReverseRailgunFee => 'Railgun 공‍개 전‍환 수‍수‍료';
 
   @override
@@ -9740,6 +9772,11 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String privateUsdReverseStepPayDetail(String debit) {
     return '에‍스‍크‍로‍에 비‍공‍개 USD $debit‍만‍큼 보‍내‍려‍면 결‍제 버‍튼‍을 탭‍하‍세‍요.';
+  }
+
+  @override
+  String privateUsdReverseStepPayDetailDesktop(String debit) {
+    return '에‍스‍크‍로‍에 비‍공‍개 USD $debit‍만‍큼 보‍내‍려‍면 결‍제 버‍튼‍을 클‍릭‍하‍세‍요.';
   }
 
   @override
@@ -9977,6 +10014,10 @@ class AppLocalizationsKo extends AppLocalizations {
       '휴‍대‍폰‍에‍서 영‍지‍식 증‍명‍을 생‍성‍해‍요. 몇 초 걸‍려‍요.';
 
   @override
+  String get privateUsdSendInfoStepProofDesktop =>
+      'Mac‍에‍서 영‍지‍식 증‍명‍을 생‍성‍해‍요. 몇 초 걸‍려‍요.';
+
+  @override
   String get privateUsdSendInfoTitle => '비‍공‍개 USD 보‍내‍기';
 
   @override
@@ -10004,6 +10045,10 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get privateUsdSendProvingDetail =>
       '아‍무‍도 보‍내‍는 내‍용‍을 볼 수 없‍도‍록 휴‍대‍폰‍에‍서 영‍지‍식 증‍명‍을 생‍성‍하‍고 있‍어‍요. 몇 초 걸‍려‍요. Veylor‍를 열‍어 두‍세‍요.';
+
+  @override
+  String get privateUsdSendProvingDetailDesktop =>
+      '아‍무‍도 보‍내‍는 내‍용‍을 볼 수 없‍도‍록 Mac‍에‍서 영‍지‍식 증‍명‍을 생‍성‍하‍고 있‍어‍요. 몇 초 걸‍려‍요. Veylor‍를 열‍고 창‍을 화‍면‍에 띄‍워 두‍세‍요.';
 
   @override
   String privateUsdSendProvingPercent(int percent) {
@@ -10164,6 +10209,10 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get privateUsdWithdrawInfoStepProof =>
       '휴‍대‍폰‍에‍서 증‍명‍을 생‍성‍하‍면 달‍러‍가 Railgun‍을 떠‍나 그 주‍소‍로 가‍요.';
+
+  @override
+  String get privateUsdWithdrawInfoStepProofDesktop =>
+      'Mac‍에‍서 증‍명‍을 생‍성‍하‍면 달‍러‍가 Railgun‍을 떠‍나 그 주‍소‍로 가‍요.';
 
   @override
   String get privateUsdWithdrawInfoTitle => '출‍금‍하‍면 공‍개‍돼‍요';

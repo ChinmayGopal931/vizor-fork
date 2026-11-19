@@ -72,6 +72,11 @@ abstract final class AppBackResolver {
     '/private-usd/withdraw': (l) => l.privateUsdActionWithdraw,
     '/private-usd/send/review': (l) => l.appBackReview,
     '/private-usd/withdraw/review': (l) => l.appBackReview,
+    '/private-usd/convert': (l) => l.privateUsdActionConvert,
+    '/private-usd/convert/review': (l) => l.appBackReview,
+    '/private-usd/refunds': (l) => l.privateUsdRefundsTitle,
+    '/private-usd/conversion/:direction/:index': (l) =>
+        l.privateUsdConvertProgressTitle,
   };
 
   static AppBackTarget resolve(BuildContext context) {

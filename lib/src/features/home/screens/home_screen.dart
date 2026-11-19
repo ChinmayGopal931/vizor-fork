@@ -62,6 +62,10 @@ import '../../portfolio_chart/models/portfolio_chart_models.dart';
 import '../../portfolio_chart/providers/portfolio_chart_provider.dart';
 import '../../private_usd/providers/private_usd_activity_provider.dart';
 import '../../private_usd/providers/private_usd_available_provider.dart';
+import '../../private_usd/providers/private_usd_conversion_provider.dart'
+    show privateUsdConversionBannerProvider;
+import '../../private_usd/widgets/desktop/desktop_private_usd_bridge_widgets.dart'
+    show DesktopPrivateUsdConversionBanner;
 import '../../private_usd/widgets/desktop/desktop_private_usd_widgets.dart'
     show desktopPrivateUsdFeedEntries;
 import '../../private_usd/widgets/mobile/private_usd_activity_rows.dart'
@@ -813,11 +817,16 @@ class _HomePaneState extends ConsumerState<_HomePane>
             swapItems: swapItems,
             transactions: widget.sync.recentTransactions,
           );
+    final privateUsd = accountUuid == null
+        ? PrivateUsdActivity.empty
+        : ref.watch(privateUsdActivityProvider(accountUuid));
     final entries = <_HomeActivityEntry>[
       for (final tx in giftCardActivityIndex.withPendingClaims(
         widget.hasActivitySyncData ? widget.sync.recentTransactions : const [],
       ))
-        if (!absorption.absorbs(tx))
+        // A bridge's own row stands in for its deposit and sweeps.
+        if (!absorption.absorbs(tx) &&
+            !privateUsd.txids.contains(tx.txidHex.toLowerCase()))
           _homeTransactionActivityEntry(
             context,
             tx,
@@ -843,15 +852,15 @@ class _HomePaneState extends ConsumerState<_HomePane>
             ),
           ),
         ),
-      // Shielded USD's rows, as the phone's Home has them but for the
-      // bridge's: a click unfolds a row's details under it.
+      // Shielded USD's rows, as the phone's Home has them: a bridge's opens
+      // its progress, the others unfold their details under them.
       for (final entry in desktopPrivateUsdFeedEntries(
         context: context,
-        activity: accountUuid == null
-            ? PrivateUsdActivity.empty
-            : ref.watch(privateUsdActivityProvider(accountUuid)),
+        activity: privateUsd,
         privacyModeEnabled: widget.privacyModeEnabled,
         details: privateUsdActivityDetails,
+        onOpenConversion: (path) => context.push(path.location),
+        onOpenRefunds: () => context.push('/private-usd/refunds'),
       ))
         _HomeActivityEntry(timestamp: entry.timestamp, row: () => entry.row),
     ]..sort(_compareHomeActivityEntries);
@@ -1915,7 +1924,39 @@ class _HomeDesktopBalanceCardState extends State<_HomeDesktopBalanceCard> {
                 ],
               ),
             ),
+          // A Shielded USD bridge under way, as the phone's Home shows it
+          // under its buttons.
+          const _HomeDesktopPrivateUsdBanner(),
         ],
+      ),
+    );
+  }
+}
+
+/// The banner of a Shielded USD bridge under way for the active account
+/// ([DesktopPrivateUsdConversionBanner]), opening its progress. It shows while
+/// a bridge is unfinished, even when Shielded USD is otherwise unavailable,
+/// and builds nothing otherwise.
+class _HomeDesktopPrivateUsdBanner extends ConsumerWidget {
+  const _HomeDesktopPrivateUsdBanner();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final uuid = ref.watch(
+      accountProvider.select((s) => s.value?.activeAccountUuid),
+    );
+    final banner = uuid == null
+        ? null
+        : ref.watch(privateUsdConversionBannerProvider(uuid));
+    if (banner == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.s),
+      child: NeonSyncOcclude(
+        child: DesktopPrivateUsdConversionBanner(
+          key: const ValueKey('home_desktop_private_usd_banner'),
+          banner: banner,
+          onOpen: (path) => context.push(path.location),
+        ),
       ),
     );
   }

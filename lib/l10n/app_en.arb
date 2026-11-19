@@ -1,10 +1,10 @@
 {
   "@@locale": "en",
-  "aboutBuiltByBody": "We built Keplr, the wallet used by millions across Cosmos, Ethereum, and Bitcoin. Veylor is our take on what a Zcash wallet should feel like.",
+  "aboutBuiltByBody": "Veylor is a fork of Vizor, the open-source Zcash wallet from the Keplr team. We like Vizor a lot, so we built Veylor on it, with our own look and features.",
   "@aboutBuiltByBody": {
     "description": "Body of the first paragraph of the About screen."
   },
-  "aboutBuiltByHeading": "Built by the Keplr team",
+  "aboutBuiltByHeading": "A fork of Vizor",
   "@aboutBuiltByHeading": {
     "description": "Heading of the first paragraph of the About screen."
   },
@@ -12,7 +12,7 @@
   "@aboutLegalPlaceholderBody": {
     "description": "Body of the placeholder paragraphs on the Terms and Privacy Policy screens."
   },
-  "aboutLegalPlaceholderHeading": "From the team that brought you Keplr Wallet.",
+  "aboutLegalPlaceholderHeading": "Built on Vizor, from the Keplr team.",
   "@aboutLegalPlaceholderHeading": {
     "description": "Heading of the placeholder paragraphs on the Terms and Privacy Policy screens."
   },
@@ -11589,6 +11589,10 @@
   "@privateUsdConvertQuoteClockAhead": {
     "description": "Message on the bridge screens when a quote arrived already expired, which usually means the phone's clock is wrong."
   },
+  "privateUsdConvertQuoteClockAheadDesktop": "The quote had expired by the time it arrived. Check that your Mac's clock is right, then try again.",
+  "@privateUsdConvertQuoteClockAheadDesktop": {
+    "description": "In the Mac app: the message on the bridge screens when a quote arrived already expired, which usually means the Mac's clock is wrong."
+  },
   "privateUsdConvertQuoteExpires": "Quote expires in {minutesSeconds}",
   "@privateUsdConvertQuoteExpires": {
     "description": "Countdown caption under the quote on the bridge amount screen, drawn in uppercase in English; {minutesSeconds} is the time left in minutes and seconds, such as 4:59.",
@@ -12231,9 +12235,17 @@
   "@privateUsdInfoWithdraw": {
     "description": "Item in the Shielded USD info sheet explaining the Withdraw action and that it is public on Ethereum."
   },
+  "privateUsdKeepDisplayAwakeDesktop": "Keep display awake",
+  "@privateUsdKeepDisplayAwakeDesktop": {
+    "description": "Label of the switch in the Mac app's slim keep-Veylor-visible row on a bridge's progress screen: while on, the Mac's display (and so the Mac) is kept awake until the bridge no longer needs Veylor. The phone's card calls it 'Keep screen on'."
+  },
   "privateUsdKeepOpenBody": "This can take a while. Veylor needs to stay open and online until it's done: if your screen turns off, it pauses until you're back.",
   "@privateUsdKeepOpenBody": {
     "description": "Body of the 'Keep Veylor open' card on a bridge's progress screen: the bridge can take a while, Veylor must stay open and online, and it pauses if the screen turns off."
+  },
+  "privateUsdKeepOpenBodyDesktop": "This can take a while. Keep Veylor open, with its window showing, until it's done: if the window is hidden or minimized, or your Mac sleeps, it pauses until you're back.",
+  "@privateUsdKeepOpenBodyDesktop": {
+    "description": "Body of the 'Keep Veylor open' card on a bridge's progress screen in the Mac app: the bridge can take a while, Veylor must stay open with its window visible, and it pauses while the window is hidden or minimized or the Mac sleeps."
   },
   "privateUsdKeepOpenTitle": "Keep Veylor open",
   "@privateUsdKeepOpenTitle": {
@@ -12242,6 +12254,14 @@
   "privateUsdKeepScreenOn": "Keep screen on",
   "@privateUsdKeepScreenOn": {
     "description": "Label of the switch (also its screen-reader label) in the 'Keep Veylor open' card that keeps the phone's screen on until the bridge no longer needs Veylor."
+  },
+  "privateUsdKeepVisibleDesktop": "Keep Veylor visible until the bridge is done.",
+  "@privateUsdKeepVisibleDesktop": {
+    "description": "The one line of the Mac app's slim row on a bridge's progress screen, shown while the bridge needs Veylor: its window must stay visible until the bridge ends."
+  },
+  "privateUsdKeepVisibleDetailDesktop": "If it's covered, minimised or your Mac sleeps, the bridge pauses until you're back.",
+  "@privateUsdKeepVisibleDetailDesktop": {
+    "description": "Tooltip of the glyph in the Mac app's slim keep-Veylor-visible row on a bridge's progress screen: the bridge pauses while Veylor's window is covered or minimised or the Mac sleeps, and goes on when the user is back."
   },
   "privateUsdLoadFailed": "Couldn't load the balance. Try again in a moment.",
   "@privateUsdLoadFailed": {
@@ -12428,6 +12448,14 @@
   "@privateUsdRelayerClaimsSetting": {
     "description": "Switch in Settings: whether a new bridge to shielded USD lets the relayer claim the dollars on the user's behalf, so the user can leave once the market maker confirms the deposit."
   },
+  "privateUsdRemoveMoreUnfinished": "More shielded USD bridges are unfinished. Review the warning and confirm again.",
+  "@privateUsdRemoveMoreUnfinished": {
+    "description": "[security] Error in the Mac app's remove-account and reset dialogs when more Shielded USD bridges became unfinished while the removal was pending; nothing was removed."
+  },
+  "privateUsdRemoveRecheckFailed": "Couldn't recheck shielded USD bridges. Review the warning and confirm again.",
+  "@privateUsdRemoveRecheckFailed": {
+    "description": "[security] Error in the Mac app's remove-account and reset dialogs when the unfinished Shielded USD bridges could not be rechecked before removal; nothing was removed."
+  },
   "privateUsdResetAnyway": "Reset anyway",
   "@privateUsdResetAnyway": {
     "description": "[security] Destructive button in the reset sheet that erases every account and all wallet data despite unfinished Shielded USD bridges, whose funds can be lost."
@@ -12588,6 +12616,10 @@
   "@privateUsdReverseProvingNote": {
     "description": "Note under the progress steps of a shielded-USD-to-ZEC bridge while the phone builds the zero-knowledge proof for the escrow payment, which can take minutes."
   },
+  "privateUsdReverseProvingNoteDesktop": "Your Mac builds a zero-knowledge proof of the payment. This can take a few minutes. Keep Veylor open, with its window showing.",
+  "@privateUsdReverseProvingNoteDesktop": {
+    "description": "Note under the progress steps of a shielded-USD-to-ZEC bridge in the Mac app while the Mac builds the zero-knowledge proof for the escrow payment, which can take minutes; the window must stay visible meanwhile."
+  },
   "privateUsdReverseRailgunFee": "Railgun unshield fee",
   "@privateUsdReverseRailgunFee": {
     "description": "Row label on the shielded-USD-to-ZEC review and in its activity details: Railgun's fee for moving the dollars out of the shielded balance (unshielding) into escrow."
@@ -12697,6 +12729,15 @@
   "privateUsdReverseStepPayDetail": "Tap Pay to send {debit} of shielded USD to escrow.",
   "@privateUsdReverseStepPayDetail": {
     "description": "Detail under the 'Pay shielded USD to escrow' step: tapping the Pay button sends the shown amount of shielded USD into escrow; {debit} is a dollar amount such as $25.10.",
+    "placeholders": {
+      "debit": {
+        "type": "String"
+      }
+    }
+  },
+  "privateUsdReverseStepPayDetailDesktop": "Click Pay to send {debit} of shielded USD to escrow.",
+  "@privateUsdReverseStepPayDetailDesktop": {
+    "description": "Detail under the 'Pay shielded USD to escrow' step in the Mac app: clicking the Pay button sends the shown amount of shielded USD into escrow; {debit} is a dollar amount such as $25.10.",
     "placeholders": {
       "debit": {
         "type": "String"
@@ -13041,6 +13082,10 @@
   "@privateUsdSendInfoStepProof": {
     "description": "Second step in the send info sheet: the phone builds a zero-knowledge proof."
   },
+  "privateUsdSendInfoStepProofDesktop": "Your Mac builds a zero-knowledge proof. This takes a few seconds.",
+  "@privateUsdSendInfoStepProofDesktop": {
+    "description": "In the Mac app: the second step in the send info card, where the Mac builds a zero-knowledge proof."
+  },
   "privateUsdSendInfoTitle": "Sending shielded USD",
   "@privateUsdSendInfoTitle": {
     "description": "Title of the info sheet on the Shielded USD send screens explaining how a send works."
@@ -13077,6 +13122,10 @@
   "privateUsdSendProvingDetail": "Your phone builds a zero-knowledge proof so nobody can see what you send. This takes a few seconds. Keep Veylor open.",
   "@privateUsdSendProvingDetail": {
     "description": "Body of the send and withdraw progress screen while the zero-knowledge proof is built."
+  },
+  "privateUsdSendProvingDetailDesktop": "Your Mac builds a zero-knowledge proof so nobody can see what you send. This takes a few seconds. Keep Veylor open, with its window showing.",
+  "@privateUsdSendProvingDetailDesktop": {
+    "description": "In the Mac app: the body of the send and withdraw progress screen while the zero-knowledge proof is built. The window must stay showing, because the Mac pauses the proof while it's hidden."
   },
   "privateUsdSendProvingPercent": "Proving your transaction · {percent}%",
   "@privateUsdSendProvingPercent": {
@@ -13290,6 +13339,10 @@
   "privateUsdWithdrawInfoStepProof": "Your phone builds a proof, and the dollars leave Railgun for that address.",
   "@privateUsdWithdrawInfoStepProof": {
     "description": "Second step in the withdraw info sheet: the phone builds a proof and the dollars leave Railgun for the address."
+  },
+  "privateUsdWithdrawInfoStepProofDesktop": "Your Mac builds a proof, and the dollars leave Railgun for that address.",
+  "@privateUsdWithdrawInfoStepProofDesktop": {
+    "description": "In the Mac app: the second step in the withdraw info card, where the Mac builds a proof and the dollars leave Railgun for the address."
   },
   "privateUsdWithdrawInfoTitle": "Withdrawing makes it public",
   "@privateUsdWithdrawInfoTitle": {

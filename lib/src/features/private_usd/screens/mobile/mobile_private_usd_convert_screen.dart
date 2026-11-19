@@ -102,7 +102,16 @@ class _MobilePrivateUsdConvertScreenState
 
   void _showProgress(PrivateUsdRoutePath path) {
     if (!mounted) return;
-    context.pushReplacement(path.location);
+    // Rebuild the stack, not just its top. A bridge under way refreshes the
+    // router, which rebuilds the review's route without its extra, so a
+    // fallback convert screen can land here while the convert screen that
+    // pushed the review is still under it, waiting. Replacing only the top
+    // left that one there, and back from the progress landed on it. Home,
+    // the Shielded USD page, then the progress, as "View balance" does.
+    final router = GoRouter.of(context);
+    router.go('/home');
+    unawaited(router.push<void>('/private-usd'));
+    unawaited(router.push<void>(path.location));
   }
 
   /// Opens the review. Once a conversion is accepted, its progress replaces

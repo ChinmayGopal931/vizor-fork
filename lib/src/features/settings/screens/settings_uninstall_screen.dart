@@ -18,9 +18,12 @@ import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../providers/account_provider.dart';
 import '../../../providers/app_security_provider.dart';
+import '../../../providers/private_usd_lifecycle_provider.dart'
+    show PrivateUsdUnfinishedConversionsException;
 import '../../../providers/voting/voting_submission_guard_provider.dart';
 import '../../../providers/wallet_mutation_guard.dart';
 import '../../payment_links/services/payment_link_received_store.dart';
+import '../../private_usd/providers/private_usd_unfinished_provider.dart';
 import '../../swap/providers/swap_activity_store.dart';
 import '../widgets/confirm_access_card.dart';
 import '../widgets/settings_pane_backdrop.dart';
@@ -76,6 +79,18 @@ class _SettingsUninstallScreenState
   String? _gateError;
   bool _isSubmitting = false;
   bool _isCheckingSwaps = false;
+
+  /// Shielded USD bridges under way were warned about, with the count the
+  /// user saw (null for one that could not be read): only this wallet can
+  /// finish or refund them, so a reset is warned about, never blocked (plan
+  /// §3.5 invariant 15). The next Reset goes on with that count, which
+  /// `resetWallet` rechecks.
+  bool _privateUsdWarned = false;
+  int? _privateUsdWarnedCount;
+
+  /// The count the reset goes ahead with: 0 when there were none, the one
+  /// warned about, or null for one that could not be read.
+  int? _privateUsdConfirmedCount = 0;
 
   @override
   void initState() {
@@ -169,6 +184,30 @@ class _SettingsUninstallScreenState
       return;
     }
 
+    // Shielded USD bridges under way: warn once with their count (or that
+    // they could not be checked), then let the next Reset go on.
+    int? bridges;
+    try {
+      bridges = await ref.read(privateUsdUnfinishedTotalProvider.future);
+    } catch (e, st) {
+      log('SettingsUninstallScreen._openGate: bridge check ERROR: $e\n$st');
+      bridges = null;
+    }
+    if (!mounted) return;
+    if (bridges != 0 &&
+        !(_privateUsdWarned && _privateUsdWarnedCount == bridges)) {
+      setState(() {
+        _isCheckingSwaps = false;
+        _privateUsdWarned = true;
+        _privateUsdWarnedCount = bridges;
+        _confirmError = bridges == null
+            ? context.l10n.privateUsdResetUncheckedBody
+            : context.l10n.privateUsdResetUnfinishedBody(bridges);
+      });
+      return;
+    }
+    _privateUsdConfirmedCount = bridges;
+
     setState(() {
       _isCheckingSwaps = false;
       _stage = SettingsUninstallStage.gate;
@@ -184,6 +223,10 @@ class _SettingsUninstallScreenState
         _stage = SettingsUninstallStage.confirm;
         _passwordController.clear();
         _gateError = null;
+        // Back at the start: the bridges are counted and warned about again.
+        _privateUsdWarned = false;
+        _privateUsdWarnedCount = null;
+        _privateUsdConfirmedCount = 0;
       });
       return;
     }
@@ -253,8 +296,14 @@ class _SettingsUninstallScreenState
 
     final accountNotifier = ref.read(accountProvider.notifier);
 
+    final confirmedBridges = _privateUsdConfirmedCount;
     try {
-      await runWithSyncPausedForWalletReset(ref, accountNotifier.resetWallet);
+      await runWithSyncPausedForWalletReset(
+        ref,
+        () => accountNotifier.resetWallet(
+          confirmedPrivateUsdUnfinishedCount: confirmedBridges,
+        ),
+      );
       if (!mounted) return;
       await _progressController.animateTo(
         1,
@@ -274,6 +323,22 @@ class _SettingsUninstallScreenState
       setState(() {
         _stage = SettingsUninstallStage.confirm;
         _confirmError = context.l10n.walletResetGiftCardInFlight;
+      });
+    } on PrivateUsdUnfinishedConversionsException catch (e, st) {
+      // More bridges than the user was warned about, or a recheck that
+      // failed: nothing was deleted. The next Reset counts and warns again.
+      log('SettingsUninstallScreen._runUninstall held for bridges: $e\n$st');
+      if (!mounted) return;
+      _progressController.stop();
+      ref.invalidate(privateUsdUnfinishedTotalProvider);
+      setState(() {
+        _stage = SettingsUninstallStage.confirm;
+        _privateUsdWarned = false;
+        _privateUsdWarnedCount = null;
+        _privateUsdConfirmedCount = 0;
+        _confirmError = e.count == null
+            ? context.l10n.privateUsdRemoveRecheckFailed
+            : context.l10n.privateUsdRemoveMoreUnfinished;
       });
     } catch (e, st) {
       log('SettingsUninstallScreen._runUninstall: ERROR: $e\n$st');
@@ -318,6 +383,7 @@ class _SettingsUninstallScreenState
                 SettingsUninstallStage.confirm => _UninstallConfirmView(
                   errorText: _confirmError,
                   isCheckingSwaps: _isCheckingSwaps,
+                  warnedOfBridges: _privateUsdWarned,
                   onUninstall: () {
                     unawaited(_openGate());
                   },
@@ -513,10 +579,15 @@ class _UninstallConfirmView extends StatelessWidget {
     required this.isCheckingSwaps,
     required this.onUninstall,
     required this.onCancel,
+    this.warnedOfBridges = false,
   });
 
   final String? errorText;
   final bool isCheckingSwaps;
+
+  /// Shielded USD bridges under way were warned about: the button says the
+  /// reset goes ahead anyway.
+  final bool warnedOfBridges;
   final VoidCallback onUninstall;
   final VoidCallback onCancel;
 
@@ -555,6 +626,8 @@ class _UninstallConfirmView extends StatelessWidget {
               child: Text(
                 isCheckingSwaps
                     ? context.l10n.commonChecking
+                    : warnedOfBridges
+                    ? context.l10n.privateUsdResetAnyway
                     : context.l10n.settingsUninstallTitle,
               ),
             ),

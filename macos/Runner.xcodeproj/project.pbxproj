@@ -29,10 +29,12 @@
 		RAILGUNMAC01000000000006 /* RailgunProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNMAC00000000000006 /* RailgunProtocol.swift */; };
 		RAILGUNMAC01000000000007 /* RailgunEndpoints.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNMAC00000000000007 /* RailgunEndpoints.swift */; };
 		RAILGUNMAC01000000000008 /* RailgunError.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNMAC00000000000008 /* RailgunError.swift */; };
+		RAILGUNMAC01000000000014 /* RailgunArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNMAC00000000000014 /* RailgunArchive.swift */; };
 		RAILGUNMAC01000000000009 /* railgun in Resources */ = {isa = PBXBuildFile; fileRef = RAILGUNMAC00000000000009 /* railgun */; };
 		RAILGUNMAC01000000000010 /* PrivateUsdAttestationHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNMAC00000000000010 /* PrivateUsdAttestationHandler.swift */; };
 		RAILGUNMAC01000000000011 /* ScreenAwakeChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNMAC00000000000011 /* ScreenAwakeChannel.swift */; };
 		RAILGUNMAC01000000000012 /* MacSessionLifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNMAC00000000000012 /* MacSessionLifecycle.swift */; };
+		RAILGUNMAC01000000000013 /* SettlementAttentionChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNMAC00000000000013 /* SettlementAttentionChannel.swift */; };
 		088C3ECBC32241862BB97A71 /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A99D1F13B43F868A52AD08B9 /* Pods_RunnerTests.framework */; };
 		331C80D8294CF71000263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C80D7294CF71000263BE5 /* RunnerTests.swift */; };
 		335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */ = {isa = PBXBuildFile; fileRef = 335BBD1A22A9A15E00E9071D /* GeneratedPluginRegistrant.swift */; };
@@ -90,10 +92,12 @@
 		RAILGUNMAC00000000000006 /* RailgunProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RailgunProtocol.swift; path = ../../../ios/Runner/Railgun/RailgunProtocol.swift; sourceTree = "<group>"; };
 		RAILGUNMAC00000000000007 /* RailgunEndpoints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RailgunEndpoints.swift; path = ../../../ios/Runner/Railgun/RailgunEndpoints.swift; sourceTree = "<group>"; };
 		RAILGUNMAC00000000000008 /* RailgunError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RailgunError.swift; sourceTree = "<group>"; };
+		RAILGUNMAC00000000000014 /* RailgunArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RailgunArchive.swift; sourceTree = "<group>"; };
 		RAILGUNMAC00000000000009 /* railgun */ = {isa = PBXFileReference; lastKnownFileType = folder; name = railgun; path = ../../../ios/Runner/Railgun/railgun; sourceTree = "<group>"; };
 		RAILGUNMAC00000000000010 /* PrivateUsdAttestationHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateUsdAttestationHandler.swift; sourceTree = "<group>"; };
 		RAILGUNMAC00000000000011 /* ScreenAwakeChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenAwakeChannel.swift; sourceTree = "<group>"; };
 		RAILGUNMAC00000000000012 /* MacSessionLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacSessionLifecycle.swift; sourceTree = "<group>"; };
+		RAILGUNMAC00000000000013 /* SettlementAttentionChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettlementAttentionChannel.swift; sourceTree = "<group>"; };
 		172D69C18F5F044E127CAAC4 /* Pods-Runner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"; sourceTree = "<group>"; };
 		315B6E283CFA18547D84131E /* Pods-Runner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.debug.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"; sourceTree = "<group>"; };
 		331C80D5294CF71000263BE5 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -240,6 +244,7 @@
 				RAILGUNMAC00000000000006 /* RailgunProtocol.swift */,
 				RAILGUNMAC00000000000007 /* RailgunEndpoints.swift */,
 				RAILGUNMAC00000000000008 /* RailgunError.swift */,
+				RAILGUNMAC00000000000014 /* RailgunArchive.swift */,
 				RAILGUNMAC00000000000009 /* railgun */,
 			);
 			path = Railgun;
@@ -256,6 +261,7 @@
 				RAILGUNMAC00000000000010 /* PrivateUsdAttestationHandler.swift */,
 				RAILGUNMAC00000000000011 /* ScreenAwakeChannel.swift */,
 				RAILGUNMAC00000000000012 /* MacSessionLifecycle.swift */,
+				RAILGUNMAC00000000000013 /* SettlementAttentionChannel.swift */,
 				33E51913231747F40026EE4D /* DebugProfile.entitlements */,
 				33E51914231749380026EE4D /* Release.entitlements */,
 				33CC11242044D66E0003C045 /* Resources */,
@@ -531,9 +537,11 @@
 				RAILGUNMAC01000000000006 /* RailgunProtocol.swift in Sources */,
 				RAILGUNMAC01000000000007 /* RailgunEndpoints.swift in Sources */,
 				RAILGUNMAC01000000000008 /* RailgunError.swift in Sources */,
+				RAILGUNMAC01000000000014 /* RailgunArchive.swift in Sources */,
 				RAILGUNMAC01000000000010 /* PrivateUsdAttestationHandler.swift in Sources */,
 				RAILGUNMAC01000000000011 /* ScreenAwakeChannel.swift in Sources */,
 				RAILGUNMAC01000000000012 /* MacSessionLifecycle.swift in Sources */,
+				RAILGUNMAC01000000000013 /* SettlementAttentionChannel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

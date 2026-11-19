@@ -1,5 +1,6 @@
 import '../../../core/l10n/l10n.dart';
 import '../../../core/formatting/address_display.dart';
+import '../../../core/layout/app_form_factor.dart' show kDesktopFormFactor;
 import '../../../core/formatting/date_format.dart';
 import '../../../core/formatting/zec_amount.dart';
 import '../../../core/privacy/privacy_mask.dart';
@@ -300,8 +301,11 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation(
           l10n.privateUsdPaymentProving(
             ((proofProgress ?? 0) * 100).floor().clamp(0, 100),
           ),
+        // The Mac's Pay is clicked, not tapped.
         ApiReversePhase.awaitingFunding when awaitingPay =>
-          l10n.privateUsdReverseStepPayDetail(usdText),
+          kDesktopFormFactor
+              ? l10n.privateUsdReverseStepPayDetailDesktop(usdText)
+              : l10n.privateUsdReverseStepPayDetail(usdText),
         ApiReversePhase.sendingUsdc => l10n.privateUsdReverseSending,
         ApiReversePhase.confirmingEscrow => l10n.privateUsdReverseConfirming,
         ApiReversePhase.awaitingReady =>
@@ -387,7 +391,13 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation(
         : null,
     callOffPaid: !unpaid,
     showsKeepOpen: true,
-    provingNote: proving ? l10n.privateUsdReverseProvingNote : null,
+    // On the Mac the window must stay visible: WebKit suspends the page that
+    // proves while it is hidden.
+    provingNote: proving
+        ? (kDesktopFormFactor
+              ? l10n.privateUsdReverseProvingNoteDesktop
+              : l10n.privateUsdReverseProvingNote)
+        : null,
     title: l10n.privateUsdConvertProgressTitle,
   );
 }

@@ -10,17 +10,17 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aboutBuiltByBody =>
-      '我们打造了 Keplr，这款钱包服务于 Cosmos、Ethereum 和 Bitcoin 生态的数百万用户。Veylor 是我们心目中 Zcash 钱包该有的样子。';
+      'Veylor 是 Vizor 的分叉版本。Vizor 是 Keplr 团队打造的开源 Zcash 钱包。我们很喜欢 Vizor，所以在它的基础上打造了 Veylor，并加入了我们自己的设计和功能。';
 
   @override
-  String get aboutBuiltByHeading => '由 Keplr 团队打造';
+  String get aboutBuiltByHeading => 'Vizor 的分叉版本';
 
   @override
   String get aboutLegalPlaceholderBody =>
       '与 Bitcoin 或 Ethereum 不同，隐私 Zcash 交易会隐藏发送方、接收方和金额。';
 
   @override
-  String get aboutLegalPlaceholderHeading => '来自打造 Keplr 钱包的团队。';
+  String get aboutLegalPlaceholderHeading => '基于 Keplr 团队的 Vizor 打造。';
 
   @override
   String aboutLinkSemantics(String label) {
@@ -8389,6 +8389,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get privateUsdConvertQuoteClockAhead => '报价送达时已过期。请检查手机时间是否准确，然后重试。';
 
   @override
+  String get privateUsdConvertQuoteClockAheadDesktop =>
+      '报价送达时已过期。请检查 Mac 的时间是否准确，然后重试。';
+
+  @override
   String privateUsdConvertQuoteExpires(String minutesSeconds) {
     return '报价剩余有效时间 $minutesSeconds';
   }
@@ -8824,14 +8828,28 @@ class AppLocalizationsZh extends AppLocalizations {
       '提取：将隐私 USD 转到公开的 Ethereum 地址。目标地址和金额会在 Ethereum 上公开。';
 
   @override
+  String get privateUsdKeepDisplayAwakeDesktop => '保持显示器常亮';
+
+  @override
   String get privateUsdKeepOpenBody =>
       '这可能需要一段时间。完成前，Veylor 需要保持打开并联网：如果屏幕关闭，流程会暂停，直到你回来。';
+
+  @override
+  String get privateUsdKeepOpenBodyDesktop =>
+      '这可能需要一段时间。完成前，请保持 Veylor 打开并让其窗口保持可见：如果窗口被隐藏或最小化，或 Mac 进入睡眠，流程会暂停，直到你回来。';
 
   @override
   String get privateUsdKeepOpenTitle => '请保持 Veylor 打开';
 
   @override
   String get privateUsdKeepScreenOn => '保持屏幕常亮';
+
+  @override
+  String get privateUsdKeepVisibleDesktop => '跨链完成前，请让 Veylor 保持可见。';
+
+  @override
+  String get privateUsdKeepVisibleDetailDesktop =>
+      '如果窗口被遮挡、最小化，或 Mac 进入睡眠，跨链会暂停，直到你回来。';
 
   @override
   String get privateUsdLoadFailed => '无法加载余额，请稍后重试。';
@@ -8966,6 +8984,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get privateUsdRelayerClaimsSetting => '由中继者代为领取';
 
   @override
+  String get privateUsdRemoveMoreUnfinished => '又有隐私 USD 跨链尚未完成。请查看警告并再次确认。';
+
+  @override
+  String get privateUsdRemoveRecheckFailed => '无法重新检查隐私 USD 跨链。请查看警告并再次确认。';
+
+  @override
   String get privateUsdResetAnyway => '仍然重置';
 
   @override
@@ -9080,6 +9104,10 @@ class AppLocalizationsZh extends AppLocalizations {
       '你的手机正在为此付款生成零知识证明，可能需要几分钟。请保持 Veylor 打开。';
 
   @override
+  String get privateUsdReverseProvingNoteDesktop =>
+      '你的 Mac 正在为此付款生成零知识证明，可能需要几分钟。请保持 Veylor 打开并让其窗口保持可见。';
+
+  @override
   String get privateUsdReverseRailgunFee => 'Railgun 转为公开手续费';
 
   @override
@@ -9162,6 +9190,11 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String privateUsdReverseStepPayDetail(String debit) {
     return '点按“支付”，将价值 $debit 的隐私 USD 发送到托管。';
+  }
+
+  @override
+  String privateUsdReverseStepPayDetailDesktop(String debit) {
+    return '点击“支付”，将价值 $debit 的隐私 USD 发送到托管。';
   }
 
   @override
@@ -9388,6 +9421,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get privateUsdSendInfoStepProof => '你的手机会生成零知识证明，需要几秒钟。';
 
   @override
+  String get privateUsdSendInfoStepProofDesktop => '你的 Mac 会生成零知识证明，需要几秒钟。';
+
+  @override
   String get privateUsdSendInfoTitle => '发送隐私 USD';
 
   @override
@@ -9413,6 +9449,10 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get privateUsdSendProvingDetail =>
       '你的手机正在生成零知识证明，让任何人都看不到你发送的内容。这需要几秒钟。请保持 Veylor 打开。';
+
+  @override
+  String get privateUsdSendProvingDetailDesktop =>
+      '你的 Mac 正在生成零知识证明，让任何人都看不到你发送的内容。这需要几秒钟。请保持 Veylor 打开并让其窗口保持可见。';
 
   @override
   String privateUsdSendProvingPercent(int percent) {
@@ -9563,6 +9603,10 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get privateUsdWithdrawInfoStepProof =>
       '你的手机会生成证明，然后美元会离开 Railgun，转到该地址。';
+
+  @override
+  String get privateUsdWithdrawInfoStepProofDesktop =>
+      '你的 Mac 会生成证明，然后美元会离开 Railgun，转到该地址。';
 
   @override
   String get privateUsdWithdrawInfoTitle => '提取后将公开';

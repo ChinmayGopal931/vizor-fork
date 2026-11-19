@@ -374,11 +374,16 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen>
         : SwapActivityLegAbsorption.empty;
     final swapReceiveTxByIntent = absorption.receiveTxByIntent;
 
+    final privateUsd = accountUuid == null
+        ? PrivateUsdActivity.empty
+        : ref.watch(privateUsdActivityProvider(accountUuid));
     final entries = <_ActivityEntry>[];
     var sourceOrder = 0;
     if (accountUuid != null) {
       for (final tx in giftCardActivityIndex.withPendingClaims(transactions)) {
         if (absorption.absorbs(tx)) continue;
+        // A bridge's own row stands in for its deposit and sweeps.
+        if (privateUsd.txids.contains(tx.txidHex.toLowerCase())) continue;
         final giftCard = giftCardActivityIndex.metadataFor(
           tx,
           transactions: transactions,
@@ -455,17 +460,17 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen>
     final pager = _pager;
     final sections = _activityFeedSections(context.l10n, [
       ...entries.take(pager?.visibleCount ?? activityPageSize),
-      // Shielded USD's rows, as the phone's Activity has them but for the
-      // bridge's; a click unfolds a row's details under it. They are all
-      // loaded while the pager pages the wallet's rows, so one shows only
-      // above the page's last row, as on the phone.
+      // Shielded USD's rows, as the phone's Activity has them: a bridge's
+      // opens its progress, the others unfold their details under them. They
+      // are all loaded while the pager pages the wallet's rows, so one shows
+      // only above the page's last row, as on the phone.
       for (final entry in desktopPrivateUsdFeedEntries(
         context: context,
-        activity: accountUuid == null
-            ? PrivateUsdActivity.empty
-            : ref.watch(privateUsdActivityProvider(accountUuid)),
+        activity: privateUsd,
         privacyModeEnabled: privacyModeEnabled,
         details: privateUsdActivityDetails,
+        onOpenConversion: (path) => context.push(path.location),
+        onOpenRefunds: () => context.push('/private-usd/refunds'),
       ))
         if (pager == null || pager.showsUnpagedRow(entry.timestamp))
           _ActivityEntry(

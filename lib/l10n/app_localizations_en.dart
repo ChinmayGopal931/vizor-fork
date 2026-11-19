@@ -10,10 +10,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutBuiltByBody =>
-      'We built Keplr, the wallet used by millions across Cosmos, Ethereum, and Bitcoin. Veylor is our take on what a Zcash wallet should feel like.';
+      'Veylor is a fork of Vizor, the open-source Zcash wallet from the Keplr team. We like Vizor a lot, so we built Veylor on it, with our own look and features.';
 
   @override
-  String get aboutBuiltByHeading => 'Built by the Keplr team';
+  String get aboutBuiltByHeading => 'A fork of Vizor';
 
   @override
   String get aboutLegalPlaceholderBody =>
@@ -21,7 +21,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutLegalPlaceholderHeading =>
-      'From the team that brought you Keplr Wallet.';
+      'Built on Vizor, from the Keplr team.';
 
   @override
   String aboutLinkSemantics(String label) {
@@ -9068,6 +9068,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'The quote had expired by the time it arrived. Check that your phone\'s clock is right, then try again.';
 
   @override
+  String get privateUsdConvertQuoteClockAheadDesktop =>
+      'The quote had expired by the time it arrived. Check that your Mac\'s clock is right, then try again.';
+
+  @override
   String privateUsdConvertQuoteExpires(String minutesSeconds) {
     return 'Quote expires in $minutesSeconds';
   }
@@ -9532,14 +9536,29 @@ class AppLocalizationsEn extends AppLocalizations {
       'Withdraw: move shielded USD to a public Ethereum address. The destination and amount are visible on Ethereum.';
 
   @override
+  String get privateUsdKeepDisplayAwakeDesktop => 'Keep display awake';
+
+  @override
   String get privateUsdKeepOpenBody =>
       'This can take a while. Veylor needs to stay open and online until it\'s done: if your screen turns off, it pauses until you\'re back.';
+
+  @override
+  String get privateUsdKeepOpenBodyDesktop =>
+      'This can take a while. Keep Veylor open, with its window showing, until it\'s done: if the window is hidden or minimized, or your Mac sleeps, it pauses until you\'re back.';
 
   @override
   String get privateUsdKeepOpenTitle => 'Keep Veylor open';
 
   @override
   String get privateUsdKeepScreenOn => 'Keep screen on';
+
+  @override
+  String get privateUsdKeepVisibleDesktop =>
+      'Keep Veylor visible until the bridge is done.';
+
+  @override
+  String get privateUsdKeepVisibleDetailDesktop =>
+      'If it\'s covered, minimised or your Mac sleeps, the bridge pauses until you\'re back.';
 
   @override
   String get privateUsdLoadFailed =>
@@ -9682,6 +9701,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get privateUsdRelayerClaimsSetting => 'Let the relayer claim for me';
 
   @override
+  String get privateUsdRemoveMoreUnfinished =>
+      'More shielded USD bridges are unfinished. Review the warning and confirm again.';
+
+  @override
+  String get privateUsdRemoveRecheckFailed =>
+      'Couldn\'t recheck shielded USD bridges. Review the warning and confirm again.';
+
+  @override
   String get privateUsdResetAnyway => 'Reset anyway';
 
   @override
@@ -9811,6 +9838,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Your phone builds a zero-knowledge proof of the payment. This can take a few minutes. Keep Veylor open.';
 
   @override
+  String get privateUsdReverseProvingNoteDesktop =>
+      'Your Mac builds a zero-knowledge proof of the payment. This can take a few minutes. Keep Veylor open, with its window showing.';
+
+  @override
   String get privateUsdReverseRailgunFee => 'Railgun unshield fee';
 
   @override
@@ -9897,6 +9928,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String privateUsdReverseStepPayDetail(String debit) {
     return 'Tap Pay to send $debit of shielded USD to escrow.';
+  }
+
+  @override
+  String privateUsdReverseStepPayDetailDesktop(String debit) {
+    return 'Click Pay to send $debit of shielded USD to escrow.';
   }
 
   @override
@@ -10137,6 +10173,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Your phone builds a zero-knowledge proof. This takes a few seconds.';
 
   @override
+  String get privateUsdSendInfoStepProofDesktop =>
+      'Your Mac builds a zero-knowledge proof. This takes a few seconds.';
+
+  @override
   String get privateUsdSendInfoTitle => 'Sending shielded USD';
 
   @override
@@ -10164,6 +10204,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get privateUsdSendProvingDetail =>
       'Your phone builds a zero-knowledge proof so nobody can see what you send. This takes a few seconds. Keep Veylor open.';
+
+  @override
+  String get privateUsdSendProvingDetailDesktop =>
+      'Your Mac builds a zero-knowledge proof so nobody can see what you send. This takes a few seconds. Keep Veylor open, with its window showing.';
 
   @override
   String privateUsdSendProvingPercent(int percent) {
@@ -10330,6 +10374,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get privateUsdWithdrawInfoStepProof =>
       'Your phone builds a proof, and the dollars leave Railgun for that address.';
+
+  @override
+  String get privateUsdWithdrawInfoStepProofDesktop =>
+      'Your Mac builds a proof, and the dollars leave Railgun for that address.';
 
   @override
   String get privateUsdWithdrawInfoTitle => 'Withdrawing makes it public';

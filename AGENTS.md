@@ -467,8 +467,8 @@ otherwise.
     the pane's back link). Without Private USD the holdings are the shielded
     pools, their total and the transparent ZEC; with it (the Mac) they list
     Shielded USD as the phone's do, and the phone Home's Shielded USD strip
-    sits under the transparent tray, opening `/private-usd` (see "Private
-    USD"). A hidden chart (off, or no history) leaves the sign inert. The Send, Receive and Pay buttons under
+    sits under the transparent tray, opening `/private-usd`, with a bridge
+    under way's banner under the buttons (see "Private USD"). A hidden chart (off, or no history) leaves the sign inert. The Send, Receive and Pay buttons under
     it are `AppButton`'s slab (the primary lit, the secondaries glass with
     an outside hairline), the Ironwood call a glass panel with a lit square
     beacon, and the transparent tray sits under a hairline of white light
@@ -2074,12 +2074,18 @@ A Railgun USDC ("private USD") balance, conversion both ways with shielded
 ZEC by atomic swap (with refunds and rescue), and private send and withdraw.
 It runs on Android. The iOS port (iOS 17 and later, behind the same define)
 has its code in but has not yet run on a simulator or an iPhone. The macOS
-desktop app hosts it too (macOS 14 and later, behind the same define; step 3a,
-2026-11-19), with desktop screens for everything but the bridge, which desktop
-hides until its screens come (step 3b); Windows and Linux have no host and hide
-it. Desktop Home's recent activity and Activity list the phone's Shielded USD
-rows but the bridge's (`desktopPrivateUsdFeedEntries`). The Mac's host, how it
-differs from iOS's and what has run are in
+desktop app hosts it too (macOS 14 and later, behind the same define): step 3a
+(2026-11-19) brought the Railgun host and desktop screens, and step 3b the
+bridge with its refunds and rescue, on the same engine and providers, in
+desktop layouts that place the phone's bridge widgets (never its screens).
+Windows and Linux have no host and hide it. Desktop Home's recent activity and
+Activity list the phone's Shielded USD rows, bridges included, and leave out
+the wallet transactions a bridge row stands in for
+(`desktopPrivateUsdFeedEntries`). Desktop follows the phone's flows action for
+action (checked 2026-11-19): the same provider calls, guards, confirmations
+and states, differing only in layout, mouse and keyboard, the Mac's own
+behaviour and wording. The Mac's host, the bridge's desktop screens and hooks,
+what desktop keeps different, how it differs from iOS's and what has run are in
 `docs/private-usd-macos.md`. Before changing it,
 read `docs/private-usd-android-plan.md`: §3.5 lists the invariants and why
 each one exists. The pinned config and defines are in
@@ -2226,9 +2232,22 @@ Code:
   suspends the page while its window is not visible, as iOS does in the
   background. The keep-awake flag is an IOKit `PreventUserIdleDisplaySleep`
   assertion (`ScreenAwakeChannel`), which desktop's
-  `SyncKeepAwakeNativeHost` takes only for Private USD while the window is not
-  hidden. Desktop has no bridge yet (`privateUsdBridgeAvailableProvider` is
-  false there), so nothing but a first sync keeps the Mac awake.
+  `SyncKeepAwakeNativeHost` takes only for Private USD (a Railgun first sync,
+  or a bridge by the phone's rules) while the window is not hidden. A
+  USD → ZEC payment is proved in the page, so in place of the keep-open card
+  desktop shows one slim row (`DesktopPrivateUsdKeepVisibleRow`): "Keep Veylor
+  visible until the bridge is done.", what pauses it in the glyph's tooltip,
+  and the phone's switch as "Keep display awake"; a relayer-claimed ZEC → USD
+  bridge still says the user may leave once the maker confirms the deposit. The settlement reminder asks for the
+  user's attention instead of buzzing: the haptics channel's
+  `settlementDeadline` has a macOS handler (`SettlementAttentionChannel`:
+  `NSApp.requestUserAttention(.criticalRequest)` and the alert sound), on the
+  shared provider's timing, foreground and unlocked only. Desktop's one idle
+  cover, the Ironwood migration's privacy lock, is not eligible while
+  `privateUsdBridgeAwaitsUserProvider` holds, so "Authorize settlement" never
+  shows behind it. The bridge screens' pinned action
+  (`DesktopPrivateUsdPage.action`) keeps it in view however far the progress
+  scrolls.
 
 **Separate databases.** Rust owns both, in
 `<support>/private_usd_<walletDbName>_<network>/` (`getPrivateUsdDirPath`):
@@ -2349,9 +2368,10 @@ keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
 - Derive keys only after the seed-fingerprint check, and refuse a Railgun
   session whose address differs from Rust's.
 - Deleting an account, or resetting, with a conversion under way warns with
-  the count and waits for the user's explicit confirmation. Drain
-  `privateUsdLifecycleProvider` first, and clean up only after the Rust
-  delete succeeds.
+  the count and waits for the user's explicit confirmation: the phones'
+  sheets, and on desktop the removal dialog, Settings' reset and the
+  lost-password reset. Drain `privateUsdLifecycleProvider` first, and clean up
+  only after the Rust delete succeeds.
 
 **Deposits (plan M9).** Public USDC sent to the account's own deposit
 addresses (`m/44'/60'|1'/(1000 + zip32)'/0/index`, from the seed) is
@@ -2488,7 +2508,7 @@ the Mac's, answer `unavailable`), Dart `services/private_usd_tokens_service.dart
   SDK's rescan still calls it). Each names the exact source of the pinned
   engine and fails the build against any other: re-check them when
   bumping it.
-- **Anon's archive** (Android, mainnet, Settings, on by default;
+- **Anon's archive** (Android and the Mac, mainnet, Settings, on by default;
   `archive*.js`):
   - It gives commitments and the transaction list only. Unshields and
     nullifiers come from rail-squid: the archive drops a nullifier spent
@@ -2553,8 +2573,14 @@ the Mac's, answer `unavailable`), Dart `services/private_usd_tokens_service.dart
     the archive.
   - Android's host fetches the archive for the page through the page's
     bridge (`RailgunArchiveFetch`: 16 MB and a minute an answer at most, a
-    fixed User-Agent); iOS starts the page without it. Every archive request
-    depends on the chain's state alone.
+    fixed User-Agent), and so does the Mac's (`RailgunArchive.swift`, the
+    same limits and User-Agent): WebKit can't intercept `https`, so before a
+    `start` that reads the archive the Mac runs a fixed prelude in the page,
+    which sends archive GETs to the page's own origin (`/anon-archive/`,
+    answered through the bridge) and hides the WebKit host from the start's
+    archive check (the page reads the archive only where it finds none; its
+    transport took the host at load). iOS starts the page without it. Every
+    archive request depends on the chain's state alone.
 
 **Network: Tor and the Railgun page.**
 
