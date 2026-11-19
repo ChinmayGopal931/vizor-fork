@@ -599,7 +599,7 @@ class _MigrationAnalyzingShimmerText extends StatelessWidget {
         textAlign: TextAlign.center,
         style: AppTypography.labelLarge.copyWith(
           color: const Color(0xFFFFFFFF),
-          fontWeight: FontWeight.w600,
+          fontWeight: AppFontWeight.semiBold,
         ),
       ),
     );
@@ -729,7 +729,7 @@ class _MigrationReviewContent extends StatelessWidget {
                         context.l10n.migrationReviewKeepRunningTitle,
                         style: AppTypography.bodyMedium.copyWith(
                           color: colors.text.accent,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: AppFontWeight.medium,
                         ),
                       ),
                       const SizedBox(height: 4),

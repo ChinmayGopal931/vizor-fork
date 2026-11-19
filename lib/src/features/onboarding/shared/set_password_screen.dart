@@ -533,7 +533,7 @@ class _SetPasswordOnPageContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final fieldLabelStyle = AppTypography.labelLarge.copyWith(
       color: context.colors.text.secondary,
-      fontWeight: FontWeight.w400,
+      fontWeight: AppFontWeight.regular,
     );
 
     return Center(

@@ -32,6 +32,8 @@ import '../../../../core/zcash/zip321_payment_request_builder.dart';
 import 'request_amount_formatters.dart';
 import 'request_amount_model.dart';
 import 'request_qr_surface.dart';
+import '../../../../core/widgets/neon_page_title.dart';
+import '../../../../core/widgets/neon_glass_panel.dart';
 
 /// Width of the request modal.
 ///
@@ -301,14 +303,11 @@ class RequestModalHeader extends StatelessWidget {
         Expanded(
           child: Semantics(
             header: true,
-            child: Text(
+            child: NeonPageTitle(
               requestFlowTitle(context.l10n),
-              key: const ValueKey('request_modal_title'),
+              textKey: const ValueKey('request_modal_title'),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: AppTypography.headlineMedium.copyWith(
-                color: colors.text.accent,
-              ),
             ),
           ),
         ),
@@ -517,7 +516,7 @@ class _RequestAmountConversionRow extends StatelessWidget {
                   key: const ValueKey('request_amount_conversion_text'),
                   style: AppTypography.labelLarge.copyWith(
                     color: enabled ? colors.text.muted : colors.text.disabled,
-                    fontWeight: FontWeight.w400,
+                    fontWeight: AppFontWeight.regular,
                   ),
                 ),
             ],
@@ -538,48 +537,49 @@ class RequestAddMessageCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final card = Container(
+    // A neon glass panel on the input surface, as the send memo card is.
+    final card = SizedBox(
       key: const ValueKey('request_add_message_card'),
       width: double.infinity,
-      decoration: BoxDecoration(
-        color: colors.surface.input.primary,
-        borderRadius: BorderRadius.circular(AppRadii.medium),
-      ),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.s,
-        vertical: AppSpacing.sm,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AppIcon(AppIcons.scroll, size: 16, color: colors.icon.accent),
-              const SizedBox(width: AppSpacing.xxs),
-              Flexible(
-                child: Text(
-                  context.l10n.commonAddAMessage,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTypography.labelLarge.copyWith(
-                    fontWeight: FontWeight.w400,
-                    color: colors.text.accent,
+      child: NeonGlassPanel(
+        cut: AppChamfer.medium,
+        fill: colors.surface.input.primary,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.s,
+          vertical: AppSpacing.sm,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AppIcon(AppIcons.scroll, size: 16, color: colors.icon.accent),
+                const SizedBox(width: AppSpacing.xxs),
+                Flexible(
+                  child: Text(
+                    context.l10n.commonAddAMessage,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.labelLarge.copyWith(
+                      fontWeight: AppFontWeight.regular,
+                      color: colors.text.accent,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            context.l10n.receiveRequestMessageHelp,
-            textAlign: TextAlign.center,
-            style: AppTypography.labelLarge.copyWith(
-              fontWeight: FontWeight.w400,
-              color: colors.text.muted,
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              context.l10n.receiveRequestMessageHelp,
+              textAlign: TextAlign.center,
+              style: AppTypography.labelLarge.copyWith(
+                fontWeight: AppFontWeight.regular,
+                color: colors.text.muted,
+              ),
+            ),
+          ],
+        ),
       ),
     );
 

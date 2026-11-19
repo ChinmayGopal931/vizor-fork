@@ -54,3 +54,74 @@ class NeonGlassPanel extends StatelessWidget {
     );
   }
 }
+
+/// [NeonGlassPanel]'s look as a [Decoration], for a card that is a
+/// `Container` both form factors build: desktop swaps its decoration for this
+/// one (`decoration: desktop ? NeonGlassDecoration.themed(...) : ...`) and
+/// keeps the rest of the widget as it was.
+class NeonGlassDecoration extends Decoration {
+  const NeonGlassDecoration({
+    required this.fill,
+    required this.glow,
+    required this.core,
+    this.cut = AppChamfer.large,
+  });
+
+  /// The glass in [colors]: the window colour at 62% unless [fill] is given.
+  factory NeonGlassDecoration.themed(
+    AppColors colors, {
+    Color? fill,
+    double cut = AppChamfer.large,
+  }) => NeonGlassDecoration(
+    fill: fill ?? colors.background.window.withValues(alpha: 0.62),
+    glow: colors.neon.glow,
+    core: colors.neon.core,
+    cut: cut,
+  );
+
+  final Color fill;
+  final Color glow;
+  final Color core;
+  final double cut;
+
+  @override
+  Path getClipPath(Rect rect, TextDirection textDirection) =>
+      Neon.wedgeBorder(cut: cut).getOuterPath(rect);
+
+  @override
+  BoxPainter createBoxPainter([VoidCallback? onChanged]) =>
+      _NeonGlassBoxPainter(this, onChanged);
+
+  @override
+  bool operator ==(Object other) =>
+      other is NeonGlassDecoration &&
+      other.fill == fill &&
+      other.glow == glow &&
+      other.core == core &&
+      other.cut == cut;
+
+  @override
+  int get hashCode => Object.hash(fill, glow, core, cut);
+}
+
+class _NeonGlassBoxPainter extends BoxPainter {
+  _NeonGlassBoxPainter(this._decoration, super.onChanged);
+
+  final NeonGlassDecoration _decoration;
+
+  @override
+  void paint(Canvas canvas, Offset offset, ImageConfiguration configuration) {
+    final size = configuration.size;
+    if (size == null || size.isEmpty) return;
+    canvas
+      ..save()
+      ..translate(offset.dx, offset.dy);
+    NeonGlassPanelPainter(
+      fill: _decoration.fill,
+      glow: _decoration.glow,
+      core: _decoration.core,
+      cut: _decoration.cut,
+    ).paint(canvas, size);
+    canvas.restore();
+  }
+}

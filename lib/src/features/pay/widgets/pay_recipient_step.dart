@@ -12,6 +12,7 @@ import '../../address_book/models/recipient_suggestions.dart';
 import '../../swap/models/swap_address_formatting.dart';
 import '../models/pay_recent_recipients.dart';
 import 'pay_wizard_page.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
 
 /// Step 2 "Select Recipient" of the desktop pay wizard — Figma 6241:85245
 /// plus the 2B1/2B2/2B3 field states (85845 / 104834 / 86376).
@@ -327,15 +328,10 @@ class _PayRecipientListCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return Container(
+    return NeonGlassPanel(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.sm,
         vertical: AppSpacing.md,
-      ),
-      decoration: BoxDecoration(
-        color: colors.background.ground,
-        borderRadius: BorderRadius.circular(AppRadii.large),
-        boxShadow: appSurfaceShadow(colors),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -403,9 +399,10 @@ class _PayRecipientRow extends StatelessWidget {
               width: 32,
               height: 32,
               alignment: Alignment.center,
-              decoration: BoxDecoration(
+              // A cut-corner plate in place of upstream's circle.
+              decoration: ShapeDecoration(
                 color: colors.background.neutralSubtleOpacity,
-                shape: BoxShape.circle,
+                shape: Neon.chamferBorder(cut: AppChamfer.small + 3),
               ),
               child: AppIcon(
                 AppIcons.wallet,
@@ -434,8 +431,8 @@ class _PayRecipientRow extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: AppTypography.labelLarge.copyWith(
                     fontWeight: contact != null
-                        ? FontWeight.w400
-                        : FontWeight.w500,
+                        ? AppFontWeight.regular
+                        : AppFontWeight.medium,
                     color: contact != null
                         ? colors.text.secondary
                         : colors.text.accent,
@@ -455,7 +452,7 @@ class _PayRecipientRow extends StatelessWidget {
                     amountText!,
                     maxLines: 1,
                     style: AppTypography.labelLarge.copyWith(
-                      fontWeight: FontWeight.w400,
+                      fontWeight: AppFontWeight.regular,
                       color: colors.text.accent,
                     ),
                   ),

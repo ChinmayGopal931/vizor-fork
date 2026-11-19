@@ -61,7 +61,7 @@ class ImportBirthdayUnknownHeightModal extends StatelessWidget {
                     context.l10n.onboardingUnknownHeightTitle,
                     style: AppTypography.bodyLarge.copyWith(
                       color: colors.text.accent,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: AppFontWeight.medium,
                     ),
                   ),
                 ),

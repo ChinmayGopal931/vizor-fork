@@ -150,7 +150,7 @@ void main() {
     );
     await _select(tester, true);
     expect(find.text(_en.settingsViewingKeyChoiceSharingWarning), findsNothing);
-    expect(find.text('Incoming key'), findsOneWidget);
+    expect(find.text('INCOMING KEY'), findsOneWidget);
     expect(find.byKey(const ValueKey('viewing_key_choose_full')), findsNothing);
     await tester.tap(find.byKey(const ValueKey('test_back')));
     await tester.pumpAndSettle();

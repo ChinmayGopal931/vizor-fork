@@ -242,7 +242,7 @@ class _SwapStatusPageContentState extends State<SwapStatusPageContent> {
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
             style: AppTypography.bodyLarge.copyWith(
-              fontWeight: FontWeight.w600,
+              fontWeight: AppSharedFontWeight.semiBold,
               color: colors.text.accent,
             ),
           ),
@@ -366,7 +366,7 @@ class _PaymentStatusSummary extends StatelessWidget {
               textAlign: TextAlign.center,
               style: AppTypography.labelSmall.copyWith(
                 color: colors.text.secondary,
-                fontWeight: FontWeight.w600,
+                fontWeight: AppSharedFontWeight.semiBold,
               ),
             ),
             const SizedBox(height: AppSpacing.xs),
@@ -684,8 +684,8 @@ class _ProgressStep extends StatelessWidget {
                         // only for pending (future) steps.
                         style: AppTypography.labelLarge.copyWith(
                           fontWeight: !isMobile && active
-                              ? FontWeight.w600
-                              : FontWeight.w500,
+                              ? AppSharedFontWeight.semiBold
+                              : AppSharedFontWeight.medium,
                           color: isMobile && pending
                               ? colors.text.secondary
                               : colors.text.accent,

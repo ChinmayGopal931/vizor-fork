@@ -1,16 +1,16 @@
-import 'package:flutter/material.dart' show InputDecoration, TextField;
+import 'package:flutter/material.dart' show Colors, InputDecoration, TextField;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../../core/l10n/l10n.dart';
 import '../../../core/l10n/locale_typography.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/app_modal_card.dart';
 import '../../../core/widgets/comma_to_dot_input_formatter.dart';
 import '../../../core/widgets/decimal_amount_input_formatter.dart';
 import '../models/swap_models.dart';
 import 'swap_confidential_ui.dart';
+import '../../../core/widgets/neon_option_panel.dart';
 
 /// Quote settings for swap and Pay: the confidential route, then slippage.
 /// Update applies both together; Cancel leaves both as they were.
@@ -161,7 +161,7 @@ class _SwapSlippageModalState extends State<SwapSlippageModal> {
                 ? context.l10n.swapSettingsTitlePay
                 : context.l10n.swapSettingsTitleSwap,
             style: AppTypography.bodyLarge.copyWith(
-              fontWeight: FontWeight.w600,
+              fontWeight: AppSharedFontWeight.semiBold,
               color: colors.text.accent,
             ),
           ),
@@ -407,15 +407,15 @@ class _SlippageCustomRadioCard extends StatelessWidget {
     final valueColor = invalid ? colors.text.destructive : colors.text.accent;
     // The entered value uses Geist Regular; label / suffix stay SemiBold.
     final valueStyle = AppTypography.labelLarge.copyWith(
-      fontWeight: FontWeight.w400,
+      fontWeight: AppFontWeight.regular,
       color: valueColor,
     );
     final hintStyle = AppTypography.labelLarge.copyWith(
-      fontWeight: FontWeight.w600,
+      fontWeight: AppFontWeight.semiBold,
       color: colors.text.accent.withValues(alpha: 0.4),
     );
     final fixedLabelStyle = AppTypography.labelLarge.copyWith(
-      fontWeight: FontWeight.w600,
+      fontWeight: AppFontWeight.semiBold,
       color: invalid ? colors.text.destructive : colors.text.accent,
     );
     final inputWidth = _slippageInputWidth(
@@ -594,7 +594,7 @@ BoxDecoration _slippageRowDecoration(
           ? invalid
                 ? colors.border.utilityDestructive
                 : colors.border.strong
-          : const Color(0x00000000),
+          : Colors.transparent,
       width: 2,
     ),
   );
@@ -624,21 +624,8 @@ class _SlippageRadioIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
-    return Container(
-      width: 16,
-      height: 16,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: selected
-            ? colors.background.inverse
-            : colors.background.neutralSubtleOpacity,
-        borderRadius: BorderRadius.circular(AppRadii.full),
-      ),
-      child: selected
-          ? AppIcon(AppIcons.check, size: 12, color: colors.icon.inverse)
-          : null,
-    );
+    // A cut-corner check plate.
+    return NeonOptionCheck(selected: selected);
   }
 }
 

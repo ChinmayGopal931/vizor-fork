@@ -80,7 +80,7 @@ void main() {
       expect(find.byType(PaymentRequestScanScreen), findsOneWidget);
       expect(find.byType(MobileQrScanCard), findsNothing);
       expect(find.byType(Dialog), findsNothing);
-      expect(find.text('Scan original QR'), findsOneWidget);
+      expect(find.text('SCAN ORIGINAL QR'), findsOneWidget);
       expect(
         tester.getSize(
           find.byKey(const ValueKey('keystone_qr_scanner_camera_viewport')),

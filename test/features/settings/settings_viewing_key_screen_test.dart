@@ -121,7 +121,7 @@ void main() {
         await tester.pump();
       }
       expect(find.text(_ufvk), findsOneWidget);
-      expect(find.text('Full viewing key'), findsOneWidget);
+      expect(find.text('FULL VIEWING KEY'), findsOneWidget);
       expect(find.text(_en.settingsViewingKeyExplanation), findsOneWidget);
       expect(
         tester
@@ -207,7 +207,7 @@ void main() {
       );
       await tester.tap(find.text('Try again'));
       await tester.pump();
-      expect(find.text('Confirm access'), findsOneWidget);
+      expect(find.text('CONFIRM ACCESS'), findsOneWidget);
       expect(find.text(_ufvk), findsNothing);
       expect(attempts, 1);
       await tester.enterText(find.byType(EditableText), 'Correct123!');

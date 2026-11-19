@@ -7,6 +7,7 @@ import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/app_profile_picture.dart';
 import '../../../core/widgets/review_info_row.dart';
 import '../../../core/widgets/review_list_row.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 /// Recipient display data for the redesigned send review/status screens.
 ///
@@ -250,7 +251,6 @@ class SendReviewContentColumn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
 
     return Align(
       alignment: Alignment.topCenter,
@@ -265,16 +265,8 @@ class SendReviewContentColumn extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                // Figma `Body L` SemiBold — branch pattern is the
-                // bodyLarge token with an inline weight bump.
-                style: AppTypography.bodyLarge.copyWith(
-                  color: colors.text.accent,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              // The review's title is the neon page title.
+              NeonPageTitle(title, textAlign: TextAlign.center),
               for (final child in children) ...[
                 const SizedBox(height: _sectionGap),
                 child,

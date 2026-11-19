@@ -226,7 +226,7 @@ class _InfoSection extends StatelessWidget {
                   title,
                   style: AppTypography.bodyLarge.copyWith(
                     color: colors.text.accent,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeight.semiBold,
                   ),
                 ),
               ),

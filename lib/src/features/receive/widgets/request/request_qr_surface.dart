@@ -125,10 +125,17 @@ class RequestQrSurface extends StatelessWidget {
                     side: BorderSide(color: colors.border.subtle),
                   ),
                 )
-              : BoxDecoration(
+              // Desktop's plate is cut at the corners too, with a red edge
+              // and its glow; the white margin stays the camera's.
+              : ShapeDecoration(
                   color: colors.surface.qrCode,
-                  borderRadius: BorderRadius.circular(AppRadii.large),
-                  border: Border.all(color: colors.border.subtle),
+                  shape: Neon.chamferBorder(
+                    cut: AppChamfer.large,
+                    side: BorderSide(
+                      color: colors.neon.glow.withValues(alpha: 0.55),
+                    ),
+                  ),
+                  shadows: Neon.boxGlow(colors.neon.glow, intensity: 0.3),
                 ),
           child: qrImage == null
               ? Center(

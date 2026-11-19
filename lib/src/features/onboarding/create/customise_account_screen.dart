@@ -649,7 +649,7 @@ class _AccountProfileCard extends StatelessWidget {
                         context.l10n.accountNameLabel,
                         style: AppTypography.labelLarge.copyWith(
                           color: cardTextColor.withValues(alpha: 0.5),
-                          fontWeight: FontWeight.w400,
+                          fontWeight: AppFontWeight.regular,
                         ),
                       ),
                       const SizedBox(height: 2),

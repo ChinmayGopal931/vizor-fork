@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart'
-    show CircularProgressIndicator, Colors, ScaffoldMessenger, SnackBar;
+    show CircularProgressIndicator, ScaffoldMessenger, SnackBar;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
@@ -33,6 +33,8 @@ import '../widgets/request/request_amount_card.dart';
 import '../widgets/request/request_amount_model.dart';
 import '../../../core/widgets/app_tooltip.dart';
 import '../../../core/widgets/untranslated_details.dart';
+import '../../../core/widgets/neon_page_title.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
 
 bool _shouldRefreshTransparentAddressAfterSyncUpdate(
   SyncState previous,
@@ -880,14 +882,11 @@ class _ReceiveContentLayout extends StatelessWidget {
                                   top: 38.5,
                                   width: 256,
                                   height: 33,
-                                  child: Text(
+                                  child: NeonPageTitle(
                                     context.l10n.receiveTitle(
                                       kZcashDefaultCurrencyTicker,
                                     ),
                                     maxLines: 1,
-                                    style: AppTypography.headlineLarge.copyWith(
-                                      color: colors.text.accent,
-                                    ),
                                     textAlign: TextAlign.center,
                                   ),
                                 ),
@@ -1271,7 +1270,7 @@ class _ReceiveInfoDialog extends StatelessWidget {
         ),
     ];
 
-    return Container(
+    return SizedBox(
       key: ValueKey(
         _isShielded
             ? 'receive_shielded_info_modal'
@@ -1279,80 +1278,68 @@ class _ReceiveInfoDialog extends StatelessWidget {
       ),
       width: 312,
       height: _isShielded ? 382 : 516,
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
-      decoration: BoxDecoration(
-        color: colors.background.ground,
-        borderRadius: BorderRadius.circular(AppRadii.large),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 28,
-            offset: const Offset(0, 14),
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 280,
-            height: 45,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTypography.bodyLarge.copyWith(
-                    color: colors.text.accent,
-                    fontWeight: FontWeight.w600,
+      // An opaque neon glass panel over the pane, its cut corners lit.
+      child: NeonGlassPanel(
+        fill: colors.background.ground,
+        padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 280,
+              height: 45,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.bodyLarge.copyWith(
+                      color: colors.text.accent,
+                      fontWeight: AppFontWeight.heading,
+                    ),
                   ),
-                ),
-                Text(
-                  subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTypography.bodyMedium.copyWith(
-                    color: colors.text.secondary,
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: colors.text.secondary,
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          SizedBox(
-            width: 280,
-            height: _isShielded ? 205 : 360,
-            child: Column(
-              children: [
-                for (var i = 0; i < items.length; i++) ...[
-                  _InfoItem(data: items[i]),
-                  if (i != items.length - 1)
-                    const SizedBox(height: AppSpacing.xs),
                 ],
-              ],
+              ),
             ),
-          ),
-          const Spacer(),
-          SizedBox(
-            width: 280,
-            height: 36,
-            child: AppButton(
-              onPressed: onClose,
-              variant: AppButtonVariant.ghost,
-              size: AppButtonSize.medium,
+            const SizedBox(height: AppSpacing.md),
+            SizedBox(
+              width: 280,
+              height: _isShielded ? 205 : 360,
+              child: Column(
+                children: [
+                  for (var i = 0; i < items.length; i++) ...[
+                    _InfoItem(data: items[i]),
+                    if (i != items.length - 1)
+                      const SizedBox(height: AppSpacing.xs),
+                  ],
+                ],
+              ),
+            ),
+            const Spacer(),
+            SizedBox(
+              width: 280,
               height: 36,
-              minWidth: 280,
-              child: Text(context.l10n.commonClose),
+              child: AppButton(
+                onPressed: onClose,
+                variant: AppButtonVariant.ghost,
+                size: AppButtonSize.medium,
+                height: 36,
+                minWidth: 280,
+                child: Text(context.l10n.commonClose),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

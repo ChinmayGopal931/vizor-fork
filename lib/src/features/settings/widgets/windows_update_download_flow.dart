@@ -218,9 +218,10 @@ class _WindowsUpdateDialogFrame extends StatelessWidget {
                   Container(
                     width: 32,
                     height: 32,
-                    decoration: BoxDecoration(
+                    // A cut-corner plate in place of upstream's circle.
+                    decoration: ShapeDecoration(
                       color: colors.background.neutralSubtleOpacity,
-                      shape: BoxShape.circle,
+                      shape: Neon.chamferBorder(cut: AppChamfer.small + 3),
                     ),
                     child: Center(
                       child: AppIcon(
@@ -236,7 +237,7 @@ class _WindowsUpdateDialogFrame extends StatelessWidget {
                       title,
                       style: AppTypography.bodyLarge.copyWith(
                         color: colors.text.accent,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: AppFontWeight.heading,
                       ),
                     ),
                   ),

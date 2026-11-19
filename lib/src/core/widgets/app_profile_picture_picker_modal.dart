@@ -196,7 +196,7 @@ class _ProfilePicturePickerHeader extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: AppTypography.bodyLarge.copyWith(
             color: context.colors.text.accent,
-            fontWeight: FontWeight.w600,
+            fontWeight: AppFontWeight.semiBold,
           ),
         ),
       ],

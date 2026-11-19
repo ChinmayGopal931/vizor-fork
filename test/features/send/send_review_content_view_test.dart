@@ -42,7 +42,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Review send'), findsOneWidget);
+    expect(find.text('REVIEW SEND'), findsOneWidget);
     expect(find.text('Amount'), findsOneWidget);
     expect(find.text('123.12 ZEC'), findsOneWidget);
     expect(find.text(r'$250.12'), findsOneWidget);
@@ -119,7 +119,7 @@ void main() {
     );
 
     expect(
-      tester.getTopLeft(find.text('Review send')).dy,
+      tester.getTopLeft(find.text('REVIEW SEND')).dy,
       moreOrLessEquals(AppSpacing.sm),
     );
   });
@@ -149,7 +149,7 @@ void main() {
     );
 
     expect(
-      tester.getTopLeft(find.text('Review send')).dy,
+      tester.getTopLeft(find.text('REVIEW SEND')).dy,
       moreOrLessEquals(AppSpacing.sm),
     );
     expect(find.byType(SingleChildScrollView), findsOneWidget);
@@ -331,7 +331,7 @@ void main() {
         ),
       );
 
-      expect(find.text('Review Payment'), findsOneWidget);
+      expect(find.text('REVIEW PAYMENT'), findsOneWidget);
       expect(find.text('Review send'), findsNothing);
       expect(find.text('Requested by'), findsOneWidget);
       expect(
@@ -413,7 +413,7 @@ void main() {
         ),
       );
 
-      expect(find.text('Review send'), findsOneWidget);
+      expect(find.text('REVIEW SEND'), findsOneWidget);
       expect(find.text('To'), findsOneWidget);
       expect(find.textContaining('Requested'), findsNothing);
       expect(find.text('Label from link'), findsNothing);

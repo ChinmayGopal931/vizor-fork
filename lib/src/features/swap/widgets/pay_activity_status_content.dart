@@ -92,7 +92,7 @@ class PayActivityStatusContent extends StatelessWidget {
             textAlign: TextAlign.center,
             style: AppTypography.bodyLarge.copyWith(
               color: context.colors.text.accent,
-              fontWeight: FontWeight.w600,
+              fontWeight: AppSharedFontWeight.semiBold,
             ),
           ),
           const SizedBox(height: AppSpacing.base),

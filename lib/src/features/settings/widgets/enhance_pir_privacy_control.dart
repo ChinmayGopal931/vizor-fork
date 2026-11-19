@@ -121,7 +121,7 @@ class EnhancePirPrivacyControl extends ConsumerWidget {
                           color: enabled && unavailableLabel == null
                               ? colors.text.brandCrimson
                               : colors.text.secondary,
-                          fontWeight: FontWeight.w400,
+                          fontWeight: AppFontWeight.regular,
                         ),
                       ),
                     ],

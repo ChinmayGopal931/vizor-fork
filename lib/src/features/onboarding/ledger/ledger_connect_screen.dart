@@ -504,7 +504,7 @@ class _LedgerConnectScreenState extends ConsumerState<LedgerConnectScreen> {
                         context.l10n.commonConnectLedger,
                         style: AppTypography.displayLarge.copyWith(
                           fontFamily: kGothamFamily,
-                          fontWeight: FontWeight.w400,
+                          fontWeight: AppFontWeight.regular,
                           color: context.colors.text.accent,
                         ),
                         textAlign: TextAlign.center,

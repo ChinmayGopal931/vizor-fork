@@ -198,7 +198,7 @@ class VotingProposalCard extends StatelessWidget {
     }
     final titleStyle = AppTypography.headlineSmall.copyWith(
       color: colors.text.accent,
-      fontWeight: FontWeight.w600,
+      fontWeight: AppSharedFontWeight.semiBold,
       height: 24 / 16,
       letterSpacing: 0,
     );

@@ -26,6 +26,7 @@ import 'package:zcash_wallet/src/core/config/rpc_endpoint_config.dart';
 import 'package:zcash_wallet/src/core/layout/app_desktop_shell.dart';
 import 'package:zcash_wallet/src/core/layout/app_pane_scroll_scaffold.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
+import 'package:zcash_wallet/src/core/widgets/mobile/neon_glyph_badge.dart';
 import 'package:zcash_wallet/src/core/widgets/app_back_link.dart';
 import 'package:zcash_wallet/src/core/widgets/app_button.dart';
 import 'package:zcash_wallet/src/core/widgets/app_icon.dart';
@@ -515,7 +516,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Confirm payment'), findsOneWidget);
+    expect(find.text('CONFIRM PAYMENT'), findsOneWidget);
     expect(find.byKey(const ValueKey('pay_review_summary')), findsOneWidget);
     expect(find.byKey(const ValueKey('swap_review_info')), findsNothing);
     expect(find.text('You pay'), findsOneWidget);
@@ -829,7 +830,7 @@ void main() {
 
     expect(find.text('Deposit tokens'), findsNothing);
     expect(find.text('Time’s up'), findsOneWidget);
-    expect(find.text('Swap failed'), findsOneWidget);
+    expect(find.text('SWAP FAILED'), findsOneWidget);
     expect(find.text('Restart swap'), findsOneWidget);
     expect(
       tester
@@ -839,37 +840,13 @@ void main() {
           .variant,
       AppButtonVariant.secondary,
     );
+    // Desktop draws a lit glyph badge where upstream had its art.
     expect(
-      (tester
-                  .widget<Image>(
-                    find.byKey(
-                      const ValueKey('swap_deposit_timeout_illustration'),
-                    ),
-                  )
-                  .image
-              as AssetImage)
-          .assetName,
-      'assets/illustrations/desktop/swap_deposit_timeout_illustration.webp',
-    );
-
-    await tester.pumpWidget(
-      _themeHarnessWithTheme(
-        AppThemeData.dark,
-        SwapDepositTimeoutPageContent(onRestart: () {}),
+      find.descendant(
+        of: find.byKey(const ValueKey('swap_deposit_timeout_illustration')),
+        matching: find.byType(NeonGlyphBadge),
       ),
-    );
-
-    expect(
-      (tester
-                  .widget<Image>(
-                    find.byKey(
-                      const ValueKey('swap_deposit_timeout_illustration'),
-                    ),
-                  )
-                  .image
-              as AssetImage)
-          .assetName,
-      'assets/illustrations/desktop/swap_deposit_timeout_illustration.webp',
+      findsOneWidget,
     );
   });
 
@@ -4959,14 +4936,6 @@ void main() {
       find.byKey(const ValueKey('swap_external_asset_menu')),
       findsOneWidget,
     );
-    final assetModal = tester.widget<Container>(
-      find.byKey(const ValueKey('swap_external_asset_menu')),
-    );
-    final assetDecoration = assetModal.decoration as BoxDecoration;
-    expect(assetModal.clipBehavior, Clip.antiAlias);
-    expect(assetDecoration.color, AppThemeData.light.colors.background.base);
-    expect(assetDecoration.borderRadius, BorderRadius.circular(AppRadii.large));
-    expect(assetDecoration.boxShadow, _figmaModalSurfaceShadows);
     expect(
       find.byKey(const ValueKey('swap_asset_chain_badge_usdc')),
       findsWidgets,
@@ -7348,7 +7317,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('swap_start_button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Deposit tokens'), findsOneWidget);
+    expect(find.text('DEPOSIT TOKENS'), findsOneWidget);
     expect(sessionStore.savedIntents.single.depositClaimedAt, isNull);
     final initialRequestCount = swapProvider.statusRequests.length;
     await tester.pump(const Duration(seconds: 21));
@@ -7628,7 +7597,7 @@ void main() {
     await _openActivityDetail(tester, 'swap-long-provider-data');
 
     expect(tester.takeException(), isNull);
-    expect(find.text('Deposit tokens'), findsOneWidget);
+    expect(find.text('DEPOSIT TOKENS'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('swap_activity_deposit_qr_panel')),
       findsOneWidget,
@@ -7818,9 +7787,9 @@ void main() {
     final reviewTitle = tester.widget<Text>(
       find.byKey(const ValueKey('swap_review_title')),
     );
-    // The redesigned review title is 16 SemiBold.
-    expect(reviewTitle.style!.fontSize, 16);
-    expect(reviewTitle.style!.fontWeight, FontWeight.w600);
+    // The review title is the neon page title.
+    expect(reviewTitle.style!.fontSize, kNeonPageTitleStyle.fontSize);
+    expect(reviewTitle.style!.fontWeight, kNeonPageTitleStyle.fontWeight);
     expect(
       tester.getSize(find.byKey(const ValueKey('swap_start_button'))).height,
       greaterThanOrEqualTo(44),
@@ -7850,7 +7819,7 @@ void main() {
       find.byKey(const ValueKey('swap_review_deposit_qr_panel')),
       findsNothing,
     );
-    expect(find.text('Review swap'), findsOneWidget);
+    expect(find.text('REVIEW SWAP'), findsOneWidget);
     final reviewSummary = find.byKey(const ValueKey('swap_review_info'));
     expect(
       find.descendant(
@@ -7944,7 +7913,7 @@ void main() {
       expect(request.refundAddress, 'u1actualshieldedrecipient');
 
       expect(find.byKey(const ValueKey('swap_review_panel')), findsOneWidget);
-      expect(find.text('Review swap'), findsOneWidget);
+      expect(find.text('REVIEW SWAP'), findsOneWidget);
 
       // The recipient identity now lives on the summary's To: line, not in the
       // detail card (which no longer renders To/From address rows).
@@ -8193,7 +8162,7 @@ void main() {
         '0x52908400098527886e0f7030069857d2e4169ee7',
       );
       expect(liveRequest.refundAddress, 'u1actualshieldedrecipient');
-      expect(find.text('Review swap'), findsOneWidget);
+      expect(find.text('REVIEW SWAP'), findsOneWidget);
       expect(find.text('Slippage tolerance'), findsOneWidget);
       expect(find.text('Guaranteed minimum'), findsOneWidget);
     },
@@ -8347,7 +8316,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('swap_review_button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Review swap'), findsOneWidget);
+    expect(find.text('REVIEW SWAP'), findsOneWidget);
 
     await tester.ensureVisible(
       find.byKey(const ValueKey('swap_review_cancel_button')),
@@ -10703,7 +10672,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('swap_review_button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Review swap'), findsOneWidget);
+    expect(find.text('REVIEW SWAP'), findsOneWidget);
     expect(find.text('Slippage tolerance'), findsOneWidget);
     expect(find.text('Swap fee'), findsOneWidget);
     expect(
@@ -10722,7 +10691,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('swap_start_button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Deposit tokens'), findsOneWidget);
+    expect(find.text('DEPOSIT TOKENS'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('swap_activity_deposit_qr_panel')),
       findsOneWidget,
@@ -10828,7 +10797,7 @@ void main() {
       swapProvider.requests.single.refundAddress,
       '0x8617e340b3d01fa5f11f306f4090fd50e238070d',
     );
-    expect(find.text('Review swap'), findsOneWidget);
+    expect(find.text('REVIEW SWAP'), findsOneWidget);
     expect(
       find.textContaining('ZEC arrives at your shielded address'),
       findsNothing,
@@ -10969,7 +10938,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('swap_start_button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Deposit tokens'), findsOneWidget);
+    expect(find.text('DEPOSIT TOKENS'), findsOneWidget);
     expect(find.text('0xlive-deposit'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('swap_deposit_check_warning')),
@@ -11037,7 +11006,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Deposit page is shown before pressing.
-      expect(find.text('Deposit tokens'), findsOneWidget);
+      expect(find.text('DEPOSIT TOKENS'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('swap_deposit_confirm_button')),
         findsOneWidget,
@@ -11122,7 +11091,7 @@ void main() {
       await tester.tap(find.text('Confirm swap'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Deposit tokens'), findsOneWidget);
+      expect(find.text('DEPOSIT TOKENS'), findsOneWidget);
       expect(find.text('0xlive-deposit'), findsOneWidget);
       expect(find.text('Make spendable'), findsNothing);
       expect(
@@ -13227,13 +13196,6 @@ void main() {
     expect(saved.last, 'account-one-swap');
   });
 }
-
-// Shared modal card shadow (core/widgets/app_modal_card.dart appModalShadow).
-const _figmaModalSurfaceShadows = [
-  BoxShadow(color: Color(0x0F000000), offset: Offset(0, 2), blurRadius: 8),
-  BoxShadow(color: Color(0x08000000), offset: Offset(0, -6), blurRadius: 12),
-  BoxShadow(color: Color(0x14000000), offset: Offset(0, 14), blurRadius: 28),
-];
 
 /// Pumps the swap screen on a desktop viewport with no seeded activity, using
 /// the given [_routerHarness] overrides, and returns its provider container.

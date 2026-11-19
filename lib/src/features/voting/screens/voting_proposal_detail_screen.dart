@@ -922,7 +922,7 @@ class _DesktopVotedPollHeader extends StatelessWidget {
     final titleStyle = AppTypography.headlineMedium.copyWith(
       color: colors.text.accent,
       fontFamily: 'Gotham',
-      fontWeight: FontWeight.w600,
+      fontWeight: AppFontWeight.semiBold,
       fontSize: 20,
       height: 30 / 20,
       letterSpacing: 0,
@@ -937,7 +937,7 @@ class _DesktopVotedPollHeader extends StatelessWidget {
             const SizedBox(width: AppSpacing.sm),
             Text(
               '#${formatGroupedInteger(snapshotHeight)}',
-              style: titleStyle.copyWith(fontWeight: FontWeight.w500),
+              style: titleStyle.copyWith(fontWeight: AppFontWeight.medium),
             ),
           ],
         ),
@@ -1177,7 +1177,7 @@ class VotingIneligibleDialog extends StatelessWidget {
                       context.l10n.votingIneligibleTitle,
                       style: AppTypography.bodyLarge.copyWith(
                         color: colors.text.accent,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: AppSharedFontWeight.semiBold,
                       ),
                     ),
                   ),
@@ -1462,7 +1462,7 @@ class _PollSummary extends StatelessWidget {
                     style: AppTypography.headlineMedium.copyWith(
                       color: colors.text.accent,
                       fontFamily: 'Gotham',
-                      fontWeight: FontWeight.w600,
+                      fontWeight: AppFontWeight.semiBold,
                       fontSize: 20,
                       height: 30 / 20,
                       letterSpacing: 0,
@@ -1479,7 +1479,7 @@ class _PollSummary extends StatelessWidget {
                     style: AppTypography.headlineMedium.copyWith(
                       color: colors.text.accent,
                       fontFamily: 'Gotham',
-                      fontWeight: FontWeight.w500,
+                      fontWeight: AppFontWeight.medium,
                       fontSize: 20,
                       height: 30 / 20,
                       letterSpacing: 0,

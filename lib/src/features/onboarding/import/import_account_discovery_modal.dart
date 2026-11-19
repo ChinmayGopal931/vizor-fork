@@ -195,7 +195,7 @@ class _ImportAccountDiscoveryModalState
                     context.l10n.onboardingDiscoveryTitle,
                     style: AppTypography.bodyLarge.copyWith(
                       color: colors.text.accent,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: AppFontWeight.medium,
                     ),
                   ),
                 ),

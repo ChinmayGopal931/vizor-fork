@@ -8,6 +8,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../keystone/widgets/keystone_qr_scanner_card.dart';
 import '../../onboarding/shared/onboarding_chrome.dart';
 import '../services/payment_request_scanner.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 class PaymentRequestScanScreen extends StatefulWidget {
   const PaymentRequestScanScreen({required this.networkName, super.key});
@@ -91,11 +92,8 @@ class _PaymentRequestScanScreenState extends State<PaymentRequestScanScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
+                      NeonPageTitle(
                         context.l10n.commonScanOriginalQr,
-                        style: AppTypography.displayLarge.copyWith(
-                          color: context.colors.text.accent,
-                        ),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: AppSpacing.sm),

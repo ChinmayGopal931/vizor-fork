@@ -64,6 +64,7 @@ class MobileSwapStatusContent extends StatelessWidget {
   /// Between the header and the tabs (or the status panel). Private USD's
   /// bridge screens close it up: their rows carry no fiat line.
   final double headerToBodyGap;
+
   /// Optional replacement for the paying/receiving flow arrow row.
   final Widget? flowConnector;
 

@@ -35,7 +35,7 @@ class AppSegmentedControl<T> extends StatelessWidget {
     this.iconSize = AppIconSize.medium,
     this.iconGap = AppSpacing.xxs,
     this.labelStyle,
-    this.labelFontWeight = FontWeight.w400,
+    this.labelFontWeight = AppSharedFontWeight.regular,
     this.position,
     super.key,
   });

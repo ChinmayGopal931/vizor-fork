@@ -625,7 +625,7 @@ class _MigrationLiveStatusContent extends ConsumerWidget {
                                     textAlign: TextAlign.center,
                                     style: AppTypography.labelLarge.copyWith(
                                       color: colors.text.primary,
-                                      fontWeight: FontWeight.w400,
+                                      fontWeight: AppFontWeight.regular,
                                     ),
                                   ),
                                 ),
@@ -1114,7 +1114,7 @@ class _PreparationRingDetail extends StatelessWidget {
     final colors = context.colors;
     final style = AppTypography.labelLarge.copyWith(
       color: colors.text.primary,
-      fontWeight: FontWeight.w400,
+      fontWeight: AppFontWeight.regular,
     );
     if (presentation.height == null) {
       return Text(
@@ -1161,7 +1161,7 @@ class _MigrationRingDetail extends StatelessWidget {
     final color = context.colors.text.primary;
     final style = AppTypography.labelLarge.copyWith(
       color: color,
-      fontWeight: FontWeight.w400,
+      fontWeight: AppFontWeight.regular,
     );
     final scheduledHeight = presentation.scheduledHeight;
     if (scheduledHeight == null) {
@@ -1205,7 +1205,7 @@ class _MigrationSummaryMetric extends StatelessWidget {
         : context.colors.text.accent;
     final style = AppTypography.labelLarge.copyWith(
       color: color,
-      fontWeight: FontWeight.w400,
+      fontWeight: AppFontWeight.regular,
     );
     return Row(
       children: [

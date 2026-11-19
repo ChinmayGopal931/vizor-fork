@@ -2971,7 +2971,7 @@ class _WindowsUpdatePrompt extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: AppTypography.labelLarge.copyWith(
                               color: colors.text.accent,
-                              fontWeight: FontWeight.w500,
+                              fontWeight: AppFontWeight.medium,
                             ),
                           ),
                           const SizedBox(height: 2),

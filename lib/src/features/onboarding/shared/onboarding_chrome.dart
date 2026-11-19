@@ -222,7 +222,7 @@ class OnboardingSidebarItem extends StatelessWidget {
 
   static const _labelStyle = TextStyle(
     fontFamily: 'Gotham',
-    fontWeight: FontWeight.w500,
+    fontWeight: AppFontWeight.medium,
     fontSize: 14,
     height: 16 / 14,
     letterSpacing: -0.06,

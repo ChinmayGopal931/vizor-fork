@@ -687,7 +687,7 @@ class _PaySlippageControl extends StatelessWidget {
               Text(
                 label,
                 style: AppTypography.labelLarge.copyWith(
-                  fontWeight: FontWeight.w400,
+                  fontWeight: AppFontWeight.regular,
                   color: colors.text.secondary,
                 ),
               ),

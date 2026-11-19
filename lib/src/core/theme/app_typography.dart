@@ -640,3 +640,25 @@ abstract final class AppFontWeight {
   /// A heading's weight: Thin (`w100`).
   static const heading = AppFontWeightNeon.heading;
 }
+
+/// One-off weights in widgets both form factors draw whose phone weight
+/// predates the neon look: desktop resolves them as [AppFontWeight] does
+/// (Light, so Korean and Chinese render Light too), and the phones keep the
+/// Figma weight they have always drawn.
+abstract final class AppSharedFontWeight {
+  static const _desktop = kAppFormFactor == AppFormFactor.desktop;
+
+  /// Light on desktop; Regular (`w400`) on mobile.
+  static const regular = _desktop ? AppFontWeight.regular : FontWeight.w400;
+
+  /// Light on desktop; Medium (`w500`) on mobile.
+  static const medium = _desktop ? AppFontWeight.medium : FontWeight.w500;
+
+  /// Light on desktop; SemiBold (`w600`) on mobile.
+  static const semiBold = _desktop ? AppFontWeight.semiBold : FontWeight.w600;
+
+  /// Thin on desktop, where it heads a title; SemiBold (`w600`) on mobile.
+  static const headingSemiBold = _desktop
+      ? AppFontWeight.heading
+      : FontWeight.w600;
+}

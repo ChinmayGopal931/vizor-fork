@@ -115,7 +115,7 @@ class VerifyAddressModal extends StatelessWidget {
     final colors = context.colors;
     final titleStyle = AppTypography.bodyLarge.copyWith(
       color: colors.text.accent,
-      fontWeight: FontWeight.w600,
+      fontWeight: AppSharedFontWeight.semiBold,
     );
 
     switch (variant) {

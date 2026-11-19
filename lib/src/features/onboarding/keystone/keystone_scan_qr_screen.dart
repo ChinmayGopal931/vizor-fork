@@ -174,7 +174,7 @@ class _TitleBlock extends StatelessWidget {
             context.l10n.commonScanQrCode,
             style: AppTypography.displayLarge.copyWith(
               fontFamily: 'Gotham',
-              fontWeight: FontWeight.w400,
+              fontWeight: AppFontWeight.regular,
               color: colors.text.accent,
             ),
             maxLines: 1,

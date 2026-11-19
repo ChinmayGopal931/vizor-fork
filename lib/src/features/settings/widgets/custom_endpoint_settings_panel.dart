@@ -20,6 +20,8 @@ import '../../../providers/sync_provider.dart';
 import 'network_privacy_control.dart';
 import 'enhance_pir_privacy_control.dart';
 import 'private_queries_turn_off.dart';
+import '../../../core/widgets/neon_page_title.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
 
 class CustomEndpointSettingsPanel extends ConsumerStatefulWidget {
   const CustomEndpointSettingsPanel({
@@ -167,13 +169,10 @@ class _CustomEndpointSettingsPanelState
     final transition = ref.watch(enhancePirTransitionProvider);
     final changingRecovery = transition == EnhancePirTransition.changing;
 
-    return DecoratedBox(
+    // An opaque neon glass panel: it floats over the Welcome's art.
+    return NeonGlassPanel(
       key: const ValueKey('network_settings_panel_surface'),
-      decoration: BoxDecoration(
-        color: isDark ? colors.background.window : colors.background.ground,
-        borderRadius: BorderRadius.circular(AppRadii.large),
-        border: Border.all(color: colors.border.subtle),
-      ),
+      fill: isDark ? colors.background.window : colors.background.ground,
       child: ConstrainedBox(
         constraints: BoxConstraints(
           minWidth: widget.width,
@@ -282,20 +281,12 @@ class _PanelHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
     return SizedBox(
       height: 32,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          Center(
-            child: Text(
-              context.l10n.networkSettingsTitle,
-              style: AppTypography.headlineMedium.copyWith(
-                color: colors.text.accent,
-              ),
-            ),
-          ),
+          Center(child: NeonPageTitle(context.l10n.networkSettingsTitle)),
           if (onClose != null)
             Positioned(
               right: 0,

@@ -401,7 +401,7 @@ class _AccountRemoveModalHeader extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: AppTypography.bodyLarge.copyWith(
               color: context.colors.text.accent,
-              fontWeight: FontWeight.w500,
+              fontWeight: AppFontWeight.medium,
             ),
           ),
         ),

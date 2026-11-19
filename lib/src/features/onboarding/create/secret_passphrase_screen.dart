@@ -562,7 +562,7 @@ class _SeedGrid extends StatelessWidget {
                 context.l10n.secretPassphraseTitle,
                 style: AppTypography.bodyLarge.copyWith(
                   color: textColor,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppFontWeight.semiBold,
                 ),
               ),
             ),

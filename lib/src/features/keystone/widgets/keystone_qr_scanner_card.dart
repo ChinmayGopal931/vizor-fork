@@ -1107,7 +1107,7 @@ class _CameraPermissionPrompt extends StatelessWidget {
                       style: _mobileFormFactor
                           ? AppTypography.bodyLarge.copyWith(
                               color: colors.text.accent,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: AppSharedFontWeight.semiBold,
                             )
                           : AppTypography.bodyMediumStrong.copyWith(
                               color: colors.text.accent,
@@ -1363,7 +1363,7 @@ class _CameraPickerHeader extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: AppTypography.bodyLarge.copyWith(
               color: colors.text.accent,
-              fontWeight: FontWeight.w500,
+              fontWeight: AppFontWeight.medium,
             ),
           ),
         ),

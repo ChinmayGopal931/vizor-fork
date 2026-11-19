@@ -428,7 +428,7 @@ class _ResultsHeader extends StatelessWidget {
     final titleStyle = AppTypography.headlineMedium.copyWith(
       color: colors.text.accent,
       fontFamily: 'Gotham',
-      fontWeight: FontWeight.w600,
+      fontWeight: AppFontWeight.semiBold,
       fontSize: 20,
       height: 30 / 20,
       letterSpacing: 0,
@@ -451,7 +451,7 @@ class _ResultsHeader extends StatelessWidget {
             const SizedBox(width: AppSpacing.sm),
             Text(
               '#${formatGroupedInteger(snapshotHeight)}',
-              style: titleStyle.copyWith(fontWeight: FontWeight.w500),
+              style: titleStyle.copyWith(fontWeight: AppFontWeight.medium),
             ),
           ],
         ),

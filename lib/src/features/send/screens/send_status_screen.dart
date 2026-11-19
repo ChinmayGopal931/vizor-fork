@@ -30,6 +30,7 @@ import '../widgets/sapling_params_prompt.dart';
 import '../widgets/send_recipient_resolver.dart';
 import '../widgets/send_status_content_view.dart';
 import '../widgets/send_verify_address_overlay.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 enum _SendStatusPhase { sending, pendingBroadcast, succeeded, failed }
 
@@ -313,12 +314,10 @@ class _SendStatusScreenState extends ConsumerState<SendStatusScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
+                    NeonPageTitle(
                       context.l10n.sendStatusScanKeystoneTitle,
-                      style: AppTypography.headlineLarge.copyWith(
-                        color: colors.button.ghost.label,
-                      ),
                       textAlign: TextAlign.center,
+                      color: colors.button.ghost.label,
                     ),
                     const SizedBox(height: 32),
                     const KeystoneTransactionProgressPanel(),
@@ -382,7 +381,6 @@ class _SendStatusScreenState extends ConsumerState<SendStatusScreen> {
           : widget.args.flowKind == SendFlowKind.donation &&
                 _phase == _SendStatusPhase.succeeded
           ? AppDesktopShell(
-              background: const DonationSuccessBackground(),
               sidebar: AppMainSidebar(
                 suppressActiveSelection: _suppressSidebarSelection,
               ),

@@ -32,6 +32,8 @@ import '../widgets/confirm_access_card.dart';
 import '../../onboarding/mobile/mobile_secret_passphrase_screen.dart'
     show SecretPassphraseRevealWarningCard;
 import '../widgets/settings_pane_backdrop.dart';
+import '../../../core/widgets/neon_page_title.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
 
 class SettingsSeedPhraseScreen extends ConsumerStatefulWidget {
   const SettingsSeedPhraseScreen({
@@ -765,13 +767,6 @@ class _SettingsSeedPhrasePane extends StatelessWidget {
 
 const _seedPhraseCardWidth = 396.0;
 
-List<BoxShadow> _seedCardShadows(Color color) => [
-  BoxShadow(color: color, blurRadius: 0.5),
-  BoxShadow(color: color, offset: const Offset(0, 2), blurRadius: 2),
-  BoxShadow(color: color, offset: const Offset(0, 1), blurRadius: 1),
-  BoxShadow(color: color, blurRadius: 0.5),
-];
-
 class _SeedPhraseRevealView extends StatelessWidget {
   const _SeedPhraseRevealView({
     required this.mnemonic,
@@ -854,12 +849,9 @@ class _SeedPhraseHeading extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
+        NeonPageTitle(
           context.l10n.secretPassphraseTitle,
           textAlign: TextAlign.center,
-          style: AppTypography.headlineLarge.copyWith(
-            color: colors.text.accent,
-          ),
         ),
         const SizedBox(height: AppSpacing.s),
         Text(
@@ -918,63 +910,61 @@ class _SeedWordsCard extends StatelessWidget {
     final passphrase = bip39Passphrase;
     final hasPassphrase = passphrase != null && passphrase.isNotEmpty;
 
-    final seedCard = Container(
+    // A neon glass panel, opaque because the passphrase footer runs under
+    // its foot.
+    final seedCard = SizedBox(
       width: _seedPhraseCardWidth,
-      padding: _padding,
-      decoration: BoxDecoration(
-        color: colors.background.homeCard,
-        borderRadius: BorderRadius.circular(AppRadii.large),
-        boxShadow: hasPassphrase
-            ? null
-            : _seedCardShadows(colors.shadows.subtle),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            height: _headerHeight,
-            child: Row(
-              children: [
-                AppIcon(
-                  AppIcons.key,
-                  size: AppIconSize.medium,
-                  color: cardTextColor,
-                ),
-                const SizedBox(width: AppSpacing.xxs),
-                Expanded(
-                  child: Text(
-                    context.l10n.secretPassphraseTitle,
-                    style: AppTypography.bodyLarge.copyWith(
-                      color: cardTextColor,
-                      fontWeight: FontWeight.w600,
+      child: NeonGlassPanel(
+        padding: _padding,
+        fill: colors.background.homeCard,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              height: _headerHeight,
+              child: Row(
+                children: [
+                  AppIcon(
+                    AppIcons.key,
+                    size: AppIconSize.medium,
+                    color: cardTextColor,
+                  ),
+                  const SizedBox(width: AppSpacing.xxs),
+                  Expanded(
+                    child: Text(
+                      context.l10n.secretPassphraseTitle,
+                      style: AppTypography.bodyLarge.copyWith(
+                        color: cardTextColor,
+                        fontWeight: AppFontWeight.semiBold,
+                      ),
                     ),
                   ),
-                ),
-                AppButton(
-                  key: const ValueKey('settings_seed_phrase_copy_button'),
-                  onPressed: () {
-                    onCopyPressed();
-                  },
-                  variant: AppButtonVariant.secondary,
-                  size: AppButtonSize.mediumLarge,
-                  height: 24,
-                  minWidth: 52,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.xxs,
+                  AppButton(
+                    key: const ValueKey('settings_seed_phrase_copy_button'),
+                    onPressed: () {
+                      onCopyPressed();
+                    },
+                    variant: AppButtonVariant.secondary,
+                    size: AppButtonSize.mediumLarge,
+                    height: 24,
+                    minWidth: 52,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xxs,
+                    ),
+                    child: Text(
+                      phraseCopied
+                          ? context.l10n.commonCopied
+                          : context.l10n.commonCopy,
+                    ),
                   ),
-                  child: Text(
-                    phraseCopied
-                        ? context.l10n.commonCopied
-                        : context.l10n.commonCopy,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: AppSpacing.s),
-          _SeedWordTable(words: words, textColor: cardTextColor),
-        ],
+            const SizedBox(height: AppSpacing.s),
+            _SeedWordTable(words: words, textColor: cardTextColor),
+          ],
+        ),
       ),
     );
 
@@ -1129,17 +1119,11 @@ class _Bip39PassphraseFooter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return Container(
+    // The panel the seed card overlaps: its lit bottom-right cut shows.
+    return NeonGlassPanel(
       key: const ValueKey('settings_bip39_passphrase_footer'),
       padding: const EdgeInsets.all(AppSpacing.sm),
-      decoration: BoxDecoration(
-        color: colors.background.ground,
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(AppRadii.large),
-          bottomRight: Radius.circular(AppRadii.large),
-        ),
-        boxShadow: _seedCardShadows(colors.shadows.subtle),
-      ),
+      fill: colors.background.ground,
       child: Align(
         alignment: Alignment.bottomCenter,
         child: Row(
@@ -1208,7 +1192,6 @@ class _SeedBirthdayCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
     final blockTime = birthdayBlockTime;
     final birthdayDate = blockTime == null || blockTime <= 0
         ? '-'
@@ -1217,47 +1200,44 @@ class _SeedBirthdayCard extends StatelessWidget {
         ? '-'
         : birthdayHeight.toString();
 
-    return Container(
+    return SizedBox(
       width: _seedPhraseCardWidth,
-      padding: const EdgeInsets.all(AppSpacing.sm),
-      decoration: BoxDecoration(
-        color: colors.background.ground,
-        borderRadius: BorderRadius.circular(AppRadii.large),
-        boxShadow: _seedCardShadows(colors.shadows.subtle),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _SeedBirthdayRow(
-            icon: AppIcons.calendar,
-            label: context.l10n.settingsBirthdayDate,
-            value: birthdayDate,
-            loading: birthdayDateLoading,
-            copied: birthdayDateCopied,
-            onCopyPressed:
-                birthdayDateLoading || blockTime == null || blockTime <= 0
-                ? null
-                : () {
-                    onCopyBirthdayDatePressed();
-                  },
-          ),
-          const SizedBox(height: AppSpacing.s),
-          _SeedBirthdayRow(
-            icon: AppIcons.block,
-            label: context.l10n.settingsBirthdayBlockHeight,
-            value: birthdayHeightText,
-            loading: birthdayHeightLoading,
-            copied: birthdayHeightCopied,
-            onCopyPressed:
-                birthdayHeightLoading ||
-                    birthdayHeight == null ||
-                    birthdayHeight! <= 0
-                ? null
-                : () {
-                    onCopyBirthdayHeightPressed();
-                  },
-          ),
-        ],
+      child: NeonGlassPanel(
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _SeedBirthdayRow(
+              icon: AppIcons.calendar,
+              label: context.l10n.settingsBirthdayDate,
+              value: birthdayDate,
+              loading: birthdayDateLoading,
+              copied: birthdayDateCopied,
+              onCopyPressed:
+                  birthdayDateLoading || blockTime == null || blockTime <= 0
+                  ? null
+                  : () {
+                      onCopyBirthdayDatePressed();
+                    },
+            ),
+            const SizedBox(height: AppSpacing.s),
+            _SeedBirthdayRow(
+              icon: AppIcons.block,
+              label: context.l10n.settingsBirthdayBlockHeight,
+              value: birthdayHeightText,
+              loading: birthdayHeightLoading,
+              copied: birthdayHeightCopied,
+              onCopyPressed:
+                  birthdayHeightLoading ||
+                      birthdayHeight == null ||
+                      birthdayHeight! <= 0
+                  ? null
+                  : () {
+                      onCopyBirthdayHeightPressed();
+                    },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1295,7 +1275,7 @@ class _SeedBirthdayRow extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: AppTypography.labelMedium.copyWith(
                 color: colors.text.primary,
-                fontWeight: FontWeight.w500,
+                fontWeight: AppFontWeight.medium,
               ),
             ),
           ),
@@ -1362,32 +1342,31 @@ class _SeedPhraseErrorCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    return Container(
+    return SizedBox(
       width: _seedPhraseCardWidth,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.base,
-      ),
-      decoration: BoxDecoration(
-        color: colors.background.ground,
-        borderRadius: BorderRadius.circular(AppRadii.large),
-        boxShadow: _seedCardShadows(colors.shadows.subtle),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AppIcon(
-            AppIcons.warning,
-            size: AppIconSize.large,
-            color: colors.icon.destructive,
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: AppTypography.bodyMedium.copyWith(color: colors.text.accent),
-          ),
-        ],
+      child: NeonGlassPanel(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.base,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppIcon(
+              AppIcons.warning,
+              size: AppIconSize.large,
+              color: colors.icon.destructive,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: AppTypography.bodyMedium.copyWith(
+                color: colors.text.accent,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

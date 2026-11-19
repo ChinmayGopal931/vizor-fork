@@ -149,7 +149,7 @@ class _TitleBlock extends StatelessWidget {
           child: Text(
             context.l10n.onboardingIntroTitle,
             style: AppTypography.displayLarge.copyWith(
-              fontWeight: FontWeight.w500,
+              fontWeight: AppFontWeight.medium,
               color: colors.text.accent,
             ),
             textAlign: TextAlign.center,

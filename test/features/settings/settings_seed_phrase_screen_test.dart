@@ -20,6 +20,7 @@ import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/layout/app_desktop_shell.dart';
 import 'package:zcash_wallet/src/core/widgets/app_back_link.dart';
 import 'package:zcash_wallet/src/core/widgets/app_button.dart';
+import 'package:zcash_wallet/src/core/widgets/neon_glass_panel.dart';
 import 'package:zcash_wallet/src/features/onboarding/mobile/mobile_secret_passphrase_screen.dart'
     show SecretPassphraseRevealWarningCard;
 import 'package:zcash_wallet/src/features/settings/screens/settings_seed_phrase_screen.dart';
@@ -642,7 +643,7 @@ void main() {
       final phraseCard = find
           .ancestor(
             of: find.byKey(const ValueKey('settings_seed_phrase_copy_button')),
-            matching: find.byType(Container),
+            matching: find.byType(NeonGlassPanel),
           )
           .first;
       expect(tester.getRect(phraseCard), warningBounds);
@@ -668,7 +669,7 @@ void main() {
       final birthdayCard = find
           .ancestor(
             of: find.text('Birthday block height'),
-            matching: find.byType(Container),
+            matching: find.byType(NeonGlassPanel),
           )
           .first;
       final buttonBounds = tester.getRect(completeButton);
@@ -740,7 +741,7 @@ void main() {
     final birthdayCard = find
         .ancestor(
           of: find.text('Birthday block height'),
-          matching: find.byType(Container),
+          matching: find.byType(NeonGlassPanel),
         )
         .first;
     final viewport = tester.getRect(find.byType(SingleChildScrollView));
@@ -838,12 +839,10 @@ void main() {
     expect(bip39CopyButton.height, 24);
     expect(bip39CopyButton.trailing, isNull);
 
-    final footer = tester.widget<Container>(
+    expect(
       find.byKey(const ValueKey('settings_bip39_passphrase_footer')),
+      findsOneWidget,
     );
-    final footerDecoration = footer.decoration as BoxDecoration;
-    expect(footerDecoration.color, AppThemeData.light.colors.background.ground);
-    expect(footerDecoration.boxShadow, hasLength(4));
   });
 
   testWidgets('hides the BIP39 section when the account has no passphrase', (

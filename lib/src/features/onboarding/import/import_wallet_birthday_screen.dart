@@ -811,7 +811,7 @@ class _DatePickerField extends StatelessWidget {
                     valueText ?? context.l10n.onboardingBirthdayDateHint,
                     style: AppTypography.labelLarge.copyWith(
                       color: valueColor,
-                      fontWeight: FontWeight.w400,
+                      fontWeight: AppFontWeight.regular,
                     ),
                   ),
                 ),
@@ -891,14 +891,14 @@ class _BlockHeightField extends StatelessWidget {
               onChanged: onChanged,
               style: AppTypography.labelLarge.copyWith(
                 color: colors.text.accent,
-                fontWeight: FontWeight.w500,
+                fontWeight: AppFontWeight.medium,
               ),
               cursorColor: colors.text.accent,
               decoration: material.InputDecoration.collapsed(
                 hintText: context.l10n.onboardingBlockHeight,
                 hintStyle: AppTypography.labelLarge.copyWith(
                   color: colors.text.muted,
-                  fontWeight: FontWeight.w400,
+                  fontWeight: AppFontWeight.regular,
                 ),
               ),
             ),
@@ -928,7 +928,7 @@ class _InlineMessage extends StatelessWidget {
       textAlign: centered ? TextAlign.center : null,
       style: AppTypography.labelLarge.copyWith(
         color: errorColor,
-        fontWeight: FontWeight.w400,
+        fontWeight: AppFontWeight.regular,
       ),
     );
     return Row(

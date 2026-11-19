@@ -129,7 +129,7 @@ class _TitleBlock extends StatelessWidget {
             context.l10n.onboardingConnectKeystone,
             style: AppTypography.displayLarge.copyWith(
               fontFamily: 'Gotham',
-              fontWeight: FontWeight.w400,
+              fontWeight: AppFontWeight.regular,
               color: colors.text.accent,
             ),
             maxLines: 1,
@@ -296,7 +296,7 @@ class _InstructionHeader extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: AppTypography.bodyLarge.copyWith(
               color: colors.text.accent,
-              fontWeight: FontWeight.w600,
+              fontWeight: AppFontWeight.semiBold,
             ),
           ),
         ),

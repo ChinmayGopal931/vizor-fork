@@ -15,6 +15,7 @@ import 'one_time_address_label.dart';
 import 'swap_asset_icon.dart';
 import 'swap_quote_error_text.dart';
 import 'swap_confidential_ui.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
 
 class SwapComposerPanel extends StatefulWidget {
   const SwapComposerPanel({
@@ -467,7 +468,7 @@ class _SwapRateInline extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: AppTypography.labelLarge.copyWith(
-              fontWeight: FontWeight.w400,
+              fontWeight: AppFontWeight.regular,
               color: colors.text.secondary,
             ),
           ),
@@ -495,36 +496,35 @@ class _SwapTicketShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
-    return Container(
+    // The ticket is a neon glass panel, its two cut corners lit.
+    return SizedBox(
       height: 336,
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: colors.background.ground,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: appSurfaceShadow(colors),
-      ),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Column(children: [payCard, const SizedBox(height: 16), receiveCard]),
-          Positioned(
-            top: 147,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: SwapConfidentialSeamReveal(
-                reveal: confidentialReveal,
-                size: 40,
-                radius: 12,
-                child: _SwapDirectionButton(
-                  key: ValueKey('swap_direction_${targetDirection.name}'),
-                  onTap: onToggleDirection,
+      child: NeonGlassPanel(
+        padding: const EdgeInsets.all(4),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Column(
+              children: [payCard, const SizedBox(height: 16), receiveCard],
+            ),
+            Positioned(
+              top: 147,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: SwapConfidentialSeamReveal(
+                  reveal: confidentialReveal,
+                  size: 40,
+                  radius: AppRadii.small,
+                  child: _SwapDirectionButton(
+                    key: ValueKey('swap_direction_${targetDirection.name}'),
+                    onTap: onToggleDirection,
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -555,9 +555,10 @@ class _SwapAmountCard extends StatelessWidget {
       duration: const Duration(milliseconds: 140),
       curve: Curves.easeOutCubic,
       padding: const EdgeInsets.fromLTRB(12, 16, 12, 16),
-      decoration: BoxDecoration(
+      // The active side lifts inside the ticket, on the ticket's own wedge.
+      decoration: ShapeDecoration(
         color: active ? colors.background.base : null,
-        borderRadius: BorderRadius.circular(24),
+        shape: Neon.wedgeBorder(cut: AppChamfer.medium),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -722,7 +723,9 @@ class _SwapFiatValueText extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: AppTypography.labelLarge.copyWith(
-                fontWeight: emphasized ? FontWeight.w600 : FontWeight.w400,
+                fontWeight: emphasized
+                    ? AppFontWeight.semiBold
+                    : AppFontWeight.regular,
                 color: colors.text.secondary,
               ),
             ),
@@ -766,7 +769,7 @@ class _AddressTrigger extends StatelessWidget {
     final name = contactName?.trim();
     final hasContact = hasValue && name != null && name.isNotEmpty;
     final textStyle = AppTypography.labelLarge.copyWith(
-      fontWeight: FontWeight.w600,
+      fontWeight: AppFontWeight.semiBold,
       color: colors.text.accent,
     );
     return MouseRegion(
@@ -862,7 +865,7 @@ class _MaxAmountTrigger extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.right,
                   style: AppTypography.labelLarge.copyWith(
-                    fontWeight: FontWeight.w400,
+                    fontWeight: AppFontWeight.regular,
                     color: hasError
                         ? colors.text.destructive
                         : colors.text.accent,
@@ -915,9 +918,10 @@ class _SwapDirectionButton extends StatelessWidget {
           width: 40,
           height: 40,
           alignment: Alignment.center,
-          decoration: BoxDecoration(
+          // A white cut-corner plate.
+          decoration: ShapeDecoration(
             color: colors.background.inverse,
-            borderRadius: BorderRadius.circular(12),
+            shape: Neon.chamferBorder(cut: AppChamfer.small + 2),
           ),
           child: AppIcon(
             AppIcons.swapArrows,
@@ -1003,7 +1007,7 @@ class _TokenPill extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: AppTypography.labelLarge.copyWith(
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeight.semiBold,
                     color: colors.text.accent,
                   ),
                 ),
@@ -1013,7 +1017,7 @@ class _TokenPill extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: AppTypography.labelLarge.copyWith(
-                      fontWeight: FontWeight.w400,
+                      fontWeight: AppFontWeight.regular,
                       color: colors.text.secondary,
                     ),
                   ),
@@ -1101,7 +1105,7 @@ class _SlippageControl extends StatelessWidget {
               Text(
                 label,
                 style: AppTypography.labelLarge.copyWith(
-                  fontWeight: FontWeight.w400,
+                  fontWeight: AppFontWeight.regular,
                   color: colors.text.secondary.withValues(
                     alpha: enabled ? 1 : 0.45,
                   ),

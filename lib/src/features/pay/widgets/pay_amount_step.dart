@@ -12,6 +12,7 @@ import '../../swap/models/swap_models.dart';
 import '../../swap/widgets/swap_asset_icon.dart';
 import '../../swap/widgets/swap_quote_error_text.dart';
 import '../models/pay_amount_input.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
 
 const _payAmountSkeletonPeriod = Duration(milliseconds: 1200);
 
@@ -70,16 +71,11 @@ class PayAmountStep extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
+          NeonGlassPanel(
             key: const ValueKey('pay_amount_card'),
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.sm,
               vertical: AppSpacing.md,
-            ),
-            decoration: BoxDecoration(
-              color: colors.background.ground,
-              borderRadius: BorderRadius.circular(AppRadii.xLarge),
-              boxShadow: appSurfaceShadow(colors),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -91,7 +87,7 @@ class PayAmountStep extends StatelessWidget {
                       Text(
                         context.l10n.payAmountPayingIn,
                         style: AppTypography.labelLarge.copyWith(
-                          fontWeight: FontWeight.w400,
+                          fontWeight: AppFontWeight.regular,
                           color: colors.text.secondary,
                         ),
                       ),
@@ -229,7 +225,7 @@ class PayAmountStep extends StatelessWidget {
                                   inputIsFiat ? '0 ${asset.symbol}' : r'$ 0',
                                   key: const ValueKey('pay_amount_counterpart'),
                                   style: AppTypography.labelLarge.copyWith(
-                                    fontWeight: FontWeight.w400,
+                                    fontWeight: AppFontWeight.regular,
                                     color: colors.text.secondary,
                                   ),
                                 )
@@ -240,7 +236,7 @@ class PayAmountStep extends StatelessWidget {
                                       : '\$${counterpartText ?? '--'}',
                                   key: const ValueKey('pay_amount_counterpart'),
                                   style: AppTypography.labelLarge.copyWith(
-                                    fontWeight: FontWeight.w400,
+                                    fontWeight: AppFontWeight.regular,
                                     color: colors.text.secondary,
                                   ),
                                 )
@@ -248,7 +244,7 @@ class PayAmountStep extends StatelessWidget {
                                 Text(
                                   inputIsFiat ? asset.symbol : r'$',
                                   style: AppTypography.labelLarge.copyWith(
-                                    fontWeight: FontWeight.w400,
+                                    fontWeight: AppFontWeight.regular,
                                     color: colors.text.secondary,
                                   ),
                                 ),
@@ -280,7 +276,7 @@ class PayAmountStep extends StatelessWidget {
                             Text(
                               context.l10n.payAmountEstimatedSpend,
                               style: AppTypography.labelLarge.copyWith(
-                                fontWeight: FontWeight.w400,
+                                fontWeight: AppFontWeight.regular,
                                 color: colors.text.secondary,
                               ),
                             ),
@@ -296,14 +292,14 @@ class PayAmountStep extends StatelessWidget {
                                     : estimatedZecText,
                                 key: const ValueKey('pay_estimated_spend'),
                                 style: AppTypography.labelLarge.copyWith(
-                                  fontWeight: FontWeight.w400,
+                                  fontWeight: AppFontWeight.regular,
                                   color: colors.text.accent,
                                 ),
                               ),
                             Text(
                               'ZEC', // l10n-ignore: asset symbol
                               style: AppTypography.labelLarge.copyWith(
-                                fontWeight: FontWeight.w400,
+                                fontWeight: AppFontWeight.regular,
                                 color: colors.text.secondary,
                               ),
                             ),
@@ -341,7 +337,7 @@ class PayAmountStep extends StatelessWidget {
                     Text(
                       context.l10n.payAmountPayingFrom,
                       style: AppTypography.labelLarge.copyWith(
-                        fontWeight: FontWeight.w400,
+                        fontWeight: AppFontWeight.regular,
                         color: colors.text.primary,
                       ),
                     ),
@@ -434,7 +430,7 @@ class _PayAssetSelector extends StatelessWidget {
                 Text(
                   asset.chainLabel,
                   style: AppTypography.labelLarge.copyWith(
-                    fontWeight: FontWeight.w400,
+                    fontWeight: AppFontWeight.regular,
                     color: colors.text.secondary,
                   ),
                 ),

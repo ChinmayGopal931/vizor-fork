@@ -800,7 +800,7 @@ class _PoolMigrationHero extends StatelessWidget {
                   context.l10n.migrationPoolLegacy,
                   style: AppTypography.labelMedium.copyWith(
                     color: colors.text.secondary,
-                    fontWeight: FontWeight.w400,
+                    fontWeight: AppFontWeight.regular,
                   ),
                 ),
                 const SizedBox(height: 2),

@@ -6,10 +6,10 @@ import '../../../core/l10n/l10n.dart';
 import '../../../core/layout/app_form_factor.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_icon.dart';
-import '../../../core/widgets/app_modal_card.dart';
 import '../models/swap_models.dart';
 import 'swap_asset_icon.dart';
 import 'swap_modal_controls.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
 
 class SwapAssetSelectorModal extends StatefulWidget {
   const SwapAssetSelectorModal({
@@ -94,23 +94,13 @@ class _SwapAssetSelectorModalState extends State<SwapAssetSelectorModal> {
     // bounded height that the card hugs. Desktop keeps the fixed card.
     final isMobile = kAppFormFactor == AppFormFactor.mobile;
 
-    return Container(
+    final menu = Container(
       key: const ValueKey('swap_external_asset_menu'),
       width: isMobile ? double.infinity : 312,
       height: isMobile ? null : 440,
-      // Container requires a decoration to clip; the mobile card (with no
-      // decoration here) is clipped by the MobileModalCard surface.
-      clipBehavior: isMobile ? Clip.none : Clip.antiAlias,
       // Desktop fills to the card edge (bottom 0); mobile hugs, so the
       // content needs its own bottom breathing room.
       padding: EdgeInsets.fromLTRB(16, 24, 16, isMobile ? AppSpacing.md : 0),
-      decoration: isMobile
-          ? null
-          : BoxDecoration(
-              color: colors.background.base,
-              borderRadius: BorderRadius.circular(AppRadii.large),
-              boxShadow: appModalShadow,
-            ),
       child: Column(
         mainAxisSize: isMobile ? MainAxisSize.min : MainAxisSize.max,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -121,7 +111,7 @@ class _SwapAssetSelectorModalState extends State<SwapAssetSelectorModal> {
                 child: Text(
                   context.l10n.swapAssetSelectorTitle,
                   style: AppTypography.bodyLarge.copyWith(
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeight.semiBold,
                     color: colors.text.accent,
                   ),
                 ),
@@ -167,7 +157,7 @@ class _SwapAssetSelectorModalState extends State<SwapAssetSelectorModal> {
                       decoration: InputDecoration.collapsed(
                         hintText: context.l10n.swapAssetSelectorSearchHint,
                         hintStyle: AppTypography.labelLarge.copyWith(
-                          fontWeight: FontWeight.w400,
+                          fontWeight: AppFontWeight.regular,
                           color: colors.text.muted,
                         ),
                       ),
@@ -199,7 +189,7 @@ class _SwapAssetSelectorModalState extends State<SwapAssetSelectorModal> {
                         textAlign: TextAlign.center,
                         // Spec: Label M Regular (Geist 14/16, weight 400).
                         style: AppTypography.labelLarge.copyWith(
-                          fontWeight: FontWeight.w400,
+                          fontWeight: AppFontWeight.regular,
                           color: colors.text.secondary,
                         ),
                       ),
@@ -243,6 +233,14 @@ class _SwapAssetSelectorModalState extends State<SwapAssetSelectorModal> {
           ),
         ],
       ),
+    );
+    // The mobile card is clipped by the MobileModalCard surface; desktop's is
+    // an opaque neon glass panel floating over the pane.
+    if (isMobile) return menu;
+    return NeonGlassPanel(
+      fill: colors.background.base,
+      clipBehavior: Clip.antiAlias,
+      child: menu,
     );
   }
 }
@@ -324,7 +322,7 @@ class _AssetMenuRow extends StatelessWidget {
                       // weight 400) — same metrics as the ticker above, regular
                       // weight. labelMedium would be 13/14 Medium, which is wrong.
                       style: AppTypography.labelLarge.copyWith(
-                        fontWeight: FontWeight.w400,
+                        fontWeight: AppFontWeight.regular,
                         color: colors.text.secondary,
                       ),
                     ),

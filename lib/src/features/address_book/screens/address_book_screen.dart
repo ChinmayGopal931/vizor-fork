@@ -1437,7 +1437,7 @@ class _NetworkSelectorModalState extends State<_NetworkSelectorModal> {
               context.l10n.addressBookSelectNetwork,
               style: AppTypography.bodyLarge.copyWith(
                 color: context.colors.text.accent,
-                fontWeight: FontWeight.w600,
+                fontWeight: AppFontWeight.semiBold,
               ),
             ),
           ),
@@ -1606,7 +1606,7 @@ class _RemoveContactModal extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: AppTypography.bodyLarge.copyWith(
               color: context.colors.text.accent,
-              fontWeight: FontWeight.w600,
+              fontWeight: AppFontWeight.semiBold,
             ),
           ),
           const SizedBox(height: AppSpacing.sm),

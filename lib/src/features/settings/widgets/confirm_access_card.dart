@@ -6,6 +6,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/app_text_field.dart';
+import '../../../core/widgets/neon_page_title.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
 
 /// Shared "Confirm access" password gate card.
 ///
@@ -50,109 +52,102 @@ class ConfirmAccessCard extends StatelessWidget {
     final cardTextColor = colors.text.homeCard;
     final hasError = errorText != null && errorText!.trim().isNotEmpty;
 
-    return Container(
+    // A neon glass panel on the black, its two cut corners lit.
+    return SizedBox(
       width: width,
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.sm,
-        AppSpacing.sm,
-        AppSpacing.sm,
-        AppSpacing.xs,
-      ),
-      decoration: BoxDecoration(
-        color: colors.background.homeCard,
-        borderRadius: BorderRadius.circular(AppRadii.large),
-        border: Border.all(
-          color: const Color(0x12FFFFFF),
-          width: 1.5,
-          strokeAlign: BorderSide.strokeAlignInside,
+      child: NeonGlassPanel(
+        fill: colors.background.homeCard,
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.sm,
+          AppSpacing.sm,
+          AppSpacing.sm,
+          AppSpacing.xs,
         ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      context.l10n.settingsConfirmAccessTitle,
-                      style: AppTypography.headlineLarge.copyWith(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      NeonPageTitle(
+                        context.l10n.settingsConfirmAccessTitle,
                         color: cardTextColor,
                       ),
-                    ),
-                    const SizedBox(height: AppSpacing.xxs),
-                    Opacity(
-                      opacity: 0.5,
-                      child: Text(
-                        subtitle,
-                        style: AppTypography.labelMedium.copyWith(
-                          color: cardTextColor,
-                          fontWeight: FontWeight.w400,
+                      const SizedBox(height: AppSpacing.xxs),
+                      Opacity(
+                        opacity: 0.5,
+                        child: Text(
+                          subtitle,
+                          style: AppTypography.labelMedium.copyWith(
+                            color: cardTextColor,
+                            fontWeight: AppFontWeight.regular,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              Opacity(
-                opacity: 0.5,
-                child: AppIcon(AppIcons.lock, size: 32, color: cardTextColor),
-              ),
-            ],
-          ),
-          const SizedBox(height: _titleFieldGap),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: _fieldBlockHeight,
-                  child: AppPasswordInput(
-                    warningOnDarkCard: true,
-                    child: AppTextField(
-                      label: context.l10n.passwordLabel,
-                      showLabel: false,
-                      controller: controller,
-                      hintText: context.l10n.settingsPasswordHint,
-                      obscureText: true,
-                      enableSuggestions: false,
-                      autocorrect: false,
-                      keyboardType: TextInputType.visiblePassword,
-                      autofocus: autofocus,
-                      enabled: !isSubmitting,
-                      messageText: errorText,
-                      tone: hasError
-                          ? AppTextFieldTone.destructive
-                          : AppTextFieldTone.neutral,
-                      inputHorizontalPadding: AppSpacing.s,
-                      onChanged: (_) => onChanged(),
-                      onSubmitted: (_) => onSubmit(),
+                const SizedBox(width: AppSpacing.xs),
+                Opacity(
+                  opacity: 0.5,
+                  child: AppIcon(AppIcons.lock, size: 32, color: cardTextColor),
+                ),
+              ],
+            ),
+            const SizedBox(height: _titleFieldGap),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: _fieldBlockHeight,
+                    child: AppPasswordInput(
+                      warningOnDarkCard: true,
+                      child: AppTextField(
+                        label: context.l10n.passwordLabel,
+                        showLabel: false,
+                        controller: controller,
+                        hintText: context.l10n.settingsPasswordHint,
+                        obscureText: true,
+                        enableSuggestions: false,
+                        autocorrect: false,
+                        keyboardType: TextInputType.visiblePassword,
+                        autofocus: autofocus,
+                        enabled: !isSubmitting,
+                        messageText: errorText,
+                        tone: hasError
+                            ? AppTextFieldTone.destructive
+                            : AppTextFieldTone.neutral,
+                        inputHorizontalPadding: AppSpacing.s,
+                        onChanged: (_) => onChanged(),
+                        onSubmitted: (_) => onSubmit(),
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              Semantics(
-                button: true,
-                label: context.l10n.passwordConfirmLabel,
-                child: AppButton(
-                  onPressed: canSubmit && !isSubmitting ? onSubmit : null,
-                  variant: AppButtonVariant.secondary,
-                  minWidth: 80,
-                  child: AppIcon(
-                    isSubmitting ? AppIcons.loader : AppIcons.chevronForward,
-                    size: 20,
+                const SizedBox(width: AppSpacing.xs),
+                Semantics(
+                  button: true,
+                  label: context.l10n.passwordConfirmLabel,
+                  child: AppButton(
+                    onPressed: canSubmit && !isSubmitting ? onSubmit : null,
+                    variant: AppButtonVariant.secondary,
+                    minWidth: 80,
+                    child: AppIcon(
+                      isSubmitting ? AppIcons.loader : AppIcons.chevronForward,
+                      size: 20,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -2328,13 +2328,13 @@ class _HomeDesktopMigrationCtaButton extends StatelessWidget {
                 child: IgnorePointer(
                   child: DecoratedBox(
                     decoration: ShapeDecoration(
-                      shape: Neon.wedgeBorder(
-                        cut: AppChamfer.medium + 1,
-                        side: BorderSide(
-                          color: colors.state.focusRing,
-                          width: 2,
-                        ),
-                      ),
+                      shape: Neon.wedgeBorder(cut: AppChamfer.medium + 1)
+                          .copyWith(
+                            side: BorderSide(
+                              color: colors.state.focusRing,
+                              width: 2,
+                            ),
+                          ),
                     ),
                   ),
                 ),

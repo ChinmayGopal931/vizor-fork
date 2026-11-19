@@ -28,6 +28,8 @@ import '../../../core/widgets/mobile/neon_glyph_badge.dart';
 import '../../../core/widgets/mobile/tron_glyph.dart';
 import '../models/wallet_link_models.dart';
 import '../providers/wallet_link_provider.dart';
+import '../../../core/widgets/neon_page_title.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
 
 const _walletLinkContentWidth = 420.0;
 const _walletLinkHorizontalInset = AppSpacing.s;
@@ -489,7 +491,7 @@ class _ErrorContent extends StatelessWidget {
     return _ContentColumn(
       title: context.l10n.walletLinkDesktopUnavailableTitle,
       body: message,
-      visual: const _StatusIcon(iconName: AppIcons.warning),
+      visual: const NeonGlyphBadge(glyph: TronGlyphKind.warning, size: 64),
       action: AppButton(
         onPressed: onRetry,
         size: AppButtonSize.mediumLarge,
@@ -519,13 +521,7 @@ class _ContentColumn extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(
-          title,
-          textAlign: TextAlign.center,
-          style: AppTypography.headlineLarge.copyWith(
-            color: colors.text.accent,
-          ),
-        ),
+        NeonPageTitle(title, textAlign: TextAlign.center),
         const SizedBox(height: AppSpacing.sm),
         ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: _walletLinkBodyWidth),
@@ -582,13 +578,7 @@ class _ResultContentColumn extends StatelessWidget {
             children: [
               ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: titleMaxWidth),
-                child: Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style: AppTypography.headlineLarge.copyWith(
-                    color: colors.text.accent,
-                  ),
-                ),
+                child: NeonPageTitle(title, textAlign: TextAlign.center),
               ),
               const SizedBox(height: AppSpacing.xs),
               ConstrainedBox(
@@ -623,7 +613,7 @@ class _EncryptedPlaceholder extends StatelessWidget {
     return CustomPaint(
       painter: _DashedRoundRectPainter(
         color: colors.text.muted.withValues(alpha: 0.65),
-        radius: 28,
+        radius: AppChamfer.large,
       ),
       child: SizedBox(
         width: 260,
@@ -669,48 +659,48 @@ class _QrTransferCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return Container(
+    // A neon glass panel, its two cut corners lit.
+    return SizedBox(
       width: 260,
       height: 340,
-      decoration: BoxDecoration(
-        color: colors.background.ground,
-        border: Border.all(color: colors.border.subtle),
-        borderRadius: BorderRadius.circular(28),
-      ),
-      padding: const EdgeInsets.fromLTRB(29, 32, 29, 0),
-      child: Column(
-        children: [
-          SizedBox.square(
-            dimension: 202,
-            child: PrettyQrView(
-              qrImage: _qrImage(qrPayload),
-              decoration: PrettyQrDecoration(
-                quietZone: PrettyQrQuietZone.zero,
-                shape: DotQrShape(color: colors.text.accent),
+      child: NeonGlassPanel(
+        fill: colors.background.ground,
+        padding: const EdgeInsets.fromLTRB(29, 32, 29, 0),
+        child: Column(
+          children: [
+            SizedBox.square(
+              dimension: 202,
+              child: PrettyQrView(
+                qrImage: _qrImage(qrPayload),
+                decoration: PrettyQrDecoration(
+                  quietZone: PrettyQrQuietZone.zero,
+                  shape: DotQrShape(color: colors.text.accent),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            context.l10n.walletLinkDesktopReadyToScan,
-            style: AppTypography.bodyMedium.copyWith(
-              color: colors.text.accent.withValues(alpha: 0.82),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: SizedBox(
-              width: 128,
-              height: 6,
-              child: LinearProgressIndicator(
-                value: _progress(remaining),
-                backgroundColor: colors.text.accent.withValues(alpha: 0.35),
-                color: colors.text.accent,
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              context.l10n.walletLinkDesktopReadyToScan,
+              style: AppTypography.bodyMedium.copyWith(
+                color: colors.text.accent.withValues(alpha: 0.82),
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: AppSpacing.sm),
+            // The time left, as a lit red bar.
+            ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadii.full),
+              child: SizedBox(
+                width: 128,
+                height: 6,
+                child: LinearProgressIndicator(
+                  value: _progress(remaining),
+                  backgroundColor: colors.neon.glow.withValues(alpha: 0.2),
+                  color: colors.neon.glow,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -732,27 +722,6 @@ class _QrTransferCard extends StatelessWidget {
   }
 }
 
-class _StatusIcon extends StatelessWidget {
-  const _StatusIcon({required this.iconName});
-
-  final String iconName;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    return Container(
-      width: 64,
-      height: 64,
-      decoration: BoxDecoration(
-        color: colors.background.base,
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: AppIcon(iconName, size: 28, color: colors.icon.accent),
-    );
-  }
-}
-
 class _DashedRoundRectPainter extends CustomPainter {
   const _DashedRoundRectPainter({required this.color, required this.radius});
 
@@ -767,10 +736,12 @@ class _DashedRoundRectPainter extends CustomPainter {
       ..color = color
       ..strokeWidth = 1
       ..style = PaintingStyle.stroke;
-    final path = Path()
-      ..addRRect(
-        RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(radius)),
-      );
+    // The glass panel's outline, its top-left and bottom-right corners cut.
+    final path = Neon.chamferedRect(
+      Offset.zero & size,
+      topLeft: radius,
+      bottomRight: radius,
+    );
     for (final metric in path.computeMetrics()) {
       var distance = 0.0;
       while (distance < metric.length) {

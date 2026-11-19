@@ -696,7 +696,7 @@ class _PollCardContent extends StatelessWidget {
           title,
           style: AppTypography.headlineSmall.copyWith(
             color: colors.text.accent,
-            fontWeight: FontWeight.w600,
+            fontWeight: AppSharedFontWeight.semiBold,
             height: 24 / 16,
             letterSpacing: 0,
           ),

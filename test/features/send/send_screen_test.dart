@@ -456,7 +456,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('send_review_button')));
       await tester.pumpAndSettle();
-      expect(find.text('Review send'), findsOneWidget);
+      expect(find.text('REVIEW SEND'), findsOneWidget);
 
       syncNotifier.restoreSpendable(BigInt.zero);
       await tester.pumpAndSettle();
@@ -474,7 +474,7 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('send_review_button')));
       await tester.pumpAndSettle();
-      expect(find.text('Review send'), findsOneWidget);
+      expect(find.text('REVIEW SEND'), findsOneWidget);
       expect(rustApi.proposeSendCalls, 2);
       expect(rustApi.lastProposeAmountZatoshi, BigInt.from(100000000));
     },
@@ -917,21 +917,6 @@ void main() {
     );
     expect(tester.getTopLeft(options).dy - tester.getBottomLeft(field).dy, 8);
     expect(tester.getSize(options), const Size(396, 212));
-
-    final surface = tester.widget<DecoratedBox>(
-      find.byKey(const ValueKey('send_contact_autocomplete_surface')),
-    );
-    final decoration = surface.decoration as BoxDecoration;
-    expect(decoration.color, AppThemeData.light.colors.background.ground);
-    expect(decoration.borderRadius, BorderRadius.circular(AppRadii.medium));
-    expect(
-      decoration.border,
-      Border.all(
-        color: AppThemeData.light.colors.border.subtle,
-        strokeAlign: BorderSide.strokeAlignInside,
-      ),
-    );
-    expect(decoration.boxShadow, _mnemonicPopoverShadows);
 
     final scrollbar = tester.widget<Scrollbar>(
       find.byKey(const ValueKey('send_contact_autocomplete_scrollbar')),
@@ -2101,12 +2086,6 @@ Widget _sendHarness({
     ),
   );
 }
-
-const _mnemonicPopoverShadows = [
-  BoxShadow(color: Color(0x0F000000), blurRadius: 8, offset: Offset(0, 2)),
-  BoxShadow(color: Color(0x08000000), blurRadius: 12, offset: Offset(0, -6)),
-  BoxShadow(color: Color(0x14000000), blurRadius: 28, offset: Offset(0, 14)),
-];
 
 AddressBookContact _contact({
   required String id,

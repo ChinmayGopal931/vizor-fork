@@ -122,7 +122,7 @@ class GiftCardActivityDetailView extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: AppTypography.bodyLarge.copyWith(
                   color: context.colors.text.accent,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppFontWeight.semiBold,
                 ),
               ),
               SizedBox(height: gap),

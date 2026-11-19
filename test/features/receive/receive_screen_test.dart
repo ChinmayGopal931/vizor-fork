@@ -112,7 +112,7 @@ void main() {
     );
     final shieldedTabLabel = tester.widget<Text>(find.text('Shielded'));
     expect(shieldedTabLabel.style?.fontFamily, 'Gotham');
-    expect(shieldedTabLabel.style?.fontWeight, FontWeight.w400);
+    expect(shieldedTabLabel.style?.fontWeight, AppFontWeight.regular);
     expect(shieldedTabLabel.style?.fontSize, 13);
     expect(shieldedTabLabel.style?.height, 14 / 13);
     expect(shieldedTabLabel.style?.letterSpacing, 0);

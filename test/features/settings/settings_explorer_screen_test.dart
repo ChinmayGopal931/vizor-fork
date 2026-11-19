@@ -108,7 +108,7 @@ void main() {
     await tester.pumpWidget(_harness());
     await tester.pump();
 
-    expect(find.text('Explorer'), findsOneWidget);
+    expect(find.text('EXPLORER'), findsOneWidget);
     expect(find.text('ZecBlock'), findsOneWidget);
     expect(find.textContaining('zecblock.com'), findsWidgets);
     expect(find.text(testL10n.settingsExplorerPrivacyCopy), findsOneWidget);

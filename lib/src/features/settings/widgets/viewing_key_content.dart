@@ -13,6 +13,7 @@ import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/mobile/mobile_account_header.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../core/widgets/app_segmented_control.dart';
+import '../../../core/widgets/neon_page_title.dart';
 import '../../../providers/account_models.dart';
 import '../../../rust/api/wallet.dart' show AccountViewingKeys;
 import '../../receive/widgets/request/request_qr_surface.dart';
@@ -168,14 +169,21 @@ class _ViewingKeyContentState extends State<ViewingKeyContent> {
           Semantics(
             header: true,
             liveRegion: true,
-            child: Text(
-              widget.type?.title(context.l10n) ??
-                  context.l10n.settingsViewingKeyTitle,
-              textAlign: TextAlign.center,
-              style: AppTypography.headlineLarge.copyWith(
-                color: colors.text.accent,
-              ),
-            ),
+            // Desktop's page title; the phones keep their headline.
+            child: mobile
+                ? Text(
+                    widget.type?.title(context.l10n) ??
+                        context.l10n.settingsViewingKeyTitle,
+                    textAlign: TextAlign.center,
+                    style: AppTypography.headlineLarge.copyWith(
+                      color: colors.text.accent,
+                    ),
+                  )
+                : NeonPageTitle(
+                    widget.type?.title(context.l10n) ??
+                        context.l10n.settingsViewingKeyTitle,
+                    textAlign: TextAlign.center,
+                  ),
           ),
           const SizedBox(height: AppSpacing.md),
         ],

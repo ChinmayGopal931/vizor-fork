@@ -15,6 +15,8 @@ import '../../../core/widgets/app_tappable.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../../../providers/rpc_endpoint_provider.dart';
 import '../../../providers/zcash_explorer_provider.dart';
+import '../../../core/widgets/neon_page_title.dart';
+import '../../../core/widgets/neon_option_panel.dart';
 
 class SettingsExplorerScreen extends ConsumerStatefulWidget {
   const SettingsExplorerScreen({super.key});
@@ -152,12 +154,9 @@ class _SettingsExplorerScreenState
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
+                    NeonPageTitle(
                       context.l10n.settingsExplorerTitle,
                       textAlign: TextAlign.center,
-                      style: AppTypography.headlineLarge.copyWith(
-                        color: colors.text.accent,
-                      ),
                     ),
                     const SizedBox(height: AppSpacing.s),
                     Text(
@@ -330,7 +329,6 @@ class _ExplorerOptionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final radius = BorderRadius.circular(AppRadii.medium);
     return Semantics(
       button: true,
       selected: selected,
@@ -340,24 +338,14 @@ class _ExplorerOptionCard extends StatelessWidget {
       excludeSemantics: true,
       child: AppTappable(
         onTap: onTap,
-        child: Container(
+        // A neon option panel; its selection strokes the outline, over the
+        // panel, so it moves nothing.
+        child: NeonOptionPanel(
+          selected: selected,
           constraints: const BoxConstraints(minHeight: 64),
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.sm,
             vertical: AppSpacing.s,
-          ),
-          decoration: BoxDecoration(
-            color: colors.background.ground,
-            borderRadius: radius,
-          ),
-          // Drawn over the card so a thicker selected border moves nothing.
-          foregroundDecoration: BoxDecoration(
-            borderRadius: radius,
-            border: Border.all(
-              color: selected ? colors.border.strong : colors.border.subtle,
-              width: selected ? 1.5 : 1,
-              strokeAlign: BorderSide.strokeAlignInside,
-            ),
           ),
           child: Row(
             children: [
@@ -389,25 +377,7 @@ class _ExplorerOptionCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppSpacing.s),
-              Container(
-                width: 16,
-                height: 16,
-                decoration: BoxDecoration(
-                  color: selected
-                      ? colors.background.inverse
-                      : colors.background.neutralSubtleOpacity,
-                  shape: BoxShape.circle,
-                ),
-                child: selected
-                    ? Center(
-                        child: AppIcon(
-                          AppIcons.check,
-                          size: 12,
-                          color: colors.background.ground,
-                        ),
-                      )
-                    : null,
-              ),
+              NeonOptionCheck(selected: selected),
             ],
           ),
         ),

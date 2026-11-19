@@ -116,7 +116,10 @@ void main() {
       await _pump(tester, const RequestAmountCard(request: _empty));
 
       expect(tester.takeException(), isNull);
-      expect(find.text(requestFlowTitle(testL10n)), findsOneWidget);
+      expect(
+        find.text(requestFlowTitle(testL10n).toUpperCase()),
+        findsOneWidget,
+      );
       // The artefact belongs to step two: nothing here is a request yet.
       expect(find.byType(RequestQrSurface), findsNothing);
       // No error while the field is simply still empty.
@@ -390,7 +393,10 @@ void main() {
       );
 
       expect(tester.takeException(), isNull);
-      expect(find.text(requestFlowTitle(testL10n)), findsOneWidget);
+      expect(
+        find.text(requestFlowTitle(testL10n).toUpperCase()),
+        findsOneWidget,
+      );
       expect(find.byType(RequestQrSurface), findsOneWidget);
       expect(find.text('0.5 ZEC'), findsOneWidget);
       expect(find.text('Shielded'), findsOneWidget);

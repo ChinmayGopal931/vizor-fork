@@ -162,7 +162,7 @@ class _TitleBlock extends StatelessWidget {
             context.l10n.commonSelectAccount,
             style: AppTypography.displayLarge.copyWith(
               fontFamily: 'Gotham',
-              fontWeight: FontWeight.w400,
+              fontWeight: AppFontWeight.regular,
               color: colors.text.accent,
             ),
             maxLines: 1,
@@ -266,7 +266,7 @@ class _AccountPickerState extends State<_AccountPicker> {
               countLabel,
               style: AppTypography.labelLarge.copyWith(
                 color: colors.text.secondary,
-                fontWeight: FontWeight.w400,
+                fontWeight: AppFontWeight.regular,
               ),
             ),
           ),
@@ -368,8 +368,8 @@ class _AccountRadioCard extends StatelessWidget {
                         style: AppTypography.labelLarge.copyWith(
                           color: colors.text.accent,
                           fontWeight: selected
-                              ? FontWeight.w600
-                              : FontWeight.w500,
+                              ? AppFontWeight.semiBold
+                              : AppFontWeight.medium,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -380,7 +380,7 @@ class _AccountRadioCard extends StatelessWidget {
                           color: selected
                               ? colors.text.accent
                               : colors.text.secondary,
-                          fontWeight: FontWeight.w400,
+                          fontWeight: AppFontWeight.regular,
                         ),
                       ),
                     ],

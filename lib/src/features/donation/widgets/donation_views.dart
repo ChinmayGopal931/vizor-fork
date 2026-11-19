@@ -10,6 +10,11 @@ import '../../../core/widgets/review_info_row.dart';
 import '../../../core/widgets/review_list_row.dart';
 import '../../../core/widgets/review_wrap_card.dart';
 import '../../send/widgets/send_review_layout.dart';
+import '../../../core/widgets/neon_page_title.dart';
+import '../../../core/layout/app_form_factor.dart';
+import '../../../core/widgets/mobile/neon_glyph_badge.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
+import '../../../core/widgets/neon_option_panel.dart';
 
 enum DonationAmountMode { zec, usd }
 
@@ -62,12 +67,9 @@ class DonationComposeView extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
+                  NeonPageTitle(
                     context.l10n.commonSupportVizor,
                     textAlign: TextAlign.center,
-                    style: AppTypography.headlineLarge.copyWith(
-                      color: colors.text.accent,
-                    ),
                   ),
                   const SizedBox(height: 56),
                   _DonationAmountCard(
@@ -170,163 +172,161 @@ class _DonationAmountCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return Container(
+    // A neon glass panel, its two cut corners lit.
+    return SizedBox(
       height: 248,
-      decoration: BoxDecoration(
-        color: colors.background.ground,
-        borderRadius: BorderRadius.circular(32),
-        boxShadow: appSurfaceShadow(colors),
-      ),
-      padding: const EdgeInsets.only(
-        left: AppSpacing.sm,
-        top: AppSpacing.md,
-        right: AppSpacing.sm,
-      ),
-      child: Column(
-        children: [
-          SizedBox(
-            height: 56,
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 266,
-                  height: 28,
-                  child: Row(
-                    children: [
-                      SizedBox.square(
-                        dimension: 20,
-                        child: Center(
-                          child: AppIcon(
-                            AppIcons.donation,
-                            size: 16.5,
-                            color: colors.icon.muted,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.xxs),
-                      Expanded(
-                        child: Text(
-                          context.l10n.donationEnterAmount,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTypography.labelLarge.copyWith(
-                            color: colors.text.secondary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                SizedBox(
-                  width: 90,
-                  height: 44,
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.xxs),
+      child: NeonGlassPanel(
+        padding: const EdgeInsets.only(
+          left: AppSpacing.sm,
+          top: AppSpacing.md,
+          right: AppSpacing.sm,
+        ),
+        child: Column(
+          children: [
+            SizedBox(
+              height: 56,
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 266,
+                    height: 28,
                     child: Row(
                       children: [
-                        ClipOval(
-                          child: Image.asset(
-                            'assets/icons/desktop/network_zec.png',
-                            width: 32,
-                            height: 32,
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.xs),
-                        SizedBox(
-                          width: 42,
-                          height: 36,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              ClipRect(
-                                child: SizedBox(
-                                  height: AppSpacing.sm,
-                                  child: Text(
-                                    'ZEC', // l10n-ignore: currency code/amount format
-                                    style: AppTypography.labelLarge.copyWith(
-                                      color: colors.text.accent,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: AppSpacing.xxs),
-                              ClipRect(
-                                child: SizedBox(
-                                  height: AppSpacing.sm,
-                                  child: Text(
-                                    'Zcash', // l10n-ignore: protocol name
-                                    style: AppTypography.labelLarge.copyWith(
-                                      color: colors.text.secondary,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.s),
-          SizedBox(
-            height: 132,
-            child: Column(
-              children: [
-                const SizedBox(height: AppSpacing.sm),
-                _DonationAmountEditor(
-                  controller: controller,
-                  isUsd: isUsd,
-                  hasError: errorText != null,
-                  onChanged: onChanged,
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                GestureDetector(
-                  onTap: onToggleMode,
-                  child: SizedBox(
-                    height: 20,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AppIcon(
-                          AppIcons.doubleArrowVertical,
-                          size: 20,
-                          color: colors.icon.muted,
-                        ),
-                        const SizedBox(width: AppSpacing.xxs),
-                        Text(
-                          conversionText,
-                          style: AppTypography.labelLarge.copyWith(
-                            color: colors.text.secondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  height: AppSpacing.sm,
-                  child: errorText == null
-                      ? null
-                      : Center(
-                          child: Text(
-                            errorText!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTypography.labelMedium.copyWith(
-                              color: colors.text.destructive,
+                        SizedBox.square(
+                          dimension: 20,
+                          child: Center(
+                            child: AppIcon(
+                              AppIcons.donation,
+                              size: 16.5,
+                              color: colors.icon.muted,
                             ),
                           ),
                         ),
-                ),
-              ],
+                        const SizedBox(width: AppSpacing.xxs),
+                        Expanded(
+                          child: Text(
+                            context.l10n.donationEnterAmount,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.labelLarge.copyWith(
+                              color: colors.text.secondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  SizedBox(
+                    width: 90,
+                    height: 44,
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.xxs),
+                      child: Row(
+                        children: [
+                          ClipOval(
+                            child: Image.asset(
+                              'assets/icons/desktop/network_zec.png',
+                              width: 32,
+                              height: 32,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.xs),
+                          SizedBox(
+                            width: 42,
+                            height: 36,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                ClipRect(
+                                  child: SizedBox(
+                                    height: AppSpacing.sm,
+                                    child: Text(
+                                      'ZEC', // l10n-ignore: currency code/amount format
+                                      style: AppTypography.labelLarge.copyWith(
+                                        color: colors.text.accent,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: AppSpacing.xxs),
+                                ClipRect(
+                                  child: SizedBox(
+                                    height: AppSpacing.sm,
+                                    child: Text(
+                                      'Zcash', // l10n-ignore: protocol name
+                                      style: AppTypography.labelLarge.copyWith(
+                                        color: colors.text.secondary,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: AppSpacing.s),
+            SizedBox(
+              height: 132,
+              child: Column(
+                children: [
+                  const SizedBox(height: AppSpacing.sm),
+                  _DonationAmountEditor(
+                    controller: controller,
+                    isUsd: isUsd,
+                    hasError: errorText != null,
+                    onChanged: onChanged,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  GestureDetector(
+                    onTap: onToggleMode,
+                    child: SizedBox(
+                      height: 20,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AppIcon(
+                            AppIcons.doubleArrowVertical,
+                            size: 20,
+                            color: colors.icon.muted,
+                          ),
+                          const SizedBox(width: AppSpacing.xxs),
+                          Text(
+                            conversionText,
+                            style: AppTypography.labelLarge.copyWith(
+                              color: colors.text.secondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    height: AppSpacing.sm,
+                    child: errorText == null
+                        ? null
+                        : Center(
+                            child: Text(
+                              errorText!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTypography.labelMedium.copyWith(
+                                color: colors.text.destructive,
+                              ),
+                            ),
+                          ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -463,21 +463,14 @@ class _DonationPreset extends StatelessWidget {
     final colors = context.colors;
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        width: 90,
-        height: 40,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: colors.background.ground,
-          border: selected
-              ? Border.all(color: colors.border.strong, width: 2)
-              : null,
-          borderRadius: BorderRadius.circular(AppRadii.medium),
-          boxShadow: appSurfaceShadow(colors),
-        ),
-        child: Text(
-          label,
-          style: AppTypography.labelLarge.copyWith(color: colors.text.accent),
+      child: NeonOptionPanel(
+        selected: selected,
+        constraints: const BoxConstraints.tightFor(width: 90, height: 40),
+        child: Center(
+          child: Text(
+            label,
+            style: AppTypography.labelLarge.copyWith(color: colors.text.accent),
+          ),
         ),
       ),
     );
@@ -490,6 +483,10 @@ class DonationVizorBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Desktop's badge is a lit glyph plate; the phones keep the painted one.
+    if (kAppFormFactor == AppFormFactor.desktop) {
+      return NeonGlyphBadge(iconName: AppIcons.donation, size: size);
+    }
     return SizedBox.square(
       dimension: size,
       child: Image.asset(
@@ -593,34 +590,6 @@ class DonationReviewContentView extends StatelessWidget {
   }
 }
 
-class DonationSuccessBackground extends StatelessWidget {
-  const DonationSuccessBackground({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.topCenter,
-      child: SizedBox(
-        width: double.infinity,
-        height: 520,
-        child: ShaderMask(
-          shaderCallback: (bounds) => const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0x26000000), Color(0x00000000)],
-            stops: [.27, 1],
-          ).createShader(bounds),
-          blendMode: BlendMode.dstIn,
-          child: Image.asset(
-            'assets/illustrations/desktop/donation_success_background.webp',
-            fit: BoxFit.cover,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class DonationSuccessView extends StatelessWidget {
   const DonationSuccessView({required this.onDone, super.key});
   final VoidCallback onDone;
@@ -638,12 +607,9 @@ class DonationSuccessView extends StatelessWidget {
             const SizedBox(height: AppSpacing.s),
             SizedBox(
               width: 302,
-              child: Text(
+              child: NeonPageTitle(
                 context.l10n.donationThanksTitle,
                 textAlign: TextAlign.center,
-                style: AppTypography.displayLarge.copyWith(
-                  color: colors.text.accent,
-                ),
               ),
             ),
             const SizedBox(height: AppSpacing.s),
@@ -678,6 +644,10 @@ class DonationHeartBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Desktop's badge is a lit glyph plate; the phones keep the painted one.
+    if (kAppFormFactor == AppFormFactor.desktop) {
+      return NeonGlyphBadge(iconName: AppIcons.donation, size: size);
+    }
     return SizedBox.square(
       dimension: size,
       child: Image.asset(

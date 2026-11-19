@@ -595,7 +595,7 @@ void main() {
         find.byKey(const ValueKey('pay_wizard_step_icon_1')),
       );
       expect(
-        (activeIcon.decoration! as BoxDecoration).color,
+        (activeIcon.decoration! as ShapeDecoration).color,
         AppThemeData.light.colors.background.raised,
       );
 

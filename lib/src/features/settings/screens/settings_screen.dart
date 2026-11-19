@@ -49,6 +49,7 @@ import '../widgets/settings_new_badge.dart';
 import '../widgets/settings_sub_option.dart';
 import '../widgets/settings_option_card.dart';
 import '../widgets/windows_update_download_flow.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 const _settingsRowActivationShortcuts = <ShortcutActivator, Intent>{
   SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
@@ -461,8 +462,6 @@ class _SettingsPane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
-
     return Align(
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
@@ -474,12 +473,9 @@ class _SettingsPane extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: AppSpacing.sm),
-              Text(
+              NeonPageTitle(
                 context.l10n.navSettings,
                 textAlign: TextAlign.center,
-                style: AppTypography.headlineLarge.copyWith(
-                  color: colors.text.accent,
-                ),
               ),
               const SizedBox(height: AppSpacing.base),
               _SettingsList(
@@ -859,7 +855,7 @@ class _ThemeModalState extends State<_ThemeModal> {
             overflow: TextOverflow.ellipsis,
             style: AppTypography.bodyLarge.copyWith(
               color: context.colors.text.accent,
-              fontWeight: FontWeight.w600,
+              fontWeight: AppFontWeight.heading,
             ),
           ),
           const SizedBox(height: AppSpacing.md),
@@ -927,7 +923,7 @@ class _WindowsUpdateModal extends ConsumerWidget {
             overflow: TextOverflow.ellipsis,
             style: AppTypography.bodyLarge.copyWith(
               color: context.colors.text.accent,
-              fontWeight: FontWeight.w600,
+              fontWeight: AppFontWeight.heading,
             ),
           ),
           const SizedBox(height: AppSpacing.md),

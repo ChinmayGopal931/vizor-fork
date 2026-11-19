@@ -18,6 +18,9 @@ import '../../../providers/rpc_endpoint_failover_provider.dart';
 import '../../../providers/rpc_endpoint_provider.dart';
 import '../../../providers/sync_provider.dart';
 import '../widgets/automatic_endpoint_detail.dart';
+import '../../../core/widgets/neon_page_title.dart';
+import '../../../core/widgets/neon_option_panel.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
 
 class SettingsEndpointScreen extends ConsumerStatefulWidget {
   const SettingsEndpointScreen({super.key});
@@ -241,7 +244,6 @@ class _SettingsEndpointPaneState extends State<_SettingsEndpointPane> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
     final showFloatingBar =
         widget.activeTab == _EndpointTab.list &&
         (widget.canUpdate || widget.isSubmitting || widget.submitError != null);
@@ -274,12 +276,9 @@ class _SettingsEndpointPaneState extends State<_SettingsEndpointPane> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
+                  NeonPageTitle(
                     context.l10n.settingsEndpointTitle,
                     textAlign: TextAlign.center,
-                    style: AppTypography.headlineLarge.copyWith(
-                      color: colors.text.accent,
-                    ),
                   ),
                   if (!isAutomaticRpcEndpointConfig(widget.current) ||
                       widget.activeTab == _EndpointTab.custom) ...[
@@ -540,7 +539,7 @@ class _PresetRegionSegment extends StatelessWidget {
             label,
             style: AppTypography.labelMedium.copyWith(
               color: context.colors.text.secondary,
-              fontWeight: FontWeight.w400,
+              fontWeight: AppFontWeight.regular,
             ),
           ),
         ),
@@ -601,7 +600,11 @@ class _PresetCard extends StatelessWidget {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        child: Container(
+        // A neon option panel; the current and the chosen endpoint stroke
+        // its outline.
+        child: NeonOptionPanel(
+          selected: bordered,
+          selectedColor: borderColor,
           constraints: const BoxConstraints(minHeight: 40),
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.xs,
@@ -609,23 +612,6 @@ class _PresetCard extends StatelessWidget {
             AppSpacing.s,
             AppSpacing.xxs,
           ),
-          decoration: BoxDecoration(
-            color: colors.background.ground,
-            borderRadius: BorderRadius.circular(AppRadii.medium),
-            boxShadow: bordered
-                ? _selectedPresetCardShadow(colors)
-                : _presetCardShadow(colors),
-          ),
-          foregroundDecoration: bordered
-              ? BoxDecoration(
-                  borderRadius: BorderRadius.circular(AppRadii.medium),
-                  border: Border.all(
-                    color: borderColor,
-                    width: 2,
-                    strokeAlign: BorderSide.strokeAlignInside,
-                  ),
-                )
-              : null,
           child: Row(
             children: [
               Expanded(
@@ -643,8 +629,8 @@ class _PresetCard extends StatelessWidget {
                         style: AppTypography.labelMedium.copyWith(
                           color: colors.text.accent,
                           fontWeight: isCurrent
-                              ? FontWeight.w600
-                              : FontWeight.w500,
+                              ? AppFontWeight.semiBold
+                              : AppFontWeight.medium,
                         ),
                       ),
                       if (detailLabel != null) ...[
@@ -657,7 +643,7 @@ class _PresetCard extends StatelessWidget {
                             color: isCurrent
                                 ? colors.text.accent
                                 : colors.text.secondary,
-                            fontWeight: FontWeight.w400,
+                            fontWeight: AppFontWeight.regular,
                           ),
                         ),
                       ],
@@ -674,40 +660,6 @@ class _PresetCard extends StatelessWidget {
   }
 }
 
-List<BoxShadow> _presetCardShadow(AppColors colors) {
-  return [
-    BoxShadow(color: colors.shadows.subtle, blurRadius: 0.5),
-    BoxShadow(
-      color: colors.shadows.subtle,
-      offset: const Offset(0, 2),
-      blurRadius: 2,
-    ),
-    BoxShadow(
-      color: colors.shadows.subtle,
-      offset: const Offset(0, 1),
-      blurRadius: 1,
-    ),
-    BoxShadow(color: colors.shadows.subtle, blurRadius: 0.5),
-  ];
-}
-
-List<BoxShadow> _selectedPresetCardShadow(AppColors colors) {
-  return [
-    BoxShadow(color: colors.shadows.subtle, blurRadius: 1),
-    BoxShadow(
-      color: colors.shadows.subtle,
-      offset: const Offset(0, 2),
-      blurRadius: 4,
-    ),
-    BoxShadow(
-      color: colors.shadows.subtle,
-      offset: const Offset(0, 1),
-      blurRadius: 2,
-    ),
-    BoxShadow(color: colors.shadows.subtle, blurRadius: 1),
-  ];
-}
-
 class _PresetIndicator extends StatelessWidget {
   const _PresetIndicator({required this.isCurrent});
 
@@ -715,27 +667,7 @@ class _PresetIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
-
-    return Container(
-      width: 16,
-      height: 16,
-      decoration: BoxDecoration(
-        color: isCurrent
-            ? colors.background.inverse
-            : colors.background.neutralSubtleOpacity,
-        shape: BoxShape.circle,
-      ),
-      child: isCurrent
-          ? Center(
-              child: AppIcon(
-                AppIcons.check,
-                size: 12,
-                color: colors.background.ground,
-              ),
-            )
-          : null,
-    );
+    return NeonOptionCheck(selected: isCurrent);
   }
 }
 
@@ -862,14 +794,6 @@ class _CustomEndpointHeroCard extends StatelessWidget {
 
   static const _height = 200.0;
 
-  // Figma: 1.5px rgba(255,255,255,0.07) in both modes — no semantic token.
-  static const _borderColor = Color(0x12FFFFFF);
-
-  // Export of Figma node 4083:457542 with the design's 30% art opacity and
-  // the bottom gradient to #1B1F1F baked in — drawn as-is, no code overlay.
-  static const _backgroundAsset =
-      'assets/illustrations/endpoint_custom_bg.webp';
-
   final TextEditingController controller;
   final String? messageText;
   final ValueChanged<String> onChanged;
@@ -879,61 +803,52 @@ class _CustomEndpointHeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    return Container(
+    // A neon glass panel on the black, with no painted art behind it.
+    return SizedBox(
       height: _height,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: colors.background.homeCard,
-        borderRadius: BorderRadius.circular(AppRadii.large),
-        border: Border.all(color: _borderColor, width: 1.5),
-      ),
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: Image.asset(
-              _backgroundAsset,
-              fit: BoxFit.cover,
-              alignment: Alignment.bottomCenter,
-            ),
-          ),
-          Positioned(
-            top: AppSpacing.sm,
-            right: AppSpacing.sm,
-            child: AppIcon(
-              AppIcons.endpoint,
-              size: 32,
-              color: colors.text.homeCard.withValues(alpha: 0.5),
-            ),
-          ),
-          Positioned.fill(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.sm,
-                AppSpacing.sm,
-                AppSpacing.sm,
-                AppSpacing.xs,
+      child: NeonGlassPanel(
+        fill: colors.background.homeCard,
+        child: Stack(
+          children: [
+            Positioned(
+              top: AppSpacing.sm,
+              right: AppSpacing.sm,
+              child: AppIcon(
+                AppIcons.endpoint,
+                size: 32,
+                color: colors.text.homeCard.withValues(alpha: 0.5),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    context.l10n.endpointCustom,
-                    style: AppTypography.headlineLarge.copyWith(
-                      color: colors.text.homeCard,
+            ),
+            Positioned.fill(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.sm,
+                  AppSpacing.sm,
+                  AppSpacing.sm,
+                  AppSpacing.xs,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      context.l10n.endpointCustom,
+                      style: AppTypography.headlineLarge.copyWith(
+                        color: colors.text.homeCard,
+                      ),
                     ),
-                  ),
-                  const Spacer(),
-                  _CustomEndpointField(
-                    controller: controller,
-                    messageText: messageText,
-                    onChanged: onChanged,
-                    onSubmit: onSubmit,
-                  ),
-                ],
+                    const Spacer(),
+                    _CustomEndpointField(
+                      controller: controller,
+                      messageText: messageText,
+                      onChanged: onChanged,
+                      onSubmit: onSubmit,
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -966,7 +881,7 @@ class _CustomEndpointField extends StatelessWidget {
         showLabel: false,
         hintText: '<hostname>:<port>', // l10n-ignore: address format hint
         hintStyle: AppTypography.labelMedium.copyWith(
-          fontWeight: FontWeight.w400,
+          fontWeight: AppFontWeight.regular,
           color: colors.text.muted,
         ),
         controller: controller,

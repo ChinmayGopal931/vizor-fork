@@ -8,6 +8,8 @@ import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../../../core/widgets/comma_to_dot_input_formatter.dart';
 import '../../../core/widgets/decimal_amount_input_formatter.dart';
+import '../../../core/widgets/neon_glass_panel.dart';
+import '../../../core/widgets/neon_page_title.dart';
 
 /// Recipient address type used to choose the leading icon.
 ///
@@ -130,7 +132,6 @@ class SendComposeView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
     final amountErrorText =
         amountError != null && amountError!.trim().isNotEmpty
         ? amountError
@@ -182,15 +183,12 @@ class SendComposeView extends StatelessWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
+                      NeonPageTitle(
                         title ??
                             context.l10n.sendTitle(
                               'ZEC', // l10n-ignore: currency ticker
                             ), // l10n-ignore: currency ticker
                         textAlign: TextAlign.center,
-                        style: AppTypography.headlineLarge.copyWith(
-                          color: colors.text.accent,
-                        ),
                       ),
                       const SizedBox(height: _sectionGap),
                       SizedBox(
@@ -542,7 +540,7 @@ class _AmountConversionRow extends StatelessWidget {
                   r'$',
                   style: AppTypography.labelLarge.copyWith(
                     color: colors.text.muted,
-                    fontWeight: FontWeight.w400,
+                    fontWeight: AppFontWeight.regular,
                   ),
                 ),
                 const SizedBox(width: AppSpacing.xxs),
@@ -555,7 +553,7 @@ class _AmountConversionRow extends StatelessWidget {
                   key: const ValueKey('send_amount_conversion_text'),
                   style: AppTypography.labelLarge.copyWith(
                     color: enabled ? colors.text.muted : colors.text.disabled,
-                    fontWeight: FontWeight.w400,
+                    fontWeight: AppFontWeight.regular,
                   ),
                 ),
             ],
@@ -577,43 +575,43 @@ class _SendAddMemoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final card = Container(
+    // A neon glass panel on the input surface, its two cut corners lit.
+    final card = SizedBox(
       key: const ValueKey('send_add_memo_card'),
       width: double.infinity,
       height: 128,
-      decoration: BoxDecoration(
-        color: colors.surface.input.primary,
-        borderRadius: BorderRadius.circular(AppRadii.medium),
-        boxShadow: _sendInputSurfaceShadow(colors),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AppIcon(AppIcons.scroll, size: 16, color: colors.icon.accent),
-              const SizedBox(width: AppSpacing.xxs),
-              Text(
-                context.l10n.sendAddMemo,
-                style: AppTypography.labelLarge.copyWith(
-                  fontWeight: FontWeight.w400,
-                  color: colors.text.accent,
+      child: NeonGlassPanel(
+        cut: AppChamfer.medium,
+        fill: colors.surface.input.primary,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AppIcon(AppIcons.scroll, size: 16, color: colors.icon.accent),
+                const SizedBox(width: AppSpacing.xxs),
+                Text(
+                  context.l10n.sendAddMemo,
+                  style: AppTypography.labelLarge.copyWith(
+                    fontWeight: AppFontWeight.regular,
+                    color: colors.text.accent,
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            context.l10n.sendMemoEncryptedHint,
-            textAlign: TextAlign.center,
-            style: AppTypography.labelLarge.copyWith(
-              fontWeight: FontWeight.w400,
-              color: colors.text.muted,
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              context.l10n.sendMemoEncryptedHint,
+              textAlign: TextAlign.center,
+              style: AppTypography.labelLarge.copyWith(
+                fontWeight: AppFontWeight.regular,
+                color: colors.text.muted,
+              ),
+            ),
+          ],
+        ),
       ),
     );
 
@@ -627,21 +625,4 @@ class _SendAddMemoCard extends StatelessWidget {
       ),
     );
   }
-}
-
-List<BoxShadow> _sendInputSurfaceShadow(AppColors colors) {
-  return [
-    BoxShadow(color: colors.shadows.subtle, blurRadius: 1),
-    BoxShadow(
-      color: colors.shadows.subtle,
-      offset: const Offset(0, 2),
-      blurRadius: 4,
-    ),
-    BoxShadow(
-      color: colors.shadows.subtle,
-      offset: const Offset(0, 1),
-      blurRadius: 2,
-    ),
-    BoxShadow(color: colors.shadows.subtle, blurRadius: 1),
-  ];
 }

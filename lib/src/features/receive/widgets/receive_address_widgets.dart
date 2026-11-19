@@ -40,7 +40,7 @@ class ReceiveTabs extends StatelessWidget {
     this.iconSize = AppIconSize.medium,
     this.iconGap = AppSpacing.xxs,
     this.labelStyle,
-    this.labelFontWeight = FontWeight.w400,
+    this.labelFontWeight = AppSharedFontWeight.regular,
     this.alwaysDarkSelected = false,
     this.position,
     super.key,
@@ -209,6 +209,19 @@ class ReceiveQrSurface extends StatelessWidget {
                 cut: AppChamfer.large,
                 side: BorderSide(color: colors.border.inverseOpacity),
               ),
+            )
+          // Desktop's decorative plate is itself the lit frame: cut at the
+          // corners, with a red edge and its glow.
+          : !_mobile && !scanOptimized
+          ? ShapeDecoration(
+              color: qrBackground,
+              shape: Neon.chamferBorder(
+                cut: AppChamfer.large,
+                side: BorderSide(
+                  color: colors.neon.glow.withValues(alpha: 0.55),
+                ),
+              ),
+              shadows: Neon.boxGlow(colors.neon.glow, intensity: 0.3),
             )
           : BoxDecoration(
               color: qrBackground,
