@@ -2508,7 +2508,7 @@ the Mac's, answer `unavailable`), Dart `services/private_usd_tokens_service.dart
   SDK's rescan still calls it). Each names the exact source of the pinned
   engine and fails the build against any other: re-check them when
   bumping it.
-- **Anon's archive** (Android, mainnet, Settings, on by default;
+- **Anon's archive** (Android and the Mac, mainnet, Settings, on by default;
   `archive*.js`):
   - It gives commitments and the transaction list only. Unshields and
     nullifiers come from rail-squid: the archive drops a nullifier spent
@@ -2573,8 +2573,14 @@ the Mac's, answer `unavailable`), Dart `services/private_usd_tokens_service.dart
     the archive.
   - Android's host fetches the archive for the page through the page's
     bridge (`RailgunArchiveFetch`: 16 MB and a minute an answer at most, a
-    fixed User-Agent); iOS starts the page without it. Every archive request
-    depends on the chain's state alone.
+    fixed User-Agent), and so does the Mac's (`RailgunArchive.swift`, the
+    same limits and User-Agent): WebKit can't intercept `https`, so before a
+    `start` that reads the archive the Mac runs a fixed prelude in the page,
+    which sends archive GETs to the page's own origin (`/anon-archive/`,
+    answered through the bridge) and hides the WebKit host from the start's
+    archive check (the page reads the archive only where it finds none; its
+    transport took the host at load). iOS starts the page without it. Every
+    archive request depends on the chain's state alone.
 
 **Network: Tor and the Railgun page.**
 

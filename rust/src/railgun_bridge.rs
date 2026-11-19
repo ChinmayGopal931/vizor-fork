@@ -870,9 +870,11 @@ mod tests {
 
     /// The archive the page reads Railgun's history from is one place in the
     /// page (`ARCHIVES`); the host Kotlin fetches it from for the page, and
-    /// lets through, must be that one's, and one the bridge allows.
+    /// lets through, must be that one's, and one the bridge allows. So must
+    /// the Mac's (`RailgunArchive.host`), which fetches it through the bridge
+    /// too.
     #[test]
-    fn the_page_archive_is_the_host_kotlin_fetches_and_the_bridge_allows() {
+    fn the_page_archive_is_the_host_kotlin_and_the_mac_fetch_and_the_bridge_allows() {
         let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let read = |path: &str| {
             std::fs::read_to_string(repo.join(path))
@@ -890,6 +892,12 @@ mod tests {
             .split("const val ARCHIVE_HOST = \"")
             .nth(1)
             .expect("`ARCHIVE_HOST` in RailgunEndpoints.kt");
+        assert_eq!(&constant[..constant.find('"').unwrap()], archive_host);
+        let mac = read("macos/Runner/Railgun/RailgunArchive.swift");
+        let constant = mac
+            .split("static let host = \"")
+            .nth(1)
+            .expect("`static let host` in RailgunArchive.swift");
         assert_eq!(&constant[..constant.find('"').unwrap()], archive_host);
         assert!(RAILGUN_PAGE_HOSTS.contains(&archive_host), "{archive_host}");
     }

@@ -43,6 +43,8 @@ import '../widgets/network_privacy_control.dart';
 import '../widgets/hide_balance_on_unlock_control.dart';
 import '../widgets/portfolio_chart_settings_control.dart';
 import '../widgets/private_usd_settings_control.dart';
+import '../../private_usd/providers/private_usd_archive_sync_provider.dart'
+    show privateUsdArchiveAvailableProvider;
 import '../../private_usd/providers/private_usd_custom_rpc_provider.dart';
 import '../../private_usd/widgets/desktop/desktop_private_usd_rpc_dialog.dart';
 import '../../../app_bootstrap.dart';
@@ -587,6 +589,9 @@ class _SettingsList extends ConsumerWidget {
     // As the phone's Settings shows its Ethereum RPC and relayer claims rows:
     // while Shielded USD is available, or a URL of the user's own is set.
     final showPrivateUsd = ref.watch(privateUsdRpcSettingVisibleProvider);
+    // As the phone's archive row: where the Mac's host fetches the archive.
+    final showArchiveSync =
+        showPrivateUsd && ref.watch(privateUsdArchiveAvailableProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -703,9 +708,10 @@ class _SettingsList extends ConsumerWidget {
           _SettingsBlock(
             key: const ValueKey('settings_private_usd_block'),
             title: context.l10n.privateUsdTitle,
-            rows: const [
-              _PrivateUsdEthereumRpcRow(),
-              PrivateUsdRelayerClaimsControl(),
+            rows: [
+              const _PrivateUsdEthereumRpcRow(),
+              const PrivateUsdRelayerClaimsControl(),
+              if (showArchiveSync) const PrivateUsdArchiveSyncControl(),
             ],
           ),
         ],

@@ -41,11 +41,11 @@ for code (`com.zcash.wallet/railgun` and `/events`: `supported`, `load`,
 - Registration: `MainFlutterWindow.registerPrivateUsdChannels`, in
   `awakeFromNib`, before Dart's bootstrap asks `supported`.
 
-**Around the host, as on iOS:** the page starts without Anon's archive
-(`privateUsdArchiveAvailableProvider` is Android only); a reset wipes the page's
-data store and an account deletion deletes its Railgun wallet through a page
-behind an offline bridge (both shared Dart); a route change, a lock, an account
-switch and the idle close close the page and stop the bridge (shared Dart).
+**Around the host, as on iOS:** a reset wipes the page's data store and an
+account deletion deletes its Railgun wallet through a page behind an offline
+bridge (both shared Dart); a route change, a lock, an account switch and the
+idle close close the page and stop the bridge (shared Dart). Unlike iOS, the
+page can read Anon's archive ("Anon's archive on the Mac" below).
 
 **The gates** (`private_usd_feature_config.dart`,
 `private_usd_available_provider.dart`):
@@ -121,8 +121,64 @@ the phone's widgets and painters where they fit.
   sync and its line would stand at 0% until then.
 - Settings: a Shielded USD block, shown when the phone shows its rows
   (`privateUsdRpcSettingVisibleProvider`): Ethereum RPC, whose dialog checks a
-  URL as the phone's sheet does before saving it, and the relayer claims switch.
-  Anon's archive is Android only and is not offered.
+  URL as the phone's sheet does before saving it, the relayer claims switch,
+  and on mainnet "Sync history from Anon's archive" (below).
+
+## Anon's archive on the Mac (2026-11-19)
+
+Railgun's sync reads history from Anon's archive before rail-squid, as on
+Android: mainnet only, behind Settings' "Sync history from Anon's archive"
+(`privateUsdArchiveSyncProvider`, on by default, the phone's setting and
+storage), which `privateUsdArchiveAvailableProvider` offers on the Mac wherever
+its host runs the page (macOS 14 and later). iOS still starts the page without
+it. The page and its rules are Android's, unchanged (AGENTS.md, "Anon's
+archive"); only the host is new (`macos/Runner/Railgun/RailgunArchive.swift`).
+
+- **Why the host fetches it.** The archive sends no CORS headers, so the page
+  can't read it, and WebKit can't intercept `https` as Android's
+  `shouldInterceptRequest` does. The page's bundle can't change (the Mac uses
+  iOS's copy), and the page reads the archive only where it finds no WebKit
+  host (`webkit.messageHandlers.railgunHost`).
+- **The prelude.** Before a `start` whose params ask for the archive, the Mac
+  runs `RailgunArchive.prelude` in the page's world (`callAsyncJavaScript`, a
+  constant script; nothing spliced in). It routes the page's archive GETs
+  (`https://digest.anon.inc/…`) to `/anon-archive/…` on the page's own origin,
+  where CSP's `'self'` and the content rules let them through, and hides the
+  WebKit host from what the page reads later, so its start reads the archive
+  as Android's does. The page's transport took the host when it loaded and
+  stays as it was. A prelude that does not take leaves the page as on iOS:
+  rail-squid alone. It runs on every page that starts with the archive, and
+  is idempotent.
+- **The fetch.** `RailgunPageSchemeHandler` answers `/anon-archive/` (iOS's
+  `RailgunSchemeHandler` the rest), only once the prelude took: the same path
+  and query on `https://digest.anon.inc`, GET only, through a `URLSession`
+  whose only route is the page's bridge (`ProxyConfiguration`, SOCKS5 at
+  `127.0.0.1:<bridge port>`, no failover), so the bridge resolves the name on
+  the wallet's route (over Tor when Tor is on) and checks it against its
+  allowlist, never directly. Android's limits: 16 MB an answer (declared or
+  read), a minute an answer, a 20 s stall, no redirect followed, no cache,
+  cookie or credential store, `Accept-Encoding: identity` (the files are
+  checked against the archive's checksums as served) and `User-Agent:
+  Mozilla/5.0`. A failure is a 502, which the page retries and then leaves for
+  rail-squid; a page that aborts a request cancels its fetch. The session goes
+  with its page: a route change, a lock or an account switch closes both.
+- **The pins.** `RailgunArchive.host` is read by the Rust test that pins the
+  page's `ARCHIVES` host to Kotlin's `ARCHIVE_HOST` and the bridge's
+  allowlist (`railgun_bridge.rs`); the host was already in every allowlist and
+  the page's CSP.
+- **Not run yet.** Only `swiftc -typecheck` and the Dart and Rust tests ran.
+  To try it: a mainnet build with `VIZOR_PRIVATE_USD_ENABLED=true` (and the
+  keyed RPC JSON, as for Android), then a Railgun first sync of a wallet far
+  behind; sync only, nothing is spent. The archive is read only by a sync that
+  starts more than four days behind the newest block, so a wallet synced
+  lately won't ask it. Like Android's host, the Mac logs nothing of it: a
+  first sync that reads it is far quicker than rail-squid's, and in a debug
+  build a page loaded with `debug` is inspectable, where Safari's Web
+  Inspector lists the `/anon-archive/` requests. Unchecked on a Mac: that
+  WebKit lets the page's `webkit` global be redefined (if not, the prelude
+  says so and the page syncs from rail-squid, as before), and that
+  `URLSession` hands the bridge the hostname, as WebKit's own requests do (the
+  bridge refuses an IP address, so a fetch would fail, never go around it).
 
 ## Foreground and keep-awake on the Mac
 

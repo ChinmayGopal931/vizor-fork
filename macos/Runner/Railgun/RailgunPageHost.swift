@@ -85,6 +85,7 @@ final class RailgunPageHost {
 
     let page = RailgunPage(
       store: store,
+      bridgePort: port,
       rules: rules,
       debug: debug,
       onEvent: { [weak self] rawJSON in self?.emit(rawJSON) },

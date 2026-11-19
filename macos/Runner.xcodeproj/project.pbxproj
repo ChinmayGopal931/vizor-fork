@@ -29,6 +29,7 @@
 		RAILGUNMAC01000000000006 /* RailgunProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNMAC00000000000006 /* RailgunProtocol.swift */; };
 		RAILGUNMAC01000000000007 /* RailgunEndpoints.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNMAC00000000000007 /* RailgunEndpoints.swift */; };
 		RAILGUNMAC01000000000008 /* RailgunError.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNMAC00000000000008 /* RailgunError.swift */; };
+		RAILGUNMAC01000000000014 /* RailgunArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNMAC00000000000014 /* RailgunArchive.swift */; };
 		RAILGUNMAC01000000000009 /* railgun in Resources */ = {isa = PBXBuildFile; fileRef = RAILGUNMAC00000000000009 /* railgun */; };
 		RAILGUNMAC01000000000010 /* PrivateUsdAttestationHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNMAC00000000000010 /* PrivateUsdAttestationHandler.swift */; };
 		RAILGUNMAC01000000000011 /* ScreenAwakeChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNMAC00000000000011 /* ScreenAwakeChannel.swift */; };
@@ -91,6 +92,7 @@
 		RAILGUNMAC00000000000006 /* RailgunProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RailgunProtocol.swift; path = ../../../ios/Runner/Railgun/RailgunProtocol.swift; sourceTree = "<group>"; };
 		RAILGUNMAC00000000000007 /* RailgunEndpoints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RailgunEndpoints.swift; path = ../../../ios/Runner/Railgun/RailgunEndpoints.swift; sourceTree = "<group>"; };
 		RAILGUNMAC00000000000008 /* RailgunError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RailgunError.swift; sourceTree = "<group>"; };
+		RAILGUNMAC00000000000014 /* RailgunArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RailgunArchive.swift; sourceTree = "<group>"; };
 		RAILGUNMAC00000000000009 /* railgun */ = {isa = PBXFileReference; lastKnownFileType = folder; name = railgun; path = ../../../ios/Runner/Railgun/railgun; sourceTree = "<group>"; };
 		RAILGUNMAC00000000000010 /* PrivateUsdAttestationHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateUsdAttestationHandler.swift; sourceTree = "<group>"; };
 		RAILGUNMAC00000000000011 /* ScreenAwakeChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenAwakeChannel.swift; sourceTree = "<group>"; };
@@ -242,6 +244,7 @@
 				RAILGUNMAC00000000000006 /* RailgunProtocol.swift */,
 				RAILGUNMAC00000000000007 /* RailgunEndpoints.swift */,
 				RAILGUNMAC00000000000008 /* RailgunError.swift */,
+				RAILGUNMAC00000000000014 /* RailgunArchive.swift */,
 				RAILGUNMAC00000000000009 /* railgun */,
 			);
 			path = Railgun;
@@ -534,6 +537,7 @@
 				RAILGUNMAC01000000000006 /* RailgunProtocol.swift in Sources */,
 				RAILGUNMAC01000000000007 /* RailgunEndpoints.swift in Sources */,
 				RAILGUNMAC01000000000008 /* RailgunError.swift in Sources */,
+				RAILGUNMAC01000000000014 /* RailgunArchive.swift in Sources */,
 				RAILGUNMAC01000000000010 /* PrivateUsdAttestationHandler.swift in Sources */,
 				RAILGUNMAC01000000000011 /* ScreenAwakeChannel.swift in Sources */,
 				RAILGUNMAC01000000000012 /* MacSessionLifecycle.swift in Sources */,
