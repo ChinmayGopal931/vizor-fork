@@ -2234,10 +2234,11 @@ Code:
   assertion (`ScreenAwakeChannel`), which desktop's
   `SyncKeepAwakeNativeHost` takes only for Private USD (a Railgun first sync,
   or a bridge by the phone's rules) while the window is not hidden. A
-  USD → ZEC payment is proved in the page, so desktop's keep-open card
-  (`DesktopPrivateUsdKeepOpenCard`) says to keep Veylor open with its window
-  showing; a relayer-claimed ZEC → USD bridge still says the user may leave
-  once the maker confirms the deposit. The settlement reminder asks for the
+  USD → ZEC payment is proved in the page, so in place of the keep-open card
+  desktop shows one slim row (`DesktopPrivateUsdKeepVisibleRow`): "Keep Veylor
+  visible until the bridge is done.", what pauses it in the glyph's tooltip,
+  and the phone's switch as "Keep display awake"; a relayer-claimed ZEC → USD
+  bridge still says the user may leave once the maker confirms the deposit. The settlement reminder asks for the
   user's attention instead of buzzing: the haptics channel's
   `settlementDeadline` has a macOS handler (`SettlementAttentionChannel`:
   `NSApp.requestUserAttention(.criticalRequest)` and the alert sound), on the

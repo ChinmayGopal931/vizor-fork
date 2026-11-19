@@ -209,16 +209,19 @@ painters, never its screens:
 **Keep Veylor open, with its window showing.** WebKit suspends the Railgun page
 while the window is not visible, and a shielded USD → ZEC payment is proved in
 the page; a hidden window also pauses the engine (the foreground is a shown
-window). So desktop's keep-open card (`DesktopPrivateUsdKeepOpenCard`,
-`privateUsdKeepOpenBodyDesktop`) says to keep Veylor open with its window
-showing, and that a hidden or minimized window or a sleeping Mac pauses the
-bridge; the proof's note (`privateUsdReverseProvingNoteDesktop`) and the Pay
+window). So in place of the phone's keep-open card, desktop shows one slim row
+(`DesktopPrivateUsdKeepVisibleRow`, the owner's call): a display glyph whose
+tooltip says that a covered or minimised window or a sleeping Mac pauses the
+bridge (`privateUsdKeepVisibleDetailDesktop`), the line "Keep Veylor visible
+until the bridge is done." (`privateUsdKeepVisibleDesktop`), and the switch at
+its right; the proof's note (`privateUsdReverseProvingNoteDesktop`) and the Pay
 step ("Click Pay", `privateUsdReverseStepPayDetailDesktop`) say the same of the
 Mac, chosen in the shared reverse presentation behind `kDesktopFormFactor`. A
-ZEC → USD bridge the relayer is to claim shows no card: its note still says to
+ZEC → USD bridge the relayer is to claim shows no row: its note still says to
 keep Veylor open until the market maker confirms the deposit, then leave.
 
-**Keep-awake.** The card's "Keep screen on" is the phone's switch
+**Keep-awake.** The row's "Keep display awake" is the phone's "Keep screen on"
+switch
 (`privateUsdScreenMaySleepProvider`): on by default, it keeps the IOKit
 assertion through a bridge with a key step to come, whichever screen shows, by
 the phone's rules (`privateUsdBridgeKeepAwakeProvider`): never once the relayer
@@ -278,7 +281,7 @@ and the sidebar veiled only while a step runs, where the phone's wide window
 veils it through every Private USD flow); the mouse and keyboard (click cursors,
 Tab with Enter or Space, Enter sending a send's form, a paste button and no
 camera scan); the Mac's own behaviour (the IOKit assertion, the Dock bounce and
-alert sound for the settlement reminder, no haptics, the window-showing card);
+alert sound for the settlement reminder, no haptics, the keep-visible row);
 and the Mac wording.
 
 **"Preparing your receiving account".** It is the first of the reverse steps
@@ -350,7 +353,7 @@ Untested, for the owner's session (3b):
   Authorize settlement, a call-off and a refund, Refunds' Recover, and the
   relayer claims on and off.
 - The Mac during a bridge: `pmset -g assertions` while one runs and once it no
-  longer needs Veylor; "Keep screen on" off; the Dock bounce and the alert
+  longer needs Veylor; "Keep display awake" off; the Dock bounce and the alert
   sound when Authorize settlement is offered and two minutes before it closes,
   with Veylor in front and behind another app; a minimised window pausing it
   and resuming on return.

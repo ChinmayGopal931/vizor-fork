@@ -9390,6 +9390,9 @@ class AppLocalizationsKo extends AppLocalizations {
       '출‍금: 비‍공‍개 USD‍를 공‍개 Ethereum 주‍소‍로 옮‍겨‍요. 받‍는 주‍소‍와 금‍액‍이 Ethereum‍에 공‍개‍돼‍요.';
 
   @override
+  String get privateUsdKeepDisplayAwakeDesktop => '디‍스‍플‍레‍이 켜 두‍기';
+
+  @override
   String get privateUsdKeepOpenBody =>
       '시‍간‍이 걸‍릴 수 있‍어‍요. 완‍료‍될 때‍까‍지 Veylor‍가 열‍려 있‍고 온‍라‍인 상‍태‍여‍야 해‍요. 화‍면‍이 꺼‍지‍면 돌‍아‍올 때‍까‍지 일‍시 중‍지‍돼‍요.';
 
@@ -9402,6 +9405,14 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get privateUsdKeepScreenOn => '화‍면 켜 두‍기';
+
+  @override
+  String get privateUsdKeepVisibleDesktop =>
+      '브‍리‍지‍가 끝‍날 때‍까‍지 Veylor‍를 화‍면‍에 띄‍워 두‍세‍요.';
+
+  @override
+  String get privateUsdKeepVisibleDetailDesktop =>
+      '창‍이 가‍려‍지‍거‍나 최‍소‍화‍되‍거‍나 Mac‍이 잠‍자‍기 상‍태‍가 되‍면 돌‍아‍올 때‍까‍지 브‍리‍지‍가 일‍시 중‍지‍돼‍요.';
 
   @override
   String get privateUsdLoadFailed =>

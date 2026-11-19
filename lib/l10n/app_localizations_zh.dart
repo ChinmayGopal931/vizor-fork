@@ -8828,6 +8828,9 @@ class AppLocalizationsZh extends AppLocalizations {
       '提取：将隐私 USD 转到公开的 Ethereum 地址。目标地址和金额会在 Ethereum 上公开。';
 
   @override
+  String get privateUsdKeepDisplayAwakeDesktop => '保持显示器常亮';
+
+  @override
   String get privateUsdKeepOpenBody =>
       '这可能需要一段时间。完成前，Veylor 需要保持打开并联网：如果屏幕关闭，流程会暂停，直到你回来。';
 
@@ -8840,6 +8843,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get privateUsdKeepScreenOn => '保持屏幕常亮';
+
+  @override
+  String get privateUsdKeepVisibleDesktop => '跨链完成前，请让 Veylor 保持可见。';
+
+  @override
+  String get privateUsdKeepVisibleDetailDesktop =>
+      '如果窗口被遮挡、最小化，或 Mac 进入睡眠，跨链会暂停，直到你回来。';
 
   @override
   String get privateUsdLoadFailed => '无法加载余额，请稍后重试。';

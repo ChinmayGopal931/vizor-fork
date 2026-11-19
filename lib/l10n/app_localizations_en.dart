@@ -9536,6 +9536,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Withdraw: move shielded USD to a public Ethereum address. The destination and amount are visible on Ethereum.';
 
   @override
+  String get privateUsdKeepDisplayAwakeDesktop => 'Keep display awake';
+
+  @override
   String get privateUsdKeepOpenBody =>
       'This can take a while. Veylor needs to stay open and online until it\'s done: if your screen turns off, it pauses until you\'re back.';
 
@@ -9548,6 +9551,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get privateUsdKeepScreenOn => 'Keep screen on';
+
+  @override
+  String get privateUsdKeepVisibleDesktop =>
+      'Keep Veylor visible until the bridge is done.';
+
+  @override
+  String get privateUsdKeepVisibleDetailDesktop =>
+      'If it\'s covered, minimised or your Mac sleeps, the bridge pauses until you\'re back.';
 
   @override
   String get privateUsdLoadFailed =>

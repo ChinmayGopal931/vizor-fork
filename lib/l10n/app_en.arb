@@ -12235,6 +12235,10 @@
   "@privateUsdInfoWithdraw": {
     "description": "Item in the Shielded USD info sheet explaining the Withdraw action and that it is public on Ethereum."
   },
+  "privateUsdKeepDisplayAwakeDesktop": "Keep display awake",
+  "@privateUsdKeepDisplayAwakeDesktop": {
+    "description": "Label of the switch in the Mac app's slim keep-Veylor-visible row on a bridge's progress screen: while on, the Mac's display (and so the Mac) is kept awake until the bridge no longer needs Veylor. The phone's card calls it 'Keep screen on'."
+  },
   "privateUsdKeepOpenBody": "This can take a while. Veylor needs to stay open and online until it's done: if your screen turns off, it pauses until you're back.",
   "@privateUsdKeepOpenBody": {
     "description": "Body of the 'Keep Veylor open' card on a bridge's progress screen: the bridge can take a while, Veylor must stay open and online, and it pauses if the screen turns off."
@@ -12250,6 +12254,14 @@
   "privateUsdKeepScreenOn": "Keep screen on",
   "@privateUsdKeepScreenOn": {
     "description": "Label of the switch (also its screen-reader label) in the 'Keep Veylor open' card that keeps the phone's screen on until the bridge no longer needs Veylor."
+  },
+  "privateUsdKeepVisibleDesktop": "Keep Veylor visible until the bridge is done.",
+  "@privateUsdKeepVisibleDesktop": {
+    "description": "The one line of the Mac app's slim row on a bridge's progress screen, shown while the bridge needs Veylor: its window must stay visible until the bridge ends."
+  },
+  "privateUsdKeepVisibleDetailDesktop": "If it's covered, minimised or your Mac sleeps, the bridge pauses until you're back.",
+  "@privateUsdKeepVisibleDetailDesktop": {
+    "description": "Tooltip of the glyph in the Mac app's slim keep-Veylor-visible row on a bridge's progress screen: the bridge pauses while Veylor's window is covered or minimised or the Mac sleeps, and goes on when the user is back."
   },
   "privateUsdLoadFailed": "Couldn't load the balance. Try again in a moment.",
   "@privateUsdLoadFailed": {

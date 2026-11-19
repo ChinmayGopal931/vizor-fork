@@ -15560,6 +15560,12 @@ abstract class AppLocalizations {
   /// **'Withdraw: move shielded USD to a public Ethereum address. The destination and amount are visible on Ethereum.'**
   String get privateUsdInfoWithdraw;
 
+  /// Label of the switch in the Mac app's slim keep-Veylor-visible row on a bridge's progress screen: while on, the Mac's display (and so the Mac) is kept awake until the bridge no longer needs Veylor. The phone's card calls it 'Keep screen on'.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep display awake'**
+  String get privateUsdKeepDisplayAwakeDesktop;
+
   /// Body of the 'Keep Veylor open' card on a bridge's progress screen: the bridge can take a while, Veylor must stay open and online, and it pauses if the screen turns off.
   ///
   /// In en, this message translates to:
@@ -15583,6 +15589,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Keep screen on'**
   String get privateUsdKeepScreenOn;
+
+  /// The one line of the Mac app's slim row on a bridge's progress screen, shown while the bridge needs Veylor: its window must stay visible until the bridge ends.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep Veylor visible until the bridge is done.'**
+  String get privateUsdKeepVisibleDesktop;
+
+  /// Tooltip of the glyph in the Mac app's slim keep-Veylor-visible row on a bridge's progress screen: the bridge pauses while Veylor's window is covered or minimised or the Mac sleeps, and goes on when the user is back.
+  ///
+  /// In en, this message translates to:
+  /// **'If it\'s covered, minimised or your Mac sleeps, the bridge pauses until you\'re back.'**
+  String get privateUsdKeepVisibleDetailDesktop;
 
   /// Error on the Shielded USD screen, also read by screen readers, when the balance could not be loaded at all.
   ///

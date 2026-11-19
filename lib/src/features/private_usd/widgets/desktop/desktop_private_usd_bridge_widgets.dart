@@ -5,6 +5,8 @@ import 'package:flutter/widgets.dart';
 
 import '../../../../core/l10n/l10n.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/app_icon.dart';
+import '../../../../core/widgets/app_tooltip.dart';
 import '../../../../core/widgets/mobile/neon_motion.dart';
 import '../../../../core/zcash/block_spacing.dart';
 import '../../../settings/widgets/network_privacy_control.dart'
@@ -19,7 +21,6 @@ import '../../private_usd_copy.dart';
 import '../../providers/private_usd_conversion_provider.dart';
 import '../mobile/private_usd_banner.dart';
 import '../mobile/private_usd_bridged_hero.dart';
-import '../mobile/private_usd_convert_widgets.dart';
 import '../mobile/private_usd_logo.dart';
 import '../mobile/private_usd_progress_views.dart';
 import 'desktop_private_usd_widgets.dart';
@@ -209,13 +210,15 @@ class DesktopPrivateUsdResultPanel extends StatelessWidget {
   }
 }
 
-/// While a bridge needs Veylor, on the Mac: why it has to stay open with its
-/// window showing (a hidden window pauses the bridge, and WebKit suspends the
-/// Railgun page, which proves a USD → ZEC payment), and "Keep screen on",
-/// which holds the Mac's display (and so the Mac) awake until the bridge no
-/// longer needs Veylor. The phone's card says the same of the phone's screen.
-class DesktopPrivateUsdKeepOpenCard extends StatelessWidget {
-  const DesktopPrivateUsdKeepOpenCard({
+/// While a bridge needs Veylor, on the Mac: one slim row, not the phone's
+/// card. A display glyph whose tooltip says what pauses the bridge (the window
+/// covered or minimised, or the Mac asleep: the engine pauses, and WebKit
+/// suspends the Railgun page that proves a USD → ZEC payment), the line to keep
+/// Veylor visible, and the phone's "Keep screen on" switch at the right as
+/// "Keep display awake", which holds the Mac's display (and so the Mac) awake
+/// until the bridge no longer needs Veylor. The switch's rules are the phone's.
+class DesktopPrivateUsdKeepVisibleRow extends StatelessWidget {
+  const DesktopPrivateUsdKeepVisibleRow({
     required this.keepScreenOn,
     required this.onKeepScreenOnChanged,
     super.key,
@@ -227,40 +230,56 @@ class DesktopPrivateUsdKeepOpenCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final label = context.l10n.privateUsdKeepScreenOn;
-    return DesktopPrivateUsdPanel(
+    final l10n = context.l10n;
+    final detail = l10n.privateUsdKeepVisibleDetailDesktop;
+    final awake = l10n.privateUsdKeepDisplayAwakeDesktop;
+    return Padding(
       key: const ValueKey('desktop_private_usd_progress_keep_open'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
+      child: Row(
         children: [
-          PrivateUsdPanelCaption(context.l10n.privateUsdKeepOpenTitle),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            context.l10n.privateUsdKeepOpenBodyDesktop,
-            key: const ValueKey('desktop_private_usd_keep_open_body'),
-            style: AppTypography.bodySmall.copyWith(
-              color: colors.text.secondary,
+          // The line's hint reads the detail out; the tooltip is the pointer's.
+          AppTooltip(
+            message: detail,
+            excludeFromSemantics: true,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.help,
+              child: AppIcon(
+                AppIcons.monitor,
+                key: const ValueKey('desktop_private_usd_keep_open_detail'),
+                size: 16,
+                color: colors.icon.accent,
+              ),
             ),
           ),
-          const SizedBox(height: AppSpacing.s),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  label,
-                  style: AppTypography.labelMedium.copyWith(
-                    color: colors.text.accent,
-                  ),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: Semantics(
+              hint: detail,
+              child: Text(
+                l10n.privateUsdKeepVisibleDesktop,
+                key: const ValueKey('desktop_private_usd_keep_open_body'),
+                style: AppTypography.bodySmall.copyWith(
+                  color: colors.text.secondary,
                 ),
               ),
-              const SizedBox(width: AppSpacing.sm),
-              PrivacyToggle(
-                enabled: keepScreenOn,
-                trackKey: const ValueKey('desktop_private_usd_keep_screen_on'),
-                semanticsLabel: label,
-                onToggle: () => onKeepScreenOnChanged(!keepScreenOn),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.s),
+          ExcludeSemantics(
+            child: Text(
+              awake,
+              style: AppTypography.bodySmall.copyWith(
+                color: colors.text.accent,
               ),
-            ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          PrivacyToggle(
+            enabled: keepScreenOn,
+            trackKey: const ValueKey('desktop_private_usd_keep_screen_on'),
+            semanticsLabel: awake,
+            onToggle: () => onKeepScreenOnChanged(!keepScreenOn),
           ),
         ],
       ),
@@ -270,7 +289,7 @@ class DesktopPrivateUsdKeepOpenCard extends StatelessWidget {
 
 /// A bridge's progress on desktop, both directions: the "Bridged" sign or
 /// the result, the note, the problem card, the direction's own [actions], the
-/// keep-open card (sliding in while the bridge needs Veylor), the red timeline
+/// keep-visible row (sliding in while the bridge needs Veylor), the red timeline
 /// with the bridge's details (the phone's `MobileSwapStatusContent`), and the
 /// note under it while the page proves a payment.
 class DesktopPrivateUsdProgressBody extends StatelessWidget {
@@ -363,7 +382,7 @@ class DesktopPrivateUsdProgressBody extends StatelessWidget {
           visible: showsKeepOpen,
           child: Padding(
             padding: const EdgeInsets.only(top: AppSpacing.s),
-            child: DesktopPrivateUsdKeepOpenCard(
+            child: DesktopPrivateUsdKeepVisibleRow(
               keepScreenOn: keepScreenOn,
               onKeepScreenOnChanged: onKeepScreenOnChanged ?? (_) {},
             ),
@@ -404,8 +423,8 @@ class DesktopPrivateUsdProgressBody extends StatelessWidget {
   }
 }
 
-/// The keep-open card slides in once the progress has been on screen a
-/// moment, as on the phone.
+/// The keep-visible row slides in once the progress has been on screen a
+/// moment, as the phone's card does.
 const _keepOpenDelay = Duration(milliseconds: 500);
 const _keepOpenSlide = Duration(milliseconds: 300);
 
