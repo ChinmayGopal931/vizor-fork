@@ -116,7 +116,8 @@ Untagged tests may run in either lane and must be lane-agnostic:
   `expect(style, AppTypography.bodyMedium)` passes in both lanes;
   `expect(style.fontSize, 14)` passes only in the desktop lane.
 - To pin one mode regardless of lane, reference the explicit sets:
-  `AppTypographyDesktop` / `AppTypographyMobile`,
+  `AppTypographyDesktopNeon` / `AppTypographyMobile` (what each form
+  factor draws; `AppTypographyDesktop` is upstream's Figma desktop mode),
   `AppAssetSizeDesktop` / `AppAssetSizeMobile`,
   `AppButtonSizingDesktop` / `AppButtonSizingMobile`,
   `AppInputSizingDesktop` / `AppInputSizingMobile`.
@@ -132,9 +133,11 @@ Untagged tests may run in either lane and must be lane-agnostic:
   + `*Mobile` const namespace pair plus a const selector in the
   unsuffixed class. The `Spacing`, `Units`, and `Window` groups are
   identical across Figma modes and stay single-mode (`AppSpacing`,
-  `AppWindowSizing`). `AppRadii` is per-mode only because of the neon
-  redesign (`AppRadiiDesktop` / `AppRadiiMobile`; see "Mobile neon
-  redesign").
+  `AppWindowSizing`). `AppRadii` is single-mode too: both form factors
+  draw the near-square `AppRadiiNeon`, and `AppRadiiDesktop` keeps
+  upstream's Figma scale for tooling and tests (see "Neon look").
+  Colours do not depend on the form factor either: both draw the neon
+  sets.
 - Form-factor branching in app code uses `kAppFormFactor` (const, so the
   dead branch is tree-shaken) — never `Platform.isIOS`-style checks.
   Runtime `Platform` checks remain only for OS-specific *behavior*
@@ -145,34 +148,40 @@ Untagged tests may run in either lane and must be lane-agnostic:
   `fvm flutter run -t lib/widgetbook.dart --dart-define=VIZOR_FORM_FACTOR=mobile`.
   Only `lib/main.dart` asserts the match.
 
-## Mobile neon redesign (Veylor)
+## Neon look (Veylor)
 
-The mobile form factor (iOS and Android) has its own look: true black, neon
-red, white light, Gotham Thin and Light, and 45° cuts instead of rounded
-corners, after the Tesla Roadster teaser frames, Tron and Cyberpunk 2077.
-Desktop keeps the Figma design. The owner directs it on a device rather than
-in Figma, so the Figma comparison rules above do not apply to these
-surfaces. Behaviour is unchanged unless a bullet below says otherwise.
+Veylor has a look of its own on every form factor: true black, neon red,
+white light, Gotham Thin and Light, and 45° cuts instead of rounded corners,
+after the Tesla Roadster teaser frames, Tron and Cyberpunk 2077. The phones
+(iOS and Android) came first; desktop (macOS, Linux, Windows) took the same
+look on 2026-11-18, keeping upstream's desktop layouts, screens, flows, sizes
+and keyboard handling (see "Desktop" below). The owner directs the look on a
+phone and on the Mac rather than in Figma, so the Figma comparison rules
+below do not apply to it. Behaviour is unchanged unless a bullet below says
+otherwise.
 
 - **Palette.** Every semantic colour group has four named sets: `figmaDark`
-  / `figmaLight` (desktop) and `neonDark` / `neonLight` (mobile), with
-  `dark` / `light` selecting by `kAppFormFactor` (as `AppColors.dark`
-  does). Tests that must pin one design regardless of lane read the named
-  sets. The neon faces come from `NeonPrimitives` (`primitives.dart`).
+  / `figmaLight` (upstream's Figma design) and `neonDark` / `neonLight`,
+  and `dark` / `light` select the neon sets on both form factors (as
+  `AppColors.dark` does). The Figma sets stay for the tooling and tests
+  that pin upstream's design. The neon faces come from `NeonPrimitives`
+  (`primitives.dart`).
   `AppNeonColors` (`colors.neon`) carries the lit elements' colours: the
   tube glow and its white-hot core on the page, the balance sign's light,
   the grid, and the white "headlight" frame. Light mode is brushed steel
-  with the same red; the balance sign stays black in both. For now the
-  mobile app is dark only (owner, 2026-10-17): `kThemeLockedToDark` pins
-  the theme and hides Settings' Theme row, and iOS sets
-  `UIUserInterfaceStyle` to Dark.
-- **Shapes.** `AppRadiiMobile` is near-square (2 to 4 px, `full` is 4).
+  with the same red; the balance sign stays black in both. For now Veylor
+  is dark only (owner: mobile 2026-10-17, desktop 2026-11-18):
+  `kThemeLockedToDark` pins the theme and hides the Theme row in both
+  Settings screens, iOS sets `UIUserInterfaceStyle` to Dark, and the Mac
+  window opens in the dark appearance.
+- **Shapes.** `AppRadiiNeon` is near-square (2 to 4 px, `full` is 4).
   `AppChamfer` sizes the 45° cuts drawn with `BeveledRectangleBorder`
   (`Neon.chamferBorder`, two-corner `Neon.wedgeBorder`). `AppButton` cuts
-  its corners on mobile, and the primary slab casts a red glow;
-  secondary buttons are glass with a hairline edge. `MobileSurfaceCard` is
-  a glass panel with lit cut corners (`NeonGlassPanelPainter`). Avatars
-  are cut-corner plates with a red edge.
+  its corners, and the primary slab casts a red glow; secondary buttons
+  are glass with a hairline edge. `MobileSurfaceCard` is a glass panel with
+  lit cut corners (`NeonGlassPanelPainter`), and `NeonGlassPanel` is the
+  same panel for desktop's cards. Avatars are cut-corner plates with a red
+  edge.
 - **Light.** `lib/src/core/theme/neon.dart`: `Neon.textGlow`,
   `Neon.boxGlow`, `Neon.strokeTube` (halo, glow and core: every lit line
   uses it), the shared painter recipes (`Neon.bead`, `Neon.perspectiveGrid`,
@@ -181,24 +190,30 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
   `lib/src/core/widgets/mobile/neon_motion.dart`: `NeonIgnition` (a sign's
   switch-on flicker, with an optional delay, off under reduced motion) and
   the `NeonAppearMotion` mixin for one-shot entrances.
-- **Type.** Gotham everywhere, lighter on mobile, and nothing on mobile is
-  Book (400) or heavier. Headings are Thin (100): screen, step, page and
-  sheet titles, a state's statement (Home's "We're importing your
+- **Type.** Gotham everywhere, Thin and Light, and nothing on either form
+  factor is Book (400) or heavier. Headings are Thin (100): screen, step,
+  page and sheet titles, a state's statement (Home's "We're importing your
   wallet..."), and display numerals. Everything else is Light (300):
   subtitles, body, labels, field and helper text, buttons, chips, rows,
   card titles and the HUD captions. Emphasis comes from colour and size,
-  not weight. Every `AppTypographyMobile` token is Thin or Light
-  (`bodyMediumStrong` and the code styles included), so mobile code leaves
-  the token's weight alone. Widgets both form factors draw use
-  `AppFontWeight` for a one-off emphasis weight (desktop keeps the Figma
-  weight, mobile resolves it to Light; `AppFontWeight.heading` is the Thin
-  heading weight); the legacy Material theme goes through it too, so
-  unstyled mobile text is Light. There are no exceptions.
+  not weight. Every `AppTypographyMobile` and `AppTypographyDesktopNeon`
+  token is Thin or Light (`bodyMediumStrong` and the code styles
+  included), so code leaves the token's weight alone; desktop draws
+  `AppTypographyDesktopNeon`, the Figma desktop metrics in those weights,
+  and `AppTypographyDesktop` keeps the Figma desktop mode for tooling and
+  tests. `AppFontWeight` names the Figma weight a one-off emphasis stands
+  in for and resolves to Light on both form factors
+  (`AppFontWeight.heading` is the Thin heading weight); the legacy
+  Material theme goes through it too, so unstyled text is Light. Desktop
+  code still names heavier weights in places, so desktop builds register no
+  Gotham face heavier than Light (`gothamHeaviestWeight` in
+  `gotham_fonts.dart`) and those render Light; mobile registers every
+  face. There are no exceptions.
   Page titles (`MobileTopNav.back`) are spaced uppercase Thin; section heads
-  (Settings groups, Activity dates, Home's recent activity) are uppercase
-  red HUD captions. These uppercase captions are a deliberate exception to
-  the sentence-case rule; the strings themselves stay sentence case and are
-  upper-cased where drawn.
+  (Settings groups, Activity dates, Home's recent activity, on both form
+  factors) are uppercase red HUD captions. These uppercase captions are a
+  deliberate exception to the sentence-case rule; the strings themselves
+  stay sentence case and are upper-cased where drawn.
 - **Home.** The balance is a frameless neon sign: Thin red digits with a
   glow, the privacy eye (a bare glyph) to their right, the fiat line
   above, and the portfolio chart's line as a light trail below
@@ -298,17 +313,19 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
   - The vertical tab rail, shown when iOS reports a system side edge,
     stands in the bottom bar's fade.
   - A nested sheet's floating Back is a cut-corner glass button.
-- **Art.** The medieval illustrations are gone from mobile: empty states use
-  `NeonHorizon` (a striped 80s sun over a grid floor), hero and status
-  spots `NeonGlyphBadge`, and painted backgrounds are dropped. The account
-  pictures are the ten neon portraits in `assets/profile_pictures/`
+- **Art.** The medieval illustrations are gone from mobile, and from
+  desktop's main surfaces (see "Desktop"): empty states use `NeonHorizon` (a
+  striped 80s sun over a grid floor), hero and status spots
+  `NeonGlyphBadge`, and painted backgrounds are dropped. The account
+  pictures, on both form factors, are the ten neon portraits in
+  `assets/profile_pictures/`
   (`pfp-01` to `pfp-07` and `pfp-16` to `pfp-18`, 224 px lossless WebP);
   ids of the retired knights (`pfp-08` to `pfp-15`) map onto the first
   seven, so a new portrait takes the next number from `pfp-19`.
   Payment-link gift card designs are unchanged. `VizorWordmark` draws a
-  VEYLOR wordmark in tube strokes on mobile (`VeylorWordmarkPainter`: lit
-  red, or plain lines where a caller sets a colour); desktop keeps
-  `vizor_logo.svg`.
+  VEYLOR wordmark in tube strokes on both form factors
+  (`VeylorWordmarkPainter`: lit red, or plain lines where a caller sets a
+  colour); upstream's `vizor_logo.svg` is no longer drawn.
 - **Keys and money flows.** The passcode keys are cut-corner glass plates
   that light red under the finger. Private USD calls a conversion a bridge
   in every user-facing string (owner, 2026-10-19: "Bridge", "Bridging",
@@ -358,6 +375,34 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
   keyboard toolbar's Done check is neon red. Sheets keep 4 px top corners
   and, on iOS, bottom corners that follow the display's curve, which would
   clip square ones.
+- **Desktop.** Upstream's desktop screens in the look above, through the
+  tokens and a few shared pieces; their layouts, sizes, flows and keyboard
+  handling are upstream's. Shared widgets that both form factors draw keep
+  mobile exactly as it was: a desktop-only change in one is gated on
+  `kAppFormFactor`.
+  - The window is true black: the Mac window opens in the dark appearance on
+    black (`appWindowBackgroundColor`, `launchBrightness` in
+    `MainFlutterWindow.swift`), Linux's view is black, and Flutter paints
+    `macosUtility.window` behind everything.
+  - Cards and panels are `NeonGlassPanel`: the sidebar
+    (`AppDesktopSidebarSurface(glass: true)`, the main and onboarding
+    sidebars), `AppModalCard` (opaque), `ReviewWrapCard`, Settings' groups,
+    Home's recent activity, the Activity feed's months (sliver segments are
+    slices of one panel) and the unlock card. The pane and its modal scrim
+    are near-square.
+  - Settings' groups, Activity's months and Home's recent activity are
+    headed by red HUD captions.
+  - No painted backgrounds: Home, Settings' sub-screens, the onboarding
+    steps, the import method picker and the auth screens (unlock, the
+    migration lock, the Gift Card claim) draw on black. The Welcome sets the
+    neon horizon beside its pane in place of upstream's video, the
+    onboarding sidebars a small horizon in place of their art, the unlock
+    card the lit wordmark, and Home's and the address book's empty states a
+    horizon. The wallet link outcomes are `NeonGlyphBadge`s.
+  - Page titles are upstream's per-screen headlines in the Thin tokens, not
+    `kNeonPageTitleStyle`: desktop has no shared page title. The neon
+    signature pieces (the sync line, the balance sign with its chart, a
+    neon sidebar) are not on desktop yet.
 
 ## Google Play opt-out (VIZOR_DEGOOGLED)
 
@@ -1541,9 +1586,12 @@ workflow, mobile capture, and cleanup rules are in `FIGMA-AI-FIX.md`.
 
 Important desktop design rule:
 
-- `Scaffold.backgroundColor: Colors.transparent` is required anywhere the native acrylic/translucent shell should remain visible.
-- Any opaque `Container`, `ColoredBox`, decoration color, or other filled background will cover the native effect in that region.
-- Treat transparency as opt-in per region: only paint solid backgrounds where the UI should actually be solid.
+- The shell is opaque and true black, with no acrylic: the native window
+  (`DesktopWindowVisualStyle.opaque`) and Flutter's root (`macosUtility.window`)
+  are the neon look's black, and the Mac window opens in the dark appearance
+  so nothing light shows before the first frame.
+- Screens leave `Scaffold.backgroundColor: Colors.transparent` over that black
+  and paint solid fills only where the UI should actually be solid.
 
 ## Mobile UI Standards
 
@@ -1554,7 +1602,7 @@ reusable mobile component or settle a new visual rule, add it here in the same
 change. The subsections below this list carry the detailed rules.
 
 These are upstream's rules for its Figma mobile design. On Veylor's mobile
-the neon redesign above wins where they disagree: colour, type weight (no
+the neon look above wins where they disagree: colour, type weight (no
 Book or heavier; shared components take `AppFontWeight`), shapes, the tab bar,
 art and page titles. The shared components and the behaviour rules still
 apply.
@@ -2484,7 +2532,9 @@ into `main` or open a PR unprompted, and never against upstream.
   Figma-compare entry points call it. A widget test that needs real glyphs
   instead of the square test font calls `loadGothamFonts()` too, never a
   hand-rolled `FontLoader` over the `Gotham-*.otf` files. Gotham has no
-  SemiBold (`w600` resolves to Bold) and no monospace face. Korean and Chinese
+  SemiBold (`w600` resolves to Bold) and no monospace face. Desktop builds
+  register no face heavier than Light (`gothamHeaviestWeight`), so every
+  heavier weight renders Light there. Korean and Chinese
   text falls back to upstream's generated subsets, the pubspec families
   `Vizor Korean UI` and `Vizor Chinese UI` (`locale_typography.dart`). The mobile serif
   headline tokens are set below the Figma sizes for it (see `_headlineLMobile`).
