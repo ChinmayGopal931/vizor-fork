@@ -465,8 +465,10 @@ otherwise.
     card, read under the pointer as well as by a drag, with range chips that
     take a click cursor and the keyboard, then `MobileHoldingsPanel`, under
     the pane's back link). Without Private USD the holdings are the shielded
-    pools, their total and the transparent ZEC. A hidden chart (off, or no
-    history) leaves the sign inert. The Send, Receive and Pay buttons under
+    pools, their total and the transparent ZEC; with it (the Mac) they list
+    Shielded USD as the phone's do, and the phone Home's Shielded USD strip
+    sits under the transparent tray, opening `/private-usd` (see "Private
+    USD"). A hidden chart (off, or no history) leaves the sign inert. The Send, Receive and Pay buttons under
     it are `AppButton`'s slab (the primary lit, the secondaries glass with
     an outside hairline), the Ironwood call a glass panel with a lit square
     beacon, and the transparent tray sits under a hairline of white light
@@ -479,7 +481,10 @@ otherwise.
     with the phone card's two switches, "Show on home" and "Use market
     prices" (`PortfolioChartSettingsControl`), on the same settings and
     storage, so the same defaults; the prices switch shows only where market
-    prices are available, and holds still while the chart is off.
+    prices are available, and holds still while the chart is off. Where the
+    phone's Settings shows its Shielded USD rows, a Shielded USD block after
+    System has the Ethereum RPC row (its dialog checks a URL as the phone's
+    sheet does) and the relayer claims switch.
   - **Sidebar.** The main sidebar's rows are lit, not filled
     (`AppSidebarItem`): the phone sidebar's `NeonSidebarGlyph` at upstream's
     20 px icon size beside Light labels, and the active glyph and red label
@@ -2061,9 +2066,13 @@ private copy:
 
 A Railgun USDC ("private USD") balance, conversion both ways with shielded
 ZEC by atomic swap (with refunds and rescue), and private send and withdraw.
-It runs on Android, mobile form factor only. The iOS port (iOS 17 and later,
-behind the same define) has its code in but has not yet run on a simulator
-or an iPhone. Before changing it,
+It runs on Android. The iOS port (iOS 17 and later, behind the same define)
+has its code in but has not yet run on a simulator or an iPhone. The macOS
+desktop app hosts it too (macOS 14 and later, behind the same define; step 3a,
+2026-11-19), with desktop screens for everything but the bridge, which desktop
+hides until its screens come (step 3b); Windows and Linux have no host and hide
+it. The Mac's host, how it differs from iOS's and what has run are in
+`docs/private-usd-macos.md`. Before changing it,
 read `docs/private-usd-android-plan.md`: §3.5 lists the invariants and why
 each one exists. The pinned config and defines are in
 `docs/private-usd-reference.md` §7. Progress and deviations are in
@@ -2077,14 +2086,23 @@ Code:
 
 - Rust: `rust/src/wallet/private_usd/`, `rust/src/api/private_usd.rs`,
   `rust/src/wallet/routed_http.rs` and `rust/src/railgun_bridge.rs`.
-- Dart: `lib/src/features/private_usd/`,
+- Dart: `lib/src/features/private_usd/` (the desktop screens in
+  `screens/desktop/` and `widgets/desktop/`),
   `lib/src/core/config/private_usd_feature_config.dart` and
   `lib/src/providers/private_usd_lifecycle_provider.dart`.
 - Kotlin: `android/app/src/main/kotlin/com/keplr/vizor/railgun/`.
-- Swift: `ios/Runner/Railgun/`.
+- Swift: `ios/Runner/Railgun/`. The macOS target compiles four of its files
+  unchanged (`RailgunEndpoints`, `RailgunContentRules`, `RailgunProtocol` and
+  `RailgunSchemeHandler`, referenced from `ios/`) beside its own AppKit and
+  FlutterMacOS versions of the rest in `macos/Runner/Railgun/` (`RailgunPage`
+  with `RailgunChannel`, `RailgunPageHost`, `RailgunHostHandler` and
+  `RailgunError`), with `macos/Runner/PrivateUsdAttestationHandler.swift`,
+  `ScreenAwakeChannel.swift` and `MacSessionLifecycle.swift`. Keep the shared
+  four free of UIKit and Flutter imports.
 - The Railgun page: `android/app/src/main/assets/railgun/`, built from
   `android/railgun-web/`; the same build copies it as is to
-  `ios/Runner/Railgun/railgun/`.
+  `ios/Runner/Railgun/railgun/`, which the macOS target references as a folder
+  (no third copy).
 - Copy: ARB messages whose keys start with `privateUsd` (the chart's
   `portfolioChart`, the sync line's `neonSync`), in Korean and Chinese
   too. `PrivateUsdCopy` keeps only what is never translated and the few
@@ -2096,8 +2114,10 @@ Code:
 **Defines (reference §7.3).** Each is a Dart define read once in
 `private_usd_feature_config.dart`. Gradle needs none of them.
 
-- `VIZOR_PRIVATE_USD_ENABLED` (default `false`) turns the feature on.
-  Release builds turn it on only after the owner's sign-off.
+- `VIZOR_PRIVATE_USD_ENABLED` (default `false`) turns the feature on, in a
+  mobile or a desktop build (`kPrivateUsdBuildEnabled`); where no host runs
+  the page, `privateUsdPlatformHostsPage` keeps it hidden. Release builds turn
+  it on only after the owner's sign-off.
 - `VIZOR_ETHEREUM_RPC_URL_{MAINNET,SEPOLIA}` are the keyed RPC URLs. They
   are the only secrets: pass them only with
   `--dart-define-from-file=<gitignored json>`. Their host must be one of
@@ -2189,6 +2209,18 @@ Code:
   one (D14).
 - Hardware accounts, accounts without ZIP-32 metadata, and regtest hide the
   feature.
+- **On the Mac** the foreground is a shown window, focused or not. A
+  minimised or hidden window, a hidden app or a window fully covered by others
+  is `AppLifecycleState.hidden` (the engine's occlusion), and so are a locked
+  screen, displays asleep, a Mac going to sleep and another user's session in
+  front (`MacSessionLifecycle` says so on `flutter/lifecycle`, and once nothing
+  keeps the Mac away sends the state the engine would report). WebKit
+  suspends the page while its window is not visible, as iOS does in the
+  background. The keep-awake flag is an IOKit `PreventUserIdleDisplaySleep`
+  assertion (`ScreenAwakeChannel`), which desktop's
+  `SyncKeepAwakeNativeHost` takes only for Private USD while the window is not
+  hidden. Desktop has no bridge yet (`privateUsdBridgeAvailableProvider` is
+  false there), so nothing but a first sync keeps the Mac awake.
 
 **Separate databases.** Rust owns both, in
 `<support>/private_usd_<walletDbName>_<network>/` (`getPrivateUsdDirPath`):
@@ -2357,8 +2389,8 @@ tokens answers an unpaid accept `401` with a `WWW-Authenticate` challenge;
 the client is built and dormant until a maker does, so no app release is
 needed then. Code: `rust/src/wallet/private_usd/tokens.rs`, the Kotlin
 `PrivateUsdAttestationHandler` (channel
-`com.zcash.wallet/private_usd_attestation`; its Swift twin answers
-`unavailable`), Dart `services/private_usd_tokens_service.dart` and
+`com.zcash.wallet/private_usd_attestation`; its Swift twins, iOS's and
+the Mac's, answer `unavailable`), Dart `services/private_usd_tokens_service.dart` and
 `private_usd_attestation.dart`.
 
 - **What is stored where.** The device-wide state is one file per network,
@@ -2530,7 +2562,11 @@ needed then. Code: `rust/src/wallet/private_usd/tokens.rs`, the Kotlin
 - On iOS a Swift `WKWebView` host behind the same channel serves the page
   from `veylor-railgun://app/`, in a data store of its own whose SOCKS5
   proxy is the bridge (no failover), with a `WKContentRuleList` allowlist
-  (iOS reference §6).
+  (iOS reference §6). The macOS host is the same on AppKit (macOS 14 and
+  later): the same files serve the page, the same store identifier, proxy and
+  rule list, and the 1×1 web view sits in the window's content view below the
+  Flutter view, refusing the pointer, the keyboard and VoiceOver. Because the
+  Mac compiles iOS's `RailgunEndpoints.swift`, the Rust pin test covers it.
 - The page's traffic leaves only through the Rust loopback SOCKS5 bridge
   (`railgun_bridge.rs`), which uses arti when Tor is on. Its direct
   connections try IPv6 and IPv4 side by side (hyper-util's connector, as

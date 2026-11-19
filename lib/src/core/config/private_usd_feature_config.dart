@@ -251,11 +251,15 @@ final privateUsdAvailabilityStoreProvider =
       (_) => const SharedPreferencesPrivateUsdAvailabilityStore(),
     );
 
-/// Whether a kill-switch retry may run in the current lifecycle (mobile is
-/// foreground-only).
+/// Whether a kill-switch retry may run in the current lifecycle: in the
+/// foreground only, as every Private USD request is (plan D9), on desktop
+/// too, where app-process work otherwise runs on while the window is hidden.
 final privateUsdKillSwitchWorkPolicyProvider =
     Provider<bool Function({required bool isInForeground})>(
-      (_) => canRunAppProcessWork,
+      (_) =>
+          ({required bool isInForeground}) =>
+              isInForeground &&
+              canRunAppProcessWork(isInForeground: isInForeground),
     );
 
 /// Delays before asking again after a failed fetch; the last one repeats.
