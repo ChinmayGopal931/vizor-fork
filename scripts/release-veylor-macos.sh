@@ -260,7 +260,10 @@ note "commit $COMMIT, version $VERSION ($BUILD_NUMBER), tag $TAG"
 # The signing identity must be Zapp LLC's, never upstream's.
 [[ "$SIGNING_IDENTITY" == *"(${VEYLOR_TEAM_ID})" ]] || die "refusing to sign with $SIGNING_IDENTITY"
 [[ "$SIGNING_IDENTITY" != *"$UPSTREAM_TEAM_ID"* ]] || die "refusing to sign with upstream's team"
-security find-identity -v -p codesigning | grep -Fq "\"$SIGNING_IDENTITY\"" ||
+# Checks read captured output: `producer | grep -q` fails under pipefail
+# when grep stops reading early.
+IDENTITIES="$(security find-identity -v -p codesigning)"
+grep -Fq "\"$SIGNING_IDENTITY\"" <<<"$IDENTITIES" ||
   die "the signing identity \"$SIGNING_IDENTITY\" is not in the keychain"
 
 # The Developer ID profile Xcode signs the app with.
@@ -409,7 +412,8 @@ INFO_PLIST="$BUILT_APP/Contents/Info.plist"
 MINIMUM_SYSTEM_VERSION="$(plist_value "$INFO_PLIST" LSMinimumSystemVersion)"
 [[ -n "$MINIMUM_SYSTEM_VERSION" ]] || die "the app has no LSMinimumSystemVersion"
 # Sparkle must be compiled in: the app references its updater controller.
-nm -u "$BUILT_APP/Contents/MacOS/$APP_NAME" 2>/dev/null | grep -q "SPUStandardUpdaterController" ||
+UNDEFINED_SYMBOLS="$(nm -u "$BUILT_APP/Contents/MacOS/$APP_NAME" 2>/dev/null)"
+grep -q "SPUStandardUpdaterController" <<<"$UNDEFINED_SYMBOLS" ||
   die "Sparkle is not compiled in (SPARKLE_ENABLED)"
 note "$BUNDLE_ID $VERSION ($BUILD_NUMBER), macOS $MINIMUM_SYSTEM_VERSION or later, Sparkle compiled in"
 
@@ -442,7 +446,8 @@ codesign_for_distribution "$STAGED_APP" identifier,entitlements
 /usr/bin/codesign --verify --deep --strict --verbose=2 "$STAGED_APP" >"$LOG_DIR/codesign-verify.log" 2>&1 ||
   die "the app's signature does not verify (see $LOG_DIR/codesign-verify.log)"
 check_signature "$STAGED_APP"
-/usr/bin/codesign -dvv "$STAGED_APP" 2>&1 | grep -q "flags=.*runtime" || die "the app lacks the hardened runtime"
+APP_SIGNATURE="$(/usr/bin/codesign -dvv "$STAGED_APP" 2>&1)"
+grep -q "flags=.*runtime" <<<"$APP_SIGNATURE" || die "the app lacks the hardened runtime"
 while IFS= read -r code; do
   check_signature "$code"
 done < <(nested_code "$STAGED_APP")
@@ -457,8 +462,8 @@ ENTITLEMENTS="$WORK_DIR/entitlements.plist"
 if plist_value "$ENTITLEMENTS" com.apple.security.get-task-allow >/dev/null; then
   die "the app carries get-task-allow"
 fi
-/usr/libexec/PlistBuddy -c "Print :com.apple.security.temporary-exception.mach-lookup.global-name" "$ENTITLEMENTS" |
-  grep -q "$BUNDLE_ID-spki" || die "Sparkle's installer mach-lookup entitlement is missing"
+MACH_LOOKUP="$(plist_value "$ENTITLEMENTS" com.apple.security.temporary-exception.mach-lookup.global-name || true)"
+grep -q "$BUNDLE_ID-spki" <<<"$MACH_LOOKUP" || die "Sparkle's installer mach-lookup entitlement is missing"
 EMBEDDED_PROFILE="$WORK_DIR/embedded-profile.plist"
 security cms -D -i "$STAGED_APP/Contents/embedded.provisionprofile" >"$EMBEDDED_PROFILE" 2>/dev/null ||
   die "the app embeds no provisioning profile"
