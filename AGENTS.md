@@ -2630,11 +2630,13 @@ the Mac's, answer `unavailable`), Dart `services/private_usd_tokens_service.dart
     answered through the bridge) and hides the WebKit host from the start's
     archive check (the page reads the archive only where it finds none; its
     transport took the host at load). Linux's page process does the same
-    (`railgun_archive.cc`: the same prelude, but defining `messageHandlers` on
-    the page's `webkit` object, since WebKit's `window.webkit` can't be
-    redefined; libsoup through the bridge, with the same limits). iOS starts
-    the page without it. Every archive request depends on the chain's state
-    alone.
+    (`railgun_archive.cc`: the prelude defines `messageHandlers` on the page's
+    `webkit` object and holds that object, since WebKit's `window.webkit`
+    can't be redefined and is made anew once nothing refers to it; libsoup
+    through the bridge, with the same limits and headers, over HTTP/1.1
+    connections kept as Android keeps them). iOS starts the page without it.
+    Every archive request depends on the chain's state alone. What every host
+    must do: `docs/private-usd-railgun-hosts.md`.
 
 **Network: Tor and the Railgun page.**
 

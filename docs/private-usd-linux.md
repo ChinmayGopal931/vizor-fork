@@ -7,7 +7,10 @@ is Linux only; Windows still hides Shielded USD.
 
 Read AGENTS.md's "Private USD" section and `docs/private-usd-android-plan.md`
 §3.5 first: every invariant there holds on Linux, because the engine and the
-Dart flows are the phones' and the Mac's own.
+Dart flows are the phones' and the Mac's own. What every Railgun page host must
+do is [docs/private-usd-railgun-hosts.md](private-usd-railgun-hosts.md) (H1 to
+H36, Android the reference); "Against the hosts checklist" below says where
+Linux stands on each item.
 
 ## Why two processes
 
@@ -38,8 +41,8 @@ channel contract, method for method and code for code
 - `railgun_host.cc`: the channels, one answer per call and `bad_args`; the
   sandbox check behind `supported`; one page at a time, each with its pending
   calls, their timeouts (a timeout closes the page) and the 30 s load timeout;
-  the event buffer (256); the wipe; memory pressure (`GMemoryMonitor`, medium
-  or worse, closes an idle page); and the page's visibility.
+  the event buffer (256); the wipe; and the page's visibility. Memory pressure
+  never closes the page, as on Android (H11).
 - `railgun_protocol.h/.cc`: the methods and timeouts, the events, the request
   envelope (params spliced, never re-serialized) and the page's replies, read
   by `railgun_json.cc`, a strict reader that keeps every value as its text.
@@ -127,24 +130,38 @@ the AppImage runs the page there.
 
 ## Anon's archive on Linux
 
-As on the Mac (`docs/private-usd-macos.md`, "Anon's archive on the Mac"), with
-two differences:
+As on the Mac (`docs/private-usd-macos.md`, "Anon's archive on the Mac") and
+the checklist's sections 4 and 5:
 
-- **The prelude** hides the WebKit host by defining `messageHandlers` on the
-  page's `webkit` object, not by redefining `window.webkit`, which WebKit
-  makes non-configurable. The page's transport took the handler when it loaded,
-  and keeps posting.
-- **The fetch** (`ArchiveFetch`) is libsoup's, through a session whose only
-  route is `socks5://127.0.0.1:<bridge port>`, with the Mac's and Android's
-  limits:
-  - 16 MB and a minute an answer at most, and a 20 s stall;
+- **The prelude** (`kArchivePrelude`) is the Mac's. WebKit makes
+  `window.webkit` non-configurable, so it hides the host by defining
+  `messageHandlers` on the page's `webkit` object. It also holds that object on
+  the global: WebKit makes a new one, with the real handlers, once nothing in
+  the page refers to it, so a garbage collection before the `start` would show
+  the host again and the page would skip the archive (H21). It re-hides the host
+  on every run. The page's transport took the handler when it loaded, and keeps
+  posting.
+- **The fetch** (`ArchiveFetch`) is libsoup's, through a pool whose only route
+  is `socks5://127.0.0.1:<bridge port>`, as Android's host fetches:
+  - 16 MB and a minute an answer at most, a 20 s connect or read stall, and a
+    502 for any failure;
   - no redirect, cache, cookie, credential, decoding or sniffing;
-  - `Accept-Encoding: identity` and `User-Agent: Mozilla/5.0`;
-  - a failure is a 502.
+  - exactly Android's headers (H24): `Host`, `User-Agent: Mozilla/5.0`,
+    `Accept-Encoding: identity` and `Connection: Keep-Alive`, with no
+    `Accept-Language` (`accept-language-auto` off) and no cache directive.
+
+  **Connections, as Android keeps them (H27).** Each request is HTTP/1.1
+  (`soup_message_set_force_http1`), so a connection carries one at a time and a
+  stalled connection costs only the try sent on it. The pool keeps five per
+  host, each idle five minutes at most. An answer read whole leaves its
+  connection for the next request. Any other end (a failure, a stall, the size
+  cap, the deadline) closes its body cancelled, so libsoup never uses that
+  connection again. A network change (`GNetworkMonitor`) starts a new pool for
+  the next request, and the old one goes with its last request.
 
   WebKitGTK has no stop call for a scheme request, so a fetch the page
-  abandons runs on to its end and its answer is dropped; the page's close
-  cancels them all.
+  abandons runs on to its end and its answer is dropped, as on Android (H28);
+  the page's close cancels them all and aborts the pools.
 
 `privateUsdArchiveAvailableProvider` offers the setting on Linux mainnet
 wherever the host runs the page.
@@ -251,6 +268,47 @@ others'. `veylor-linux.yml`'s `pins` job runs them on CI:
 - **An abandoned archive fetch** runs to its end (above).
 - **Backups** are kept out by `CACHEDIR.TAG`, not a backup exclusion flag.
 - **Minimise on Wayland and a covered window** don't pause Shielded USD.
+
+## Against the hosts checklist
+
+[docs/private-usd-railgun-hosts.md](private-usd-railgun-hosts.md), item by
+item. Items not named here hold as on Android and the Mac.
+
+- **H1.** The same contract. `supported` answers once the sandbox check has run,
+  about a second, so on Linux the bootstrap asks it after the first frame rather
+  than before it (kept: the check runs a process of its own).
+- **H4.** Linux joins `privateUsdPlatformHostsPage` and
+  `privateUsdArchiveAvailableProvider`, and `private_usd_archive_sync_test.dart`
+  covers it. `replaceDeadBridge` stays iOS's: Linux keeps its sockets.
+- **H6.** The scheme is registered secure. The sandbox check loads its page on
+  that scheme and requires a secure context, `crypto.subtle`, WebAssembly,
+  IndexedDB, `localStorage` and workers (fixed 2026-11-20).
+- **H7.** WebKitGTK gives a script message no frame or origin (kept: there is no
+  API for it). A message counts only while the view shows the page's own URL,
+  the handler is in the page world alone, and the CSP allows no frames.
+- **H9.** The store is in the app's support directory, beside the wallet, and
+  is wiped whole (retried). Linux has no system backup flag: a `CACHEDIR.TAG`
+  keeps the store out of the backup tools that honour one.
+- **H10.** The offscreen window keeps the page unthrottled while Veylor's window
+  shows, focused or not. Veylor hides it while its window is minimised or
+  withdrawn or the session is away. On Wayland GTK never learns of a minimise,
+  so the page runs on there (kept: GTK's limit).
+- **H11.** Memory pressure never closes the page (fixed 2026-11-20).
+- **H16.** libsoup, which WebKitGTK's network process uses, has no HTTP/3, so
+  nothing goes around the bridge over QUIC.
+- **H18.** The page's own requests carry a fixed User-Agent, `Mozilla/5.0 (X11;
+  Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko)`, the same on every
+  computer. WebKitGTK's default names the distribution and the processor
+  (fixed 2026-11-20).
+- **H21, H24, H26, H27.** The prelude's hold, the exact headers, the buffer
+  sized from a declared length, and the connection rules (above; fixed
+  2026-11-20).
+- **H22.** Not Linux's: no Chromium.
+- **H28.** WebKitGTK doesn't tell the host when the page aborts a request, so
+  the fetch runs to its own deadline and its answer is dropped, as on Android
+  (kept).
+- **H30.** The fetches run on the page process's main loop, never Veylor's.
+- **H35.** The keep-awake flag is an idle inhibitor (above).
 
 ## What has run (2026-11-20)
 
