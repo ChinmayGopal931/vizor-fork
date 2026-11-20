@@ -298,6 +298,8 @@ item. Items not named here hold as on Android and the Mac.
   withdrawn or the session is away. On Wayland GTK never learns of a minimise,
   so the page runs on there (kept: GTK's limit).
 - **H11.** Memory pressure never closes the page (fixed 2026-11-20).
+- **H12.** The filter lets `blob:` through, as the Mac's does, and the page's
+  workers run (below).
 - **H16.** libsoup, which WebKitGTK's network process uses, has no HTTP/3, so
   nothing goes around the bridge over QUIC.
 - **H18.** The page's own requests carry a fixed User-Agent, `Mozilla/5.0 (X11;
@@ -348,6 +350,9 @@ mnemonic, read-only.
   - **Sockets (section 3, H16).** During a run the page process and WebKit's
     network process held only TCP connections to the bridge's port, four of
     them the archive's, and no UDP socket.
+  - **Workers (H12).** A Sepolia first sync on a debug page reached `synced`
+    in 83 s, and its `noteKeys` showed six workers, with 12,237 of 12,271
+    points prepared, as on the Mac.
   - **The User-Agent (H18).** A request from the page carried the fixed one.
   - **The sandbox check (H6).** The installed check passed from
     `/opt/veylor` in 0.23 to 0.45 s, on the page's secure scheme, and a copy
