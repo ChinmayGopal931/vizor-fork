@@ -4,7 +4,8 @@ Step 3a of the owner's desktop plan (2026-11-19): the Railgun page host on the
 Mac, and desktop screens for everything but the bridge. Step 3b (2026-11-19):
 the bridge, converting ZEC and shielded USD both ways with its refunds and
 rescue, on the phone's engine and providers ("The bridge" below).
-Windows and Linux get hosts of their own later and hide Shielded USD until then.
+Linux has a host of its own (`docs/private-usd-linux.md`); Windows hides Shielded
+USD until it gets one.
 
 Read AGENTS.md's "Private USD" section and `docs/private-usd-android-plan.md`
 §3.5 first: every invariant there holds on the Mac, because the Rust engine and
@@ -53,9 +54,10 @@ page can read Anon's archive ("Anon's archive on the Mac" below).
 - `kPrivateUsdBuildEnabled` is the define alone, so a desktop build with
   `VIZOR_PRIVATE_USD_ENABLED` has the feature. Phone builds are unchanged.
 - `privateUsdPlatformHostsPage` takes the form factor: the phones as before;
-  desktop only on macOS with `supported` (macOS 14 and later). Windows and Linux
-  have no handler, so the bootstrap's `supported` reads no
-  (`MissingPluginException`) and the feature stays hidden.
+  desktop on macOS with `supported` (macOS 14 and later) and on Linux with its
+  host's `supported` (`docs/private-usd-linux.md`). Windows has no handler, so
+  the bootstrap's `supported` reads no (`MissingPluginException`) and the
+  feature stays hidden.
 - The other gates hold: hardware accounts, accounts without ZIP-32 metadata,
   regtest (no deployment) and the kill switch.
 - `privateUsdBridgeAvailableProvider` follows the deployment's windows

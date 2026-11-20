@@ -36,6 +36,9 @@ constexpr guint kProbeTimeoutSeconds = 30;
 constexpr int kWipeAttempts = 5;
 constexpr guint kWipeRetryMs = 500;
 constexpr guint kQuitGraceMs = 2000;
+// How long a page process waits after the one before it exited: WebKit's own processes exit as their link to it
+// closes, a moment later, and two pages must never share the data store.
+constexpr gint64 kAfterExitUs = 500 * 1000;
 constexpr char kHelperName[] = "veylor-railgun-page";
 // The page process's own diagnostic lines; whatever else WebKit prints there is dropped, since it could quote a URL.
 constexpr char kLogPrefix[] = "veylor-railgun-page: ";
@@ -302,7 +305,8 @@ class Page : public std::enable_shared_from_this<Page> {
 // MARK: Host
 
 // The process-wide host: the channels, the page process's sandbox check, one page at a time, the event buffer and
-// the wipe. It outlives the page; a load from an older generation gives up.
+// the wipe. It outlives the page. A load waits for the page processes before it to exit, and gives up when a close,
+// a wipe or another load comes first.
 class Host {
  public:
   Host(FlBinaryMessenger* messenger, GtkWindow* window);
@@ -323,11 +327,18 @@ class Host {
     FlMethodCall* call;
     int attempts;
   };
+  struct PendingLoad {
+    int port;
+    bool debug;
+    FlMethodCall* call;
+  };
 
   void Supported(FlMethodCall* call);
   void StartProbe();
   void ProbeEnded(bool passed);
   void Load(int port, bool debug, FlMethodCall* call);
+  void StartPendingLoad();
+  void Spawn(PendingLoad load);
   void ClosePage(const Error& reason);
   void Wipe(FlMethodCall* call);
   void RunWipes();
@@ -340,6 +351,7 @@ class Host {
   static gboolean OnProbeTimeout(gpointer data);
   static void OnProcessExited(GObject* source, GAsyncResult* result, gpointer data);
   static gboolean OnKill(gpointer data);
+  static gboolean OnLoadTimer(gpointer data);
   static void OnLowMemory(GMemoryMonitor* monitor, GMemoryMonitorWarningLevel level, gpointer data);
 
   FlMethodChannel* methods_ = nullptr;
@@ -355,8 +367,10 @@ class Host {
   guint probe_timer_ = 0;
 
   std::shared_ptr<Page> page_;
-  // Bumped by every close and load; a load from an older one gives up.
-  int generation_ = 0;
+  // The load waiting for the page processes before it to exit, if any.
+  std::optional<PendingLoad> pending_load_;
+  guint load_timer_ = 0;
+  gint64 last_exit_ = 0;
   // Every page process started and not yet exited, each with the page it served.
   std::map<GSubprocess*, std::weak_ptr<Page>> processes_;
   std::vector<WipeJob*> wipes_;
@@ -766,45 +780,74 @@ void Host::ProbeEnded(bool passed) {
 // MARK: Pages
 
 // Loads a fresh page, closing the one before it, with its traffic sent to the bridge at `port`. Answers once the
-// page says it is ready.
+// page says it is ready. Two page processes would share the page's data store, so a new one starts once the one
+// before it, and WebKit's processes with it, have exited.
 void Host::Load(int port, bool debug, FlMethodCall* call) {
   ClosePage(Error::Disconnected("a new page replaced it"));
   if (probe_ != Probe::kPassed) {
     AnswerError(call, Error::Unavailable("WebKit's sandbox can't start here"));
     return;
   }
+  pending_load_ = PendingLoad{port, debug, static_cast<FlMethodCall*>(g_object_ref(call))};
+  StartPendingLoad();
+}
+
+void Host::StartPendingLoad() {
+  if (!pending_load_.has_value() || load_timer_ != 0 || !processes_.empty()) return;
+  const gint64 since_exit = g_get_monotonic_time() - last_exit_;
+  if (last_exit_ != 0 && since_exit < kAfterExitUs) {
+    load_timer_ = g_timeout_add(static_cast<guint>((kAfterExitUs - since_exit) / 1000) + 1, OnLoadTimer, this);
+    return;
+  }
+  PendingLoad load = *pending_load_;
+  pending_load_.reset();
+  Spawn(load);
+}
+
+gboolean Host::OnLoadTimer(gpointer data) {
+  auto* self = static_cast<Host*>(data);
+  self->load_timer_ = 0;
+  self->StartPendingLoad();
+  return G_SOURCE_REMOVE;
+}
+
+void Host::Spawn(PendingLoad load) {
   // Never a page without its proxy.
-  if (!LoopbackAccepts(port)) {
-    AnswerError(call, Error::Unavailable("the bridge is not running"));
-    return;
-  }
   const std::string data_dir = DataDirectory();
-  if (!PrepareDataDirectory(data_dir)) {
-    AnswerError(call, Error::Unavailable("the page's storage could not be made"));
-    return;
-  }
-  auto page = std::make_shared<Page>(this, debug);
   Error error;
-  if (!page->Start(HelperPath(), port, data_dir, BundleDirectory(), &error)) {
-    AnswerError(call, error);
-    return;
+  if (!LoopbackAccepts(load.port)) {
+    error = Error::Unavailable("the bridge is not running");
+  } else if (!PrepareDataDirectory(data_dir)) {
+    error = Error::Unavailable("the page's storage could not be made");
+  } else {
+    auto page = std::make_shared<Page>(this, load.debug);
+    if (page->Start(HelperPath(), load.port, data_dir, BundleDirectory(), &error)) {
+      page_ = page;
+      page->AwaitReady(load.call);
+      g_object_unref(load.call);
+      return;
+    }
   }
-  page_ = page;
-  page->AwaitReady(call);
+  AnswerError(load.call, error);
+  g_object_unref(load.call);
 }
 
 void Host::ClosePage(const Error& reason) {
-  ++generation_;
+  if (pending_load_.has_value()) {
+    FlMethodCall* call = pending_load_->call;
+    pending_load_.reset();
+    if (load_timer_ != 0) g_source_remove(load_timer_);
+    load_timer_ = 0;
+    AnswerError(call, Error::Disconnected(reason.message));
+    g_object_unref(call);
+  }
   std::shared_ptr<Page> closing = std::move(page_);
   page_.reset();
   if (closing != nullptr) closing->Close(reason);
 }
 
 void Host::Forget(Page* page) {
-  if (page_.get() == page) {
-    ++generation_;
-    page_.reset();
-  }
+  if (page_.get() == page) page_.reset();
 }
 
 void Host::Spawned(GSubprocess* process, std::weak_ptr<Page> page) {
@@ -828,7 +871,9 @@ void Host::ProcessExited(GSubprocess* process) {
   const int status = signalled ? -1 : g_subprocess_get_exit_status(process);
   if (auto page = weak.lock()) page->Exited(status, signalled);
   g_object_unref(process);
+  last_exit_ = g_get_monotonic_time();
   RunWipes();
+  StartPendingLoad();
 }
 
 // Asks the page process to exit, and ends it if it has not after a moment.
