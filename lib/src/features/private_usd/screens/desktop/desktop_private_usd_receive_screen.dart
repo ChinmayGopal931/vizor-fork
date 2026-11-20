@@ -4,18 +4,18 @@ import 'package:flutter/material.dart' show SelectableText;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pretty_qr_code/pretty_qr_code.dart';
 
 import '../../../../core/l10n/l10n.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_icon.dart';
 import '../../../../core/widgets/app_toast.dart';
-import '../../../../core/widgets/dot_qr_shape.dart';
 import '../../../../core/widgets/mobile/neon_switch_tabs.dart';
 import '../../../../providers/account_provider.dart';
 import '../../../../providers/privacy_mode_provider.dart';
 import '../../../../rust/api/private_usd.dart' as rust;
+import '../../../receive/widgets/mobile/receive_qr_frame.dart';
+import '../../../receive/widgets/receive_address_widgets.dart';
 import '../../models/private_usd_balances.dart';
 import '../../models/private_usd_deposits.dart';
 import '../../models/private_usd_send.dart' show privateUsdPercentText;
@@ -219,10 +219,15 @@ class _ReceiveView extends StatelessWidget {
     );
   }
 
-  /// A code on its lit plate, the address under it and its copy button.
+  /// The code's side, as the plate before it drew it.
+  static const _qrSize = 230.0;
+
+  /// A code in the phones' lit frame, Veylor's helmet in its middle, as the
+  /// phone draws it, the address under it and its copy button.
   Widget _code(
     BuildContext context, {
     required String address,
+    required ReceiveAddressType type,
     required Key qrKey,
     required Key addressKey,
     required Key copyKey,
@@ -235,7 +240,17 @@ class _ReceiveView extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Center(
-            child: _AddressQr(key: qrKey, data: address),
+            child: ReceiveQrFrame(
+              child: ReceiveQrSurface(
+                key: qrKey,
+                address: address,
+                size: _qrSize,
+                paddingX: AppSpacing.sm,
+                paddingY: AppSpacing.sm,
+                type: type,
+                neonFramed: true,
+              ),
+            ),
           ),
           const SizedBox(height: AppSpacing.sm),
           SelectableText(
@@ -274,6 +289,7 @@ class _ReceiveView extends StatelessWidget {
         _code(
           context,
           address: address,
+          type: ReceiveAddressType.shielded,
           qrKey: const ValueKey('private_usd_receive_shielded_qr'),
           addressKey: const ValueKey('desktop_private_usd_address'),
           copyKey: const ValueKey('desktop_private_usd_copy_address'),
@@ -318,6 +334,7 @@ class _ReceiveView extends StatelessWidget {
         _code(
           context,
           address: address,
+          type: ReceiveAddressType.transparent,
           qrKey: const ValueKey('private_usd_deposit_qr'),
           addressKey: const ValueKey('private_usd_deposit_address'),
           copyKey: const ValueKey('private_usd_deposit_copy'),
@@ -389,44 +406,5 @@ class _ReceiveView extends StatelessWidget {
       const SizedBox(height: AppSpacing.s),
       Text(context.l10n.privateUsdDepositHow, style: note),
     ];
-  }
-}
-
-/// An address's code: dark modules on a light plate, cut at the corners with a
-/// lit red edge as desktop's receive plates are. No badge: desktop's receive
-/// badges name ZEC's pools, which would misname a USDC address.
-class _AddressQr extends StatelessWidget {
-  const _AddressQr({required this.data, super.key});
-
-  final String data;
-
-  static const _size = 230.0;
-  static const _padding = AppSpacing.sm;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    return Container(
-      width: _size + _padding * 2,
-      height: _size + _padding * 2,
-      padding: const EdgeInsets.all(_padding),
-      decoration: ShapeDecoration(
-        color: colors.surface.qrCode,
-        shape: Neon.chamferBorder(
-          cut: AppChamfer.large,
-          side: BorderSide(color: colors.neon.glow.withValues(alpha: 0.55)),
-        ),
-        shadows: Neon.boxGlow(colors.neon.glow, intensity: 0.3),
-      ),
-      child: PrettyQrView(
-        qrImage: QrImage(
-          QrCode.fromData(data: data, errorCorrectLevel: QrErrorCorrectLevel.M),
-        ),
-        decoration: const PrettyQrDecoration(
-          quietZone: PrettyQrQuietZone.zero,
-          shape: DotQrShape(),
-        ),
-      ),
-    );
   }
 }
