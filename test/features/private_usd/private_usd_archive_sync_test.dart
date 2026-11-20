@@ -23,6 +23,7 @@ void main() {
   ProviderContainer containerWith({
     required PrivateUsdArchiveSyncStore store,
     String railgunNetwork = 'mainnet',
+    bool railgunHostSupported = false,
   }) {
     final container = ProviderContainer(
       overrides: [
@@ -36,6 +37,7 @@ void main() {
             rpcEndpointConfig: defaultRpcEndpointConfig('main'),
             themeMode: ThemeMode.dark,
             privacyModeEnabled: false,
+            railgunHostSupported: railgunHostSupported,
             isPasswordConfigured: true,
             isUnlocked: true,
             passwordRotationRecoveryFailed: false,
@@ -100,6 +102,48 @@ void main() {
       await starts(containerWith(store: MemoryArchiveSyncStore())),
       isFalse,
       reason: "the iOS host doesn't fetch it for the page",
+    );
+  });
+
+  test("the Mac's page starts on the archive where its host runs the page, "
+      'on mainnet, with the setting on', () async {
+    final start = FutureProvider.autoDispose(privateUsdArchiveSyncOf);
+    Future<bool> starts(ProviderContainer container) =>
+        container.read(start.future);
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+
+    expect(
+      await starts(
+        containerWith(
+          store: MemoryArchiveSyncStore(),
+          railgunHostSupported: true,
+        ),
+      ),
+      isTrue,
+    );
+    expect(
+      await starts(
+        containerWith(
+          store: MemoryArchiveSyncStore(false),
+          railgunHostSupported: true,
+        ),
+      ),
+      isFalse,
+    );
+    expect(
+      await starts(containerWith(store: MemoryArchiveSyncStore())),
+      isFalse,
+      reason: 'below macOS 14 no host runs the page',
+    );
+    expect(
+      await starts(
+        containerWith(
+          store: MemoryArchiveSyncStore(),
+          railgunNetwork: 'sepolia',
+          railgunHostSupported: true,
+        ),
+      ),
+      isFalse,
     );
   });
 
