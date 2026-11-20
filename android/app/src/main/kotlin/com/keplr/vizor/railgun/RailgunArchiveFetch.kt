@@ -28,9 +28,6 @@ internal object RailgunArchiveFetch {
     /** Far above the archive's largest file and far below the app's heap: a body past it is refused, never buffered. */
     const val MAX_BYTES = 16 * 1024 * 1024
 
-    // The same for every phone; the platform's own names the device and its build.
-    private const val USER_AGENT = "Mozilla/5.0"
-
     /** Whether the host answers a request itself: a GET of the archive, on the default https port. */
     fun handles(
         scheme: String?,
@@ -64,7 +61,8 @@ internal object RailgunArchiveFetch {
             connection.instanceFollowRedirects = false
             // The files are gzip, checked against the archive's checksums as served: never unzipped on the way.
             connection.setRequestProperty("Accept-Encoding", "identity")
-            connection.setRequestProperty("User-Agent", USER_AGENT)
+            // The page's own, the same for every phone: the platform's names the device and its build.
+            connection.setRequestProperty("User-Agent", RailgunRequests.USER_AGENT)
             val status = connection.responseCode
             if (!servable(status)) return empty(BAD_GATEWAY, headers)
             val stream = if (status in 200..299) connection.inputStream else connection.errorStream
