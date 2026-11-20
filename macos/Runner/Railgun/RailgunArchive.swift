@@ -34,7 +34,8 @@ enum RailgunArchive {
 
   /// Run once in the page's world before the `start` that reads the archive; idempotent, and true once the page
   /// will read it. The page took its transport (`railgunHost`) when it loaded, so hiding the WebKit host from what
-  /// it reads later leaves the transport as it was; only the start's archive check reads it again. Archive GETs go to
+  /// it reads later leaves the transport as it was; only the start's archive check reads it again. WebKit defines
+  /// `window.webkit` non-configurable, so the prelude replaces its `messageHandlers` instead. Archive GETs go to
   /// [path], the rest of the page's requests as they were. Nothing is spliced into it.
   static let prelude = """
     const archive = 'https://\(host)/';
@@ -52,8 +53,8 @@ enum RailgunArchive {
     };
     Object.defineProperty(globalThis, 'fetch', { value: routed, writable: true, configurable: true });
     try {
-      Object.defineProperty(globalThis, 'webkit', {
-        value: Object.freeze({ messageHandlers: Object.freeze({}) }),
+      Object.defineProperty(globalThis.webkit, 'messageHandlers', {
+        value: Object.freeze({}),
         configurable: true,
       });
     } catch {

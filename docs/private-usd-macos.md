@@ -145,7 +145,10 @@ archive"); only the host is new (`macos/Runner/Railgun/RailgunArchive.swift`).
   (`https://digest.anon.inc/…`) to `/anon-archive/…` on the page's own origin,
   where CSP's `'self'` and the content rules let them through, and hides the
   WebKit host from what the page reads later, so its start reads the archive
-  as Android's does. The page's transport took the host when it loaded and
+  as Android's does. WebKit defines `window.webkit` non-configurable, so the
+  prelude replaces `webkit.messageHandlers` with an empty object; 0.9.0's first
+  build redefined `webkit` itself, which threw, so that build never read the
+  archive. The page's transport took the host when it loaded (`index.js`) and
   stays as it was. A prelude that does not take leaves the page as on iOS:
   rail-squid alone. It runs on every page that starts with the archive, and
   is idempotent.
@@ -166,19 +169,20 @@ archive"); only the host is new (`macos/Runner/Railgun/RailgunArchive.swift`).
   page's `ARCHIVES` host to Kotlin's `ARCHIVE_HOST` and the bridge's
   allowlist (`railgun_bridge.rs`); the host was already in every allowlist and
   the page's CSP.
-- **Not run yet.** Only `swiftc -typecheck` and the Dart and Rust tests ran.
-  To try it: a mainnet build with `VIZOR_PRIVATE_USD_ENABLED=true` (and the
+- **What has run.** On 2026-11-20, on macOS 26.7, outside the app:
+  - In a WKWebView, the prelude took, and it is idempotent. The page's archive
+    check then found no host, and a transport taken at load still posted.
+  - The archive session asked a stand-in SOCKS5 proxy for
+    `digest.anon.inc:443` by hostname, so the bridge's allowlist accepts it.
+
+  Still not run: a real mainnet sync that reads the archive. To try it: a mainnet build with `VIZOR_PRIVATE_USD_ENABLED=true` (and the
   keyed RPC JSON, as for Android), then a Railgun first sync of a wallet far
   behind; sync only, nothing is spent. The archive is read only by a sync that
   starts more than four days behind the newest block, so a wallet synced
   lately won't ask it. Like Android's host, the Mac logs nothing of it: a
   first sync that reads it is far quicker than rail-squid's, and in a debug
   build a page loaded with `debug` is inspectable, where Safari's Web
-  Inspector lists the `/anon-archive/` requests. Unchecked on a Mac: that
-  WebKit lets the page's `webkit` global be redefined (if not, the prelude
-  says so and the page syncs from rail-squid, as before), and that
-  `URLSession` hands the bridge the hostname, as WebKit's own requests do (the
-  bridge refuses an IP address, so a fetch would fail, never go around it).
+  Inspector lists the `/anon-archive/` requests.
 
 ## Foreground and keep-awake on the Mac
 
