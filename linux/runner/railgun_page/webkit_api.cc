@@ -37,6 +37,8 @@ bool LoadWebKit(WebKitApi* api, std::string* why) {
   }
   RAILGUN_WEBKIT_FUNCTIONS(RAILGUN_RESOLVE)
 #undef RAILGUN_RESOLVE
+  api->soup_message_set_force_http1 =
+      reinterpret_cast<void (*)(SoupMessage*, gboolean)>(resolve("soup_message_set_force_http1"));
 
   const unsigned major = api->webkit_get_major_version();
   const unsigned minor = api->webkit_get_minor_version();

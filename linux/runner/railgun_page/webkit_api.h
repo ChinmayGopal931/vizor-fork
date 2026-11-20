@@ -77,7 +77,6 @@ namespace railgun_page {
   X(soup_auth_manager_get_type)                           \
   X(soup_message_new)                                     \
   X(soup_message_set_flags)                               \
-  X(soup_message_set_force_http1)                         \
   X(soup_message_get_status)                              \
   X(soup_message_get_request_headers)                     \
   X(soup_message_get_response_headers)                    \
@@ -92,6 +91,9 @@ struct WebKitApi {
 #define RAILGUN_DECLARE(name) decltype(&::name) name = nullptr;
   RAILGUN_WEBKIT_FUNCTIONS(RAILGUN_DECLARE)
 #undef RAILGUN_DECLARE
+  // libsoup 3.4 and later, null before: older headers (Ubuntu 22.04's 3.0, Debian 12's 3.2) don't declare it, so it
+  // is resolved by name and never required.
+  void (*soup_message_set_force_http1)(SoupMessage* message, gboolean value) = nullptr;
 };
 
 // The oldest WebKitGTK the page runs on: the page's engine and the calls above need no older, and every distribution

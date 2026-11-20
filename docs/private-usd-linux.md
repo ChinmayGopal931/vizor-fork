@@ -150,9 +150,13 @@ the checklist's sections 4 and 5:
     `Accept-Encoding: identity` and `Connection: Keep-Alive`, with no
     `Accept-Language` (`accept-language-auto` off) and no cache directive.
 
-  **Connections, as Android keeps them (H27).** Each request is HTTP/1.1
-  (`soup_message_set_force_http1`), so a connection carries one at a time and a
-  stalled connection costs only the try sent on it. The pool keeps five per
+  **Connections, as Android keeps them (H27).** Each request is HTTP/1.1, so a
+  connection carries one at a time and a stalled connection costs only the try
+  sent on it. libsoup offers HTTP/2 only on a direct connection, never through a
+  proxy, so the bridge's route alone gives HTTP/1.1 (Ubuntu 22.04's 3.0, Debian
+  12's 3.2); from 3.4 the request also asks for it
+  (`soup_message_set_force_http1`, resolved by name, since older headers lack
+  it). The pool keeps five per
   host, each idle five minutes at most. An answer read whole leaves its
   connection for the next request. Any other end (a failure, a stall, the size
   cap, the deadline) closes its body cancelled, so libsoup never uses that

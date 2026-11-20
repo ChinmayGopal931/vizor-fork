@@ -208,8 +208,11 @@ SoupMessage* NewArchiveMessage(const char* upstream) {
   SoupMessage* message = wk.soup_message_new("GET", upstream);
   if (message == nullptr) return nullptr;
   wk.soup_message_set_flags(message, SOUP_MESSAGE_NO_REDIRECT);
-  // HTTP/1.1, as Android's HttpURLConnection speaks: one request per connection at a time, never multiplexed.
-  wk.soup_message_set_force_http1(message, TRUE);
+  // HTTP/1.1, as Android's HttpURLConnection speaks: one request per connection at a time, never multiplexed. libsoup
+  // offers HTTP/2 only on a direct connection, never through a proxy (`new_tls_connection` in 3.0.7, 3.2.2 and 3.4.4),
+  // so the bridge's route alone gives HTTP/1.1; the call, where libsoup has it (3.4 and later), keeps it so whatever
+  // a later libsoup offers.
+  if (wk.soup_message_set_force_http1 != nullptr) wk.soup_message_set_force_http1(message, TRUE);
   SoupMessageHeaders* headers = wk.soup_message_get_request_headers(message);
   wk.soup_message_headers_replace(headers, "Accept-Encoding", "identity");
   wk.soup_message_headers_replace(headers, "Connection", "Keep-Alive");
