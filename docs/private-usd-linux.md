@@ -72,6 +72,11 @@ Registration is `register_private_usd_channels` in `my_application.cc`'s
     link, as on most machines).
     A `CACHEDIR.TAG` there keeps it out of backups that honour one (Déjà Dup,
     Borg, restic), as the Mac keeps its store out of Time Machine.
+  - Its one origin may keep 60% of the volume (`origin-storage-ratio`), as an
+    origin may in Chromium, which Android's page runs on. WebKitGTK's own quota
+    is 1 GiB, and a write past it fails with a `QuotaExceededError`; Railgun's
+    mainnet store passes 2 GB. The total is left unlimited, since a total
+    reached evicts, which would take the page's store.
   - Its proxy is `socks5://127.0.0.1:<bridge port>`, with no direct route (the
     bridge is checked before any load).
   - The `veylor-railgun` scheme is registered as secure and CORS-enabled. It
@@ -292,7 +297,10 @@ item. Items not named here hold as on Android and the Mac.
   the handler is in the page world alone, and the CSP allows no frames.
 - **H9.** The store is in the app's support directory, beside the wallet, and
   is wiped whole (retried). Linux has no system backup flag: a `CACHEDIR.TAG`
-  keeps the store out of the backup tools that honour one.
+  keeps the store out of the backup tools that honour one. Its origin may keep
+  60% of the volume, where WebKitGTK's own quota of 1 GiB failed every write of
+  a mainnet store past about 2 GB (fixed 2026-11-21, below). The Mac's WebKit
+  gives an app's origin 15% of the disk.
 - **H10.** The offscreen window keeps the page unthrottled while Veylor's window
   shows, focused or not. Veylor hides it while its window is minimised or
   withdrawn or the session is away. On Wayland GTK never learns of a minimise,
@@ -317,6 +325,24 @@ item. Items not named here hold as on Android and the Mac.
   (kept).
 - **H30.** The fetches run on the page process's main loop, never Veylor's.
 - **H35.** The keep-awake flag is an idle inhibitor (above).
+
+## Every refresh failed on the owner's mainnet store (2026-11-21)
+
+On internal.12 every Shielded USD refresh failed ("Couldn't update the
+balance"). Replayed on a copy of the owner's page store, with BIP-39's test
+mnemonic and nothing spent, the first refreshes went through. Then the
+transaction list, catching up from about 55,000 of 153,469 from the archive,
+stopped at 74,999 ("the engine kept nothing of an archive batch"). From then on
+every refresh failed after about 11 s: `FAILED`, "the notes scan broke off,
+so the balances may be stale". The engine's scan ended in a storage `put`.
+
+The store had reached WebKitGTK's quota for the page's origin. Its IndexedDB
+held 2,185,469,952 bytes. On WebKit's defaults a 16 MB `put` into that origin
+failed with `QuotaExceededError: Failed to PutOrAdd in database because not
+enough space for domain`; with `origin-storage-ratio` 0.6, puts up to 512 MB
+went through. Every scan writes, so every refresh failed. The page's process
+now gives its origin 60% of the volume. The archive tip fix wasn't the cause:
+it changes where the list's transactions come from, not how much is kept.
 
 ## What has run (2026-11-20)
 
