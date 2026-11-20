@@ -107,10 +107,11 @@ outside it:
   bubblewrap closes the page as `unavailable`.
 - **Where it fails**, `supported` is false and Shielded USD stays hidden, as
   below macOS 14.
-- **Asked after the first frame.** On Linux the bootstrap does not ask
+- **Asked after the first frame.** On Linux the bootstrap does not wait for
   `supported` before the first frame (`app_bootstrap.dart`), so the check (a
-  second or so) never delays the start; `RailgunHostSupportedNotifier` asks
-  after it, and Shielded USD shows when the check passes.
+  second or so) never delays the start. It starts once the first frame is up,
+  `RailgunHostSupportedNotifier` takes its answer, and Shielded USD shows when
+  the check passes.
 
 **Ubuntu 23.10 and later** refuse user namespaces to programs no AppArmor
 profile allows (`kernel.apparmor_restrict_unprivileged_userns=1`), so

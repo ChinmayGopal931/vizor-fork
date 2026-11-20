@@ -1,8 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart' show kDebugMode, visibleForTesting;
-import 'package:flutter/material.dart' show ThemeMode;
+import 'package:flutter/material.dart' show ThemeMode, WidgetsBinding;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -323,8 +324,9 @@ Future<AppBootstrapState> loadAppBootstrap({
     final explorerUrlTemplate = await _readExplorerUrlTemplate(storage);
     final themeMode = await _readThemeMode(storage);
     final appLanguage = await _readAppLanguage(storage);
-    final privacyModeEnabled = await PrivacyModePersistence(storage)
-        .readAndRecover();
+    final privacyModeEnabled = await PrivacyModePersistence(
+      storage,
+    ).readAndRecover();
     final hideBalanceOnUnlockEnabled = await _readPlainBool(
       storage,
       key: kHideBalanceOnUnlockKey,
@@ -354,6 +356,13 @@ Future<AppBootstrapState> loadAppBootstrap({
         : Platform.isLinux
         ? null
         : await queryRailgunHostSupported();
+    // Linux's check starts once the first frame is up, so its answer is in
+    // by the time the unlocked wallet asks.
+    if (kPrivateUsdBuildEnabled && Platform.isLinux) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => unawaited(queryRailgunHostSupported()),
+      );
+    }
     final flipToHideBalanceEnabled = await _readPlainBool(
       storage,
       key: kFlipToHideBalanceEnabledKey,
@@ -579,7 +588,8 @@ Future<AppBootstrapState> loadAppBootstrap({
     log('bootstrap: secure storage unavailable: $e');
     return AppBootstrapState.blocked(
       failureKind: AppBootstrapFailureKind.secureStorageUnavailable,
-      failureMessage: 'Veylor needs access to secure storage before it can open your wallet.', // l10n-ignore: diagnostic; the screen words it by failureKind
+      failureMessage:
+          'Veylor needs access to secure storage before it can open your wallet.', // l10n-ignore: diagnostic; the screen words it by failureKind
     );
   } catch (e) {
     log('bootstrap: failed, blocking startup: $e');
@@ -588,7 +598,8 @@ Future<AppBootstrapState> loadAppBootstrap({
     );
     return AppBootstrapState.blocked(
       failureKind: AppBootstrapFailureKind.startupFailure,
-      failureMessage: 'Veylor could not load its startup state.', // l10n-ignore: diagnostic; the screen words it by failureKind
+      failureMessage:
+          'Veylor could not load its startup state.', // l10n-ignore: diagnostic; the screen words it by failureKind
     );
   }
 }
