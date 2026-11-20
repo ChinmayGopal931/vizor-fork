@@ -271,16 +271,63 @@ test('a chunk sealed since the index was read is taken before the tip', async ()
   assert.deepEqual(stored, await storedBySquid());
 });
 
-test("a tip that doesn't follow the last sealed chunk is refused, and rail-squid goes on from that chunk", async () => {
+/** `fixture`'s archive with its tip's meta edited by `edit`, and the manifest naming the edited tip. */
+function editedTip(edit) {
   const server = archiveServer(fixture, { sealedAt });
-  const tip = JSON.parse(server.files.get('tip/meta.json'));
-  const moved = Buffer.from(JSON.stringify({ ...tip, startBlock: tip.startBlock + 5 }));
-  server.files.set('tip/meta.json', moved);
-  server.setManifest((manifest) => ({ ...manifest, tipChecksum: hashOf(moved) }));
-  const { stored, asked, left } = await storedByArchive(server);
-  assert.match(left[0], /tip/);
-  assert.equal(squidFrom(asked, 'commitments'), sealedAt[2]);
-  assert.deepEqual(stored, await storedBySquid());
+  const meta = Buffer.from(JSON.stringify(edit(JSON.parse(server.files.get('tip/meta.json')))));
+  server.files.set('tip/meta.json', meta);
+  server.setManifest((manifest) => ({ ...manifest, tipChecksum: hashOf(meta) }));
+  return server;
+}
+
+test("a tip that overlaps the last sealed chunk, or doesn't name its blocks, is refused, and rail-squid goes on from that chunk", async () => {
+  const sealedEnd = sealedAt[2] - 1;
+  const tips = [
+    (tip) => ({ ...tip, startBlock: sealedEnd }),
+    (tip) => ({ ...tip, startBlock: sealedEnd - 5 }),
+    (tip) => ({ ...tip, startBlock: String(tip.startBlock) }),
+    (tip) => ({ ...tip, endBlock: undefined }),
+  ];
+  for (const edit of tips) {
+    const { stored, asked, left } = await storedByArchive(editedTip(edit));
+    assert.match(left[0], new RegExp(`the tip does not follow block ${sealedEnd}`));
+    assert.equal(squidFrom(asked, 'commitments'), sealedAt[2]);
+    assert.deepEqual(stored, await storedBySquid());
+  }
+});
+
+// As on mainnet, blocks with no event where the last sealed chunk meets the tip: the chunk names its blocks through its
+// last event's, the tip from its first event's.
+const quiet = history({ quiet: Array.from({ length: 10 }, (_, i) => sealedAt[2] - 4 + i) });
+const seamOf = (server) => ({
+  sealedEnd: JSON.parse(server.files.get('chunk-index.json')).chunks.at(-1).endBlock,
+  tipStart: JSON.parse(server.files.get('tip/meta.json')).startBlock,
+});
+
+test('a tip that starts blocks after the last sealed chunk ends is read: the tree positions show no note is missing', async () => {
+  const server = archiveServer(quiet, { sealedAt });
+  const { sealedEnd, tipStart } = seamOf(server);
+  assert.ok(tipStart > sealedEnd + 1, `the fixture's tip starts at ${tipStart}, right after ${sealedEnd}`);
+  const { stored, asked, left } = await storedByArchive(server, { lists: quiet.squid });
+  assert.deepEqual(left, []);
+  assert.ok(server.asked.includes('tip/commitments.json.gz'));
+  // The tip's commitments came from the archive: rail-squid was asked for them only past its lists' newest block.
+  assert.equal(squidFrom(asked, 'commitments'), newestBlockOf(quiet.squid.unshields) + 1);
+  assert.deepEqual(stored, await storedBySquid(quiet.squid));
+});
+
+test('a batch missing between the last sealed chunk and the tip, the tip starting after it, hands the rest to rail-squid there', async () => {
+  // The archive without the tip's first block, as a tip that started a block late would be: checksums and all.
+  const { tipStart } = seamOf(archiveServer(quiet, { sealedAt }));
+  const without = (records) => records.filter(({ blockNumber }) => blockNumber !== tipStart);
+  const lists = Object.entries(quiet.archive).map(([kind, records]) => [kind, without(records)]);
+  const server = archiveServer({ ...quiet, archive: Object.fromEntries(lists) }, { sealedAt });
+  const { sealedEnd } = seamOf(server);
+  assert.ok(seamOf(server).tipStart > tipStart);
+  const { stored, asked, left } = await storedByArchive(server, { lists: quiet.squid });
+  assert.match(left[0], /the archive's commitments skip/);
+  assert.equal(squidFrom(asked, 'commitments'), sealedEnd + 1);
+  assert.deepEqual(stored, await storedBySquid(quiet.squid));
 });
 
 test('a quick sync killed partway through the archive resumes from its newest stored commitment', async () => {

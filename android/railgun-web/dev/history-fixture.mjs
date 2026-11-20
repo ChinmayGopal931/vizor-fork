@@ -20,14 +20,15 @@ export const blockTime = (block) => 1_650_000_000 + block * 12;
 const TOKEN = `0x${word('token', 20)}`;
 
 /**
- * Blocks `from` to `from + blocks - 1`, each with a few commitment batches, nullifiers and unshields:
- * `squid` (rail-squid's raw lists) and `archive` (the archive's records, in block order).
+ * Blocks `from` to `from + blocks - 1`, each with a few commitment batches, nullifiers and unshields but those in
+ * `quiet`, which have none: `squid` (rail-squid's raw lists) and `archive` (the archive's records, in block order).
  */
-export function history({ from = 14_760_000, blocks = 120 } = {}) {
+export function history({ from = 14_760_000, blocks = 120, quiet = [] } = {}) {
   const squid = { commitments: [], nullifiers: [], unshields: [] };
   const archive = { commitments: [], nullifiers: [], unshields: [] };
   let position = 0;
   for (let block = from; block < from + blocks; block += 1) {
+    if (quiet.includes(block)) continue;
     const time = blockTime(block);
     for (let batch = 0; batch < block % 4; batch += 1) {
       const txid = word(`tx-${block}-${batch}`);
@@ -161,8 +162,10 @@ export function treeFile(leaves) {
 
 /**
  * Anon's archive of `fixture` for chain 1, sealed into chunks at `sealedAt` (the first block of each chunk after the
- * first) with the rest as the tip, and `transactions` (archive records) placed by block. `files` maps each path to its
- * bytes; `fetch` answers from it (404 for a missing one) and records every path asked for.
+ * first) with the rest as the tip, and `transactions` (archive records) placed by block. As the archive does, each
+ * chunk and the tip name their blocks from the first with an event to the last (one without events keeps its bounds).
+ * `files` maps each path to its bytes; `fetch` answers from it (404 for a missing one) and records every path asked
+ * for.
  */
 export function archiveServer(fixture, { sealedAt, transactions = [], trees = {} }) {
   const files = new Map();
@@ -173,12 +176,20 @@ export function archiveServer(fixture, { sealedAt, transactions = [], trees = {}
     ranges.push([start, boundary - 1]);
     start = boundary;
   }
-  const tipRange = ranges.pop();
   const inRange =
     ([from, to]) =>
     ({ blockNumber }) =>
       blockNumber >= from && blockNumber <= to;
   const kinds = { ...fixture.archive, transactions };
+  // The blocks a range is published as: from its first event's to its last's.
+  const spans = ranges.map((range) => {
+    const blocks = Object.values(kinds).flatMap((records) =>
+      records.filter(inRange(range)).map(({ blockNumber }) => Number(blockNumber)),
+    );
+    if (blocks.length === 0) return range;
+    return [blocks.reduce((a, b) => Math.min(a, b)), blocks.reduce((a, b) => Math.max(a, b))];
+  });
+  const tipRange = spans.pop();
   const publish = (dir, range) => {
     const meta = { files: {}, counts: {} };
     for (const [kind, records] of Object.entries(kinds)) {
@@ -189,7 +200,7 @@ export function archiveServer(fixture, { sealedAt, transactions = [], trees = {}
     }
     return meta;
   };
-  const chunks = ranges.map(([from, to], id) => {
+  const chunks = spans.map(([from, to], id) => {
     const meta = publish(`chunks/${id}`, [from, to]);
     files.set(
       `chunks/${id}/meta.json`,
