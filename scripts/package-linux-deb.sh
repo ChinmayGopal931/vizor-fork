@@ -227,7 +227,7 @@ cat > "$ROOT/DEBIAN/control" <<CONTROL
 Package: $PACKAGE
 Version: $VERSION
 Architecture: $DEB_ARCH
-Maintainer: Zapp LLC <noreply@veylor.invalid>
+Maintainer: Zapp LLC <hello@veylor.cash>
 Installed-Size: $installed_size
 Depends: $depends
 Recommends: libwebkit2gtk-4.1-0, gnome-keyring | kwalletmanager | keepassxc, gstreamer1.0-plugins-base, gstreamer1.0-plugins-good, gstreamer1.0-pipewire
