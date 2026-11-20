@@ -11,26 +11,27 @@ const char kArchivePrelude[] = R"JS(
 const archive = 'https://digest.anon.inc/';
 const own = '/anon-archive/';
 const marker = Symbol.for('veylor.railgunArchive');
-if (globalThis[marker] === true) return true;
-const pageFetch = globalThis.fetch;
-const host = globalThis.webkit;
-if (typeof pageFetch !== 'function' || host === undefined || host === null) return false;
+const webkit = globalThis.webkit;
+if (typeof webkit !== 'object' || webkit === null) return false;
+if (globalThis[marker] === undefined) {
+  const pageFetch = globalThis.fetch;
+  if (typeof pageFetch !== 'function') return false;
+  const routed = function (input, init) {
+    const method = init?.method === undefined ? 'GET' : String(init.method).toUpperCase();
+    if (typeof input === 'string' && method === 'GET' && input.startsWith(archive)) {
+      return pageFetch.call(globalThis, own + input.slice(archive.length), init);
+    }
+    return pageFetch.call(globalThis, input, init);
+  };
+  Object.defineProperty(globalThis, 'fetch', { value: routed, writable: true, configurable: true });
+}
 try {
-  Object.defineProperty(host, 'messageHandlers', { value: Object.freeze({}), configurable: true });
+  Object.defineProperty(webkit, 'messageHandlers', { value: Object.freeze({}), configurable: true });
 } catch {
   return false;
 }
-if (globalThis.webkit?.messageHandlers?.railgunHost !== undefined) return false;
-const routed = function (input, init) {
-  const method = init?.method === undefined ? 'GET' : String(init.method).toUpperCase();
-  if (typeof input === 'string' && method === 'GET' && input.startsWith(archive)) {
-    return pageFetch.call(globalThis, own + input.slice(archive.length), init);
-  }
-  return pageFetch.call(globalThis, input, init);
-};
-Object.defineProperty(globalThis, 'fetch', { value: routed, writable: true, configurable: true });
-Object.defineProperty(globalThis, marker, { value: true });
-return true;
+Object.defineProperty(globalThis, marker, { value: webkit, configurable: true });
+return globalThis.webkit?.messageHandlers?.railgunHost === undefined;
 )JS";
 
 std::string ArchiveUpstream(const char* page_uri) {
@@ -73,14 +74,16 @@ void AnswerSchemeRequest(WebKitURISchemeRequest* request, unsigned status, const
   g_object_unref(response);
 }
 
-// One archive request on its way: the page's request, the archive's answer and its body so far.
+// One archive request on its way: the page's request, the archive's answer and its body so far, and the session
+// (the connection pool) it went out on.
 struct ArchiveFetch::Fetch {
   ArchiveFetch* owner;
   WebKitURISchemeRequest* request;
+  SoupSession* session;
   SoupMessage* message;
   GCancellable* cancellable;
   GInputStream* body_stream = nullptr;
-  GByteArray* body;
+  GByteArray* body = nullptr;
   guint deadline = 0;
   unsigned status = 0;
   std::string type;
@@ -91,20 +94,29 @@ namespace {
 
 using Fetch = ArchiveFetch::Fetch;
 
-void Finish(Fetch* fetch, unsigned status, const char* type, GBytes* body) {
+// Ends `fetch`, answering the page unless it was abandoned. An answer read whole leaves its connection to the pool
+// for the next request; any other end closes it first, cancelled so nothing more is read from it, and libsoup never
+// uses it again: the page's next try goes out on another connection.
+void Finish(Fetch* fetch, bool whole, unsigned status, const char* type, GBytes* body) {
   if (fetch->deadline != 0) g_source_remove(fetch->deadline);
   fetch->deadline = 0;
+  if (fetch->body_stream != nullptr) {
+    if (!whole) g_cancellable_cancel(fetch->cancellable);
+    g_input_stream_close(fetch->body_stream, whole ? nullptr : fetch->cancellable, nullptr);
+    g_object_unref(fetch->body_stream);
+    fetch->body_stream = nullptr;
+  }
   if (!fetch->abandoned) AnswerSchemeRequest(fetch->request, status, type, body, nullptr);
   if (fetch->owner != nullptr) fetch->owner->Remove(fetch);
-  if (fetch->body_stream != nullptr) g_object_unref(fetch->body_stream);
   g_object_unref(fetch->message);
   g_object_unref(fetch->cancellable);
   g_object_unref(fetch->request);
-  g_byte_array_unref(fetch->body);
+  g_object_unref(fetch->session);
+  if (fetch->body != nullptr) g_byte_array_unref(fetch->body);
   delete fetch;
 }
 
-void Fail(Fetch* fetch) { Finish(fetch, 502, "text/plain; charset=utf-8", nullptr); }
+void Fail(Fetch* fetch) { Finish(fetch, false, 502, "text/plain; charset=utf-8", nullptr); }
 
 void OnRead(GObject* source, GAsyncResult* result, gpointer data) {
   auto* fetch = static_cast<Fetch*>(data);
@@ -116,11 +128,10 @@ void OnRead(GObject* source, GAsyncResult* result, gpointer data) {
   const gsize size = g_bytes_get_size(chunk);
   if (size == 0) {
     g_autoptr(GBytes) body = g_byte_array_free_to_bytes(g_byte_array_ref(fetch->body));
-    Finish(fetch, fetch->status, fetch->type.empty() ? "application/octet-stream" : fetch->type.c_str(), body);
+    Finish(fetch, true, fetch->status, fetch->type.empty() ? "application/octet-stream" : fetch->type.c_str(), body);
     return;
   }
   if (fetch->body->len + size > kArchiveMaxBytes) {
-    g_cancellable_cancel(fetch->cancellable);
     Fail(fetch);
     return;
   }
@@ -134,19 +145,23 @@ void OnSent(GObject* source, GAsyncResult* result, gpointer data) {
   const WebKitApi& wk = Wk();
   GInputStream* stream = wk.soup_session_send_finish(reinterpret_cast<SoupSession*>(source), result, nullptr);
   if (stream == nullptr || fetch->abandoned) {
-    if (stream != nullptr) g_object_unref(stream);
+    if (stream != nullptr) {
+      fetch->body_stream = stream;
+    }
     Fail(fetch);
     return;
   }
   fetch->body_stream = stream;
   fetch->status = wk.soup_message_get_status(fetch->message);
   SoupMessageHeaders* headers = wk.soup_message_get_response_headers(fetch->message);
-  if (!ArchiveServable(fetch->status) ||
-      (wk.soup_message_headers_get_encoding(headers) == SOUP_ENCODING_CONTENT_LENGTH &&
-       wk.soup_message_headers_get_content_length(headers) > static_cast<goffset>(kArchiveMaxBytes))) {
+  const bool declared = wk.soup_message_headers_get_encoding(headers) == SOUP_ENCODING_CONTENT_LENGTH;
+  const goffset length = declared ? wk.soup_message_headers_get_content_length(headers) : 0;
+  if (!ArchiveServable(fetch->status) || length > static_cast<goffset>(kArchiveMaxBytes)) {
     Fail(fetch);
     return;
   }
+  // A body that says how long it is is kept in one piece, as Android's host sizes its buffer.
+  fetch->body = g_byte_array_sized_new(length > 0 ? static_cast<guint>(length) : 64 * 1024);
   if (const char* type = wk.soup_message_headers_get_content_type(headers, nullptr)) fetch->type = type;
   g_input_stream_read_bytes_async(stream, 64 * 1024, G_PRIORITY_DEFAULT, fetch->cancellable, OnRead, fetch);
 }
@@ -154,7 +169,7 @@ void OnSent(GObject* source, GAsyncResult* result, gpointer data) {
 gboolean OnDeadline(gpointer data) {
   auto* fetch = static_cast<Fetch*>(data);
   fetch->deadline = 0;
-  // The pending read or send then fails, and answers.
+  // The pending send or read then fails, and answers.
   g_cancellable_cancel(fetch->cancellable);
   return G_SOURCE_REMOVE;
 }
@@ -169,25 +184,54 @@ void ArchiveFetch::Remove(Fetch* fetch) {
 
 ArchiveFetch::~ArchiveFetch() {
   Close();
-  if (session_ != nullptr) g_object_unref(session_);
 }
 
-// The archive's own session: through the bridge alone (no direct route to fall back on), with no cache, cookie or
-// credential store, a stalled connection or read failing after 20 s and any answer after a minute.
-SoupSession* ArchiveFetch::Session() {
-  if (session_ != nullptr) return session_;
+SoupSession* NewArchiveSession(int bridge_port) {
   const WebKitApi& wk = Wk();
-  const std::string proxy = "socks5://127.0.0.1:" + std::to_string(bridge_port_);
+  const std::string proxy = "socks5://127.0.0.1:" + std::to_string(bridge_port);
   g_autoptr(GProxyResolver) resolver = g_simple_proxy_resolver_new(proxy.c_str(), nullptr);
-  session_ = wk.soup_session_new_with_options("proxy-resolver", resolver, "timeout", kArchiveStallSeconds,
-                                              "idle-timeout", kArchiveStallSeconds, "user-agent", kArchiveUserAgent,
-                                              nullptr);
-  if (session_ == nullptr) return nullptr;
+  SoupSession* session = wk.soup_session_new_with_options(
+      "proxy-resolver", resolver, "timeout", kArchiveStallSeconds, "idle-timeout", kArchiveKeepAliveSeconds,
+      "max-conns", static_cast<int>(kArchiveMaxConnections * 2), "max-conns-per-host",
+      static_cast<int>(kArchiveMaxConnections), "user-agent", kArchiveUserAgent, "accept-language-auto", FALSE,
+      nullptr);
+  if (session == nullptr) return nullptr;
   // The files are checked against the archive's checksums as served: never unzipped, sniffed or authenticated.
-  wk.soup_session_remove_feature_by_type(session_, wk.soup_content_decoder_get_type());
-  wk.soup_session_remove_feature_by_type(session_, wk.soup_content_sniffer_get_type());
-  wk.soup_session_remove_feature_by_type(session_, wk.soup_auth_manager_get_type());
+  wk.soup_session_remove_feature_by_type(session, wk.soup_content_decoder_get_type());
+  wk.soup_session_remove_feature_by_type(session, wk.soup_content_sniffer_get_type());
+  wk.soup_session_remove_feature_by_type(session, wk.soup_auth_manager_get_type());
+  return session;
+}
+
+SoupMessage* NewArchiveMessage(const char* upstream) {
+  const WebKitApi& wk = Wk();
+  SoupMessage* message = wk.soup_message_new("GET", upstream);
+  if (message == nullptr) return nullptr;
+  wk.soup_message_set_flags(message, SOUP_MESSAGE_NO_REDIRECT);
+  // HTTP/1.1, as Android's HttpURLConnection speaks: one request per connection at a time, never multiplexed.
+  wk.soup_message_set_force_http1(message, TRUE);
+  SoupMessageHeaders* headers = wk.soup_message_get_request_headers(message);
+  wk.soup_message_headers_replace(headers, "Accept-Encoding", "identity");
+  wk.soup_message_headers_replace(headers, "Connection", "Keep-Alive");
+  return message;
+}
+
+// The connections' pool: a session, through the bridge alone (no direct route to fall back on), with no cache, cookie
+// or credential store. A change of network makes the next request start a new one, so no connection made before is
+// used again; requests in flight finish on theirs, and the old pool goes with the last of them.
+SoupSession* ArchiveFetch::Session() {
+  if (network_changed_handler_ == 0) {
+    GNetworkMonitor* monitor = g_network_monitor_get_default();
+    network_changed_handler_ = g_signal_connect(monitor, "network-changed", G_CALLBACK(OnNetworkChanged), this);
+  }
+  if (session_ == nullptr) session_ = NewArchiveSession(bridge_port_);
   return session_;
+}
+
+void ArchiveFetch::OnNetworkChanged(GNetworkMonitor*, gboolean, gpointer data) {
+  auto* self = static_cast<ArchiveFetch*>(data);
+  if (self->session_ != nullptr) g_object_unref(self->session_);
+  self->session_ = nullptr;
 }
 
 void ArchiveFetch::Start(WebKitURISchemeRequest* request) {
@@ -203,15 +247,13 @@ void ArchiveFetch::Start(WebKitURISchemeRequest* request) {
     return;
   }
   SoupSession* session = Session();
-  SoupMessage* message = session != nullptr ? wk.soup_message_new("GET", upstream.c_str()) : nullptr;
+  SoupMessage* message = session != nullptr ? NewArchiveMessage(upstream.c_str()) : nullptr;
   if (message == nullptr) {
     AnswerSchemeRequest(request, 502, "text/plain; charset=utf-8", nullptr, nullptr);
     return;
   }
-  wk.soup_message_set_flags(message, SOUP_MESSAGE_NO_REDIRECT);
-  wk.soup_message_headers_replace(wk.soup_message_get_request_headers(message), "Accept-Encoding", "identity");
-  auto* fetch = new Fetch{this, static_cast<WebKitURISchemeRequest*>(g_object_ref(request)), message,
-                          g_cancellable_new(), nullptr, g_byte_array_new()};
+  auto* fetch = new Fetch{this, static_cast<WebKitURISchemeRequest*>(g_object_ref(request)),
+                          static_cast<SoupSession*>(g_object_ref(session)), message, g_cancellable_new()};
   fetch->deadline = g_timeout_add_seconds(kArchiveDeadlineSeconds, OnDeadline, fetch);
   fetches_.push_back(fetch);
   wk.soup_session_send_async(session, message, G_PRIORITY_DEFAULT, fetch->cancellable, OnSent, fetch);
@@ -220,15 +262,25 @@ void ArchiveFetch::Start(WebKitURISchemeRequest* request) {
 void ArchiveFetch::Close() {
   closed_ = true;
   enabled_ = false;
-  // Each fetch answers once its cancelled step returns; a closed page reads none of them.
+  if (network_changed_handler_ != 0) {
+    g_signal_handler_disconnect(g_network_monitor_get_default(), network_changed_handler_);
+    network_changed_handler_ = 0;
+  }
+  // Each fetch ends once its cancelled step returns, and a closed page reads none of them; every connection, kept ones
+  // included, closes with its pool.
   std::vector<Fetch*> fetches = fetches_;
   for (Fetch* fetch : fetches) {
     fetch->abandoned = true;
     fetch->owner = nullptr;
     g_cancellable_cancel(fetch->cancellable);
+    Wk().soup_session_abort(fetch->session);
   }
   fetches_.clear();
-  if (session_ != nullptr) Wk().soup_session_abort(session_);
+  if (session_ != nullptr) {
+    Wk().soup_session_abort(session_);
+    g_object_unref(session_);
+    session_ = nullptr;
+  }
 }
 
 }  // namespace railgun_page

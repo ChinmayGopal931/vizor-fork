@@ -34,11 +34,18 @@ inline constexpr unsigned kArchiveStallSeconds = 20;
 // The same for every computer, and Android's: the platform's own would name the system and its build.
 inline constexpr char kArchiveUserAgent[] = "Mozilla/5.0";
 
-// Run once in the page's world before the `start` that reads the archive; idempotent, and true once the page will
-// read it. WebKit's `window.webkit` can't be redefined, so it hides the host behind an own `messageHandlers` on the
-// `webkit` object instead; the page took its transport (`railgunHost`) when it loaded, which keeps posting, and only
-// the start's archive check reads the handlers again. Archive GETs then go to `kArchivePath`, the rest of the page's
-// requests as they were. Nothing is spliced into it.
+// Android's connection pool (`ConfigAwareConnectionPool`'s defaults): five connections at most, each kept idle for
+// five minutes at most. Five also leaves the page's four requests in flight a connection each.
+inline constexpr unsigned kArchiveMaxConnections = 5;
+inline constexpr unsigned kArchiveKeepAliveSeconds = 5 * 60;
+
+// Run in the page's world before every `start` that reads the archive; idempotent, and true once the page will read
+// it. WebKit's `window.webkit` can't be redefined, so it hides the host behind an own `messageHandlers` on the
+// `webkit` object instead, and holds that object on the global: WebKit makes it anew, with the real handlers, once
+// nothing in the page refers to it, so a garbage collection between the prelude and the start would show the start
+// the host again (the Mac's page skipped the archive so). The page took its transport (`railgunHost`) when it loaded,
+// which keeps posting, and only the start's archive check reads the handlers again. Archive GETs then go to
+// `kArchivePath`, the rest of the page's requests as they were. Nothing is spliced into it.
 extern const char kArchivePrelude[];
 
 // The archive URL a request to `kArchivePath` on the page's origin stands for: the same path and query on the
@@ -49,11 +56,23 @@ std::string ArchiveUpstream(const char* page_uri);
 // is a failure.
 bool ArchiveServable(unsigned status);
 
-// One page's archive requests, fetched through its bridge with Android's limits: a GET of the archive on the default
-// https port, a minute and 16 MB an answer at most, no redirect followed, no cache, cookie or credential, a fixed
-// User-Agent, and the files as served (never unzipped on the way, since the page checks them against the archive's
-// checksums as served). A failure is a 502, which the page takes as the archive's, as on Android. Everything runs on
-// the main loop. It logs nothing.
+// The archive's session, a pool of connections through the bridge at `bridge_port` alone, and a request for
+// `upstream`, as Android's host makes them: HTTP/1.1, so a connection carries one request at a time (never multiplexed
+// on one HTTP/2 connection, which a stalled connection would hold whole); at most five, each kept idle five minutes;
+// a 20 s connect or read stall; no cookie, cache, credential, decoding or sniffing; and exactly Android's headers:
+// `Host`, `User-Agent: Mozilla/5.0`, `Accept-Encoding: identity` and `Connection: Keep-Alive`, no `Accept-Language`
+// and no cache directive. Separate so a check can see what they send.
+SoupSession* NewArchiveSession(int bridge_port);
+SoupMessage* NewArchiveMessage(const char* upstream);
+
+// One page's archive requests, fetched through its bridge as Android's host fetches them (`RailgunArchiveFetch.kt`):
+// a GET of the archive on the default https port, a minute and 16 MB an answer at most, no redirect followed, and the
+// files as served (never unzipped on the way, since the page checks them against the archive's checksums as served).
+// A failure is a 502, which the page tries again and then takes as the archive's, as on Android. Its connections are
+// kept as Android keeps them: one whose answer was read whole goes back to the pool for the next request, one whose
+// request failed, stalled, was refused for its size or was abandoned is closed, and a change of network starts a new
+// pool. WebKitGTK doesn't say when the page aborts a request, so such a fetch runs to its own end and its answer is
+// dropped, as on Android. Everything runs on the main loop. It logs nothing.
 class ArchiveFetch {
  public:
   explicit ArchiveFetch(int bridge_port);
@@ -75,11 +94,13 @@ class ArchiveFetch {
 
  private:
   SoupSession* Session();
+  static void OnNetworkChanged(GNetworkMonitor* monitor, gboolean available, gpointer data);
 
   int bridge_port_;
   bool enabled_ = false;
   bool closed_ = false;
   SoupSession* session_ = nullptr;
+  gulong network_changed_handler_ = 0;
   std::vector<Fetch*> fetches_;
 };
 

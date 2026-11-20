@@ -29,6 +29,16 @@ constexpr char kDeliveryScript[] = "__railgunHostDeliver(m); return true;";
 constexpr char kMessageHandler[] = "railgunHost";
 constexpr char kFilterIdentifier[] = "railgun-allowlist";
 constexpr guint kProbeTimeoutSeconds = 20;
+// What the page's own requests (the RPC, rail-squid, the screening node, the artifacts) say they come from: the same
+// on every computer. WebKitGTK's own names the distribution and the processor; this one, like the Mac's WebKit,
+// which freezes its OS version and names no model, names neither, and claims one platform for all.
+constexpr char kPageUserAgent[] = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko)";
+// The check's page, on the page's own secure scheme: it must have what the page needs.
+constexpr char kProbeUrl[] = "veylor-railgun://app/probe.html";
+constexpr char kProbePage[] = "<!doctype html><meta charset=utf-8><title></title>";
+constexpr char kProbeScript[] =
+    "isSecureContext && typeof crypto?.subtle?.digest === 'function' && typeof WebAssembly === 'object' && "
+    "typeof indexedDB === 'object' && typeof localStorage === 'object' && typeof Worker === 'function'";
 
 // The link's descriptor, for the fatal path, where nothing else may run.
 int g_link_fd = -1;
@@ -141,6 +151,9 @@ GObject* NewSettings(bool debug) {
   flag("allow-universal-access-from-file-urls", FALSE);
   flag("enable-write-console-messages-to-stdout", FALSE);
   flag("enable-developer-extras", debug ? TRUE : FALSE);
+  if (g_object_class_find_property(klass, "user-agent") != nullptr) {
+    g_object_set(settings, "user-agent", kPageUserAgent, nullptr);
+  }
   if (g_object_class_find_property(klass, "hardware-acceleration-policy") != nullptr) {
     g_object_set(settings, "hardware-acceleration-policy", WEBKIT_HARDWARE_ACCELERATION_POLICY_NEVER, nullptr);
   }
@@ -593,16 +606,17 @@ struct Probe {
 
 void ProbeLoaded(WebKitWebView* view, WebKitLoadEvent event, gpointer) {
   if (event != WEBKIT_LOAD_FINISHED) return;
-  // The page's own needs: WebAssembly and IndexedDB, in a page whose web process is inside the sandbox.
+  // The page's own needs (a secure context with `crypto.subtle`, WebAssembly, IndexedDB, `localStorage` and
+  // workers), in a page whose web process is inside the sandbox.
   Wk().webkit_web_view_evaluate_javascript(
-      view, "typeof WebAssembly === 'object' && typeof indexedDB === 'object'", -1, nullptr, nullptr, nullptr,
+      view, kProbeScript, -1, nullptr, nullptr, nullptr,
       [](GObject* source, GAsyncResult* result, gpointer) {
         const WebKitApi& wk = Wk();
         JSCValue* value =
             wk.webkit_web_view_evaluate_javascript_finish(reinterpret_cast<WebKitWebView*>(source), result, nullptr);
         const bool capable = value != nullptr && wk.jsc_value_is_boolean(value) && wk.jsc_value_to_boolean(value);
         if (!capable) {
-          Log("unavailable: the page's engine lacks WebAssembly or IndexedDB");
+          Log("unavailable: the page's engine lacks a secure context, crypto.subtle, WebAssembly, storage or workers");
           _exit(kExitPageFailed);
         }
         if (CheckSandbox() != Sandbox::kInside) {
@@ -631,6 +645,17 @@ int RunProbe() {
     Log("unavailable: WebKit's sandbox is off");
     return kExitSandbox;
   }
+  // The page's scheme, registered as the page's is, serving one empty page.
+  wk.webkit_web_context_register_uri_scheme(
+      context, kScheme,
+      [](WebKitURISchemeRequest* request, gpointer) {
+        g_autoptr(GBytes) page = g_bytes_new_static(kProbePage, sizeof(kProbePage) - 1);
+        AnswerSchemeRequest(request, 200, "text/html; charset=utf-8", page, nullptr);
+      },
+      nullptr, nullptr);
+  WebKitSecurityManager* security = wk.webkit_web_context_get_security_manager(context);
+  wk.webkit_security_manager_register_uri_scheme_as_secure(security, kScheme);
+  wk.webkit_security_manager_register_uri_scheme_as_cors_enabled(security, kScheme);
   WebKitUserContentManager* content = wk.webkit_user_content_manager_new();
   static Probe probe;
   probe.view = NewView(context, content, false, &probe.window);
@@ -641,8 +666,7 @@ int RunProbe() {
                      _exit(kExitPageFailed);
                    }),
                    nullptr);
-  wk.webkit_web_view_load_html(reinterpret_cast<WebKitWebView*>(probe.view), "<!doctype html><title></title>",
-                               nullptr);
+  wk.webkit_web_view_load_uri(reinterpret_cast<WebKitWebView*>(probe.view), kProbeUrl);
   g_timeout_add_seconds(
       kProbeTimeoutSeconds,
       [](gpointer) -> gboolean {

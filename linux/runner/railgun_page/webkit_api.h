@@ -39,7 +39,6 @@ namespace railgun_page {
   X(webkit_web_view_get_type)                             \
   X(webkit_web_view_set_background_color)                 \
   X(webkit_web_view_load_uri)                             \
-  X(webkit_web_view_load_html)                            \
   X(webkit_web_view_get_uri)                              \
   X(webkit_web_view_call_async_javascript_function)       \
   X(webkit_web_view_call_async_javascript_function_finish) \
@@ -78,6 +77,7 @@ namespace railgun_page {
   X(soup_auth_manager_get_type)                           \
   X(soup_message_new)                                     \
   X(soup_message_set_flags)                               \
+  X(soup_message_set_force_http1)                         \
   X(soup_message_get_status)                              \
   X(soup_message_get_request_headers)                     \
   X(soup_message_get_response_headers)                    \
