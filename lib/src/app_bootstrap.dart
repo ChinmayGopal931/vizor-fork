@@ -112,9 +112,10 @@ class AppBootstrapState {
   final bool? enhancePirEnabled;
 
   /// Whether this platform's Railgun host can run Private USD's page: Android
-  /// always, iOS from iOS 17, nothing else. `null` when the iOS handler did
-  /// not answer yet; it is asked again after the first frame. Only builds
-  /// with Private USD ask; the rest keep `false`.
+  /// always, iOS from iOS 17, the Mac from macOS 14, Linux where WebKit's
+  /// sandbox starts, nothing else. `null` when the iOS handler did not answer
+  /// yet, and always on Linux; it is asked again after the first frame. Only
+  /// builds with Private USD ask; the rest keep `false`.
   final bool? railgunHostSupported;
 
   /// The saved NEAR swap privacy setting, or `null` when it could not be read
@@ -322,9 +323,8 @@ Future<AppBootstrapState> loadAppBootstrap({
     final explorerUrlTemplate = await _readExplorerUrlTemplate(storage);
     final themeMode = await _readThemeMode(storage);
     final appLanguage = await _readAppLanguage(storage);
-    final privacyModeEnabled = await PrivacyModePersistence(
-      storage,
-    ).readAndRecover();
+    final privacyModeEnabled = await PrivacyModePersistence(storage)
+        .readAndRecover();
     final hideBalanceOnUnlockEnabled = await _readPlainBool(
       storage,
       key: kHideBalanceOnUnlockKey,
@@ -345,10 +345,15 @@ Future<AppBootstrapState> loadAppBootstrap({
     );
     final portfolioChart = await readPortfolioChartPreferences(storage);
     final enhancePirEnabled = await readEnhancePirEnabledPreference(storage);
-    // Known before the first frame, so the router's synchronous guards see it.
-    final railgunHostSupported = kPrivateUsdBuildEnabled
-        ? await queryRailgunHostSupported()
-        : false;
+    // Known before the first frame, so the router's synchronous guards see it;
+    // except on Linux, whose host answers once its sandbox check has run in a
+    // process of its own (about a second): it is asked after the first frame
+    // instead (`RailgunHostSupportedNotifier`), so it never delays the start.
+    final railgunHostSupported = !kPrivateUsdBuildEnabled
+        ? false
+        : Platform.isLinux
+        ? null
+        : await queryRailgunHostSupported();
     final flipToHideBalanceEnabled = await _readPlainBool(
       storage,
       key: kFlipToHideBalanceEnabledKey,
@@ -574,8 +579,7 @@ Future<AppBootstrapState> loadAppBootstrap({
     log('bootstrap: secure storage unavailable: $e');
     return AppBootstrapState.blocked(
       failureKind: AppBootstrapFailureKind.secureStorageUnavailable,
-      failureMessage:
-          'Veylor needs access to secure storage before it can open your wallet.', // l10n-ignore: diagnostic; the screen words it by failureKind
+      failureMessage: 'Veylor needs access to secure storage before it can open your wallet.', // l10n-ignore: diagnostic; the screen words it by failureKind
     );
   } catch (e) {
     log('bootstrap: failed, blocking startup: $e');
@@ -584,8 +588,7 @@ Future<AppBootstrapState> loadAppBootstrap({
     );
     return AppBootstrapState.blocked(
       failureKind: AppBootstrapFailureKind.startupFailure,
-      failureMessage:
-          'Veylor could not load its startup state.', // l10n-ignore: diagnostic; the screen words it by failureKind
+      failureMessage: 'Veylor could not load its startup state.', // l10n-ignore: diagnostic; the screen words it by failureKind
     );
   }
 }

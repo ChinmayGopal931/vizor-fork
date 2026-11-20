@@ -14846,6 +14846,12 @@ abstract class AppLocalizations {
   /// **'The quote had expired by the time it arrived. Check that your Mac\'s clock is right, then try again.'**
   String get privateUsdConvertQuoteClockAheadDesktop;
 
+  /// In the Linux app: the message on the bridge screens when a quote arrived already expired, which usually means the computer's clock is wrong.
+  ///
+  /// In en, this message translates to:
+  /// **'The quote had expired by the time it arrived. Check that your computer\'s clock is right, then try again.'**
+  String get privateUsdConvertQuoteClockAheadLinux;
+
   /// Countdown caption under the quote on the bridge amount screen, drawn in uppercase in English; {minutesSeconds} is the time left in minutes and seconds, such as 4:59.
   ///
   /// In en, this message translates to:
@@ -15602,6 +15608,12 @@ abstract class AppLocalizations {
   /// **'If it\'s covered, minimised or your Mac sleeps, the bridge pauses until you\'re back.'**
   String get privateUsdKeepVisibleDetailDesktop;
 
+  /// Tooltip of the glyph in the Linux app's slim keep-Veylor-visible row on a bridge's progress screen: the bridge pauses while Veylor's window is minimised or the computer is locked or asleep, and goes on when the user is back.
+  ///
+  /// In en, this message translates to:
+  /// **'If it\'s minimised, or your computer locks or sleeps, the bridge pauses until you\'re back.'**
+  String get privateUsdKeepVisibleDetailLinux;
+
   /// Error on the Shielded USD screen, also read by screen readers, when the balance could not be loaded at all.
   ///
   /// In en, this message translates to:
@@ -16045,6 +16057,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your Mac builds a zero-knowledge proof of the payment. This can take a few minutes. Keep Veylor open, with its window showing.'**
   String get privateUsdReverseProvingNoteDesktop;
+
+  /// Note under the progress steps of a shielded-USD-to-ZEC bridge in the Linux app while the computer builds the zero-knowledge proof for the escrow payment, which can take minutes; the window must stay visible meanwhile.
+  ///
+  /// In en, this message translates to:
+  /// **'Your computer builds a zero-knowledge proof of the payment. This can take a few minutes. Keep Veylor open, with its window showing.'**
+  String get privateUsdReverseProvingNoteLinux;
 
   /// Row label on the shielded-USD-to-ZEC review and in its activity details: Railgun's fee for moving the dollars out of the shielded balance (unshielding) into escrow.
   ///
@@ -16580,6 +16598,12 @@ abstract class AppLocalizations {
   /// **'Your Mac builds a zero-knowledge proof. This takes a few seconds.'**
   String get privateUsdSendInfoStepProofDesktop;
 
+  /// In the Linux app: the second step in the send info card, where the computer builds a zero-knowledge proof.
+  ///
+  /// In en, this message translates to:
+  /// **'Your computer builds a zero-knowledge proof. This takes a few seconds.'**
+  String get privateUsdSendInfoStepProofLinux;
+
   /// Title of the info sheet on the Shielded USD send screens explaining how a send works.
   ///
   /// In en, this message translates to:
@@ -16633,6 +16657,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your Mac builds a zero-knowledge proof so nobody can see what you send. This takes a few seconds. Keep Veylor open, with its window showing.'**
   String get privateUsdSendProvingDetailDesktop;
+
+  /// In the Linux app: the body of the send and withdraw progress screen while the zero-knowledge proof is built. The window must stay showing, because the proof pauses while it's hidden.
+  ///
+  /// In en, this message translates to:
+  /// **'Your computer builds a zero-knowledge proof so nobody can see what you send. This takes a few seconds. Keep Veylor open, with its window showing.'**
+  String get privateUsdSendProvingDetailLinux;
 
   /// Title of the send and withdraw progress screen while the phone builds the proof, with its progress; {percent} is a whole number from 0 to 100.
   ///
@@ -16891,6 +16921,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your Mac builds a proof, and the dollars leave Railgun for that address.'**
   String get privateUsdWithdrawInfoStepProofDesktop;
+
+  /// In the Linux app: the second step in the withdraw info card, where the computer builds a proof and the dollars leave Railgun for the address.
+  ///
+  /// In en, this message translates to:
+  /// **'Your computer builds a proof, and the dollars leave Railgun for that address.'**
+  String get privateUsdWithdrawInfoStepProofLinux;
 
   /// Title of the info sheet on the withdraw screens: a withdrawal moves the dollars to a public Ethereum address.
   ///

@@ -1,4 +1,5 @@
 import '../../../core/layout/app_form_factor.dart';
+
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -11,6 +12,7 @@ import '../../../providers/network_upgrade_window_provider.dart';
 import '../../../providers/sync_provider.dart';
 import '../../../rust/api/private_usd.dart' as rust;
 import '../../migration/providers/ironwood_migration_announcement_provider.dart';
+import '../models/private_usd_desktop_wording.dart';
 import '../models/private_usd_messages.dart';
 import '../models/private_usd_record_key.dart';
 import '../private_usd_copy.dart';
@@ -786,7 +788,9 @@ class PrivateUsdConvertNotifier
         quoting: false,
         clearQuote: !onReview,
         quoteError: (l10n) => kDesktopFormFactor
-            ? l10n.privateUsdConvertQuoteClockAheadDesktop
+            ? (privateUsdLinuxWording
+                  ? l10n.privateUsdConvertQuoteClockAheadLinux
+                  : l10n.privateUsdConvertQuoteClockAheadDesktop)
             : l10n.privateUsdConvertQuoteClockAhead,
       );
       return;
@@ -803,8 +807,9 @@ class PrivateUsdConvertNotifier
   void _quoteFailed(Object error) {
     if (showsUnderWay(error)) return;
     final PrivateUsdText? message = switch (error) {
-      PrivateUsdNoQuoteFitsException() =>
-        (l10n) => l10n.privateUsdConvertZecNoQuote,
+      PrivateUsdNoQuoteFitsException() => (
+        l10n,
+      ) => l10n.privateUsdConvertZecNoQuote,
       rust.ApiPrivateUsdError(:final code) => privateUsdErrorText(code),
       PrivateUsdPause() => null,
       _ => (l10n) => l10n.privateUsdConvertErrorGeneric,

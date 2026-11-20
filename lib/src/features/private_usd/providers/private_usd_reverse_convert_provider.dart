@@ -1,4 +1,5 @@
 import '../../../core/layout/app_form_factor.dart';
+
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -6,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/private_usd_feature_config.dart';
 import '../../../rust/api/private_usd.dart' as rust;
+import '../models/private_usd_desktop_wording.dart';
 import '../models/private_usd_messages.dart';
 import '../models/private_usd_record_key.dart';
 import '../models/private_usd_reverse_amount.dart';
@@ -469,7 +471,9 @@ class PrivateUsdReverseConvertNotifier
         quoting: false,
         clearDraft: !onReview,
         quoteError: (l10n) => kDesktopFormFactor
-            ? l10n.privateUsdConvertQuoteClockAheadDesktop
+            ? (privateUsdLinuxWording
+                  ? l10n.privateUsdConvertQuoteClockAheadLinux
+                  : l10n.privateUsdConvertQuoteClockAheadDesktop)
             : l10n.privateUsdConvertQuoteClockAhead,
         stale: next.units,
       );

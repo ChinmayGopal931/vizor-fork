@@ -19,13 +19,13 @@ final privateUsdArchiveSyncStoreProvider = Provider<PrivateUsdArchiveSyncStore>(
 
 /// Whether the Railgun page can read Railgun's history from Anon's archive
 /// here: Ethereum's archive, which Android's host fetches for the page, and
-/// the Mac's where it hosts the page (macOS 14 and later); iOS's host starts
-/// the page without it. Which host fetches it is an OS difference, not a
-/// layout one; the Mac's is desktop's alone.
+/// the Mac's and Linux's where they host the page; iOS's host starts the page
+/// without it. Which host fetches it is an OS difference, not a layout one;
+/// the Mac's and Linux's are desktop's alone.
 final privateUsdArchiveAvailableProvider = Provider<bool>((ref) {
   final fetched = switch (defaultTargetPlatform) {
     TargetPlatform.android => true,
-    TargetPlatform.macOS =>
+    TargetPlatform.macOS || TargetPlatform.linux =>
       kDesktopFormFactor && ref.watch(railgunHostSupportedProvider),
     _ => false,
   };
