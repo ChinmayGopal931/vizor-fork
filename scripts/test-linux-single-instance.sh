@@ -33,7 +33,7 @@ for flavor in main testnet; do
     "-DAPP_ICON_NAME=\"$app_id\"" '-DAPP_ICON_THEME_PATH="/nonexistent"' \
     "$runner_dir/main.cc" "$runner_dir/my_application.cc" \
     "$runner_dir/single_instance.cc" "$runner_dir/caps_lock_channel.cc" \
-    "$runner_dir/tests/flutter_stub.cc" \
+    "$runner_dir/tests/flutter_stub.cc" "$runner_dir/tests/private_usd_stub.cc" \
     -Wl,--wrap=gtk_dialog_run "${gtk_flags[@]}" -o "$test_output/$binary"
 done
 
