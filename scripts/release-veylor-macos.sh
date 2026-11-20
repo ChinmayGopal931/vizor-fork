@@ -121,6 +121,8 @@ SPARKLE_BIN="$ROOT_DIR/build/macos/SourcePackages/artifacts/sparkle/Sparkle/bin"
 OVERRIDES_PATH="$ROOT_DIR/macos/Runner/Configs/FlavorOverrides.xcconfig"
 OVERRIDES_BACKUP=""
 OVERRIDES_SELECTED=false
+PODFILE_LOCK="$ROOT_DIR/macos/Podfile.lock"
+PODFILE_LOCK_BACKUP=""
 
 restore_overrides() {
   [[ "$OVERRIDES_SELECTED" == true ]] || return 0
@@ -131,7 +133,28 @@ restore_overrides() {
   fi
   OVERRIDES_SELECTED=false
 }
-trap restore_overrides EXIT
+
+# pod install, which the build runs, rewrites Podfile.lock's COCOAPODS line
+# with the local CocoaPods version. Put it back when that is all it changed;
+# the next build's pod install brings the Pods back in step.
+restore_podfile_lock() {
+  [[ -n "$PODFILE_LOCK_BACKUP" ]] || return 0
+  if ! cmp -s "$PODFILE_LOCK" "$PODFILE_LOCK_BACKUP"; then
+    if diff <(grep -v '^COCOAPODS:' "$PODFILE_LOCK") <(grep -v '^COCOAPODS:' "$PODFILE_LOCK_BACKUP") >/dev/null; then
+      cp "$PODFILE_LOCK_BACKUP" "$PODFILE_LOCK"
+    else
+      note "pod install changed macos/Podfile.lock beyond its COCOAPODS line; review it"
+    fi
+  fi
+  rm -f "$PODFILE_LOCK_BACKUP"
+  PODFILE_LOCK_BACKUP=""
+}
+
+cleanup() {
+  restore_overrides
+  restore_podfile_lock
+}
+trap cleanup EXIT
 
 require() {
   command -v "$1" >/dev/null 2>&1 || die "$1 is required"
@@ -351,6 +374,8 @@ else
   fi
   OVERRIDES_SELECTED=true
   "$ROOT_DIR/scripts/macos-identity.sh" "$BUNDLE_ID" --release
+  PODFILE_LOCK_BACKUP="$(mktemp -t veylor-podfile-lock)"
+  cp "$PODFILE_LOCK" "$PODFILE_LOCK_BACKUP"
 
   (cd "$ROOT_DIR" && fvm flutter pub get >"$LOG_DIR/pub-get.log" 2>&1) || die "flutter pub get failed (see $LOG_DIR/pub-get.log)"
   flutter_args=(build macos --release --config-only --no-pub --build-name "$VERSION" --build-number "$BUILD_NUMBER")
@@ -397,6 +422,7 @@ PY
     die "xcodebuild failed (see $LOG_DIR/xcodebuild.log)"
   }
   restore_overrides
+  restore_podfile_lock
 fi
 
 # ---------------------------------------------------------------------------
@@ -574,6 +600,12 @@ tagged $TAG, and leave it a full release (not a pre-release or a draft):
 the feed URL resolves through releases/latest.
 INFO
 rm -rf "$WORK_DIR"
+
+CHANGED="$(git -C "$ROOT_DIR" status --porcelain --untracked-files=no)"
+if [[ -n "$CHANGED" ]]; then
+  note "the build changed tracked files; review them:"
+  printf '      %s\n' "$CHANGED"
+fi
 
 log "Done: $OUT_DIR"
 (cd "$OUT_DIR" && ls -l "$DMG_ASSET" "$APPCAST_ASSET" "$NOTES_ASSET" SHA256SUMS release-info.txt)
