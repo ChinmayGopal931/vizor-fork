@@ -152,16 +152,16 @@ the checklist's sections 4 and 5:
 
   **Connections, as Android keeps them (H27).** Each request is HTTP/1.1, so a
   connection carries one at a time and a stalled connection costs only the try
-  sent on it. libsoup offers HTTP/2 only on a direct connection, never through a
-  proxy, so the bridge's route alone gives HTTP/1.1 (Ubuntu 22.04's 3.0, Debian
-  12's 3.2); from 3.4 the request also asks for it
+  sent on it. libsoup offers HTTP/2 only on a direct connection, never through
+  a proxy, so the bridge's route alone gives HTTP/1.1 (Ubuntu 22.04's 3.0,
+  Debian 12's 3.2); from 3.4 the request also asks for it
   (`soup_message_set_force_http1`, resolved by name, since older headers lack
-  it). The pool keeps five per
-  host, each idle five minutes at most. An answer read whole leaves its
-  connection for the next request. Any other end (a failure, a stall, the size
-  cap, the deadline) closes its body cancelled, so libsoup never uses that
-  connection again. A network change (`GNetworkMonitor`) starts a new pool for
-  the next request, and the old one goes with its last request.
+  it). The pool keeps five per host, each idle five minutes at most. An answer
+  read whole leaves its connection for the next request. Any other end (a
+  failure, a stall, the size cap, the deadline) closes its body cancelled, so
+  libsoup never uses that connection again. A network change
+  (`GNetworkMonitor`) starts a new pool for the next request, and the old one
+  goes with its last request.
 
   WebKitGTK has no stop call for a scheme request, so a fetch the page
   abandons runs on to its end and its answer is dropped, as on Android (H28);
@@ -302,8 +302,10 @@ item. Items not named here hold as on Android and the Mac.
   nothing goes around the bridge over QUIC.
 - **H18.** The page's own requests carry a fixed User-Agent, `Mozilla/5.0 (X11;
   Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko)`, the same on every
-  computer. WebKitGTK's default names the distribution and the processor
-  (fixed 2026-11-20).
+  computer, as the Mac's WebKit names no model. WebKitGTK's default names the
+  distribution, the processor and a release token (`Mozilla/5.0 (X11; Ubuntu;
+  Linux aarch64) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/60.5
+  Safari/605.1.15` on the test VM) (fixed 2026-11-20).
 - **H21, H24, H26, H27.** The prelude's hold, the exact headers, the buffer
   sized from a declared length, and the connection rules (above; fixed
   2026-11-20).
@@ -319,6 +321,38 @@ item. Items not named here hold as on Android and the Mac.
 In the test VM (Ubuntu 24.04.3 arm64, GNOME on Wayland, WebKitGTK 2.52.6).
 No wallet was unlocked and nothing was spent: the page ran a public test
 mnemonic, read-only.
+
+- **Against the hosts checklist** (section 7, run 44796638369's arm64 .deb,
+  libsoup 3.4.4). The VM's own network was down, so the stand-in for the bridge
+  ran on the Mac and the VM reached it through an SSH tunnel; the page's traffic
+  left only through it.
+  - **The prelude under garbage collection (H21).** The real bundle, the
+    prelude, then 30 rounds of garbage made in the page. With the earlier
+    prelude, WebKit replaced the `webkit` object at the first collection, and
+    the start's check saw the host in 30 of 30 rounds. With the held prelude it
+    never did, though a full collection ran (an aged sentinel went in round 3),
+    and the transport still posted.
+  - **The archive path (7.1).** `load`, `start` with the archive, `openWallet`
+    (BIP-39's test mnemonic, a random key) and `refresh`, eleven times, each on
+    a fresh store. Every run read `digest.anon.inc` 2.3 to 2.5 s after the
+    start's answer, on four connections that each carried 0.6 to 4.9 MB and
+    stayed open to the end. With `"archive":false` (twice), no archive
+    connection.
+  - **A stalled connection (7.2).** The stand-in stopped forwarding on the
+    second archive connection after 64 KB, leaving it open. libsoup gave it up
+    20.0 s later and closed it, the page opened a new one six seconds after
+    that, and the other three ran on throughout.
+  - **The fetch's requests (H24, H27).** Three GETs through the stand-in sent
+    exactly `Host`, `User-Agent: Mozilla/5.0`, `Accept-Encoding: identity` and
+    `Connection: Keep-Alive`, each over HTTP/1.1 on the one connection.
+  - **Sockets (section 3, H16).** During a run the page process and WebKit's
+    network process held only TCP connections to the bridge's port, four of
+    them the archive's, and no UDP socket.
+  - **The User-Agent (H18).** A request from the page carried the fixed one.
+  - **The sandbox check (H6).** The installed check passed from
+    `/opt/veylor` in 0.23 to 0.45 s, on the page's secure scheme, and a copy
+    outside the profile's path failed it (exit 3).
+  - **The package.** Maintainer `Zapp LLC <hello@veylor.cash>`.
 
 - **The spike.** The real bundle ran on WebKitGTK from the custom secure
   scheme:
@@ -368,7 +402,8 @@ mnemonic, read-only.
     sandbox started; Shielded USD can run here`.
 
 Not run: anything behind the unlock (the page in the app itself, the
-bridge, sends, deposits, the archive in the app, Tor), the keep-awake hold and
+bridge, sends, deposits, the archive in the app and the checklist's real sync
+(7.3), Tor), the keep-awake hold and
 the settlement reminder, X11 sessions, KDE and other desktops, Fedora, Debian
 and Arch, and x86_64 machines (CI built and checked those packages, but no
 desktop ran them).
