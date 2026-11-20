@@ -256,8 +256,10 @@ Android's `kt/RailgunArchiveFetch.kt` is the reference; the Mac's
   under `/anon-archive/` on the page's own origin, only once the prelude
   took, and no path that escapes it (`RailgunArchive.upstream`).
 - **H24. The request.** The headers Android sends: `Host`,
-  `User-Agent: Mozilla/5.0`, `Accept-Encoding: identity`, and nothing
-  else of the page's or the platform's: no `Accept-Language` (the Mac's
+  `User-Agent: Mozilla/5.0`, `Accept-Encoding: identity`, `Connection:
+  Keep-Alive` (HTTP/1.1's), and nothing else of the page's or the
+  platform's (the Mac's `URLSession` adds `Accept: */*`, the same
+  everywhere): no `Accept-Language` (the Mac's
   `URLSession` adds the Mac's own languages, so it sends `*`), no cookie, no
   credential, no cache read or written, and no cache directive (the Mac's
   `reloadIgnoringLocalAndRemoteCacheData` sent `Cache-Control: no-cache` to
