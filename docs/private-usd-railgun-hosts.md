@@ -187,11 +187,15 @@ Prefixes below: `kt/` is the Android host's directory, `rw/` is
   and calls `deleteWallet` alone; the host treats it as any page.
 - **H18. Headers that name nothing.** Requests the host makes itself carry
   the same headers on every device of its kind: Android's archive fetch sends
-  `User-Agent: Mozilla/5.0`, not the phone's. The page's own requests carry
-  the engine's defaults, which the host should not make worse: WebKit's on
-  the Mac freezes the OS version (`Macintosh; Intel Mac OS X 10_15_7`) and
-  names no model; Android's WebView names the phone's model and build (see
-  section 8).
+  `User-Agent: Mozilla/5.0`, not the phone's. So do the page's own requests
+  on Android: the WebView's User-Agent names the phone's model and its
+  Android build, so the host sets the page's to the same `Mozilla/5.0`
+  (`RailgunRequests.USER_AGENT`, `kt/RailgunWebViewHost.kt`, since
+  2026-11-20), which every host the page reaches answers (section 8). WebKit's
+  on the Mac freezes the OS version (`Macintosh; Intel Mac OS X 10_15_7`) and
+  names no model, and the Mac keeps it. **(Chromium)** set the page's
+  User-Agent before it loads; check what it names on a host whose engine's
+  own isn't frozen.
 
 ## 4. Anon's archive: whether the page reads it
 
@@ -408,20 +412,58 @@ Nothing here spends: the page only reads public chain data.
 
 ## 8. Found on the way, in the shared page or on Android
 
-Not changed here (the page and Android's host are Android's code):
+Both fixed on 2026-11-20 (`fix/railgun-page-archive-tip`):
 
-- **The archive's tip is refused.** `archive.js` takes the tip only when it
-  starts the block after the last sealed chunk ends (`meta.startBlock !==
-  after + 1`). On 2026-11-20 chunk 243 ends at block 26,439,999 and the tip
-  starts at 26,440,026, its first block with events, so every sync, on
-  Android too, reads the sealed chunks from the archive and the last few days
-  from rail-squid, and the transaction list leaves the archive for the rest
-  of the page there. Sealed chunks have such gaps between them (238 of 243),
-  which the page accepts; it could accept a tip that starts later than the
-  block after, since the commitments' positions and the list's hash chain are
-  checked anyway.
-- **Android's page names the phone.** Its own requests (the RPC, rail-squid,
-  the screening node, the artifacts) carry the WebView's default
-  User-Agent, with the phone's model and Android build, the reason the
-  archive fetch sends `Mozilla/5.0` (157cfca43). The Mac's WebKit names no
-  model.
+- **The archive's tip was refused.** `archive.js` took the tip only when it
+  started the block after the last sealed chunk ends (`meta.startBlock !==
+  after + 1`). But the archive names a sealed chunk's blocks, and the tip's,
+  from the first with an event to the last: it seals the tip's oldest events
+  into a chunk, whole blocks at a time, and the tip goes on at its next event.
+  On 2026-11-20 chunk 243 ended at block 26,439,999, its last event's, and
+  the tip started at 26,440,026, its first's. A tip that starts at the block
+  right after is as rare as two sealed chunks that meet (5 of 243 seams), so
+  every sync far behind, Android's and the Mac's, read the sealed chunks from
+  the archive and the tip's days from rail-squid (18,105 blocks then: 2,029
+  leaves and 947 transactions, under 1% of the history), and the transaction
+  list left the archive for the rest of the page there. The page now takes a
+  tip that starts after the last sealed chunk, as it takes each sealed chunk
+  after the one before: what shows that nothing is missing between them is
+  what the events carry, the commitments' tree positions and the
+  transactions' verification hashes (`rw/dev/archive-sync.test.mjs` and
+  `archive-txids.test.mjs` drop a batch and a transaction there). Run against
+  the live archive, the page's reader went from chunk 243 into the tip: 3,485
+  leaves on by tree position from chunk 242's end, and 1,613 transactions
+  chained from chunk 242's last. Anon's own wallet (the Chrome extension,
+  0.14.1, read for this only) takes the tip the same way, as everything after
+  the last sealed chunk's end, and never compares the tip's first block with
+  it: its notes sync reads the tip's files by the manifest's checksum after
+  the sealed chunks, and its transaction list joins the two by sequence and
+  the verification hashes, holding at a break rather than leaving the
+  archive. It checks less than the page: no checksum of the tip's event
+  files, and nothing of the commitments running on by tree position.
+- **Android's page named the phone.** Its own requests (the RPC, rail-squid,
+  the screening node, the artifacts) carried the WebView's default
+  User-Agent, with the phone's model and Android build. The page now sends
+  the archive fetch's `Mozilla/5.0` (H18). Asked from the Mac with the page's
+  origin, the keyless RPCs (publicnode on both networks, dRPC, BlockPI,
+  Tenderly, Pocket, MEV Blocker), rail-squid on both networks, the Sepolia
+  list, the screening node, the IPFS gateway and the mirror answered it as
+  they answer the WebView's own, preflights included; OnFinality's and
+  Ankr's keyless endpoints turn every User-Agent away alike (a rate limit, a
+  key), and the keyed providers serve clients of every kind.
+
+Still open:
+
+- **A tree's last batches.** Nothing in the events shows where a notes tree
+  ended. The archive's position check takes a batch at the next tree's start
+  whatever the last tree's end (`archiveCommitments`), at every seam, and the
+  page checks no positions of rail-squid's; a tree that ends at a batch has a
+  root the contract recorded, which the end-of-scan check accepts. So
+  a tree's last batches missing would go unseen, and a wallet would miss its
+  notes there. Railgun starts a new tree only for a batch that doesn't fit in
+  the last (`Commitments.insertLeaves`), so the page could require, where a
+  batch starts the next tree, that the last tree's end plus that batch's
+  leaves exceed 65,536. That holds at all four of mainnet's rollovers (trees
+  of 65,536, 65,535, 65,536 and 65,536 leaves, then first batches of 1, 2, 2
+  and 1), and would show any missing tail as long as the new tree's first
+  batch, or longer.

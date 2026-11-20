@@ -2578,7 +2578,14 @@ the Mac's, answer `unavailable`), Dart `services/private_usd_tokens_service.dart
     both number the first leaf of mainnet's tree 1 as tree 0's leaf 65,536,
     and records keep that number. Transactions come in sequence, each
     verification hash continuing the chain: the chain, not the sequence,
-    shows none is missing, so a sequence that skips a number is kept.
+    shows none is missing, so a sequence that skips a number is kept. A
+    sealed chunk names its blocks, and so does the tip, from its first
+    event's to its last's, so each mostly starts some blocks after the one
+    before ends: the tip is taken when it starts after the last sealed chunk,
+    as each chunk is after the one before. The positions and the chain, not
+    the block numbers, show that nothing between them is missing, but for a
+    tree's last batches: nothing in the events shows where a tree ended,
+    from the archive or from rail-squid.
   - Times come from the shipped block table, never the archive. Records
     carry no archive railgunTxid; a transaction's leaf is hashed from the
     archive's, which the screening node's root check then vouches for. That
@@ -2658,6 +2665,9 @@ the Mac's, answer `unavailable`), Dart `services/private_usd_tokens_service.dart
   intercepts every subresource against a fixed host allowlist. The Kotlin
   and Swift allowlists (`RailgunEndpoints`), the Rust bridge's allowlist and
   the page's CSP must agree; a Rust test in `railgun_bridge.rs` pins them.
+  Its User-Agent is a fixed `Mozilla/5.0` (`RailgunRequests.USER_AGENT`),
+  the archive fetch's too: the WebView's own names the phone's model and its
+  Android build to every host the page reaches.
 - On iOS a Swift `WKWebView` host behind the same channel serves the page
   from `veylor-railgun://app/`, in a data store of its own whose SOCKS5
   proxy is the bridge (no failover), with a `WKContentRuleList` allowlist
