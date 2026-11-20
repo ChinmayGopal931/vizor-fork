@@ -32,35 +32,41 @@ enum RailgunArchive {
   /// The same for every Mac, and Android's: the platform's own would name the Mac and its build.
   static let userAgent = "Mozilla/5.0"
 
-  /// Run once in the page's world before the `start` that reads the archive; idempotent, and true once the page
-  /// will read it. The page took its transport (`railgunHost`) when it loaded, so hiding the WebKit host from what
-  /// it reads later leaves the transport as it was; only the start's archive check reads it again. WebKit defines
+  /// Run in the page's world before every `start` that reads the archive; idempotent, and true once the page will
+  /// read it. The page took its transport (`railgunHost`) when it loaded, so hiding the WebKit host from what it reads
+  /// later leaves the transport as it was; only the start's archive check reads it again. WebKit defines
   /// `window.webkit` non-configurable, so the prelude replaces its `messageHandlers` instead. Archive GETs go to
   /// [path], the rest of the page's requests as they were. Nothing is spliced into it.
+  ///
+  /// The prelude holds the `webkit` object it changed. WebKit makes that object anew once nothing in the page refers
+  /// to it, and the new one has the real `messageHandlers`: a garbage collection between the prelude and the start
+  /// showed the start the host again, and the page synced from rail-squid alone. 0.9.0's first mainnet sync did, and
+  /// so did 6 of 15 starts of this host in a test (none of 15 since), where a page that collected garbage after the
+  /// prelude saw the host every time.
   static let prelude = """
     const archive = 'https://\(host)/';
     const own = '\(path)';
     const marker = Symbol.for('veylor.railgunArchive');
-    if (globalThis[marker] === true) return true;
-    const pageFetch = globalThis.fetch;
-    if (typeof pageFetch !== 'function') return false;
-    const routed = function (input, init) {
-      const method = init?.method === undefined ? 'GET' : String(init.method).toUpperCase();
-      if (typeof input === 'string' && method === 'GET' && input.startsWith(archive)) {
-        return pageFetch.call(globalThis, own + input.slice(archive.length), init);
-      }
-      return pageFetch.call(globalThis, input, init);
-    };
-    Object.defineProperty(globalThis, 'fetch', { value: routed, writable: true, configurable: true });
+    const webkit = globalThis.webkit;
+    if (typeof webkit !== 'object' || webkit === null) return false;
+    if (globalThis[marker] === undefined) {
+      const pageFetch = globalThis.fetch;
+      if (typeof pageFetch !== 'function') return false;
+      const routed = function (input, init) {
+        const method = init?.method === undefined ? 'GET' : String(init.method).toUpperCase();
+        if (typeof input === 'string' && method === 'GET' && input.startsWith(archive)) {
+          return pageFetch.call(globalThis, own + input.slice(archive.length), init);
+        }
+        return pageFetch.call(globalThis, input, init);
+      };
+      Object.defineProperty(globalThis, 'fetch', { value: routed, writable: true, configurable: true });
+    }
     try {
-      Object.defineProperty(globalThis.webkit, 'messageHandlers', {
-        value: Object.freeze({}),
-        configurable: true,
-      });
+      Object.defineProperty(webkit, 'messageHandlers', { value: Object.freeze({}), configurable: true });
     } catch {
       return false;
     }
-    Object.defineProperty(globalThis, marker, { value: true });
+    Object.defineProperty(globalThis, marker, { value: webkit, configurable: true });
     return globalThis.webkit?.messageHandlers?.railgunHost === undefined;
     """
 
