@@ -80,8 +80,8 @@ Bundles include the Ledger udev rule and host setup instructions under
 
 - `RELEASE_REPOSITORY`
 - `RELEASE_BUILD_NUMBER`
-- `LINUX_APPIMAGE_GPG_PRIVATE_KEY`
-- `LINUX_APPIMAGE_GPG_KEY_ID`
+- `LINUX_APPIMAGE_GPG_PRIVATE_KEY`, unless `LINUX_APPIMAGE_UNSIGNED=true`
+- `LINUX_APPIMAGE_GPG_KEY_ID`, unless `LINUX_APPIMAGE_UNSIGNED=true`
 
 Workflows that are not triggered by a tag also require:
 
@@ -98,6 +98,22 @@ Workflows that are not triggered by a tag also require:
 - `LINUXDEPLOY_BIN`
 - `APPIMAGETOOL_BIN`
 - `LINUX_APPIMAGE_GPG_PASSPHRASE`
+- `LINUX_APPIMAGE_UNSIGNED`
+- `VIZOR_PRIVATE_USD_ENABLED`
+
+## Unsigned AppImages
+
+`LINUX_APPIMAGE_UNSIGNED=true` is the signing switch: `package` and `release`
+then pass `--unsigned` to `scripts/package-linux-appimage.sh`, which writes the
+AppImage and its `.sha256` with no embedded signature and no `.asc`, and the
+lanes need no GPG key. It is for builds that publish nothing, such as Veylor's
+CI on its fork (`.github/workflows/veylor-linux.yml`). A flavor or tag that
+embeds update information refuses it, since updates must be verifiable. Unset
+it, and provide the GPG variables above, to sign.
+
+`VIZOR_PRIVATE_USD_ENABLED=true` compiles Shielded USD in (AGENTS.md, "Private
+USD"); Linux keeps it hidden until it has a Railgun host. Unset, the define is
+not passed.
 
 ## Asset names
 

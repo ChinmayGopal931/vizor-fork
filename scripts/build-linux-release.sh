@@ -33,6 +33,9 @@ Environment:
   VIZOR_UPDATE_CHECK_ENABLED     true only for builds that should check updates.
   VIZOR_COINGECKO_PRICE_BASE_URL Home price API base URL.
   VIZOR_WALLET_LINK_BACKEND_URL  Wallet link relay API base URL.
+  VIZOR_PRIVATE_USD_ENABLED      true compiles Shielded USD in (AGENTS.md,
+                                 "Private USD"). Linux keeps it hidden until it
+                                 has a Railgun host. Unset: not passed.
   FVM_BIN                        fvm executable path. Default: fvm.
 
 Default flavors: mainnet,testnet
@@ -97,6 +100,14 @@ case "$BUILD_MODE" in
   release|profile|debug) ;;
   *)
     echo "Unsupported build mode: $BUILD_MODE" >&2
+    exit 2
+    ;;
+esac
+
+case "${VIZOR_PRIVATE_USD_ENABLED:-}" in
+  ''|true|false) ;;
+  *)
+    echo "VIZOR_PRIVATE_USD_ENABLED must be true or false, not '$VIZOR_PRIVATE_USD_ENABLED'" >&2
     exit 2
     ;;
 esac
@@ -240,6 +251,9 @@ build_flavor() {
       --dart-define="VIZOR_COINGECKO_PRICE_BASE_URL=${VIZOR_COINGECKO_PRICE_BASE_URL:-https://api.coingecko.com/api/v3}"
       --dart-define="VIZOR_WALLET_LINK_BACKEND_URL=${VIZOR_WALLET_LINK_BACKEND_URL:-https://functions.vizor.cash}"
     )
+    if [[ -n "${VIZOR_PRIVATE_USD_ENABLED:-}" ]]; then
+      flutter_args+=(--dart-define="VIZOR_PRIVATE_USD_ENABLED=$VIZOR_PRIVATE_USD_ENABLED")
+    fi
     if [[ -n "${VIZOR_RELEASE_VERSION:-}" ]]; then
       release_build_name="${VIZOR_RELEASE_BUILD_NAME:-$VIZOR_RELEASE_VERSION}"
       flutter_args+=(

@@ -577,6 +577,28 @@ own way, and a malformed or unknown id fails the build:
   literal). The rename keeps the data apart: path_provider_linux names the
   support directory after the executable when it cannot load `libgio-2.0.so`,
   as on most machines without development packages.
+  - **Builds run on GitHub Actions** (`.github/workflows/veylor-linux.yml`, on
+    the fork, for pushes to `feat/linux-desktop` and on demand), never on the
+    Mac. Each architecture builds on its own runner, x86_64 on `ubuntu-22.04`
+    and ARM64 on `ubuntu-24.04-arm`, through upstream's lane:
+    `fastlane linux release` with `VIZOR_LINUX_FLAVORS=veylor`, which runs
+    `scripts/build-linux-release.sh` and `scripts/package-linux-appimage.sh`.
+  - **What it builds:** mainnet, the desktop form factor, and
+    `VIZOR_PRIVATE_USD_ENABLED=true`, which the build script passes on as a
+    define. Shielded USD stays hidden until Linux has a Railgun host
+    (`privateUsdPlatformHostsPage`). Flutter comes from `.fvmrc` through fvm,
+    checked against `scripts/release-config/flutter-sdk.json`; Rust is stable,
+    as cargokit picks it.
+  - **What it keeps:** `Veylor-linux-<arch>.AppImage` and its `.sha256`, as a
+    workflow artifact for 30 days. Nothing is published.
+  - **Signing:** the AppImages are unsigned. `LINUX_APPIMAGE_UNSIGNED=true` is
+    the switch (`fastlane/linux/README.md`); an AppImage that embeds update
+    information refuses it.
+  - **Caches:** the Cargo registry and pub caches (shared by both
+    architectures) and an sccache directory per architecture, each saved once
+    per lockfile. Cargokit's target directory lies under `build/linux`, which
+    the build script deletes first, so sccache is what carries Rust across
+    runs.
 - **Windows**: `$env:VIZOR_APPLICATION_ID = "com.veylor.desktop"`, then
   `fvm flutter run -d windows` (or `fvm flutter build windows --release`).
   CMake sets the version resource (company `com.veylor`, product `Veylor`,

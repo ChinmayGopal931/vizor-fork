@@ -13,12 +13,13 @@ BINARY_NAME=""
 ARCH="x86_64"
 UPDATE_INFO=""
 SIGN_KEY=""
+UNSIGNED="false"
 
 usage() {
   cat <<USAGE
 Usage: scripts/package-linux-appimage.sh [options]
 
-Package a Flutter Linux bundle into a signed AppImage.
+Package a Flutter Linux bundle into an AppImage, GPG-signed unless --unsigned.
 
 Required:
   --bundle-dir <path>       Flutter Linux bundle directory.
@@ -26,7 +27,9 @@ Required:
   --app-id <id>             Linux application id, e.g. app.keplr.vizor.
   --app-name <name>         Display name.
   --binary-name <name>      Executable name inside the bundle.
-  --sign-key <key-id>       GPG key id for AppImage signing.
+  --sign-key <key-id>       GPG key id for AppImage signing, or
+  --unsigned                no signature: neither the embedded one nor the
+                            detached .asc. Not with --update-info.
 
 Optional:
   --arch <arch>             AppImage architecture. Default: x86_64.
@@ -74,6 +77,10 @@ while [[ $# -gt 0 ]]; do
     --sign-key)
       SIGN_KEY="$2"
       shift 2
+      ;;
+    --unsigned)
+      UNSIGNED="true"
+      shift
       ;;
     --help|-h)
       usage
@@ -136,7 +143,21 @@ require_value "--output" "$OUTPUT"
 require_value "--app-id" "$APP_ID"
 require_value "--app-name" "$APP_NAME"
 require_value "--binary-name" "$BINARY_NAME"
-require_value "--sign-key" "$SIGN_KEY"
+# Signing is an explicit choice either way, so a release never ships unsigned
+# by omission. An unsigned AppImage carries no update information: updates
+# must be verifiable.
+if [[ "$UNSIGNED" == "true" ]]; then
+  if [[ -n "$SIGN_KEY" ]]; then
+    echo "--unsigned and --sign-key are mutually exclusive" >&2
+    exit 2
+  fi
+  if [[ -n "$UPDATE_INFO" ]]; then
+    echo "An unsigned AppImage cannot carry --update-info" >&2
+    exit 2
+  fi
+else
+  require_value "--sign-key" "$SIGN_KEY"
+fi
 
 BUNDLE_DIR="$(cd "$BUNDLE_DIR" && pwd)"
 OUTPUT_DIR="$(mkdir -p "$(dirname "$OUTPUT")" && cd "$(dirname "$OUTPUT")" && pwd)"
@@ -433,10 +454,13 @@ rm -f "$OUTPUT" "$OUTPUT.zsync" "$OUTPUT.sha256" "$OUTPUT.asc"
 OUTPUT_BASENAME="$(basename "$OUTPUT")"
 (
   cd "$OUTPUT_DIR"
-  appimagetool_args=(
-    --sign
-    --sign-key "$SIGN_KEY"
-  )
+  appimagetool_args=()
+  if [[ "$UNSIGNED" != "true" ]]; then
+    appimagetool_args+=(
+      --sign
+      --sign-key "$SIGN_KEY"
+    )
+  fi
   if [[ -n "$UPDATE_INFO" ]]; then
     appimagetool_args+=(-u "$UPDATE_INFO")
   fi
@@ -455,14 +479,16 @@ if [[ -n "$UPDATE_INFO" && ! -f "$OUTPUT.zsync" ]]; then
   exit 1
 fi
 
-PASSPHRASE="${LINUX_APPIMAGE_GPG_PASSPHRASE:-${APPIMAGETOOL_SIGN_PASSPHRASE:-}}"
-GPG_ARGS=(--batch --yes --armor --local-user "$SIGN_KEY")
-log_step "Signing detached AppImage signature"
-if [[ -n "$PASSPHRASE" ]]; then
-  GPG_ARGS+=(--pinentry-mode loopback --passphrase-fd 0)
-  printf '%s\n' "$PASSPHRASE" | gpg "${GPG_ARGS[@]}" --detach-sign --output "$OUTPUT.asc" "$OUTPUT"
-else
-  gpg "${GPG_ARGS[@]}" --detach-sign --output "$OUTPUT.asc" "$OUTPUT"
+if [[ "$UNSIGNED" != "true" ]]; then
+  PASSPHRASE="${LINUX_APPIMAGE_GPG_PASSPHRASE:-${APPIMAGETOOL_SIGN_PASSPHRASE:-}}"
+  GPG_ARGS=(--batch --yes --armor --local-user "$SIGN_KEY")
+  log_step "Signing detached AppImage signature"
+  if [[ -n "$PASSPHRASE" ]]; then
+    GPG_ARGS+=(--pinentry-mode loopback --passphrase-fd 0)
+    printf '%s\n' "$PASSPHRASE" | gpg "${GPG_ARGS[@]}" --detach-sign --output "$OUTPUT.asc" "$OUTPUT"
+  else
+    gpg "${GPG_ARGS[@]}" --detach-sign --output "$OUTPUT.asc" "$OUTPUT"
+  fi
 fi
 
 (
@@ -471,13 +497,19 @@ fi
   sha256sum -c "$(basename "$OUTPUT").sha256"
 )
 
-log_step "Verifying AppImage signatures"
-env -u APPIMAGE_EXTRACT_AND_RUN "$OUTPUT" --appimage-signature >/dev/null
-gpg --batch --verify "$OUTPUT.asc" "$OUTPUT"
+if [[ "$UNSIGNED" != "true" ]]; then
+  log_step "Verifying AppImage signatures"
+  env -u APPIMAGE_EXTRACT_AND_RUN "$OUTPUT" --appimage-signature >/dev/null
+  gpg --batch --verify "$OUTPUT.asc" "$OUTPUT"
+fi
 
 echo "AppImage written to $OUTPUT"
 if [[ -n "$UPDATE_INFO" ]]; then
   echo "zsync written to $OUTPUT.zsync"
 fi
 echo "sha256 written to $OUTPUT.sha256"
-echo "detached signature written to $OUTPUT.asc"
+if [[ "$UNSIGNED" == "true" ]]; then
+  echo "AppImage is unsigned (--unsigned)"
+else
+  echo "detached signature written to $OUTPUT.asc"
+fi

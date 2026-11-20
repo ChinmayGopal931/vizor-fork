@@ -230,12 +230,25 @@ def linux_update_enabled_for_release?(metadata)
   metadata.fetch(:update_enabled)
 end
 
+# LINUX_APPIMAGE_UNSIGNED=true packages AppImages with no GPG signature, for
+# builds that publish nothing (Veylor's CI on its fork). An AppImage that
+# embeds update information must stay signed.
+def linux_appimage_unsigned?
+  VizorRelease.release_boolean_env("LINUX_APPIMAGE_UNSIGNED")
+end
+
+def linux_assert_unsigned_allowed!(metadata)
+  return unless linux_appimage_unsigned? && linux_update_enabled_for_release?(metadata)
+
+  UI.user_error!("#{metadata.fetch(:appimage_asset_name)} embeds update information and must be signed. Unset LINUX_APPIMAGE_UNSIGNED.")
+end
+
 def linux_appimage_assets(metadata)
   assets = [
     metadata.fetch(:appimage_path),
-    metadata.fetch(:sha256_path),
-    metadata.fetch(:asc_path)
+    metadata.fetch(:sha256_path)
   ]
+  assets << metadata.fetch(:asc_path) unless linux_appimage_unsigned?
   assets.insert(1, metadata.fetch(:zsync_path)) if linux_update_enabled_for_release?(metadata)
   assets
 end
@@ -274,9 +287,10 @@ platform :linux do
     linux_verify_bundle_metadata!(metadata)
   end
 
-  desc "Package one Linux release bundle into a signed AppImage"
+  desc "Package one Linux release bundle into a signed AppImage (unsigned with LINUX_APPIMAGE_UNSIGNED=true)"
   lane :package do |options|
     metadata = linux_release_metadata(flavor: single_linux_release_flavor(options))
+    linux_assert_unsigned_allowed!(metadata)
     build(flavor: metadata[:flavor]) unless options[:skip_build]
 
     FileUtils.mkdir_p(metadata[:appimage_dir])
@@ -289,9 +303,13 @@ platform :linux do
       "--app-id", VizorRelease.shell_escape(metadata[:app_id]),
       "--app-name", VizorRelease.shell_escape(metadata[:app_name]),
       "--binary-name", VizorRelease.shell_escape(metadata[:binary_name]),
-      "--arch", VizorRelease.shell_escape(metadata[:arch]),
-      "--sign-key", VizorRelease.shell_escape(ENV.fetch("LINUX_APPIMAGE_GPG_KEY_ID"))
+      "--arch", VizorRelease.shell_escape(metadata[:arch])
     ]
+    if linux_appimage_unsigned?
+      command << "--unsigned"
+    else
+      command += ["--sign-key", VizorRelease.shell_escape(ENV.fetch("LINUX_APPIMAGE_GPG_KEY_ID"))]
+    end
     if linux_update_enabled_for_release?(metadata)
       command += ["--update-info", VizorRelease.shell_escape(metadata.fetch(:update_info))]
     end
@@ -304,12 +322,20 @@ platform :linux do
     flavors = linux_release_flavors
     metadata_items = flavors.map { |flavor| linux_release_metadata(flavor: flavor) }
 
-    linux_validate_signing_environment!
-
-    linux_with_gnupg_home do
-      linux_import_appimage_gpg_key!
+    if linux_appimage_unsigned?
+      metadata_items.each { |metadata| linux_assert_unsigned_allowed!(metadata) }
+      UI.important("LINUX_APPIMAGE_UNSIGNED=true: the AppImages are not signed")
       metadata_items.each do |metadata|
         package(flavor: metadata[:flavor])
+      end
+    else
+      linux_validate_signing_environment!
+
+      linux_with_gnupg_home do
+        linux_import_appimage_gpg_key!
+        metadata_items.each do |metadata|
+          package(flavor: metadata[:flavor])
+        end
       end
     end
 
