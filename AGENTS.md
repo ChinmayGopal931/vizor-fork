@@ -588,7 +588,9 @@ own way, and a malformed or unknown id fails the build:
     define. Shielded USD stays hidden until Linux has a Railgun host
     (`privateUsdPlatformHostsPage`). Flutter comes from `.fvmrc` through fvm,
     checked against `scripts/release-config/flutter-sdk.json`; Rust is stable,
-    as cargokit picks it.
+    as cargokit picks it. After the build, the job reads the defines back from
+    Flutter's generated config and fails unless they are those, with the
+    `veylor` flavor and no keyed RPC URL.
   - **What it keeps:** `Veylor-linux-<arch>.AppImage` and its `.sha256`, as a
     workflow artifact for 30 days. Nothing is published.
   - **Signing:** the AppImages are unsigned. `LINUX_APPIMAGE_UNSIGNED=true` is

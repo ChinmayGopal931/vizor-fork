@@ -239,6 +239,37 @@ jobs:
           LINUX_APPIMAGE_UNSIGNED: "true"
         run: bundle exec fastlane linux release
 
+      # Flutter's generated config records the defines the app compiled with.
+      # The step prints their names only, as the Mac release does.
+      - name: Check the build's settings
+        run: |
+          python3 -I - <<'PY'
+          import base64, re, sys
+          config = open("linux/flutter/ephemeral/generated_config.cmake", encoding="utf-8").read()
+          match = re.search(r'"DART_DEFINES=([^"]*)"', config)
+          if not match:
+              sys.exit("the generated config has no DART_DEFINES")
+          defines = {}
+          for item in filter(None, match.group(1).split(",")):
+              key, _, value = base64.b64decode(item).decode().partition("=")
+              defines[key] = value
+          print("dart-defines:", ", ".join(sorted(defines)))
+          expected = {
+              "ZCASH_DEFAULT_NETWORK": "main",
+              "VIZOR_PRIVATE_USD_ENABLED": "true",
+              "VIZOR_RELEASE_FLAVOR": "veylor",
+          }
+          wrong = [key for key, value in expected.items() if defines.get(key) != value]
+          if defines.get("VIZOR_FORM_FACTOR", "desktop") != "desktop":
+              wrong.append("VIZOR_FORM_FACTOR")
+          wrong += [key for key in defines if key.startswith("VIZOR_ETHEREUM_RPC_URL")]
+          if wrong:
+              sys.exit("unexpected build settings: " + ", ".join(wrong))
+          PY
+          bundle=dist/linux/Veylor-linux
+          grep -E '^(Name|Exec|Icon|StartupWMClass)=' "$bundle/data/applications/com.veylor.desktop.desktop"
+          file -b "$bundle/veylor" "$bundle/lib/librust_lib_zcash_wallet.so"
+
       - name: Upload the AppImage
         uses: actions/upload-artifact@v6
         with:
