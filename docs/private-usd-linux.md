@@ -344,6 +344,12 @@ went through. Every scan writes, so every refresh failed. The page's process
 now gives its origin 60% of the volume. The archive tip fix wasn't the cause:
 it changes where the list's transactions come from, not how much is kept.
 
+On internal.13 (CI 44822644819) the same replay, on a fresh copy of the
+owner's store, went through. The list wrote past 75,000 and caught up to the
+screening nodes' index, and the rest ended `synced` with screening `ok`. Nine
+refreshes went through and none failed. The store's IndexedDB then held
+2,602,262,184 bytes.
+
 ## What has run (2026-11-20)
 
 In the test VM (Ubuntu 24.04.3 arm64, GNOME on Wayland, WebKitGTK 2.52.6).
