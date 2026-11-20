@@ -7,6 +7,10 @@
 #
 #   scripts/release-veylor-macos.sh --version 0.9.0 --build-number 1
 #
+# If it stops while Apple is still notarizing (a new team's first
+# submissions can take hours), run the same command with --resume: it keeps
+# the signed app and DMG and waits on the same submissions.
+#
 # It needs Zapp LLC's Developer ID identity and the "Veylor Desktop Developer
 # ID" profile, the App Store Connect API key (ASC_KEY_ID, ASC_ISSUER_ID and
 # ASC_KEY_FILEPATH, from the environment or ~/dev/zapp/ios-zapp/fastlane/.env),
@@ -49,6 +53,9 @@ SPARKLE_KEY_FILE=""
 NOTARY_ENV_FILE="${VEYLOR_NOTARY_ENV_FILE:-$HOME/dev/zapp/ios-zapp/fastlane/.env}"
 SKIP_BUILD=false
 ALLOW_DIRTY=false
+RESUME=false
+# How long to wait on Apple; a new team's first submissions can take hours.
+NOTARY_TIMEOUT="${VEYLOR_NOTARY_TIMEOUT:-12h}"
 
 usage() {
   cat <<USAGE
@@ -73,8 +80,15 @@ Usage: scripts/release-veylor-macos.sh --version X.Y.Z --build-number N [options
                            variables in the environment win.
   --skip-build             Reuse build/veylor-release's last build of this
                            version and build number.
+  --resume                 Pick up a run that stopped (Apple still
+                           notarizing, a closed terminal): keep its build,
+                           its signed app and DMG and its notary
+                           submissions, and wait for those rather than
+                           sign and submit again.
   --allow-dirty            Build a tree with uncommitted changes (never for a
                            release that ships).
+
+Apple's answer is awaited for up to VEYLOR_NOTARY_TIMEOUT (default 12h).
 USAGE
 }
 
@@ -92,6 +106,7 @@ while [[ $# -gt 0 ]]; do
     --sparkle-key-file) SPARKLE_KEY_FILE="${2:-}"; shift 2 ;;
     --notary-env) NOTARY_ENV_FILE="${2:-}"; shift 2 ;;
     --skip-build) SKIP_BUILD=true; shift ;;
+    --resume) RESUME=true; SKIP_BUILD=true; shift ;;
     --allow-dirty) ALLOW_DIRTY=true; shift ;;
     -h|--help) usage; exit 0 ;;
     *) usage >&2; die "unknown argument: $1" ;;
@@ -113,6 +128,8 @@ NOTES_URL="${DOWNLOAD_PREFIX}${NOTES_ASSET}"
 BUILD_ROOT="$ROOT_DIR/build/veylor-release"
 PRODUCTS_DIR="$BUILD_ROOT/Products"
 BUILT_APP="$PRODUCTS_DIR/Release/$APP_NAME.app"
+# The commit the last build came from, for a run that reuses it.
+BUILD_COMMIT_FILE="$BUILD_ROOT/build-commit"
 WORK_DIR="$BUILD_ROOT/work"
 STAGED_APP="$WORK_DIR/stage/$APP_NAME.app"
 TOOLS_VENV="$BUILD_ROOT/tools/venv"
@@ -224,21 +241,35 @@ nested_code() {
   find "$app/Contents/Frameworks" -path '*/Versions/*/Autoupdate' -type f -print 2>/dev/null
 }
 
+# Submits PATH, or with --resume waits on the submission an earlier run made,
+# whose id the work folder keeps.
 notarize() {
-  local path="$1" label="$2" submit_json="$LOG_DIR/notary-$2-submit.json"
+  local path="$1" label="$2" id_file="$WORK_DIR/notary-$2.id"
   local status id
-  note "submitting $(basename "$path") to Apple's notary service (this can take minutes)"
-  set +e
-  xcrun notarytool submit "$path" \
-    --key "$ASC_KEY_PATH" --key-id "$ASC_KEY_ID_VALUE" --issuer "$ASC_ISSUER_ID_VALUE" \
-    --wait --timeout 2h --output-format json >"$submit_json" 2>"$LOG_DIR/notary-$label-submit.err"
-  set -e
-  status="$(/usr/bin/plutil -extract status raw -o - "$submit_json" 2>/dev/null || true)"
-  id="$(/usr/bin/plutil -extract id raw -o - "$submit_json" 2>/dev/null || true)"
-  [[ -n "$id" ]] || die "notarytool returned no submission for $label (see $LOG_DIR/notary-$label-submit.err)"
-  xcrun notarytool log "$id" \
-    --key "$ASC_KEY_PATH" --key-id "$ASC_KEY_ID_VALUE" --issuer "$ASC_ISSUER_ID_VALUE" \
-    "$LOG_DIR/notary-$label-log.json" >/dev/null 2>&1 || note "could not fetch the notary log for $id"
+  if [[ "$RESUME" == true && -s "$id_file" ]]; then
+    id="$(cat "$id_file")"
+    note "waiting on the earlier submission $id"
+  else
+    note "submitting $(basename "$path") to Apple's notary service"
+    xcrun notarytool submit "$path" "${NOTARY_AUTH[@]}" --output-format json \
+      >"$LOG_DIR/notary-$label-submit.json" 2>"$LOG_DIR/notary-$label-submit.err" ||
+      die "notarytool could not submit $label (see $LOG_DIR/notary-$label-submit.err)"
+    id="$(/usr/bin/plutil -extract id raw -o - "$LOG_DIR/notary-$label-submit.json" 2>/dev/null || true)"
+    [[ -n "$id" ]] || die "notarytool returned no submission id for $label"
+    printf '%s\n' "$id" >"$id_file"
+    note "submission $id; waiting up to $NOTARY_TIMEOUT (a new team's first ones can take hours)"
+  fi
+  # wait exits non-zero on a timeout and for a rejected submission; info says which.
+  xcrun notarytool wait "$id" "${NOTARY_AUTH[@]}" --timeout "$NOTARY_TIMEOUT" \
+    >"$LOG_DIR/notary-$label-wait.log" 2>&1 || true
+  xcrun notarytool info "$id" "${NOTARY_AUTH[@]}" --output-format json \
+    >"$LOG_DIR/notary-$label-info.json" 2>/dev/null || true
+  status="$(/usr/bin/plutil -extract status raw -o - "$LOG_DIR/notary-$label-info.json" 2>/dev/null || true)"
+  if [[ "$status" == "In Progress" || -z "$status" ]]; then
+    die "Apple has not finished notarizing $label ($id). Run the same command with --resume to wait again."
+  fi
+  xcrun notarytool log "$id" "${NOTARY_AUTH[@]}" "$LOG_DIR/notary-$label-log.json" >/dev/null 2>&1 ||
+    note "could not fetch the notary log for $id"
   note "notarization $id: $status"
   if [[ -f "$LOG_DIR/notary-$label-log.json" ]]; then
     "$PYTHON" -I - "$LOG_DIR/notary-$label-log.json" <<'PY'
@@ -326,6 +357,7 @@ if [[ -z "$ASC_KEY_ID_VALUE" || -z "$ASC_ISSUER_ID_VALUE" || -z "$ASC_KEY_PATH" 
 fi
 [[ -n "$ASC_KEY_ID_VALUE" && -n "$ASC_ISSUER_ID_VALUE" ]] || die "ASC_KEY_ID and ASC_ISSUER_ID are required"
 [[ -r "$ASC_KEY_PATH" ]] || die "the App Store Connect key file is not readable"
+NOTARY_AUTH=(--key "$ASC_KEY_PATH" --key-id "$ASC_KEY_ID_VALUE" --issuer "$ASC_ISSUER_ID_VALUE")
 note "notary key: found (not printed)"
 
 # Veylor's Sparkle key: the backup file, else the login Keychain.
@@ -344,7 +376,12 @@ else
   note "Sparkle key: login Keychain, account $SPARKLE_KEY_ACCOUNT"
 fi
 
-if [[ -d "$OUT_DIR" && -n "$(ls -A "$OUT_DIR" 2>/dev/null)" ]]; then
+if [[ "$RESUME" == true ]]; then
+  # A stopped run leaves its logs; a finished one, its DMG.
+  [[ -d "$STAGED_APP" ]] || die "no stopped run to resume: $STAGED_APP is missing"
+  [[ ! -e "$OUT_DIR/$DMG_ASSET" ]] || die "$OUT_DIR already holds a finished release"
+  note "resuming the run in $WORK_DIR"
+elif [[ -d "$OUT_DIR" && -n "$(ls -A "$OUT_DIR" 2>/dev/null)" ]]; then
   die "$OUT_DIR is not empty; move it away first"
 fi
 mkdir -p "$OUT_DIR" "$LOG_DIR"
@@ -366,6 +403,9 @@ DART_DEFINES=(
 if [[ "$SKIP_BUILD" == true ]]; then
   log "Reusing the last build"
   [[ -d "$BUILT_APP" ]] || die "no earlier build at $BUILT_APP"
+  BUILD_COMMIT="$(cat "$BUILD_COMMIT_FILE" 2>/dev/null || true)"
+  [[ -n "$BUILD_COMMIT" ]] || die "the last build did not record its commit; build again"
+  note "built from $BUILD_COMMIT"
 else
   log "Building $APP_NAME $VERSION ($BUILD_NUMBER) for mainnet"
   if [[ -f "$OVERRIDES_PATH" ]]; then
@@ -406,7 +446,7 @@ for source in (settings, flutter):
 PY
 
   note "xcodebuild (several minutes; log: $LOG_DIR/xcodebuild.log)"
-  rm -rf "$PRODUCTS_DIR"
+  rm -rf "$PRODUCTS_DIR" "$BUILD_COMMIT_FILE"
   (cd "$ROOT_DIR" && xcrun xcodebuild \
     -clonedSourcePackagesDirPath "$ROOT_DIR/build/macos/SourcePackages" \
     -workspace "$ROOT_DIR/macos/Runner.xcworkspace" \
@@ -423,6 +463,8 @@ PY
   }
   restore_overrides
   restore_podfile_lock
+  BUILD_COMMIT="$COMMIT"
+  printf '%s\n' "$BUILD_COMMIT" >"$BUILD_COMMIT_FILE"
 fi
 
 # ---------------------------------------------------------------------------
@@ -444,30 +486,40 @@ grep -q "SPUStandardUpdaterController" <<<"$UNDEFINED_SYMBOLS" ||
 note "$BUNDLE_ID $VERSION ($BUILD_NUMBER), macOS $MINIMUM_SYSTEM_VERSION or later, Sparkle compiled in"
 
 # ---------------------------------------------------------------------------
-log "Staging the app with Sparkle's feed and key"
-
-rm -rf "$WORK_DIR"
-mkdir -p "$(dirname "$STAGED_APP")"
-ditto "$BUILT_APP" "$STAGED_APP"
 STAGED_INFO="$STAGED_APP/Contents/Info.plist"
-/usr/bin/plutil -replace SUPublicEDKey -string "$SPARKLE_PUBLIC_ED_KEY" "$STAGED_INFO"
-/usr/bin/plutil -replace SUFeedURL -string "$SPARKLE_FEED_URL" "$STAGED_INFO"
-/usr/bin/plutil -replace SUVerifyUpdateBeforeExtraction -bool YES "$STAGED_INFO"
-/usr/bin/plutil -replace SURequireSignedFeed -bool YES "$STAGED_INFO"
-/usr/bin/plutil -replace SUSignedFeedFailureExpirationInterval -integer 0 "$STAGED_INFO"
-note "feed: $SPARKLE_FEED_URL"
+if [[ "$RESUME" == true ]]; then
+  # The stopped run's signed app; signing it again would void its submission.
+  log "Keeping the stopped run's signed app"
+else
+  log "Staging the app with Sparkle's feed and key"
+  rm -rf "$WORK_DIR"
+  mkdir -p "$(dirname "$STAGED_APP")"
+  ditto "$BUILT_APP" "$STAGED_APP"
+  /usr/bin/plutil -replace SUPublicEDKey -string "$SPARKLE_PUBLIC_ED_KEY" "$STAGED_INFO"
+  /usr/bin/plutil -replace SUFeedURL -string "$SPARKLE_FEED_URL" "$STAGED_INFO"
+  /usr/bin/plutil -replace SUVerifyUpdateBeforeExtraction -bool YES "$STAGED_INFO"
+  /usr/bin/plutil -replace SURequireSignedFeed -bool YES "$STAGED_INFO"
+  /usr/bin/plutil -replace SUSignedFeedFailureExpirationInterval -integer 0 "$STAGED_INFO"
 
-# Sparkle's helpers ship with Sparkle's own signatures; they and the app are
-# signed again, nested first, as upstream's release lane does.
-log "Signing with $SIGNING_IDENTITY"
-SPARKLE_VERSION_DIR="$STAGED_APP/Contents/Frameworks/Sparkle.framework/Versions/B"
-[[ -d "$SPARKLE_VERSION_DIR" ]] || die "Sparkle.framework is missing from the app"
-codesign_for_distribution "$SPARKLE_VERSION_DIR/XPCServices/Installer.xpc"
-codesign_for_distribution "$SPARKLE_VERSION_DIR/XPCServices/Downloader.xpc" entitlements
-codesign_for_distribution "$SPARKLE_VERSION_DIR/Autoupdate"
-codesign_for_distribution "$SPARKLE_VERSION_DIR/Updater.app"
-codesign_for_distribution "$STAGED_APP/Contents/Frameworks/Sparkle.framework"
-codesign_for_distribution "$STAGED_APP" identifier,entitlements
+  # Sparkle's helpers ship with Sparkle's own signatures; they and the app are
+  # signed again, nested first, as upstream's release lane does.
+  log "Signing with $SIGNING_IDENTITY"
+  SPARKLE_VERSION_DIR="$STAGED_APP/Contents/Frameworks/Sparkle.framework/Versions/B"
+  [[ -d "$SPARKLE_VERSION_DIR" ]] || die "Sparkle.framework is missing from the app"
+  codesign_for_distribution "$SPARKLE_VERSION_DIR/XPCServices/Installer.xpc"
+  codesign_for_distribution "$SPARKLE_VERSION_DIR/XPCServices/Downloader.xpc" entitlements
+  codesign_for_distribution "$SPARKLE_VERSION_DIR/Autoupdate"
+  codesign_for_distribution "$SPARKLE_VERSION_DIR/Updater.app"
+  codesign_for_distribution "$STAGED_APP/Contents/Frameworks/Sparkle.framework"
+  codesign_for_distribution "$STAGED_APP" identifier,entitlements
+fi
+
+[[ "$(plist_value "$STAGED_INFO" SUFeedURL)" == "$SPARKLE_FEED_URL" ]] || die "the app's SUFeedURL is not $SPARKLE_FEED_URL"
+[[ "$(plist_value "$STAGED_INFO" SUPublicEDKey)" == "$SPARKLE_PUBLIC_ED_KEY" ]] || die "the app's SUPublicEDKey is not Veylor's"
+[[ "$(plist_value "$STAGED_INFO" SURequireSignedFeed)" == "true" ]] || die "the app does not require a signed feed"
+[[ "$(plist_value "$STAGED_INFO" SUVerifyUpdateBeforeExtraction)" == "true" ]] || die "the app does not verify updates before extraction"
+[[ "$(plist_value "$STAGED_INFO" CFBundleVersion)" == "$BUILD_NUMBER" ]] || die "the staged app is not build $BUILD_NUMBER"
+note "feed: $SPARKLE_FEED_URL"
 
 /usr/bin/codesign --verify --deep --strict --verbose=2 "$STAGED_APP" >"$LOG_DIR/codesign-verify.log" 2>&1 ||
   die "the app's signature does not verify (see $LOG_DIR/codesign-verify.log)"
@@ -498,10 +550,18 @@ note "signature, entitlements and profile check out"
 
 # ---------------------------------------------------------------------------
 log "Notarizing the app"
-APP_ZIP="$WORK_DIR/$APP_NAME-notarize.zip"
-ditto -c -k --sequesterRsrc --keepParent "$STAGED_APP" "$APP_ZIP"
-notarize "$APP_ZIP" app
-xcrun stapler staple "$STAGED_APP" >"$LOG_DIR/staple-app.log" 2>&1 || die "stapling the app failed (see $LOG_DIR/staple-app.log)"
+if [[ "$RESUME" == true ]] && xcrun stapler validate -q "$STAGED_APP" >/dev/null 2>&1; then
+  note "already notarized and stapled"
+  NOTARY_IDS+=("app=$(cat "$WORK_DIR/notary-app.id" 2>/dev/null || echo unknown)")
+else
+  APP_ZIP="$WORK_DIR/$APP_NAME-notarize.zip"
+  if [[ "$RESUME" != true || ! -s "$WORK_DIR/notary-app.id" ]]; then
+    rm -f "$APP_ZIP"
+    ditto -c -k --sequesterRsrc --keepParent "$STAGED_APP" "$APP_ZIP"
+  fi
+  notarize "$APP_ZIP" app
+  xcrun stapler staple "$STAGED_APP" >"$LOG_DIR/staple-app.log" 2>&1 || die "stapling the app failed (see $LOG_DIR/staple-app.log)"
+fi
 xcrun stapler validate "$STAGED_APP" >>"$LOG_DIR/staple-app.log" 2>&1 || die "the app's ticket does not validate"
 spctl --assess --type execute --verbose=4 "$STAGED_APP" >"$LOG_DIR/spctl-app.log" 2>&1 ||
   die "Gatekeeper rejects the app (see $LOG_DIR/spctl-app.log)"
@@ -509,27 +569,39 @@ note "$(tr '\n' ' ' <"$LOG_DIR/spctl-app.log")"
 
 # ---------------------------------------------------------------------------
 log "Packaging $DMG_ASSET"
-"$PYTHON" -I -m venv "$TOOLS_VENV" >/dev/null 2>&1 || true
-[[ -x "$TOOLS_VENV/bin/python" ]] || die "could not create the packaging virtualenv"
-"$TOOLS_VENV/bin/python" -I -m pip install --disable-pip-version-check --quiet \
-  --require-hashes --only-binary=:all: --no-deps \
-  -r "$ROOT_DIR/scripts/veylor-macos-release/requirements.txt" >"$LOG_DIR/pip.log" 2>&1 ||
-  die "installing dmgbuild failed (see $LOG_DIR/pip.log)"
 DMG_PATH="$WORK_DIR/$DMG_ASSET"
-"$TOOLS_VENV/bin/python" -I "$ROOT_DIR/scripts/veylor-macos-release/build_dmg.py" \
-  --app "$STAGED_APP" \
-  --output "$DMG_PATH" \
-  --volume-name "$VOLUME_NAME" \
-  --background "$ROOT_DIR/macos/Packaging/DMG/veylor/background.png" \
-  --volume-icon "$STAGED_APP/Contents/Resources/$APP_ICON_FILE.icns"
-
-/usr/bin/codesign --force --sign "$SIGNING_IDENTITY" --timestamp "$DMG_PATH"
+DMG_STAPLED=false
+if [[ "$RESUME" == true && -f "$DMG_PATH" ]] && xcrun stapler validate -q "$DMG_PATH" >/dev/null 2>&1; then
+  note "already packaged, notarized and stapled"
+  DMG_STAPLED=true
+elif [[ "$RESUME" == true && -f "$DMG_PATH" && -s "$WORK_DIR/notary-dmg.id" ]]; then
+  note "keeping the stopped run's submitted DMG"
+else
+  rm -f "$DMG_PATH" "$WORK_DIR/notary-dmg.id"
+  "$PYTHON" -I -m venv "$TOOLS_VENV" >/dev/null 2>&1 || true
+  [[ -x "$TOOLS_VENV/bin/python" ]] || die "could not create the packaging virtualenv"
+  "$TOOLS_VENV/bin/python" -I -m pip install --disable-pip-version-check --quiet \
+    --require-hashes --only-binary=:all: --no-deps \
+    -r "$ROOT_DIR/scripts/veylor-macos-release/requirements.txt" >"$LOG_DIR/pip.log" 2>&1 ||
+    die "installing dmgbuild failed (see $LOG_DIR/pip.log)"
+  "$TOOLS_VENV/bin/python" -I "$ROOT_DIR/scripts/veylor-macos-release/build_dmg.py" \
+    --app "$STAGED_APP" \
+    --output "$DMG_PATH" \
+    --volume-name "$VOLUME_NAME" \
+    --background "$ROOT_DIR/macos/Packaging/DMG/veylor/background.png" \
+    --volume-icon "$STAGED_APP/Contents/Resources/$APP_ICON_FILE.icns"
+  /usr/bin/codesign --force --sign "$SIGNING_IDENTITY" --timestamp "$DMG_PATH"
+fi
 /usr/bin/codesign --verify --verbose=2 "$DMG_PATH" >"$LOG_DIR/codesign-dmg.log" 2>&1 || die "the DMG's signature does not verify"
 check_signature "$DMG_PATH"
 
 log "Notarizing $DMG_ASSET"
-notarize "$DMG_PATH" dmg
-xcrun stapler staple "$DMG_PATH" >"$LOG_DIR/staple-dmg.log" 2>&1 || die "stapling the DMG failed (see $LOG_DIR/staple-dmg.log)"
+if [[ "$DMG_STAPLED" == true ]]; then
+  NOTARY_IDS+=("dmg=$(cat "$WORK_DIR/notary-dmg.id" 2>/dev/null || echo unknown)")
+else
+  notarize "$DMG_PATH" dmg
+  xcrun stapler staple "$DMG_PATH" >"$LOG_DIR/staple-dmg.log" 2>&1 || die "stapling the DMG failed (see $LOG_DIR/staple-dmg.log)"
+fi
 xcrun stapler validate "$DMG_PATH" >>"$LOG_DIR/staple-dmg.log" 2>&1 || die "the DMG's ticket does not validate"
 spctl --assess --type open --context context:primary-signature --verbose=4 "$DMG_PATH" >"$LOG_DIR/spctl-dmg.log" 2>&1 ||
   die "Gatekeeper rejects the DMG (see $LOG_DIR/spctl-dmg.log)"
@@ -538,6 +610,7 @@ note "$(tr '\n' ' ' <"$LOG_DIR/spctl-dmg.log")"
 # ---------------------------------------------------------------------------
 log "Writing the Sparkle appcast"
 ARCHIVES_DIR="$WORK_DIR/appcast"
+rm -rf "$ARCHIVES_DIR"
 mkdir -p "$ARCHIVES_DIR"
 cp "$DMG_PATH" "$ARCHIVES_DIR/$DMG_ASSET"
 cp "$NOTES_PATH" "$ARCHIVES_DIR/$NOTES_ASSET"
@@ -583,7 +656,7 @@ cp "$ARCHIVES_DIR/$NOTES_ASSET" "$OUT_DIR/$NOTES_ASSET"
 (cd "$OUT_DIR" && shasum -a 256 "$DMG_ASSET" "$APPCAST_ASSET" "$NOTES_ASSET" >SHA256SUMS)
 cat >"$OUT_DIR/release-info.txt" <<INFO
 Veylor $VERSION ($BUILD_NUMBER) for macOS, mainnet, Shielded USD on
-Commit:          $COMMIT
+Commit:          $BUILD_COMMIT
 Tag:             $TAG
 Repository:      $RELEASE_REPOSITORY
 Signed by:       $SIGNING_IDENTITY

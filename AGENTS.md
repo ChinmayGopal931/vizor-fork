@@ -636,7 +636,10 @@ release from a clean tree and publishes nothing:
 - **Notarization.** `notarytool` with the App Store Connect key named in
   `~/dev/zapp/ios-zapp/fastlane/.env`, read in place (never copied, printed
   or committed). The app and the DMG are notarized, stapled, and checked with
-  `spctl --assess` and `stapler validate`.
+  `spctl --assess` and `stapler validate`. Apple can take hours over a new
+  team's first submissions: the script waits up to 12 hours, and if it stops
+  first, the same command with `--resume` waits on the same submissions
+  without signing again.
 - **DMG.** `Veylor-macos.dmg`, volume "Veylor", with the neon background in
   `macos/Packaging/DMG/veylor/` (drawn by `render-background.swift`). dmgbuild
   (pinned with hashes in `scripts/veylor-macos-release/requirements.txt`)
