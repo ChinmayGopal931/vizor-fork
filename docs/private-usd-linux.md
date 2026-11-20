@@ -290,10 +290,23 @@ mnemonic, read-only.
 - **The session lifecycle**, through the same stand-ins: locking the VM's
   session (`loginctl lock-session`) sent `hidden`, and unlocking it sent
   `resumed`, then again a second later.
-- **The CI packages** (run 44783200926):
+- **The CI packages** (runs 44783200926 and 44787126543):
   - Both .debs installed side by side, with both profiles loaded. Each
     installed page process passed the check from `/opt/<package>`.
   - Ubuntu 22.04's runner, on WebKitGTK 2.50.4, passed the check too, since
     22.04 allows user namespaces.
-  - That run's packaged app did not start (ZXing not found). The next run
-    fixed it, and its CI checks the library paths of the installed package.
+  - The first run's packaged app did not start (ZXing not found). The second
+    fixed it, and CI now checks that nothing in the installed package goes
+    unfound.
+- **The apps themselves** (the second run's builds, on the owner's locked
+  mainnet wallet, never unlocked):
+  - The AppImage logged `Railgun page: unavailable (the check exited with 3)`
+    a second after it started, so Shielded USD stays hidden there.
+  - The .deb's Veylor and Veylor Testnet logged `Railgun page: WebKit's
+    sandbox started; Shielded USD can run here`.
+
+Not run: anything behind the unlock (the page in the app itself, the
+bridge, sends, deposits, the archive in the app, Tor), the keep-awake hold and
+the settlement reminder, X11 sessions, KDE and other desktops, Fedora, Debian
+and Arch, and x86_64 machines (CI built and checked those packages, but no
+desktop ran them).
