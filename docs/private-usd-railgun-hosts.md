@@ -112,6 +112,15 @@ Prefixes below: `kt/` is the Android host's directory, `rw/` is
   Android's `WebStorage.deleteOrigin`). Keep it out of backups where the OS
   backs up (Android `allowBackup="false"`, the Mac and iOS exclude
   `Library/WebKit`).
+  - **Room.** Let the store's origin keep far more than the 2 GB of a mainnet first
+    sync. It reaches 2.6 GB once the transaction list has caught up.
+  - **No total limit.** Reaching one makes WebKit evict data, this store with it.
+  - **What each engine allows.** WebKitGTK's default per-origin quota is 1 GiB, so
+    the Linux host sets `origin-storage-ratio` to 0.6, as Chromium allows an
+    origin about 60% of the disk. The Mac's WebKit allows an app's origin 15% of it.
+  - **What happens past the quota.** Every write fails, so every notes scan breaks
+    off and every refresh fails. Linux hit this on 2026-11-20: see
+    `docs/private-usd-linux.md`.
 - **H10. Keep the page running while it is shown.** A sync runs for minutes
   in the page, and so does the rest of one (section 6). **(WebKit)** a web
   view that is not in a visible window is suspended: the Mac keeps the 1×1
