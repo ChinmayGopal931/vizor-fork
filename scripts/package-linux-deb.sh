@@ -70,9 +70,9 @@ if [[ ! "$VERSION" =~ ^[0-9][A-Za-z0-9.+~-]*$ ]]; then
   echo "Not a Debian version: $VERSION" >&2
   exit 2
 fi
-for tool in dpkg-deb dpkg-shlibdeps readelf; do
+for tool in dpkg-deb dpkg-shlibdeps readelf patchelf; do
   if ! command -v "$tool" >/dev/null 2>&1; then
-    echo "Missing $tool (dpkg-dev, binutils)" >&2
+    echo "Missing $tool (dpkg-dev, binutils, patchelf)" >&2
     exit 1
   fi
 done
@@ -100,6 +100,29 @@ mkdir -p "$ROOT$INSTALL_DIR" "$ROOT/usr/bin" "$ROOT/usr/share/applications" "$RO
 
 cp -a "$BUNDLE_DIR/." "$ROOT$INSTALL_DIR/"
 ln -s "$INSTALL_DIR/$BINARY_NAME" "$ROOT/usr/bin/$BINARY_NAME"
+# What ZXing's own install leaves beside its library: headers and build files.
+rm -rf "$ROOT$INSTALL_DIR/include" "$ROOT$INSTALL_DIR/lib/cmake" "$ROOT$INSTALL_DIR/lib/pkgconfig"
+
+# The AppImage finds the bundle's libraries through AppRun's LD_LIBRARY_PATH; a
+# package has none. The executable's RUNPATH ($ORIGIN/lib) reaches its own
+# dependencies but not theirs, and the plugins keep the build tree's paths, so
+# the QR scanner's plugin would not find ZXing beside it. Each bundled library
+# that has a library path, or needs another bundled library, looks beside
+# itself instead.
+lib_dir="$ROOT$INSTALL_DIR/lib"
+for library in "$lib_dir"/*.so*; do
+  [[ -f "$library" && ! -L "$library" ]] || continue
+  dynamic="$(readelf --wide --dynamic "$library" 2>/dev/null || true)"
+  needs_bundled="false"
+  while IFS= read -r needed; do
+    if [[ -n "$needed" && -e "$lib_dir/$needed" ]]; then
+      needs_bundled="true"
+    fi
+  done < <(sed -n 's/.*(NEEDED).*\[\(.*\)\].*/\1/p' <<< "$dynamic")
+  if [[ "$needs_bundled" == "true" ]] || grep -qE '\((RPATH|RUNPATH)\)' <<< "$dynamic"; then
+    patchelf --set-rpath '$ORIGIN' "$library"
+  fi
+done
 
 desktop="$ROOT/usr/share/applications/$APP_ID.desktop"
 cp "$BUNDLE_DIR/data/applications/$APP_ID.desktop" "$desktop"

@@ -103,7 +103,7 @@ jobs:
             libgtk-3-dev liblzma-dev libsecret-1-dev libudev-dev \
             libwebkit2gtk-4.1-dev libsoup-3.0-dev \
             gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-pipewire \
-            binutils dpkg-dev file python3 xvfb xauth dbus-x11
+            binutils dpkg-dev file patchelf python3 xvfb xauth dbus-x11
           # clang builds against the newest GCC it finds; give it that GCC's
           # C++ library.
           gcc_dir="$(clang++ -v 2>&1 | sed -n 's/^Selected GCC installation: //p')"
@@ -335,6 +335,12 @@ jobs:
         run: |
           sudo apt-get install -y --no-install-recommends ./dist/linux/deb/"${FLAVOR}"_*.deb
           test -x "/opt/$FLAVOR/veylor-railgun-page"
+          # Every bundled program and library finds what it needs without
+          # AppRun's LD_LIBRARY_PATH.
+          if ldd "/opt/$FLAVOR/$BINARY" "/opt/$FLAVOR"/lib/*.so* | grep "not found"; then
+            echo "The package's libraries can't find each other" >&2
+            exit 1
+          fi
           test -L "/usr/bin/$BINARY"
           test -f "/usr/share/$FLAVOR/apparmor/$FLAVOR"
           dpkg -L "$FLAVOR" | grep -E "^/(usr/bin|usr/share/applications|usr/share/$FLAVOR)/" 

@@ -205,6 +205,10 @@ the reverse bridge's proof note, and the send and withdraw proof steps.
     (com.veylor.desktop.testnet), which install side by side.
   - The bundle goes to `/opt/veylor` or `/opt/veylor-testnet`, with a
     `/usr/bin` link, the desktop entry and the icons.
+  - A package has no AppRun to set `LD_LIBRARY_PATH`, so each bundled library
+    that needs another, or carries the build tree's path, gets the RUNPATH
+    `$ORIGIN` (`patchelf`): the QR scanner's plugin then finds ZXing beside it.
+    CI checks with `ldd` that nothing in the installed package goes unfound.
   - Depends come from `dpkg-shlibdeps`. `libwebkit2gtk-4.1-0`, a Secret Service
     provider and GStreamer's plugins are Recommends, so the app installs
     without WebKit and Shielded USD is then hidden.
