@@ -155,8 +155,10 @@ wherever the host runs the page.
   USD runs on, as it does in an unfocused window. A covered window is not
   detected either.
 - **The session away.** `session_lifecycle.cc` says `hidden` on
-  `flutter/lifecycle` while the user is away, as `MacSessionLifecycle` does,
-  from these:
+  `flutter/lifecycle` while the user is away, as `MacSessionLifecycle` does.
+  Like the Mac's notifications, it reacts to changes only, never to a state
+  read at the start, which in an odd setup (another session's lock) could
+  hide the app for good. It listens to these:
   - logind's `PrepareForSleep`;
   - the session's `LockedHint` and `Active`: the user's display session, else
     the process's own;
@@ -249,9 +251,9 @@ others'. `veylor-linux.yml`'s `pins` job runs them on CI:
 
 ## What has run (2026-11-20)
 
-In the test VM (Ubuntu 24.04.3 arm64, GNOME on Wayland, WebKitGTK 2.52.6),
-first as a spike and then as the real page process, driven over its link by a
-test script (not committed) in place of Veylor:
+In the test VM (Ubuntu 24.04.3 arm64, GNOME on Wayland, WebKitGTK 2.52.6).
+No wallet was unlocked and nothing was spent: the page ran a public test
+mnemonic, read-only.
 
 - **The spike.** The real bundle ran on WebKitGTK from the custom secure
   scheme:
@@ -265,9 +267,30 @@ test script (not committed) in place of Veylor:
 - **The sandbox check.** Without a profile: exit 3 after about a second
   ("Failed to fully launch dbus-proxy"), and no crash report. Under Ubuntu's
   Epiphany profile (`aa-exec`, no system change): passed in 0.55 s.
-- **The page process under that profile.**
-  - The page said ready in 1.2 to 3.7 s. `start` returned fees and
-    `openWallet` the wallet's address.
+- **The page process**, driven over its link by a test script:
+  - The page said ready in 1.1 to 3.7 s, and a Sepolia first sync reached
+    `synced` in 100 s.
+  - A mainnet `start` with the archive took the prelude, and the page read
+    Anon's archive through the libsoup fetch and the proxy (351 MB stored in
+    two minutes).
   - The web process ran inside bubblewrap, beside `xdg-dbus-proxy`.
   - Killing its parent took the page process and WebKit's processes down
     with it.
+- **Veylor's side** (`railgun_host.cc`), driven through stand-in Flutter
+  channels in place of the engine, built with ASan and UBSan:
+  - `supported`, `load`, `call` (start, openWallet and refresh to `synced`),
+    the events, `isOpen`, `close` and `wipe` all answered as on the Mac, as
+    did a call after a close (`closed`) and bad arguments (`bad_args`).
+  - Without a profile, `supported` was false and `load` `unavailable`.
+  - A load straight after a load waited for the first page process, and a
+    close dropped a load still waiting.
+- **The session lifecycle**, through the same stand-ins: locking the VM's
+  session (`loginctl lock-session`) sent `hidden`, and unlocking it sent
+  `resumed`, then again a second later.
+- **The CI packages** (run 44783200926):
+  - Both .debs installed side by side, with both profiles loaded. Each
+    installed page process passed the check from `/opt/<package>`.
+  - Ubuntu 22.04's runner, on WebKitGTK 2.50.4, passed the check too, since
+    22.04 allows user namespaces.
+  - That run's packaged app did not start (ZXing not found). The next run
+    fixed it, and its CI checks the library paths of the installed package.

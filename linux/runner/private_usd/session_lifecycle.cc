@@ -125,25 +125,14 @@ void OnSessionPropertiesChanged(GDBusConnection*, const gchar*, const gchar*, co
   while (g_variant_iter_loop(&iter, "{&sv}", &name, &value)) ApplySessionProperty(name, value);
 }
 
-void OnSessionProperties(GObject* source, GAsyncResult* result, gpointer) {
-  g_autoptr(GVariant) reply = g_dbus_connection_call_finish(G_DBUS_CONNECTION(source), result, nullptr);
-  if (reply == nullptr || !g_variant_is_of_type(reply, G_VARIANT_TYPE("(a{sv})"))) return;
-  g_autoptr(GVariant) properties = g_variant_get_child_value(reply, 0);
-  for (const char* name : {"LockedHint", "Active"}) {
-    g_autoptr(GVariant) value = g_variant_lookup_value(properties, name, G_VARIANT_TYPE_BOOLEAN);
-    if (value != nullptr) ApplySessionProperty(name, value);
-  }
-}
-
+// Only changes count, as only the Mac's notifications do: a session Veylor started in is one its user sees, and a
+// state read at the start (another session's, in an odd setup) must never hide the app for good.
 void WatchSession(const std::string& path) {
   if (path.empty() || path == "/" || !g_lifecycle->session_path.empty()) return;
   g_lifecycle->session_path = path;
   g_dbus_connection_signal_subscribe(g_lifecycle->system, kLogind, "org.freedesktop.DBus.Properties",
                                      "PropertiesChanged", path.c_str(), kSessionInterface, G_DBUS_SIGNAL_FLAGS_NONE,
                                      OnSessionPropertiesChanged, nullptr, nullptr);
-  g_dbus_connection_call(g_lifecycle->system, kLogind, path.c_str(), "org.freedesktop.DBus.Properties", "GetAll",
-                         g_variant_new("(s)", kSessionInterface), G_VARIANT_TYPE("(a{sv})"), G_DBUS_CALL_FLAGS_NONE,
-                         5000, nullptr, OnSessionProperties, nullptr);
 }
 
 void OnSessionByPid(GObject* source, GAsyncResult* result, gpointer) {
