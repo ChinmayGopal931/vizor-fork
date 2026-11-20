@@ -34,8 +34,10 @@ Environment:
   VIZOR_COINGECKO_PRICE_BASE_URL Home price API base URL.
   VIZOR_WALLET_LINK_BACKEND_URL  Wallet link relay API base URL.
   VIZOR_PRIVATE_USD_ENABLED      true compiles Shielded USD in (AGENTS.md,
-                                 "Private USD"). Linux keeps it hidden until it
-                                 has a Railgun host. Unset: not passed.
+                                 "Private USD"); it shows where the Railgun
+                                 page process starts WebKit's sandbox
+                                 (docs/private-usd-linux.md). Unset: not
+                                 passed.
   FVM_BIN                        fvm executable path. Default: fvm.
 
 Default flavors: mainnet,testnet

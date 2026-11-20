@@ -112,8 +112,16 @@ embeds update information refuses it, since updates must be verifiable. Unset
 it, and provide the GPG variables above, to sign.
 
 `VIZOR_PRIVATE_USD_ENABLED=true` compiles Shielded USD in (AGENTS.md, "Private
-USD"); Linux keeps it hidden until it has a Railgun host. Unset, the define is
-not passed.
+USD"). Its Railgun page runs in the bundle's `veylor-railgun-page`, on the
+system's WebKitGTK 4.1 in WebKit's sandbox; where that can't start, Shielded USD
+stays hidden (docs/private-usd-linux.md). The build needs
+`libwebkit2gtk-4.1-dev` for the page process's headers; it never links WebKit,
+and the AppImage carries none of it. Unset, the define is not passed.
+
+`scripts/package-linux-deb.sh` packages a Veylor bundle as a .deb for Ubuntu
+and Debian (`/opt/veylor` or `/opt/veylor-testnet`, with the AppArmor profile
+the page's sandbox needs on Ubuntu 23.10 and later); Veylor's CI builds one
+beside each AppImage.
 
 ## Asset names
 

@@ -187,8 +187,12 @@ LINUXDEPLOY_BIN="$(resolve_tool LINUXDEPLOY_BIN linuxdeploy)"
 APPIMAGETOOL_BIN="$(resolve_tool APPIMAGETOOL_BIN appimagetool)"
 
 APPDIR="$(mktemp -d "${OUTPUT_DIR}/${APP_ID}.AppDir.XXXXXX")"
+RAILGUN_PAGE_HOLD=""
 cleanup() {
   rm -rf "$APPDIR"
+  if [[ -n "$RAILGUN_PAGE_HOLD" ]]; then
+    rm -rf "$RAILGUN_PAGE_HOLD"
+  fi
 }
 trap cleanup EXIT
 
@@ -426,6 +430,16 @@ install_appimage_root_icon() {
 
 export APPIMAGE_EXTRACT_AND_RUN=1
 
+# Shielded USD's Railgun page process loads the system's WebKitGTK and runs on
+# the system's libraries alone (linux/runner/CMakeLists.txt): linuxdeploy must
+# neither deploy anything for it nor give it an RPATH into the AppDir, so it
+# waits outside the AppDir while linuxdeploy runs.
+RAILGUN_PAGE_NAME="veylor-railgun-page"
+if [[ -f "$PAYLOAD_DIR/$RAILGUN_PAGE_NAME" ]]; then
+  RAILGUN_PAGE_HOLD="$(mktemp -d "${OUTPUT_DIR}/railgun-page.XXXXXX")"
+  mv "$PAYLOAD_DIR/$RAILGUN_PAGE_NAME" "$RAILGUN_PAGE_HOLD/"
+fi
+
 log_step "Running linuxdeploy"
 linuxdeploy_excludes=()
 for pattern in "${HOST_LIBRARY_PATTERNS[@]}"; do
@@ -437,6 +451,12 @@ done
   --executable "$PAYLOAD_DIR/$BINARY_NAME" \
   --desktop-file "$DESKTOP_FILE" \
   --icon-file "$APPDIR/$APP_ID.png"
+
+if [[ -n "$RAILGUN_PAGE_HOLD" ]]; then
+  mv "$RAILGUN_PAGE_HOLD/$RAILGUN_PAGE_NAME" "$PAYLOAD_DIR/"
+  rmdir "$RAILGUN_PAGE_HOLD"
+  RAILGUN_PAGE_HOLD=""
+fi
 
 log_step "Writing custom AppRun"
 write_app_run
