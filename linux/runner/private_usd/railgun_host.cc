@@ -279,7 +279,6 @@ class Page : public std::enable_shared_from_this<Page> {
 
   bool loaded() const { return loaded_; }
   bool open() const { return !closed_by_.has_value(); }
-  bool has_pending_calls() const { return !pending_.empty(); }
 
  private:
   struct Pending {
@@ -359,7 +358,6 @@ class Host {
   void RunWipes();
   void TryWipe(WipeJob* job);
   void ProcessExited(GSubprocess* process);
-  void MemoryWarning();
   bool WindowShowing() const;
 
   static void OnProbeExited(GObject* source, GAsyncResult* result, gpointer data);
@@ -367,7 +365,6 @@ class Host {
   static void OnProcessExited(GObject* source, GAsyncResult* result, gpointer data);
   static gboolean OnKill(gpointer data);
   static gboolean OnLoadTimer(gpointer data);
-  static void OnLowMemory(GMemoryMonitor* monitor, GMemoryMonitorWarningLevel level, gpointer data);
 
   FlMethodChannel* methods_ = nullptr;
   FlEventChannel* events_ = nullptr;
@@ -393,7 +390,6 @@ class Host {
   bool window_showing_ = false;
   bool session_away_ = false;
   gchar** environment_;
-  GMemoryMonitor* memory_ = nullptr;
 };
 
 Page::~Page() {
@@ -658,8 +654,6 @@ Host::Host(FlBinaryMessenger* messenger, GtkWindow* window) : window_(window), e
         return nullptr;
       },
       this, nullptr);
-  memory_ = g_memory_monitor_dup_default();
-  if (memory_ != nullptr) g_signal_connect(memory_, "low-memory-warning", G_CALLBACK(OnLowMemory), this);
   window_showing_ = WindowShowing();
 }
 
@@ -981,18 +975,10 @@ void Host::TryWipe(WipeJob* job) {
       new Retry{this, job}, [](gpointer data) { delete static_cast<Retry*>(data); });
 }
 
-// MARK: Memory and visibility
+// MARK: Visibility
 
-// Memory pressure closes an idle page, as the Mac's does; it reopens on the next use.
-void Host::OnLowMemory(GMemoryMonitor*, GMemoryMonitorWarningLevel level, gpointer data) {
-  if (level < G_MEMORY_MONITOR_WARNING_LEVEL_MEDIUM) return;
-  static_cast<Host*>(data)->MemoryWarning();
-}
-
-void Host::MemoryWarning() {
-  if (page_ == nullptr || !page_->loaded() || !page_->open() || page_->has_pending_calls()) return;
-  ClosePage(Error::Disconnected("closed to free memory"));
-}
+// Memory pressure never closes the page, as Android's host never does: the rest of a sync runs with no call waiting,
+// so a page that looks idle may be the one syncing. Dart closes a page nobody uses after ten minutes.
 
 bool Host::WindowShowing() const {
   if (window_ == nullptr || !gtk_widget_get_mapped(GTK_WIDGET(window_))) return false;
