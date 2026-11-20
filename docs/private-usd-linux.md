@@ -61,9 +61,12 @@ Registration is `register_private_usd_channels` in `my_application.cc`'s
   and links none of them; no macro that calls a `*_get_type` function is used.
   WebKitGTK older than 2.44 is refused.
 - `railgun_page.cc`: one page, as iOS's and the Mac's are:
-  - Its context has a persistent data manager of its own, under the app's data
-    directory, so each identity has its own: `$XDG_DATA_HOME/<application
-    id>/railgun-page/` (`data`, `cache`, `filters`), the wallet's own directory.
+  - Its context has a persistent data manager of its own, in the app's support
+    directory beside the wallet, so each identity has its own:
+    `$XDG_DATA_HOME/<application id>/railgun-page/` (`data`, `cache`,
+    `filters`), or under the executable's name where path_provider named the
+    support directory so (it does where it can't load libgio's development
+    link, as on most machines).
     A `CACHEDIR.TAG` there keeps it out of backups that honour one (Déjà Dup,
     Borg, restic), as the Mac keeps its store out of Time Machine.
   - Its proxy is `socks5://127.0.0.1:<bridge port>`, with no direct route (the

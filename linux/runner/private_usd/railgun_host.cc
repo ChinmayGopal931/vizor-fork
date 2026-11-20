@@ -101,10 +101,25 @@ std::string BundleDirectory() {
   return path;
 }
 
-// The page's only data store, in this identity's data directory (`$XDG_DATA_HOME/<application id>`, where the wallet
-// lives too), so Veylor's never mixes with Vizor's or the testnet app's.
+// The app's support directory, where the wallet lives, as path_provider_linux finds it:
+// `$XDG_DATA_HOME/<application id>`, or `$XDG_DATA_HOME/<executable name>` where only that one exists (path_provider
+// names it so where it can't load libgio's development link, as on most machines). Both are this identity's, so
+// Veylor's never mixes with Vizor's or the testnet app's.
+std::string SupportDirectory() {
+  g_autofree gchar* by_id = g_build_filename(g_get_user_data_dir(), APPLICATION_ID, nullptr);
+  if (g_file_test(by_id, G_FILE_TEST_IS_DIR)) return by_id;
+  g_autofree gchar* exe = g_file_read_link("/proc/self/exe", nullptr);
+  if (exe != nullptr) {
+    g_autofree gchar* name = g_path_get_basename(exe);
+    g_autofree gchar* by_name = g_build_filename(g_get_user_data_dir(), name, nullptr);
+    if (g_file_test(by_name, G_FILE_TEST_IS_DIR)) return by_name;
+  }
+  return by_id;
+}
+
+// The page's only data store, beside the wallet in the app's support directory.
 std::string DataDirectory() {
-  g_autofree gchar* path = g_build_filename(g_get_user_data_dir(), APPLICATION_ID, "railgun-page", nullptr);
+  g_autofree gchar* path = g_build_filename(SupportDirectory().c_str(), "railgun-page", nullptr);
   return path;
 }
 
