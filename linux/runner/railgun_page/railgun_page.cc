@@ -29,6 +29,12 @@ constexpr char kDeliveryScript[] = "__railgunHostDeliver(m); return true;";
 constexpr char kMessageHandler[] = "railgunHost";
 constexpr char kFilterIdentifier[] = "railgun-allowlist";
 constexpr guint kProbeTimeoutSeconds = 20;
+// How much of the volume the page's one origin may keep. WebKitGTK's own quota for an origin is 1 GiB
+// (`origin-storage-ratio` -1.0), and a write past it fails with a QuotaExceededError: Railgun's mainnet store, its notes
+// trees, its transaction list and their records, passes 2 GB, and from there every scan's write failed, so every
+// refresh did. 60% is what an origin may keep in Chromium, which Android's page runs on. The total is left unlimited
+// (`total-storage-ratio` -1.0): a total reached evicts, which would take the page's store.
+constexpr double kOriginStorageRatio = 0.6;
 // What the page's own requests (the RPC, rail-squid, the screening node, the artifacts) say they come from: the same
 // on every computer. WebKitGTK's own names the distribution and the processor; this one, like the Mac's WebKit,
 // which freezes its OS version and names no model, names neither, and claims one platform for all.
@@ -295,8 +301,10 @@ void Page::Start() {
   const WebKitApi& wk = Wk();
   g_autofree gchar* data = g_build_filename(options_.data_dir.c_str(), "data", nullptr);
   g_autofree gchar* cache = g_build_filename(options_.data_dir.c_str(), "cache", nullptr);
+  // WebKitGTK 2.42 has the ratio, and the page runs on 2.44 or later (`LoadWebKit`).
   WebKitWebsiteDataManager* manager =
-      wk.webkit_website_data_manager_new("base-data-directory", data, "base-cache-directory", cache, nullptr);
+      wk.webkit_website_data_manager_new("base-data-directory", data, "base-cache-directory", cache,
+                                         "origin-storage-ratio", kOriginStorageRatio, nullptr);
   context_ = NewContext(manager, options_.proxy_port);
   g_object_unref(manager);
   if (!wk.webkit_web_context_get_sandbox_enabled(context_)) {
