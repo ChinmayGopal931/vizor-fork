@@ -2139,7 +2139,10 @@ action (checked 2026-11-19): the same provider calls, guards, confirmations
 and states, differing only in layout, mouse and keyboard, the Mac's own
 behaviour and wording. The Mac's host, the bridge's desktop screens and hooks,
 what desktop keeps different, how it differs from iOS's and what has run are in
-`docs/private-usd-macos.md`. Before changing it,
+`docs/private-usd-macos.md`. What every Railgun page host must do (the channel,
+the page, the bridge, Anon's archive and its connections), item by item against
+Android's, is in `docs/private-usd-railgun-hosts.md`: read it before changing a
+host or writing a new one. Before changing it,
 read `docs/private-usd-android-plan.md`: §3.5 lists the invariants and why
 each one exists. The pinned config and defines are in
 `docs/private-usd-reference.md` §7. Progress and deviations are in
@@ -2627,13 +2630,22 @@ the Mac's, answer `unavailable`), Dart `services/private_usd_tokens_service.dart
   - Android's host fetches the archive for the page through the page's
     bridge (`RailgunArchiveFetch`: 16 MB and a minute an answer at most, a
     fixed User-Agent), and so does the Mac's (`RailgunArchive.swift`, the
-    same limits and User-Agent): WebKit can't intercept `https`, so before a
+    same limits and headers): WebKit can't intercept `https`, so before a
     `start` that reads the archive the Mac runs a fixed prelude in the page,
     which sends archive GETs to the page's own origin (`/anon-archive/`,
     answered through the bridge) and hides the WebKit host from the start's
     archive check (the page reads the archive only where it finds none; its
-    transport took the host at load). iOS starts the page without it. Every
-    archive request depends on the chain's state alone.
+    transport took the host at load). The prelude holds the `webkit` object
+    it changes: WebKit makes it anew after a garbage collection, which showed
+    the start the host again and kept 0.9.0's first mainnet sync off the
+    archive. iOS starts the page without it. Every archive request depends on
+    the chain's state alone.
+  - A host keeps the archive's connections as Android's `HttpURLConnection`
+    does: one request at a time on each (HTTP/1.1), kept only after an answer
+    read whole (five idle, five minutes), closed when its request fails, and
+    all dropped when the network changes. Never multiplex the requests on one
+    HTTP/2 connection: one that stops answering would take every try the page
+    sends (`docs/private-usd-railgun-hosts.md`, H27).
 
 **Network: Tor and the Railgun page.**
 
