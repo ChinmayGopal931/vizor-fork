@@ -140,9 +140,14 @@ if ! grep -qs "^JAVA_RUNTIME_VERSION=\"${JDK_VERSION}" "${java_home}/release"; t
 fi
 "${java_home}/bin/java" -version 2>&1 | sed -n '1,2p'
 
+# A package's source.properties may put spaces around '=' (the NDK's does).
+package_revision() {
+  sed -n 's/^Pkg\.Revision *= *//p' "$1/source.properties" 2>/dev/null | tr -d '\r' || true
+}
+
 android_home="${prefix}/android-sdk"
 sdkmanager="${android_home}/cmdline-tools/latest/bin/sdkmanager"
-if ! grep -qs "^Pkg.Revision=${CMDLINE_TOOLS_VERSION}" "${android_home}/cmdline-tools/latest/source.properties"; then
+if [[ "$(package_revision "${android_home}/cmdline-tools/latest")" != "${CMDLINE_TOOLS_VERSION}" ]]; then
   echo "Installing the Android command-line tools ${CMDLINE_TOOLS_VERSION}"
   archive="${downloads}/commandlinetools-${CMDLINE_TOOLS_VERSION}.zip"
   fetch "${CMDLINE_TOOLS_URL}" "${archive}" "${CMDLINE_TOOLS_SHA256}"
@@ -201,7 +206,7 @@ EOF
   echo "jdk: $("${java_home}/bin/java" -version 2>&1 | sed -n '2p')"
   echo "android-cmdline-tools: ${CMDLINE_TOOLS_VERSION}"
   for package in "${SDK_PACKAGES[@]}"; do
-    revision="$(sed -n 's/^Pkg.Revision=//p' "${android_home}/${package//;//}/source.properties" 2>/dev/null || true)"
+    revision="$(package_revision "${android_home}/${package//;//}")"
     echo "android-sdk ${package}: ${revision:-?}"
   done
   echo "flutter: ${flutter_version} (${flutter_revision})"
