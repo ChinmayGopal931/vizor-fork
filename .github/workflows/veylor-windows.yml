@@ -336,6 +336,37 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
+      # What Windows itself shows of an installed Veylor: the installer runs
+      # silently, Apps & features and the Start menu name Veylor Testnet and
+      # Zapp LLC, and the app starts, titles its window Veylor Testnet and
+      # keeps running, with no WebView2 before a wallet is unlocked (the
+      # Railgun page opens only behind the unlock).
+      - name: Install and start Veylor Testnet
+        run: |
+          $setup = Get-ChildItem dist/windows/velopack/veylor-testnet -Filter "*-Setup.exe" | Select-Object -First 1
+          Start-Process -FilePath $setup.FullName -ArgumentList "--silent" -Wait
+          $entry = Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\com.veylor.desktop.testnet"
+          $entry | Select-Object DisplayName, Publisher, DisplayIcon, InstallLocation | Format-List
+          if ($entry.DisplayName -ne "Veylor Testnet") { throw "Apps & features names it '$($entry.DisplayName)'" }
+          if ($entry.Publisher -ne "Zapp LLC") { throw "Apps & features names its publisher '$($entry.Publisher)'" }
+          $shortcuts = @(Get-ChildItem "$env:APPDATA\Microsoft\Windows\Start Menu\Programs" -Recurse -Filter *.lnk |
+            Where-Object { $_.Name -match "veylor|vizor" })
+          $shortcuts | ForEach-Object { Write-Host "shortcut: $($_.Name)" }
+          if (-not ($shortcuts | Where-Object { $_.Name -eq "Veylor Testnet.lnk" })) { throw "no Veylor Testnet shortcut" }
+          if ($shortcuts | Where-Object { $_.Name -match "vizor" }) { throw "a shortcut names Vizor" }
+          $exe = Join-Path $env:LOCALAPPDATA "com.veylor.desktop.testnet\current\VeylorTestnet.exe"
+          if (-not (Get-Process VeylorTestnet -ErrorAction SilentlyContinue)) { Start-Process -FilePath $exe }
+          Start-Sleep -Seconds 30
+          $app = Get-Process VeylorTestnet -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $app) { throw "the app did not keep running" }
+          Write-Host "running: $($app.Path), window '$($app.MainWindowTitle)'"
+          if ($app.MainWindowTitle -ne "Veylor Testnet") { throw "the window is titled '$($app.MainWindowTitle)'" }
+          # A WebView2 browser process is its host's child.
+          $webviews = @(Get-CimInstance Win32_Process -Filter "Name = 'msedgewebview2.exe'" |
+            Where-Object { $_.ParentProcessId -eq $app.Id })
+          if ($webviews.Count -gt 0) { throw "WebView2 started before an unlock" }
+          Stop-Process -Id $app.Id
+
       # Keep the caches once the Rust library has built, even when a later
       # step failed, so the next run starts from them.
       - name: See what the build left
