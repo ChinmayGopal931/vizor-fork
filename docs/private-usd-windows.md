@@ -357,6 +357,12 @@ the bridge accepts and logs each `CONNECT`.
   - **The archive.** A mainnet `start` with the archive asked the host for it
     (ten requests in 90 s), and without the wallet library none was dialled.
   - **The wipe** removed the store whole once the browser process had exited.
+  - **A new page on another bridge**, as after a route change, a lock or the
+    idle close: a page closed and loaded again in the same process on a second
+    stand-in was ready 1.1 to 1.2 s later (the last browser process exited and
+    a new environment was made); its request to the RPC went through the second
+    stand-in with a `CONNECT` of its own, and nothing went through the first
+    once its page had closed, so no pooled socket outlived the route (U19).
 
 Not run: anything with a wallet in the app (the page in Veylor itself, behind
 the unlock: the real bridge, Tor, sends, deposits and bridges, the archive in
