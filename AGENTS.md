@@ -2351,6 +2351,40 @@ deposits, send and withdraw. The reveal rules are `swap::claim_window`, `swap::m
 `swap::may_refund`, held to the vectors of zecSwap's port oracle
 (`rust/src/wallet/private_usd/tests/windows_vectors.json`).
 
+**The open fee (zecSwap's `docs/open-fee.md`).** A ZEC → USD quote may carry
+`openFee {zat, address}`: the maker's gas for opening the swap (and for
+cancelling it if no deposit follows), paid in ZEC before the maker opens it
+and never refunded. Testnet asks it since 2026-11-21 (20,000 zatoshis);
+mainnet asks none yet, and a quote without it takes the old path unchanged.
+`open_fee.rs` and `forward.rs` hold the rules:
+
+- Refused at the quote with nothing paid (the index is spent all the same):
+  `zat` of 0 or above the deployment's `max_open_fee_zat` (500,000 on both
+  networks), or an address that is not a canonical unified address of our
+  network with one Orchard receiver and nothing else (`orchard_only`, which
+  the pinned zecswap-core lacks).
+- Paid only with a minute of the quote left (`OPEN_FEE_MARGIN_SECONDS`),
+  judged before it is proposed and again right before it is created: a stored
+  payment is one the wallet's own sync sends again, so creation is the point
+  of no return. The accept checks first that the spendable Orchard and
+  Ironwood ZEC cover the fee, the deposit and both network fees.
+- One payment of exactly `zat`, no memo (send flow
+  `private-usd-open-fee:{account}:{index}`): the record is saved with the
+  payment started before it is created (`openFeeAttempted`), the payment kept
+  before it is first sent (`openFeePayment`), found again in the wallet after
+  an interruption, and never built twice. It is sent again every 30 s while
+  no block has it and the quote leaves the minute.
+- The accept goes from the engine loop, only once Veylor's wallet shows the
+  fee mined. `402 feeRequired`, a `5xx` or no answer post the same accept
+  again after `Retry-After` (else 5 s, or 12 s unanswered; at least 1 s the
+  first time and 12 s after, at most 30 s), and never once `expiresAt` has
+  passed. Any other `4xx` ends the bridge, and the fee is lost; a quote that
+  expires with the fee unseen ends `FEE_NOT_HONOURED`.
+- A bridge that paid the fee waits for its change (`FundsPending`) rather
+  than fail its deposit. Its fee transaction folds into its row in Activity,
+  and a bridge that ended unstarted after its fee was mined keeps a row for
+  the fee lost. Schema 7 added these record fields.
+
 **Invariants (plan §3.5).** Each one guards funds or privacy. Keep them, and
 keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
 `test/features/private_usd/`.

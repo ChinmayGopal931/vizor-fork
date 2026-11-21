@@ -63,6 +63,7 @@ The Kotlin driver in `of/` is the source of truth. Where `zc/` (the Rust referen
   - `unavailable`, `watchtowerUnavailable`, `internal`
   - `notFound`, `methodNotAllowed`
   - `tokenRequired`, `alreadySpent`
+  - `feeRequired` (`402` with `Retry-After`: a forward quote's open fee is in no block the maker has seen yet; zecSwap PR #6)
 
   Branch on `code` and the HTTP status, never on `error` text. A `409 alreadySpent` may add `transactions: [hash]`.
 - **Ticket.** The accept returns `ticket`, which goes in the `ZecSwap-Ticket` header on every relayer POST for that swap. It is never logged. zapp keeps it only if it starts with `"<swapId>."` and is printable ASCII (`of/SwapWire.kt:198-199`).
@@ -78,7 +79,7 @@ The Kotlin driver in `of/` is the source of truth. Where `zc/` (the Rust referen
 | Call | Body | 200 answer |
 |---|---|---|
 | `GET /v1/info` | — | `{apiVersion:1, maker, chainId, contract, token, zcashNetwork:"mainnet"\|"testnet", reverseEnabled, tokenReturnKey?, contractKind?, minWindow?, lateWindow?}`. Windows the info names must be the pinned ones, and a kind must be `windows` (`WrongDeployment`); all three are optional because mainnet's lock-contract services name none. |
-| `POST /v1/quote` | `{units, payout: authAddress, payoutNote}` | `{quoteId, maker, makerShare, makerProof, chainId, contract, token, amount, depositZat, expiresAt, networkCost?}` |
+| `POST /v1/quote` | `{units, payout: authAddress, payoutNote}` | `{quoteId, maker, makerShare, makerProof, chainId, contract, token, amount, depositZat, expiresAt, networkCost?, openFee?}`; `openFee: {zat, address}` is what the maker asks before it opens the swap (below) |
 | `POST /v1/quote/{quoteId}/accept` | `{userShare, userProof, viewingKeys, tokenRequest?}`, plus `Authorization: PrivateToken token=…` on a paid retry | `{swapId, t0, t1, ticket, lateWindow?}`; a `lateWindow` other than the pinned one is another contract's (`NothingSent(MISMATCH)`, nothing paid) |
 | `GET /v1/swaps/{swapId}` | — | `{swapId, tokenReturn?}` (read only to collect the token) |
 | `POST /v1/reverse/quote` | `{units, user: authAddress, refundNote}` | `{terms: <Quote>, user, refundNote, fundingDeadline, readyDeadline, refundAfter}` |
@@ -86,6 +87,7 @@ The Kotlin driver in `of/` is the source of truth. Where `zc/` (the Rust referen
 | `GET /v1/reverse/swaps/{swapId}` | — | `{swapId, phase, depositTxid?, readyDeadline, refundAfter, tokenReturn?}` (advisory only) |
 
 - **`/v1/info` checks** (`of/SwapChecks.kt:9-28`): it must equal the pin in `apiVersion`, `maker`, `chainId`, `contract`, `token` and `zcashNetwork`, and a `contractKind`, `minWindow` or `lateWindow` it names must be the pinned contract's, as in the relayer's terms (§5.3; else `WrongDeployment`). Reverse also needs `reverseEnabled`. A `tokenReturnKey` that differs from the pinned return key is refused (`TOKENS_REFUSED`). Check once per driver.
+- **Open fee** (zecSwap PR #6, `docs/open-fee.md`; testnet since 2026-11-21, 20,000 zatoshis; mainnet asks none yet). A forward quote may carry `openFee: {zat, address}`: the maker's gas for the open and, if no deposit follows, the cancel, paid in ZEC before the maker opens the swap and never refunded. Absent, the accept is as before. Present, the accept is answered `402 {code: "feeRequired"}` with `Retry-After` (seconds) until the maker has seen exactly `zat` paid to `address` in a mined transaction; then it opens the swap as always. Veylor's rules are §5.6 step 2a. Reverse quotes ask no fee.
 - **Quote well-formedness** (`of/SwapWire.kt:247-253`, `of/ReverseSwapModels.kt:228-234`):
   - `quoteId` is 32 bytes and `makerProof` 64 bytes
   - `amount` is in 1..2^120
@@ -254,13 +256,14 @@ Terms hashes (amount 150000000, t0 1790003600, t1 1790007200, makerKey E, userKe
 | `receives` | Usdc6 | expected net; replaced by the event's net at the end |
 | `relayerFee`, `feeExpiresAt?` | Usdc6, Long | from `GET /v1/terms` at quote time |
 | `maxTotalZat?` | Long | `depositZat + depositFee` the user approved |
+| `openFeeMaxTotalZat?`, `openFeeAttempted`, `openFeePayment?` | Long, Bool, `{txId, raw, expiryHeight, networkFeeZat?}` | only where the quote asks an open fee (schema 7): the fee and its payment's network fee the user approved; the payment marked started before it is created; the payment kept before it is first sent (step 2a) |
 | `deposit` | `NotStarted` \| `Started` \| `Kept(ZcashTransaction)` | stored as `depositAttempted: Bool` + `deposit?` |
 | `sweep?` | `ZcashTransaction` | `{txId (display hex), raw (hex), expiryHeight}` |
 | `payout?` | `SwapPayout` | `{swapId, note, fee, signature}`, signed and kept |
 | `relayerClaims` | Bool | the user's choice at accept (Settings, on by default): the claim goes to the relayer once the deposit is out |
 | `claimHold?` | `posted` \| `held` \| `declined` | the claim handed to the relayer: kept as `posted` before it is posted; `held` once the relayer holds it; `declined` after a `404` or a refusal |
 | `t0?`, `t1?`, `ticket?` | | from the accept answer |
-| `end?` | `{outcome, at}` | `Paid` \| `Refunded(sweepTxId, MAKER_CANCELLED\|NOT_CLAIMED_IN_TIME)` \| `NothingSent(QUOTE_EXPIRED\|MAKER_REFUSED\|MAKER_UNAVAILABLE\|NEVER_OPENED\|MISMATCH\|DEPOSIT_WINDOW_MISSED\|MAKER_CANCELLED)` |
+| `end?` | `{outcome, at}` | `Paid` \| `Refunded(sweepTxId, MAKER_CANCELLED\|NOT_CLAIMED_IN_TIME)` \| `NothingSent(QUOTE_EXPIRED\|MAKER_REFUSED\|MAKER_UNAVAILABLE\|NEVER_OPENED\|MISMATCH\|DEPOSIT_WINDOW_MISSED\|MAKER_CANCELLED\|FEE_NOT_HONOURED)`; `FEE_NOT_HONOURED`: the quote expired before the maker saw its open fee, or a swap paid for never opened |
 | `payoutTx?` | hash | from the `PaidOut` event |
 
 **Steps.** Each `advance` reads the chain first, so it can be rerun at any point.
@@ -286,6 +289,12 @@ Terms hashes (amount 150000000, t0 1790003600, t1 1790007200, makerKey E, userKe
    | Turned away at the token gate | zapp: `NothingSent(MAKER_UNAVAILABLE)`, then rethrow. veylor: return `TokensNeeded`, issue once, and retry the same acceptance (§5.9); if issuance fails, abandon → `NothingSent(MAKER_UNAVAILABLE)`. Until M4 there is no issuance: Rust returns `TokensNeeded` with no retry, and Dart abandons at once (progress D-33). |
    | Timeout, transport failure or 5xx | throw. The record stays "maybe opened". |
    | 200 | save `t0`, `t1`, `ticket`. If `answer.swapId ≠ record.swapId`: `NothingSent(MISMATCH)`. |
+2a. **Open fee** (veylor, zecSwap PR #6; `open_fee.rs`, `forward.rs`). Only where the quote carries `openFee`:
+   1. **At the quote**, refuse it with `OPEN_FEE_REFUSED` (nothing paid, the index spent all the same) unless `0 < zat ≤ max_open_fee_zat` (500,000 on both networks, the reference CLI's `--max-open-fee`) and `address` is a canonical unified address of our Zcash network with one Orchard receiver and nothing else (`orchard_only`, ported: the pinned zecswap-core predates it). The offer also estimates the fee payment's network fee; none means unpayable.
+   2. **At accept**, after the maker's proof checks: refuse (`QUOTE_EXPIRED`, nothing saved) with under `OPEN_FEE_MARGIN_SECONDS` (60) of the quote left; refuse (`DEPOSIT_UNPAYABLE`, nothing saved) unless the spendable Orchard and Ironwood ZEC cover the fee, the deposit and both network fees. Propose the payment (exactly `zat`, no memo, one ordinary send, total ≤ `openFeeMaxTotalZat`, send flow `private-usd-open-fee:{account}:{index}`), judge the minute again, **save the record with `openFeeAttempted`**, create, **keep `openFeePayment`**, then send. The accept is not posted: the call returns `Accepted` and the engine goes on. A stored payment is one the main sync sends again until it is mined, so creating it is the point of no return; the minute is judged right before it.
+   3. **Each advance until the maker answers**: a started payment is looked for in the wallet (sent to `address`) before anything is built; a record saved with none is paid only while the minute allows, else `NothingSent(QUOTE_EXPIRED)`. While the main wallet shows it in no block: `Waiting(FEE_CONFIRMING)`, sent again every `OPEN_FEE_RESEND_SECONDS` (30) while the minute is left; at `expiresAt` `NothingSent(FEE_NOT_HONOURED)` (`QUOTE_EXPIRED` once the payment provably expired).
+   4. **Once mined**, post the accept, unchanged. `402 feeRequired`, a `5xx`, an unreadable answer or none: `Waiting(FEE_ACCEPTING)`, posted again after `Retry-After`, else `FEE_WAIT_SECONDS` (5) or, unanswered, `UNANSWERED_ACCEPT_WAIT_SECONDS` (12), clamped to at least 1 s the first time and `FEE_PACE_SECONDS` (12) after, at most 30 s, never past `expiresAt`. Never posted at or after `expiresAt`: a last answer of `feeRequired` ends `FEE_NOT_HONOURED` at once; otherwise the swap waits as step 3 below (the maker's open may be on its way), and one that never opened ends `FEE_NOT_HONOURED`. Other answers as step 2.4 (a `4xx` that nothing opens ends `NothingSent`, the fee lost). The pacing is process memory (`engine::FeePace`): a restart sends the kept payment and posts at once.
+   5. **The deposit** of a swap that paid the fee waits (`FUNDS_PENDING`) while no deposit fits the spendable funds and more are pending (the fee's change), never failing as `DEPOSIT_UNPAYABLE` for it.
 3. **No `t0`/`t1` yet, or not confirmed on chain** (`notOnChain`, `:157-171`): `Waiting(OPENING)` until `quote.expiresAt + 300 s`. If the deposit is still `NotStarted` at that point:
    - `swap(id)` (latest) is empty → `NothingSent(NEVER_OPENED)`
    - otherwise, if the accept was never answered → `NothingSent(MAKER_UNAVAILABLE)`
@@ -1056,6 +1065,8 @@ Source: `ui/common/atomicswap/AtomicSwapMainnet.kt:18-79` and `AtomicSwapTestnet
 | POI node | `https://ppoi.fdi.network/` | same |
 | Proving artifacts (allowlisted; §6.5) | `https://ipfs-lb.com`, the SDK's gateway; when it fails, veylor's mirror `https://railgun-artifacts.pepeman931.workers.dev` (not in zapp; progress D-114) | same |
 | Beta limits (server side) | `maxSwapUsdc` 50, `maxAwaitingDeposit` 20, `spreadBps` 100; relayer fee floor 500000 (0.5 USDC) | `maxAwaitingDeposit` 20 |
+| Open fee the maker asks (zecSwap PR #6) | none yet; when on, priced from each quote's gas price | 20,000 zatoshis since 2026-11-21 (the maker's minimum) |
+| Open fee cap (`max_open_fee_zat`, Veylor's) | 500,000 zatoshis | 500,000 zatoshis |
 
 **Token keys** (copied 2026-10-13 from zapp and cross-checked equal to the zecSwap records; one line each, no whitespace):
 
@@ -1085,6 +1096,8 @@ MIIBUjA9BgkqhkiG9w0BAQowMKANMAsGCWCGSAFlAwQCAqEaMBgGCSqGSIb3DQEBCDALBglghkgBZQME
 - `MAX_T0_TO_T1_SECONDS` = 2 h: the most a forward swap's `t1` may follow its `t0`; the least is `max(MIN_WINDOW, 600 s)`
 - `MAX_HEAD_LAG_SECONDS` = 180 (`freshHead`)
 - `ACCEPT_MARGIN_SECONDS` = 15 (`of/AtomicSwapDriver.kt:294`)
+- `OPEN_FEE_MARGIN_SECONDS` = 60 (zecSwap's `OPEN_FEE_MARGIN`): an open fee is paid, and sent again, only with this much of its quote left; `OPEN_FEE_RESEND_SECONDS` = 30: an unmined fee is sent again this often
+- `FEE_WAIT_SECONDS` = 5, `FEE_WAIT_MIN_SECONDS` = 1, `FEE_PACE_SECONDS` = 12, `FEE_WAIT_MAX_SECONDS` = 30, `UNANSWERED_ACCEPT_WAIT_SECONDS` = 12 (zecSwap's `FEE_WAIT`, `FEE_WAIT_MIN`, `FEE_PACE`, `BUSY_WAIT`): an accept answered `feeRequired`, a `5xx` or nothing is posted again after `Retry-After`, else 5 s (12 s unanswered), at least 1 s the first time and 12 s after, at most 30 s
 - `RAILGUN_FEE` = 25 bps (`:297`)
 - quick HTTP timeout 20 s (`of/SwapClients.kt:438`); relayer ticket header `ZecSwap-Ticket` (`:436`)
 - the issuer clock skew allowed is 600 s (`of/SwapTokens.kt:344`)

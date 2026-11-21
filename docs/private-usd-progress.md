@@ -7,6 +7,30 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
 
 ## Where things stand (2026-10-17; read this first)
 
+- **A ZEC → USD bridge pays the maker's open fee first (2026-11-21, D-160).**
+  Since 2026-11-21 the hosted testnet maker refuses every ZEC → USD accept
+  `402 feeRequired` until the quote's `openFee` (20,000 zatoshis) is in a
+  block; mainnet asks none yet. Ported from zecSwap PR #6 (`feat/open-fee`,
+  `docs/open-fee.md`):
+  - **Rust.** `open_fee.rs` (the cap, the Orchard-only check, the accept's
+    pacing) and `forward.rs`: the quote refuses a fee over 500,000 zatoshis
+    or payable outside Orchard (`OPEN_FEE_REFUSED`); the accept checks the
+    minute and the funds, proposes the payment, saves the record with it
+    started, creates, keeps and sends it, and returns; the engine sends it
+    again every 30 s while unmined, posts the accept once Veylor's wallet
+    shows it mined, and posts it again through `feeRequired`, a `5xx` or
+    no answer until the quote expires (`FEE_NOT_HONOURED` then). The deposit
+    waits for the fee's change (`FUNDS_PENDING`). Schema 7 adds the record's
+    `openFeeMaxTotalZat`, `openFeeAttempted` and `openFeePayment`.
+  - **Dart.** The review's ledger shows "Market maker fee · not refunded" and
+    its total includes the fee; the quote stops being offered 80 s before
+    it expires; the progress names the fee's waits; Activity folds the fee's
+    transaction into its bridge row, and keeps a row for a fee lost.
+  - **Tests.** `tests/open_fee.rs` (the five "done when" cases on the
+    fakes), `open_fee.rs` units, the schema 6 → 7 migration and the strict
+    fixtures. Not yet run against the hosted maker: the owner's Mac testnet
+    build is for that.
+
 - **A refresh the user waits on shows its progress (2026-11-01, D-156).**
   On a wallet that synced before, the sync line read `RAILGUN SYNCED`
   through every refresh while the total's arrow spun, and a tap on the
@@ -2907,6 +2931,38 @@ M8 status (2026-10-14): the non-device parts are done.
   WebView sent its default User-Agent, which names the phone's model and
   Android build, to the RPC, rail-squid, the screening nodes and the artifact
   hosts; it now sends the archive fetch's `Mozilla/5.0`.
+
+- **D-160 (owner, 2026-11-21): the open fee, ported from zecSwap PR #6.**
+  Where Veylor differs from the reference CLI (`crates/zecswap-cli/src/swap.rs`)
+  and `docs/open-fee.md`, and why:
+  - **The second minute check comes before the payment is created, not
+    after.** Veylor's sync sends every unmined transaction the wallet stores
+    again (`resubmit_pending_transactions`), so a payment withheld after
+    creation would go out anyway. The check right before creation is the
+    last point at which nothing is paid; after it the payment is sent at
+    once.
+  - **The accept is the engine's step, not a loop in one call.** Each advance
+    posts it at most once and naps what `Retry-After` asks (the pacing is in
+    `engine::FeePace`, process memory); the FRB accept of a fee quote pays
+    and returns `Accepted`. After `expiresAt` nothing is posted: a last
+    answer of `feeRequired` ends the bridge at once, anything else waits the
+    5-minute grace and reads the chain, as an unanswered accept always did.
+  - **A `4xx` that may follow an open** (`unknownSwap`, `internal`, or an
+    unknown code outside 400/404/503) keeps the bridge, posted again, as
+    Veylor's no-fee accept already treats it; zecSwap ends on any `4xx`.
+  - **Funds** are the spendable Orchard and Ironwood ZEC, at least the fee,
+    the deposit and both network fees, checked at accept; the review's own
+    check (`totalZat <= spendable`) already counts the fee.
+  - **The cap is a pin** (`Deployment.max_open_fee_zat`), 500,000 zatoshis
+    (0.005 ZEC) on both networks, the CLI's default: 25 times testnet's fee.
+    Mainnet's fee will be priced from each quote's gas; revisit the cap when
+    the maker turns it on there.
+  - **The fee is paid from any note.** Paying it from a note the deposit
+    does not need is not done: a one-note wallet's deposit waits for the
+    change (`FUNDS_PENDING`).
+  - **A canonical address only.** The wallet finds an interrupted payment
+    by its recipient as it encodes it; a fee address spelt otherwise
+    (uppercase) is refused at the quote rather than risk a second payment.
 
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's
