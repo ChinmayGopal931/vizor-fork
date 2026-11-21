@@ -174,6 +174,16 @@ void main() {
       expect(files(), hasLength(3));
       expect(files().last.path, isNot(kept.last.path));
       expect(files().first.path, isNot(kept.first.path));
+
+      // A folder removed under it: the line after the failed one starts over.
+      directory.deleteSync(recursive: true);
+      next.failure(PrivateUsdDiagnosticOp.open, failedScan);
+      next.failure(PrivateUsdDiagnosticOp.open, failedScan);
+      now = now.add(const Duration(minutes: 1));
+      next.failure(PrivateUsdDiagnosticOp.open, failedScan);
+      await next.flush();
+      expect(files(), hasLength(1));
+      expect(lines().last['n'], 3);
     });
 
     test('counts the same failure within a minute on one line', () async {

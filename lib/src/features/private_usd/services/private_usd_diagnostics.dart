@@ -663,6 +663,8 @@ class PrivateUsdDiagnostics {
         }
         await _write(line);
       } catch (_) {
+        // The next line starts a new file (its folder may have been removed).
+        _file = null;
         _reportFailure();
       }
     });
