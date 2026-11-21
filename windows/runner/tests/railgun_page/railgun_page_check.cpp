@@ -160,17 +160,20 @@ void Load(std::function<void(bool ok)> next) {
   });
 }
 
-// One page call. Only the result's own keys are printed: its values can name the wallet.
+// One page call. Only the result's own keys are printed: its values can name the wallet. A call whose step went on
+// without it (`abandoned` set) is not reported when its answer comes.
 void Call(const std::string& method_name, const std::string& params_json, std::function<void(bool ok)> next,
-          std::function<void(const std::string& result_json)> result = nullptr) {
+          std::function<void(const std::string& result_json)> result = nullptr,
+          std::shared_ptr<bool> abandoned = nullptr) {
   const railgun_protocol::Method* method = railgun_protocol::FindMethod(method_name);
   const railgun_protocol::Method debug_method = {method_name.c_str(), 600};
   if (method == nullptr) method = &debug_method;
   const long long started = Ms();
   const railgun_protocol::Method copy = *method;
   const std::string name = method_name;
-  RailgunPageHost::Get().Call(copy, params_json, [name, next, result, started](const Error* error,
-                                                                               const std::string& result_json) {
+  RailgunPageHost::Get().Call(copy, params_json, [name, next, result, started, abandoned](
+                                                     const Error* error, const std::string& result_json) {
+    if (abandoned && *abandoned) return;
     if (error != nullptr) {
       Print("{\"step\":" + Quote(name) + ",\"ok\":false,\"error\":" + ErrorJson(*error) + "}");
       g_exit = 1;
@@ -277,6 +280,38 @@ void WatchHeaders(std::function<void(bool ok)> next) {
   page->webview()->CallDevToolsProtocolMethod(
       L"Network.enable", L"{}",
       Callback<ICoreWebView2CallDevToolsProtocolMethodCompletedHandler>([next](HRESULT, LPCWSTR) -> HRESULT {
+        next(true);
+        return S_OK;
+      }).Get());
+}
+
+// The quota Chromium enforces for the page's origin, which DevTools reads: since Chromium 133 the page's own
+// `navigator.storage.estimate()` reports its usage plus 10 GiB whatever the disk (StaticStorageQuota).
+void PrintQuota(std::function<void(bool ok)> next) {
+  railgun_windows::RailgunPage* page = RailgunPageHost::Get().page();
+  if (page == nullptr || page->webview() == nullptr) {
+    Fail("quota", "no page");
+    next(false);
+    return;
+  }
+  page->webview()->CallDevToolsProtocolMethod(
+      L"Storage.getUsageAndQuota", L"{\"origin\":\"veylor-railgun://app\"}",
+      Callback<ICoreWebView2CallDevToolsProtocolMethodCompletedHandler>([next](HRESULT result, LPCWSTR json)
+                                                                             -> HRESULT {
+        if (FAILED(result) || json == nullptr) {
+          Fail("quota", "DevTools did not answer");
+        } else {
+          railgun_json::Value root;
+          railgun_json::Members members;
+          const std::string text = Utf8(json);
+          std::string quota = "null";
+          if (railgun_json::Parse(text, &root) && railgun_json::ObjectMembers(text, root, &members)) {
+            if (const railgun_json::Value* value = railgun_json::Find(members, "quota")) {
+              quota = std::string(railgun_json::Raw(text, *value));
+            }
+          }
+          Print("{\"step\":\"quota\",\"ok\":true,\"quota\":" + quota + ",\"ms\":" + std::to_string(Ms()) + "}");
+        }
         next(true);
         return S_OK;
       }).Get());
@@ -411,6 +446,7 @@ void BuildSteps(Steps* steps) {
       Evaluate("environment", script, next);
     });
     steps->Add(PrintHeaders);
+    steps->Add(PrintQuota);
     steps->Add([](std::function<void(bool)> next) {
       RailgunPageHost::Get().Close();
       Print(std::string("{\"step\":\"close\",\"ok\":true,\"open\":") +
@@ -434,11 +470,13 @@ void BuildSteps(Steps* steps) {
         Print("{\"step\":\"refresh\",\"ok\":true,\"stopped\":true,\"ms\":" + std::to_string(Ms()) + "}");
         next(true);
       });
-      Call("refresh", "{}", [answered, next](bool ok) {
-        if (*answered) return;
-        *answered = true;
-        next(ok);
-      });
+      Call(
+          "refresh", "{}",
+          [answered, next](bool ok) {
+            *answered = true;
+            next(ok);
+          },
+          nullptr, answered);
     });
     if (g_options.network == "sepolia") {
       steps->Add([](std::function<void(bool)> next) { AwaitEvent("synced", 300, next); });

@@ -333,9 +333,12 @@ def main() -> int:
             run.check(value.get("userAgentData") in (None, "[]"), "no User-Agent client hints in the page")
             run.check(value.get("visibility") == "visible", "the page is visible while its window shows")
             run.check((value.get("timerTicks") or 0) >= 100, "the page's timers run unthrottled while shown")
+            # The page's own estimate reports its usage plus 10 GiB (Chromium's StaticStorageQuota); DevTools reads
+            # the quota Chromium enforces.
             total = shutil.disk_usage(args.work).total
-            quota = value.get("quota") or 0
+            quota = step(environment, "quota").get("quota") or 0
             run.report["quota_ratio"] = round(quota / total, 3) if total else None
+            run.report["reported_quota_ratio"] = round((value.get("quota") or 0) / total, 3) if total else None
             run.check(quota >= 0.5 * total, f"the origin may keep at least half the disk ({run.report['quota_ratio']})")
             connects = environment["connects"]
             run.check(value.get("refused", {}).get("failed") is not None, "the filter refuses a host the CSP allows")
