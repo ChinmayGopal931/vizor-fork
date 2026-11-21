@@ -633,7 +633,8 @@ fastlane builds leave Sparkle out, the Linux check is off, and Windows hides
 its updater in a build without a feed key. The lanes keep upstream's signing,
 Apple team, match and release targets, and the macOS lane refuses to sign a
 Veylor flavor. Veylor's macOS release has its own signing, notarization and
-update feed (below); Linux and Windows have no Veylor release yet.
+update feed, and Linux's comes from CI (both below); Windows has no Veylor
+release yet.
 
 ### Veylor macOS release
 
@@ -685,6 +686,22 @@ website's `releases/latest/download/Veylor-macos.dmg` and the feed resolve
 through "latest", so any later release that becomes latest carries
 `appcast.xml` too. The DMG's name never carries the version, and each release
 takes a higher build number.
+
+### Veylor Linux release
+
+`gh workflow run veylor-linux.yml --ref main -f public_release=true` builds
+`VEYLOR_VERSION` (set in the workflow) for x86_64 and aarch64. A run without
+`public_release` stays `-internal.<run>`.
+
+- **Assets.** Publish the mainnet four: `Veylor-linux-<arch>.AppImage` and
+  `veylor_<version>_<amd64|arm64>.deb`. The testnet ones stay unpublished.
+  Add `SHA256SUMS`, and the notes from `release_notes/veylor-linux-vX.Y.Z.md`.
+- **The release.** Tag it `veylor-linux/vX.Y.Z` and never mark it latest
+  (`--latest=false`): the Mac's DMG link and update feed resolve through
+  "latest". The website links the Linux assets by that tag.
+- **What it isn't.** The AppImages are unsigned (`LINUX_APPIMAGE_UNSIGNED`),
+  the .debs come from no repository, and nothing updates itself. A new
+  version is a new release with new links.
 
 ## Deep-link Host (VIZOR_DEEPLINK_BASE_URL)
 
