@@ -366,8 +366,9 @@ the bridge accepts and logs each `CONNECT`.
     stand-in with a `CONNECT` of its own, and nothing went through the first
     once its page had closed, so no pooled socket outlived the route (U19).
 
-- **The packages** (`veylor-windows.yml`'s Package jobs, run 44871895018, x64
-  and ARM64): both identities built as `Veylor.exe` and `VeylorTestnet.exe`,
+- **The packages** (`veylor-windows.yml`'s Package jobs, runs 44871895018 and
+  44874351505, the first run green throughout, x64 and ARM64): both identities
+  built as `Veylor.exe` and `VeylorTestnet.exe`,
   their version resources naming Veylor or Veylor Testnet, `com.veylor` and
   Zapp LLC, with the page's bundle in `data\railgun`; the installers are
   `com.veylor.desktop-win-<arch>-mainnet-Setup.exe` and
@@ -381,8 +382,8 @@ the bridge accepts and logs each `CONNECT`.
 - **The archive through the wallet library**: the check program with the
   app's own `rust_lib_zcash_wallet.dll`, a mainnet first sync reading the
   archive for 90 s. On x64 the page asked for 180 files and 179 came back (one
-  was in flight when it stopped), over five connections; on ARM64 110 of 110,
-  over four. Every connection went to `digest.anon.inc` through the stand-in by
+  was in flight when it stopped), over five connections, then 144 of 144; on
+  ARM64 110 of 110, over four, both times. Every connection went to `digest.anon.inc` through the stand-in by
   name, and none failed. (An earlier run's check passed without the library,
   whose dependencies it hadn't found; the check now requires it.)
 
