@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/app_bootstrap.dart';
 import 'package:zcash_wallet/src/core/config/rpc_endpoint_config.dart';
+import 'package:zcash_wallet/src/core/layout/app_form_factor.dart';
 import 'package:zcash_wallet/src/core/storage/app_secure_store.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/railgun_models.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_archive_sync_provider.dart';
@@ -145,6 +146,25 @@ void main() {
       ),
       isFalse,
     );
+  });
+
+  // The Mac's and Linux's desktop hosts fetch it too, where they run the page.
+  test('desktop hosts fetch the archive where they run the page', () async {
+    final start = FutureProvider.autoDispose(privateUsdArchiveSyncOf);
+    for (final platform in [TargetPlatform.macOS, TargetPlatform.linux]) {
+      debugDefaultTargetPlatformOverride = platform;
+      for (final supported in [true, false]) {
+        final container = containerWith(
+          store: MemoryArchiveSyncStore(),
+          railgunHostSupported: supported,
+        );
+        expect(
+          await container.read(start.future),
+          kDesktopFormFactor && supported,
+          reason: '${platform.name}, host supported: $supported',
+        );
+      }
+    }
   });
 
   test(

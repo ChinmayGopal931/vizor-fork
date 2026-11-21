@@ -198,6 +198,16 @@ if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
     COMPONENT Runtime)
 endif()
 
+# Shielded USD's Railgun page process beside the executable, and the page's
+# bundle in data/railgun: the copy android/railgun-web/build.mjs writes for iOS,
+# which the Mac uses too (no third copy in the tree).
+if(TARGET railgun_page)
+  install(TARGETS railgun_page RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
+    COMPONENT Runtime)
+endif()
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../ios/Runner/Railgun/railgun/"
+  DESTINATION "${INSTALL_BUNDLE_DATA_DIR}/railgun" COMPONENT Runtime)
+
 # Ship the USB permission setup with bundles/AppImages; installation on the host
 # remains an explicit administrator action.
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/udev/"

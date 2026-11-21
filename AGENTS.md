@@ -578,6 +578,30 @@ own way, and a malformed or unknown id fails the build:
   literal). The rename keeps the data apart: path_provider_linux names the
   support directory after the executable when it cannot load `libgio-2.0.so`,
   as on most machines without development packages.
+  - **Builds run on GitHub Actions** (`.github/workflows/veylor-linux.yml`, on
+    the fork, for pushes to `feat/linux-desktop` and on demand), never on the
+    Mac. Each architecture builds on its own runner, x86_64 on `ubuntu-22.04`
+    and ARM64 on `ubuntu-24.04-arm`, through upstream's lane:
+    `fastlane linux release` with `VIZOR_LINUX_FLAVORS=veylor`, which runs
+    `scripts/build-linux-release.sh` and `scripts/package-linux-appimage.sh`.
+  - **What it builds:** mainnet, the desktop form factor, and
+    `VIZOR_PRIVATE_USD_ENABLED=true`, which the build script passes on as a
+    define. Shielded USD stays hidden until Linux has a Railgun host
+    (`privateUsdPlatformHostsPage`). Flutter comes from `.fvmrc` through fvm,
+    checked against `scripts/release-config/flutter-sdk.json`; Rust is stable,
+    as cargokit picks it. After the build, the job reads the defines back from
+    Flutter's generated config and fails unless they are those, with the
+    `veylor` flavor and no keyed RPC URL.
+  - **What it keeps:** `Veylor-linux-<arch>.AppImage` and its `.sha256`, as a
+    workflow artifact for 30 days. Nothing is published.
+  - **Signing:** the AppImages are unsigned. `LINUX_APPIMAGE_UNSIGNED=true` is
+    the switch (`fastlane/linux/README.md`); an AppImage that embeds update
+    information refuses it.
+  - **Caches:** the Cargo registry and pub caches (shared by both
+    architectures) and an sccache directory per architecture, each saved once
+    per lockfile. Cargokit's target directory lies under `build/linux`, which
+    the build script deletes first, so sccache is what carries Rust across
+    runs.
 - **Windows**: `$env:VIZOR_APPLICATION_ID = "com.veylor.desktop"`, then
   `fvm flutter run -d windows` (or `fvm flutter build windows --release`).
   CMake sets the version resource (company `com.veylor`, product `Veylor`,
@@ -601,7 +625,10 @@ Packaging follows the same switch: the `veylor` and `veylor-testnet` flavors of
 `VIZOR_WINDOWS_FLAVOR`), `scripts/build-linux-release.sh --flavor veylor` and
 `scripts/package-windows-velopack.ps1 -ApplicationId com.veylor.desktop` make
 `Veylor-macos.dmg`, `Veylor-linux-<arch>.AppImage` and the
-`com.veylor.desktop` Velopack package. Those packages have no updates: the
+`com.veylor.desktop` Velopack package; `scripts/package-linux-deb.sh` makes the
+`veylor` and `veylor-testnet` .debs (`/opt/<package>`, side by side, with the
+AppArmor profile Shielded USD needs on Ubuntu), which Veylor's Linux CI builds
+beside each AppImage. Those packages have no updates: the
 fastlane builds leave Sparkle out, the Linux check is off, and Windows hides
 its updater in a build without a feed key. The lanes keep upstream's signing,
 Apple team, match and release targets, and the macOS lane refuses to sign a
@@ -2131,7 +2158,11 @@ desktop app hosts it too (macOS 14 and later, behind the same define): step 3a
 (2026-11-19) brought the Railgun host and desktop screens, and step 3b the
 bridge with its refunds and rescue, on the same engine and providers, in
 desktop layouts that place the phone's bridge widgets (never its screens).
-Windows and Linux have no host and hide it. Desktop Home's recent activity and
+Linux hosts it too (2026-11-20): the page runs in a process of its own on the
+system's WebKitGTK 4.1, always in WebKit's sandbox, and where that can't start
+(no WebKitGTK, or Ubuntu 23.10+ without the .deb's AppArmor profile) Shielded
+USD stays hidden; `docs/private-usd-linux.md` has the host and what has run.
+Windows has no host and hides it. Desktop Home's recent activity and
 Activity list the phone's Shielded USD rows, bridges included, and leave out
 the wallet transactions a bridge row stands in for
 (`desktopPrivateUsdFeedEntries`). Desktop follows the phone's flows action for
@@ -2169,10 +2200,16 @@ Code:
   `RailgunError`), with `macos/Runner/PrivateUsdAttestationHandler.swift`,
   `ScreenAwakeChannel.swift` and `MacSessionLifecycle.swift`. Keep the shared
   four free of UIKit and Flutter imports.
+- C++ (Linux): `linux/runner/private_usd/` (Veylor's side: the channels, the
+  page's link, the session lifecycle, keep-awake and the settlement reminder)
+  and `linux/runner/railgun_page/` (`veylor-railgun-page`, the page process:
+  WebKitGTK loaded at run time, the page, the archive fetch and the hosts);
+  `scripts/package-linux-deb.sh` makes the .deb with its AppArmor profile.
 - The Railgun page: `android/app/src/main/assets/railgun/`, built from
   `android/railgun-web/`; the same build copies it as is to
   `ios/Runner/Railgun/railgun/`, which the macOS target references as a folder
-  (no third copy).
+  and the Linux build installs into the bundle's `data/railgun` (no third
+  copy).
 - Copy: ARB messages whose keys start with `privateUsd` (the chart's
   `portfolioChart`, the sync line's `neonSync`), in Korean and Chinese
   too. `PrivateUsdCopy` keeps only what is never translated and the few
@@ -2198,8 +2235,9 @@ Code:
   subdomain, one label or more of letters, digits and inner hyphens, for
   QuickNode's endpoint names and Chainstack's dedicated nodes). Every one
   is in `RAILGUN_PAGE_HOSTS`, which the Kotlin and Swift `RailgunEndpoints`,
-  the page's CSP (and its two bundle copies of `index.html`) and the Rust
-  bridge repeat and a Rust test pins together: a new provider goes into all
+  Linux's `kHosts` (`linux/runner/railgun_page/railgun_endpoints.h`), the
+  page's CSP (and its two bundle copies of `index.html`) and the Rust bridge
+  repeat and a Rust test pins together: a new provider goes into all
   of them, and only a provider that serves every call the engine and the
   page make belongs (`eth_call` at a block hash and `eth_getLogs` over the
   engine's 5,000-block window included; a transaction RPC such as Flashbots
@@ -2304,6 +2342,18 @@ Code:
   shows behind it. The bridge screens' pinned action
   (`DesktopPrivateUsdPage.action`) keeps it in view however far the progress
   scrolls.
+- **On Linux** the foreground is the same, with what GTK reports: a minimised
+  or withdrawn window is `hidden` (Flutter's embedder; on Wayland GTK never
+  learns of a minimise, so it stays `inactive` and Private USD runs on), and a
+  locked or blanked screen, a computer going to sleep and another session in
+  front are `hidden` too (`session_lifecycle.cc`, from logind and the
+  screensaver, on `flutter/lifecycle`). Veylor hides the page's offscreen
+  window meanwhile, so WebKit throttles the page as the Mac's suspends it. The
+  keep-awake flag is an idle inhibitor (`gtk_application_inhibit`, else
+  `org.freedesktop.ScreenSaver`), and the settlement reminder the window's
+  urgency hint and the desktop's alert sound. Desktop messages that name the
+  Mac say "your computer" on Linux (`privateUsd…Linux`,
+  `privateUsdLinuxWording`).
 
 **Separate databases.** Rust owns both, in
 `<support>/private_usd_<walletDbName>_<network>/` (`getPrivateUsdDirPath`):
@@ -2564,8 +2614,8 @@ the Mac's, answer `unavailable`), Dart `services/private_usd_tokens_service.dart
   SDK's rescan still calls it). Each names the exact source of the pinned
   engine and fails the build against any other: re-check them when
   bumping it.
-- **Anon's archive** (Android and the Mac, mainnet, Settings, on by default;
-  `archive*.js`):
+- **Anon's archive** (Android, the Mac and Linux, mainnet, Settings, on by
+  default; `archive*.js`):
   - It gives commitments and the transaction list only. Unshields and
     nullifiers come from rail-squid: the archive drops a nullifier spent
     again in another tree, and a missing unshield stops the txid sync at its
@@ -2645,8 +2695,12 @@ the Mac's, answer `unavailable`), Dart `services/private_usd_tokens_service.dart
     transport took the host at load). The prelude holds the `webkit` object
     it changes: WebKit makes it anew after a garbage collection, which showed
     the start the host again and kept 0.9.0's first mainnet sync off the
-    archive. iOS starts the page without it. Every archive request depends on
-    the chain's state alone.
+    archive. Linux's page process does the same (`railgun_archive.cc`: the
+    prelude defines `messageHandlers` on the page's `webkit` object and holds
+    that object; libsoup through the bridge, with the same limits and
+    headers). iOS starts the page without it. Every archive request depends
+    on the chain's state alone. What every host must do:
+    `docs/private-usd-railgun-hosts.md`.
   - A host keeps the archive's connections as Android's `HttpURLConnection`
     does: one request at a time on each (HTTP/1.1), kept only after an answer
     read whole (five idle, five minutes), closed when its request fails, and
@@ -2663,8 +2717,10 @@ the Mac's, answer `unavailable`), Dart `services/private_usd_tokens_service.dart
   `com.zcash.wallet/railgun` (no Dart WebView plugin and no injected JS
   bridge). It loads only its own assets through `WebViewAssetLoader` and
   intercepts every subresource against a fixed host allowlist. The Kotlin
-  and Swift allowlists (`RailgunEndpoints`), the Rust bridge's allowlist and
-  the page's CSP must agree; a Rust test in `railgun_bridge.rs` pins them.
+  and Swift allowlists (`RailgunEndpoints`), Linux's (`kHosts`), the Rust
+  bridge's allowlist and the page's CSP must agree; Rust tests in
+  `railgun_bridge.rs` pin them, and Linux's events and methods to Kotlin's
+  (CI's `pins` job in `veylor-linux.yml`).
   Its User-Agent is a fixed `Mozilla/5.0` (`RailgunRequests.USER_AGENT`),
   the archive fetch's too: the WebView's own names the phone's model and its
   Android build to every host the page reaches.
@@ -2676,6 +2732,20 @@ the Mac's, answer `unavailable`), Dart `services/private_usd_tokens_service.dart
   rule list, and the 1×1 web view sits in the window's content view below the
   Flutter view, refusing the pointer, the keyboard and VoiceOver. Because the
   Mac compiles iOS's `RailgunEndpoints.swift`, the Rust pin test covers it.
+- On Linux the page runs in `veylor-railgun-page`, which Veylor starts with a
+  clean environment (the AppImage's GStreamer would break the system's
+  WebKitGTK, and WebKit aborts a process whose sandbox can't start) and drives
+  over a socket pair on the same channel contract. It loads WebKitGTK 4.1 and
+  libsoup 3 at run time (nothing in the bundle links them) and serves the page
+  from `veylor-railgun://app/` in a data manager under the identity's data
+  directory, whose proxy is the bridge (no direct route), with a content
+  filter of the same rules and a 1×1 view in an offscreen window. WebKit's
+  sandbox is required: `supported` checks it in a process of its own (the web
+  process must be bubblewrap's child), after the first frame, and every page
+  checks it again; where it can't start, Shielded USD stays hidden. Ubuntu
+  23.10 and later allow bubblewrap's user namespace only under an AppArmor
+  profile, which the .deb installs for the page process (`/opt/veylor`) and
+  an AppImage can't.
 - The page's traffic leaves only through the Rust loopback SOCKS5 bridge
   (`railgun_bridge.rs`), which uses arti when Tor is on. Its direct
   connections try IPv6 and IPv4 side by side (hyper-util's connector, as

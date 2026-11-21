@@ -837,9 +837,9 @@ mod tests {
 
     /// The bridge's allowlist is one of several copies of the page's hosts. A
     /// host missing from any copy fails silently on a device, so pin them
-    /// together: Kotlin's and Swift's `RailgunEndpoints.hosts`, and the CSP
-    /// `connect-src` of the bundle's source, of the Android bundle and of its
-    /// iOS copy.
+    /// together: Kotlin's and Swift's `RailgunEndpoints.hosts`, Linux's
+    /// `kHosts`, and the CSP `connect-src` of the bundle's source, of the
+    /// Android bundle and of its iOS copy (which the Mac and Linux serve too).
     #[test]
     fn the_page_hosts_match_the_host_filters_and_the_page_csp() {
         let mut expected = RAILGUN_PAGE_HOSTS.map(str::to_owned).to_vec();
@@ -859,6 +859,12 @@ mod tests {
         assert_eq!(kotlin, expected, "RailgunEndpoints.hosts");
         let swift = swift_hosts(&read("ios/Runner/Railgun/RailgunEndpoints.swift"));
         assert_eq!(swift, expected, "RailgunEndpoints.swift hosts");
+        let linux = cpp_strings(
+            &read("linux/runner/railgun_page/railgun_endpoints.h"),
+            "kHosts[] = {",
+            "};",
+        );
+        assert_eq!(linux, expected, "railgun_endpoints.h kHosts");
         for page in [
             "android/railgun-web/src/index.html",
             "android/app/src/main/assets/railgun/index.html",
@@ -871,8 +877,8 @@ mod tests {
     /// The archive the page reads Railgun's history from is one place in the
     /// page (`ARCHIVES`); the host Kotlin fetches it from for the page, and
     /// lets through, must be that one's, and one the bridge allows. So must
-    /// the Mac's (`RailgunArchive.host`), which fetches it through the bridge
-    /// too.
+    /// the Mac's (`RailgunArchive.host`) and Linux's (`kArchiveHost`), which
+    /// fetch it through the bridge too.
     #[test]
     fn the_page_archive_is_the_host_kotlin_and_the_mac_fetch_and_the_bridge_allows() {
         let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
@@ -899,6 +905,18 @@ mod tests {
             .nth(1)
             .expect("`static let host` in RailgunArchive.swift");
         assert_eq!(&constant[..constant.find('"').unwrap()], archive_host);
+        let linux = read("linux/runner/railgun_page/railgun_archive.h");
+        let constant = linux
+            .split("kArchiveHost[] = \"")
+            .nth(1)
+            .expect("`kArchiveHost` in railgun_archive.h");
+        assert_eq!(&constant[..constant.find('"').unwrap()], archive_host);
+        assert!(
+            linux.contains(&format!("'https://{archive_host}/'"))
+                || read("linux/runner/railgun_page/railgun_archive.cc")
+                    .contains(&format!("'https://{archive_host}/'")),
+            "the Linux prelude routes {archive_host}"
+        );
         assert!(RAILGUN_PAGE_HOSTS.contains(&archive_host), "{archive_host}");
     }
 
@@ -961,9 +979,16 @@ mod tests {
                 .unwrap_or_else(|| panic!("`{prefix}`"));
             rest[..rest.find('"').unwrap()].to_owned()
         };
+        // Android's one User-Agent for the page and the archive alike.
+        let requests =
+            read("android/app/src/main/kotlin/com/keplr/vizor/railgun/RailgunWebViewHost.kt");
+        assert!(
+            kotlin.contains("RailgunRequests.USER_AGENT"),
+            "RailgunArchiveFetch.kt sends RailgunRequests.USER_AGENT"
+        );
         assert_eq!(
             agent(&mac, "static let userAgent = \""),
-            agent(&kotlin, "private const val USER_AGENT = \"")
+            agent(&requests, "const val USER_AGENT = \"")
         );
 
         let prelude = mac
@@ -979,6 +1004,98 @@ mod tests {
             prelude.contains("Object.defineProperty(globalThis, marker, { value: webkit"),
             "the prelude keeps hold of that webkit object"
         );
+    }
+
+    /// Linux's host forwards only the events in its list and answers only the
+    /// methods in its table, with their timeouts: they must be Kotlin's, which
+    /// `RailgunProtocolTest` holds to every event the page emits and every
+    /// method it answers. A host missing an event drops it silently, and one
+    /// with another timeout closes a page the others keep.
+    #[test]
+    fn the_linux_host_speaks_the_kotlin_hosts_protocol() {
+        let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let read = |path: &str| {
+            std::fs::read_to_string(repo.join(path))
+                .unwrap_or_else(|error| panic!("read {path}: {error}"))
+        };
+        let kotlin = read("android/app/src/main/kotlin/com/keplr/vizor/railgun/RailgunProtocol.kt");
+        let linux = read("linux/runner/private_usd/railgun_protocol.h");
+
+        let events = kotlin
+            .split("val EVENTS = setOf(")
+            .nth(1)
+            .expect("`EVENTS` in RailgunProtocol.kt");
+        let mut kotlin_events: Vec<String> = events[..events.find(')').unwrap()]
+            .split(',')
+            .map(|name| name.trim().trim_matches('"'))
+            .map(|name| if name == "LOG" { "log" } else { name })
+            .map(str::to_owned)
+            .collect();
+        kotlin_events.sort();
+        assert_eq!(
+            cpp_strings(&linux, "kEvents[] = {", "};"),
+            kotlin_events,
+            "railgun_protocol.h kEvents"
+        );
+
+        let mut kotlin_methods: Vec<(String, u64)> = kotlin
+            .lines()
+            .filter_map(|line| {
+                // `START("start", 2.minutes),`: an entry of the enum.
+                let (constant, rest) = line.trim().split_once("(\"")?;
+                if constant.is_empty()
+                    || !constant.chars().all(|c| c.is_ascii_uppercase() || c == '_')
+                {
+                    return None;
+                }
+                let name = &rest[..rest.find('"')?];
+                let duration = rest[rest.find(", ")? + 2..].trim_end_matches("),");
+                let (amount, unit) = duration.split_once('.')?;
+                let seconds = match unit {
+                    "seconds" => 1,
+                    "minutes" => 60,
+                    "hours" => 3600,
+                    _ => return None,
+                };
+                Some((name.to_owned(), amount.parse::<u64>().ok()? * seconds))
+            })
+            .collect();
+        kotlin_methods.sort();
+        assert!(
+            !kotlin_methods.is_empty(),
+            "no methods in RailgunProtocol.kt"
+        );
+
+        let table = &linux[linux
+            .find("kMethods[] = {")
+            .expect("`kMethods` in railgun_protocol.h")..];
+        let table = &table[..table.find("};").unwrap()];
+        let mut linux_methods: Vec<(String, u64)> = table
+            .lines()
+            .filter_map(|line| {
+                let line = line.trim().strip_prefix("{\"")?;
+                let (name, rest) = line.split_once("\", ")?;
+                let seconds = rest.trim_end_matches("},").trim().parse().ok()?;
+                Some((name.to_owned(), seconds))
+            })
+            .collect();
+        linux_methods.sort();
+        assert_eq!(linux_methods, kotlin_methods, "railgun_protocol.h kMethods");
+    }
+
+    /// The string literals of a C++ initializer between `open` and `close`,
+    /// sorted.
+    fn cpp_strings(source: &str, open: &str, close: &str) -> Vec<String> {
+        let start = source.find(open).unwrap_or_else(|| panic!("`{open}`")) + open.len();
+        let body = &source[start..start + source[start..].find(close).expect(close)];
+        let mut strings: Vec<String> = body
+            .split('"')
+            .skip(1)
+            .step_by(2)
+            .map(str::to_owned)
+            .collect();
+        strings.sort();
+        strings
     }
 
     /// The string literals inside `val hosts = setOf(…)`, sorted.

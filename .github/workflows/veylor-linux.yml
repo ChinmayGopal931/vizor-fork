@@ -1,0 +1,494 @@
+name: Veylor Linux
+
+# Builds Veylor's Linux desktop app into an AppImage and a .deb per
+# architecture and network, and keeps them as workflow artifacts; it publishes
+# nothing. The identities are com.veylor.desktop (mainnet) and
+# com.veylor.desktop.testnet (testnet), the form factor desktop (the default),
+# and Shielded USD is compiled in: its Railgun page runs in
+# veylor-railgun-page, on the system's WebKitGTK, in WebKit's sandbox
+# (docs/private-usd-linux.md). The build runs upstream's lane, `fastlane linux
+# release`, which runs scripts/build-linux-release.sh and
+# scripts/package-linux-appimage.sh (fastlane/linux/README.md; AGENTS.md,
+# "Desktop identity"); scripts/package-linux-deb.sh packages the same bundle.
+# A second job runs the Rust tests that pin the Railgun page's host lists
+# across Android, iOS, the Mac and Linux.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/linux-desktop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: veylor-linux-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The version a CI build carries: release/v<version>-internal.<run number>.
+  VEYLOR_VERSION: 0.9.0
+  # Flutter comes from .fvmrc through fvm and is checked against
+  # scripts/release-config/flutter-sdk.json. The tools below are pinned by
+  # version here and by SHA-256 in the matrix.
+  FVM_VERSION: 4.3.1
+  LINUXDEPLOY_VERSION: 1-alpha-20251107-1
+  APPIMAGETOOL_VERSION: 1.9.1
+  SCCACHE_VERSION: v0.19.0
+  FVM_USE_GIT_CACHE: "false"
+  FASTLANE_SKIP_UPDATE_CHECK: "1"
+  FASTLANE_HIDE_TIMESTAMP: "1"
+  FASTLANE_OPT_OUT_USAGE: "1"
+
+jobs:
+  appimage:
+    name: ${{ matrix.flavor }} (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86_64, aarch64]
+        flavor: [veylor, veylor-testnet]
+        include:
+          # The identity each flavor builds (scripts/build-linux-release.sh).
+          - flavor: veylor
+            network: main
+            artifact: Veylor-linux
+            app_id: com.veylor.desktop
+            app_name: Veylor
+            binary: veylor
+          - flavor: veylor-testnet
+            network: test
+            artifact: Veylor-Testnet-linux
+            app_id: com.veylor.desktop.testnet
+            app_name: Veylor Testnet
+            binary: veylor-testnet
+          # Built on 22.04, the AppImage needs no newer glibc or libstdc++
+          # than Ubuntu 22.04 and Debian 12 have, on both architectures.
+          - arch: x86_64
+            runner: ubuntu-22.04
+            fvm_asset: linux-x64
+            fvm_sha256: ad59c861bdbef80c9f262d30ab28debd374afad0ef4b10b99a47bbab77e08bde
+            sccache_target: x86_64-unknown-linux-musl
+            sccache_sha256: aa73c7270c997894038c0d8f0d297865f57569e1687883322bc431713d4bb9dd
+            linuxdeploy_sha256: c20cd71e3a4e3b80c3483cef793cda3f4e990aca14014d23c544ca3ce1270b4d
+            appimagetool_sha256: ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0
+          - arch: aarch64
+            runner: ubuntu-22.04-arm
+            fvm_asset: linux-arm64
+            fvm_sha256: ea4c4da1b4dcbf17e250c477711b453d54113fadbebea5b43971d31e00358210
+            sccache_target: aarch64-unknown-linux-musl
+            sccache_sha256: 3e47fc4a71b1ddd1b4294a0de9d34498922fdf41e3cd0bda5df3954e3d6deb9d
+            linuxdeploy_sha256: 620095110d693282b8ebeb244a95b5e911cf8f65f76c88b4b47d16ae6346fcff
+            appimagetool_sha256: f0837e7448a0c1e4e650a93bb3e85802546e60654ef287576f46c71c126a9158
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Install the Linux build packages
+        run: |
+          sudo apt-get update
+          # Flutter's Linux toolchain, the plugins' libraries (GTK, libsecret,
+          # libudev for Ledger's hidraw backend), the GStreamer plugins the
+          # AppImage bundles for the QR scanner, WebKitGTK's and libsoup's
+          # headers for the Railgun page process (built against them, never
+          # linked), and the packaging checks' tools (readelf,
+          # dpkg-architecture, dpkg-shlibdeps), and Xvfb for the page
+          # process's sandbox check.
+          sudo apt-get install -y --no-install-recommends \
+            clang cmake ninja-build pkg-config \
+            libgtk-3-dev liblzma-dev libsecret-1-dev libudev-dev \
+            libwebkit2gtk-4.1-dev libsoup-3.0-dev \
+            gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-pipewire \
+            binutils dpkg-dev file patchelf python3 xvfb xauth dbus-x11
+          # clang builds against the newest GCC it finds; give it that GCC's
+          # C++ library.
+          gcc_dir="$(clang++ -v 2>&1 | sed -n 's/^Selected GCC installation: //p')"
+          if [ -z "$gcc_dir" ]; then
+            echo "clang++ found no GCC installation" >&2
+            exit 1
+          fi
+          sudo apt-get install -y --no-install-recommends "libstdc++-$(basename "$gcc_dir")-dev"
+          clang++ --version
+          cmake --version | head -n 1
+
+      - name: Install Rust
+        id: rust
+        run: |
+          if ! command -v rustup >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs |
+              sh -s -- -y --profile minimal --default-toolchain none
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+            export PATH="$HOME/.cargo/bin:$PATH"
+          fi
+          # Cargokit builds with `rustup run stable`, as upstream's lanes do.
+          rustup toolchain install stable --profile minimal
+          rustc +stable --version
+          echo "version=$(rustc +stable --version | cut -d ' ' -f 2)" >> "$GITHUB_OUTPUT"
+
+      - name: Install sccache
+        env:
+          SCCACHE_TARGET: ${{ matrix.sccache_target }}
+          SCCACHE_SHA256: ${{ matrix.sccache_sha256 }}
+        run: |
+          dir="$RUNNER_TEMP/sccache"
+          archive="sccache-${SCCACHE_VERSION}-${SCCACHE_TARGET}.tar.gz"
+          mkdir -p "$dir"
+          curl -fsSL -o "$dir/$archive" \
+            "https://github.com/mozilla/sccache/releases/download/${SCCACHE_VERSION}/${archive}"
+          echo "${SCCACHE_SHA256}  $dir/$archive" | sha256sum --check
+          tar -xzf "$dir/$archive" -C "$dir" --strip-components=1
+          rm "$dir/$archive"
+          # Cargokit passes its own --target-dir under build/linux, which the
+          # build script deletes first, so the compiler cache is what carries
+          # Rust builds from one run to the next.
+          {
+            echo "RUSTC_WRAPPER=$dir/sccache"
+            echo "SCCACHE_DIR=$HOME/.cache/sccache"
+            echo "SCCACHE_CACHE_SIZE=3G"
+          } >> "$GITHUB_ENV"
+          "$dir/sccache" --version
+
+      # The registry and pub caches hold sources, so both architectures share
+      # them. Each is saved once per lockfile, at the end of the job.
+      - name: Restore the Cargo registry
+        id: cargo-registry
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: cargo-registry-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: cargo-registry-
+
+      - name: Restore the compiler cache
+        id: sccache
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/.cache/sccache
+          key: sccache-${{ matrix.arch }}-rust-${{ steps.rust.outputs.version }}-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            sccache-${{ matrix.arch }}-rust-${{ steps.rust.outputs.version }}-
+            sccache-${{ matrix.arch }}-
+
+      - name: Restore the pub cache
+        id: pub-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/.pub-cache
+          key: pub-cache-${{ hashFiles('pubspec.lock', 'rust_builder/cargokit/build_tool/pubspec.lock') }}
+          restore-keys: pub-cache-
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Install fvm and Flutter
+        env:
+          FVM_ASSET: ${{ matrix.fvm_asset }}
+          FVM_SHA256: ${{ matrix.fvm_sha256 }}
+        run: |
+          dir="$RUNNER_TEMP/fvm"
+          archive="fvm-${FVM_VERSION}-${FVM_ASSET}.tar.gz"
+          mkdir -p "$dir"
+          curl -fsSL -o "$dir/$archive" \
+            "https://github.com/leoafarias/fvm/releases/download/${FVM_VERSION}/${archive}"
+          echo "${FVM_SHA256}  $dir/$archive" | sha256sum --check
+          tar -xzf "$dir/$archive" -C "$dir"
+          rm "$dir/$archive"
+          echo "$dir/fvm" >> "$GITHUB_PATH"
+          export PATH="$dir/fvm:$PATH"
+          export FVM_CACHE_PATH="$HOME/fvm"
+          echo "FVM_CACHE_PATH=$FVM_CACHE_PATH" >> "$GITHUB_ENV"
+          fvm --version
+
+          # Upstream's Flutter pin: .fvmrc's version at the release config's
+          # framework commit.
+          pin="$(python3 -I -c '
+          import json
+          pin = json.load(open("scripts/release-config/flutter-sdk.json"))
+          fvmrc = json.load(open(".fvmrc"))
+          if fvmrc["flutter"] != pin["version"]:
+              raise SystemExit(".fvmrc and flutter-sdk.json pin different Flutter versions")
+          print(pin["version"], pin["revision"])
+          ')"
+          read -r version revision <<< "$pin"
+          fvm install "$version"
+          actual="$(git -C "$FVM_CACHE_PATH/versions/$version" rev-parse HEAD)"
+          if [ "$actual" != "$revision" ]; then
+            echo "Flutter $version is at $actual, not the pinned $revision" >&2
+            exit 1
+          fi
+          fvm flutter --disable-analytics
+          fvm flutter --version
+
+      - name: Install linuxdeploy and appimagetool
+        env:
+          ARCH: ${{ matrix.arch }}
+          LINUXDEPLOY_SHA256: ${{ matrix.linuxdeploy_sha256 }}
+          APPIMAGETOOL_SHA256: ${{ matrix.appimagetool_sha256 }}
+        run: |
+          dir="$RUNNER_TEMP/appimage-tools"
+          mkdir -p "$dir"
+          curl -fsSL -o "$dir/linuxdeploy" \
+            "https://github.com/linuxdeploy/linuxdeploy/releases/download/${LINUXDEPLOY_VERSION}/linuxdeploy-${ARCH}.AppImage"
+          curl -fsSL -o "$dir/appimagetool" \
+            "https://github.com/AppImage/appimagetool/releases/download/${APPIMAGETOOL_VERSION}/appimagetool-${ARCH}.AppImage"
+          printf '%s  %s\n' \
+            "$LINUXDEPLOY_SHA256" "$dir/linuxdeploy" \
+            "$APPIMAGETOOL_SHA256" "$dir/appimagetool" | sha256sum --check
+          chmod +x "$dir/linuxdeploy" "$dir/appimagetool"
+          {
+            echo "LINUXDEPLOY_BIN=$dir/linuxdeploy"
+            echo "APPIMAGETOOL_BIN=$dir/appimagetool"
+          } >> "$GITHUB_ENV"
+
+      - name: Build and package Veylor
+        env:
+          RELEASE_TAG: release/v${{ env.VEYLOR_VERSION }}-internal.${{ github.run_number }}
+          RELEASE_BUILD_NUMBER: ${{ github.run_number }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+          VIZOR_LINUX_FLAVORS: ${{ matrix.flavor }}
+          VIZOR_LINUX_ARCH: ${{ matrix.arch }}
+          VIZOR_PRIVATE_USD_ENABLED: "true"
+          # The signing switch (fastlane/linux/README.md). To sign, remove
+          # this line and pass LINUX_APPIMAGE_GPG_PRIVATE_KEY,
+          # LINUX_APPIMAGE_GPG_KEY_ID and LINUX_APPIMAGE_GPG_PASSPHRASE from
+          # the repository's secrets; the lane then signs as upstream's does.
+          LINUX_APPIMAGE_UNSIGNED: "true"
+        run: bundle exec fastlane linux release
+
+      # Flutter's generated config records the defines the app compiled with.
+      # The step prints their names only, as the Mac release does.
+      - name: Check the build's settings
+        env:
+          NETWORK: ${{ matrix.network }}
+          FLAVOR: ${{ matrix.flavor }}
+          ARTIFACT: ${{ matrix.artifact }}
+          APP_ID: ${{ matrix.app_id }}
+          BINARY: ${{ matrix.binary }}
+        run: |
+          python3 -I - <<'PY'
+          import base64, os, re, sys
+          config = open("linux/flutter/ephemeral/generated_config.cmake", encoding="utf-8").read()
+          match = re.search(r'"DART_DEFINES=([^"]*)"', config)
+          if not match:
+              sys.exit("the generated config has no DART_DEFINES")
+          defines = {}
+          for item in filter(None, match.group(1).split(",")):
+              key, _, value = base64.b64decode(item).decode().partition("=")
+              defines[key] = value
+          print("dart-defines:", ", ".join(sorted(defines)))
+          expected = {
+              "ZCASH_DEFAULT_NETWORK": os.environ["NETWORK"],
+              "VIZOR_PRIVATE_USD_ENABLED": "true",
+              "VIZOR_RELEASE_FLAVOR": os.environ["FLAVOR"],
+          }
+          wrong = [key for key, value in expected.items() if defines.get(key) != value]
+          if defines.get("VIZOR_FORM_FACTOR", "desktop") != "desktop":
+              wrong.append("VIZOR_FORM_FACTOR")
+          wrong += [key for key in defines if key.startswith("VIZOR_ETHEREUM_RPC_URL")]
+          if wrong:
+              sys.exit("unexpected build settings: " + ", ".join(wrong))
+          PY
+          bundle="dist/linux/$ARTIFACT"
+          grep -E '^(Name|Exec|Icon|StartupWMClass)=' "$bundle/data/applications/$APP_ID.desktop"
+          file -b "$bundle/$BINARY" "$bundle/lib/librust_lib_zcash_wallet.so" "$bundle/veylor-railgun-page"
+
+      # Nothing in the bundle or the AppImage links WebKit or carries it, and
+      # the page process has no library path into the AppImage.
+      - name: Check the Railgun page process
+        env:
+          ARTIFACT: ${{ matrix.artifact }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          python3 -I scripts/linux-appimage/check_railgun_page.py \
+            "dist/linux/$ARTIFACT" "dist/linux/appimage/$ARTIFACT-$ARCH.AppImage"
+          readelf --wide --dynamic "dist/linux/$ARTIFACT/veylor-railgun-page" | grep -E '\((NEEDED|RPATH|RUNPATH)\)'
+
+      - name: Package the .deb
+        env:
+          FLAVOR: ${{ matrix.flavor }}
+          ARTIFACT: ${{ matrix.artifact }}
+          APP_ID: ${{ matrix.app_id }}
+          APP_NAME: ${{ matrix.app_name }}
+          BINARY: ${{ matrix.binary }}
+          ARCH: ${{ matrix.arch }}
+          DEB_VERSION: ${{ env.VEYLOR_VERSION }}~internal.${{ github.run_number }}
+        run: |
+          scripts/package-linux-deb.sh \
+            --bundle-dir "dist/linux/$ARTIFACT" --output-dir dist/linux/deb \
+            --package "$FLAVOR" --app-id "$APP_ID" --app-name "$APP_NAME" \
+            --binary-name "$BINARY" --version "$DEB_VERSION" --arch "$ARCH"
+
+      # Installs and removes the package on the runner (AppArmor 3, so the
+      # profile is not put in place there), as a check of its control and
+      # maintainer scripts.
+      - name: Check the .deb installs and removes
+        env:
+          FLAVOR: ${{ matrix.flavor }}
+          BINARY: ${{ matrix.binary }}
+        run: |
+          sudo apt-get install -y --no-install-recommends ./dist/linux/deb/"${FLAVOR}"_*.deb
+          test -x "/opt/$FLAVOR/veylor-railgun-page"
+          # Every bundled program and library finds what it needs without
+          # AppRun's LD_LIBRARY_PATH.
+          if ldd "/opt/$FLAVOR/$BINARY" "/opt/$FLAVOR"/lib/*.so* | grep "not found"; then
+            echo "The package's libraries can't find each other" >&2
+            exit 1
+          fi
+          test -L "/usr/bin/$BINARY"
+          test -f "/usr/share/$FLAVOR/apparmor/$FLAVOR"
+          dpkg -L "$FLAVOR" | grep -E "^/(usr/bin|usr/share/applications|usr/share/$FLAVOR)/" 
+          sudo apt-get remove -y "$FLAVOR"
+          test ! -e "/etc/apparmor.d/$FLAVOR"
+          test ! -e "/opt/$FLAVOR/veylor-railgun-page"
+
+      - name: Upload the AppImage and the .deb
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.artifact }}-${{ matrix.arch }}
+          path: |
+            dist/linux/appimage/${{ matrix.artifact }}-${{ matrix.arch }}.AppImage
+            dist/linux/appimage/${{ matrix.artifact }}-${{ matrix.arch }}.AppImage.sha256
+            dist/linux/deb/*.deb
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+      # The page process on the runner's own WebKitGTK, under Xvfb: it loads
+      # WebKit, starts a sandboxed page and checks that the web process runs in
+      # bubblewrap. Ubuntu 22.04 lets programs make user namespaces, so the
+      # sandbox can start here; it reports, and never fails the build.
+      - name: Run the page process's sandbox check
+        continue-on-error: true
+        env:
+          ARTIFACT: ${{ matrix.artifact }}
+        run: |
+          env -i HOME="$HOME" PATH=/usr/bin:/bin NO_AT_BRIDGE=1 \
+            dbus-run-session -- xvfb-run -a "dist/linux/$ARTIFACT/veylor-railgun-page" --probe
+          echo "exit status $?"
+
+      # Keep the caches once the Rust library has built, even when a later
+      # step failed, so the next run starts from them.
+      - name: See what the build left
+        id: built
+        if: always()
+        run: |
+          if compgen -G 'build/linux/*/release/plugins/rust_lib_zcash_wallet/librust_lib_zcash_wallet.so' >/dev/null ||
+            [ -f dist/linux/Veylor-linux/lib/librust_lib_zcash_wallet.so ]; then
+            echo "rust=true" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -n "${RUSTC_WRAPPER:-}" ]; then
+            "$RUSTC_WRAPPER" --show-stats || true
+            "$RUSTC_WRAPPER" --stop-server >/dev/null 2>&1 || true
+          fi
+          du -sh ~/.cache/sccache ~/.cargo/registry ~/.cargo/git ~/.pub-cache 2>/dev/null || true
+          df -h / | tail -n 1
+
+      - name: Save the compiler cache
+        if: always() && steps.built.outputs.rust == 'true' && steps.sccache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ~/.cache/sccache
+          key: ${{ steps.sccache.outputs.cache-primary-key }}
+
+      - name: Save the Cargo registry
+        if: always() && steps.built.outputs.rust == 'true' && steps.cargo-registry.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ steps.cargo-registry.outputs.cache-primary-key }}
+
+      - name: Save the pub cache
+        if: always() && steps.built.outputs.rust == 'true' && steps.pub-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ~/.pub-cache
+          key: ${{ steps.pub-cache.outputs.cache-primary-key }}
+
+  # The Rust tests that hold the Railgun page's host lists together: the
+  # bridge's allowlist, Kotlin's, Swift's and Linux's hosts and the page's CSP,
+  # the archive host, and Linux's events and methods against Kotlin's
+  # (rust/src/railgun_bridge.rs).
+  pins:
+    name: Railgun page pins
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Install the build packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang cmake pkg-config libudev-dev
+
+      - name: Install Rust
+        id: rust
+        run: |
+          if ! command -v rustup >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs |
+              sh -s -- -y --profile minimal --default-toolchain none
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+            export PATH="$HOME/.cargo/bin:$PATH"
+          fi
+          rustup toolchain install stable --profile minimal
+          echo "version=$(rustc +stable --version | cut -d ' ' -f 2)" >> "$GITHUB_OUTPUT"
+
+      - name: Install sccache
+        run: |
+          dir="$RUNNER_TEMP/sccache"
+          archive="sccache-${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+          mkdir -p "$dir"
+          curl -fsSL -o "$dir/$archive" \
+            "https://github.com/mozilla/sccache/releases/download/${SCCACHE_VERSION}/${archive}"
+          echo "aa73c7270c997894038c0d8f0d297865f57569e1687883322bc431713d4bb9dd  $dir/$archive" | sha256sum --check
+          tar -xzf "$dir/$archive" -C "$dir" --strip-components=1
+          rm "$dir/$archive"
+          {
+            echo "RUSTC_WRAPPER=$dir/sccache"
+            echo "SCCACHE_DIR=$HOME/.cache/sccache"
+            echo "SCCACHE_CACHE_SIZE=3G"
+          } >> "$GITHUB_ENV"
+
+      - name: Restore the Cargo registry
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: cargo-registry-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: cargo-registry-
+
+      - name: Restore the compiler cache
+        id: sccache
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/.cache/sccache
+          key: sccache-pins-rust-${{ steps.rust.outputs.version }}-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            sccache-pins-rust-${{ steps.rust.outputs.version }}-
+            sccache-pins-
+
+      - name: Run the pin tests
+        id: pins
+        working-directory: rust
+        run: |
+          cargo +stable test --locked --lib railgun_bridge::tests -- --test-threads=1
+
+      - name: Save the compiler cache
+        if: always() && steps.sccache.outputs.cache-hit != 'true' && steps.pins.outcome != 'skipped'
+        uses: actions/cache/save@v5
+        with:
+          path: ~/.cache/sccache
+          key: ${{ steps.sccache.outputs.cache-primary-key }}

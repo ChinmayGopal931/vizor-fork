@@ -12,7 +12,7 @@ read -r -a gtk_flags <<< "$(pkg-config --cflags --libs gtk+-3.0)"
   '-DAPP_ICON_NAME="app.keplr.vizor"' '-DAPP_ICON_THEME_PATH="/nonexistent"' \
   "$runner_dir/main.cc" "$runner_dir/my_application.cc" \
   "$runner_dir/single_instance.cc" "$runner_dir/caps_lock_channel.cc" \
-  "$runner_dir/tests/flutter_stub.cc" -Wl,--wrap=gtk_dialog_run \
+  "$runner_dir/tests/flutter_stub.cc" "$runner_dir/tests/private_usd_stub.cc" -Wl,--wrap=gtk_dialog_run \
   "${gtk_flags[@]}" -o "$test_output/runner"
 xvfb-run -a -s '-screen 0 1600x1000x24' dbus-run-session -- \
   python3 "$runner_dir/tests/test_caps_lock.py" "$test_output"

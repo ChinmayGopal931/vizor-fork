@@ -20,6 +20,11 @@ HOST_LIBRARIES = tuple(
 )
 
 
+# Shielded USD's page process, which runs on the system's libraries alone.
+RAILGUN_PAGE = "veylor-railgun-page"
+WEBKIT_LIBRARIES = ("libwebkit2gtk", "libjavascriptcoregtk", "libsoup")
+
+
 def host_library(name: str) -> bool:
     return any(fnmatch.fnmatchcase(name, pattern) for pattern in HOST_LIBRARIES)
 
@@ -46,6 +51,13 @@ def inspect_bundle(appdir: Path, output: Path) -> dict:
         if soname and host_library(soname[1]) and not host_library(path.name):
             failures.append(f"Bundled host SONAME: {relative} ({soname[1]})")
         needed = re.findall(r"\(NEEDED\).*?\[(.*?)\]", dynamic)
+        # Nothing in the AppDir may need WebKit: Shielded USD's page process
+        # loads the system's at run time.
+        for library in needed:
+            if library.startswith(WEBKIT_LIBRARIES):
+                failures.append(f"Needs {library}: {relative}")
+        if path.name == RAILGUN_PAGE and re.search(r"\((RPATH|RUNPATH)\)", dynamic):
+            failures.append(f"The Railgun page process has a library path: {relative}")
         resolved = ""
         if needed:
             linked = subprocess.run(
