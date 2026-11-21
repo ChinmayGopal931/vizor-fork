@@ -339,9 +339,11 @@ the bridge accepts and logs each `CONNECT`.
     hostname (SOCKS5 type 3) on 443 (publicnode's Sepolia RPC, the screening
     node and the Sepolia list), and the stand-in refused none. With Windows's
     firewall blocking the WebView2 Runtime's program from every address but
-    loopback, the sync went through as before; sampled during it, its six
-    processes held only loopback TCP connections (38 seen on x64), and no UDP
-    socket.
+    loopback, the sync went through as before; sampled during it, the page's
+    own processes (the check program's browser process and its children, six)
+    held only loopback TCP connections (38 seen on x64), and no UDP socket.
+    The Windows 11 runner also ran another app's WebView2, which talked to
+    Microsoft directly; the sampler counts those apart since 2026-11-21.
   - **The filter and the CSP.** A host the CSP allows but the filter was told
     to refuse failed in the page and was never dialled, and so did one off the
     CSP. Anon's archive answered for the page's origin: without the wallet
@@ -363,6 +365,26 @@ the bridge accepts and logs each `CONNECT`.
     a new environment was made); its request to the RPC went through the second
     stand-in with a `CONNECT` of its own, and nothing went through the first
     once its page had closed, so no pooled socket outlived the route (U19).
+
+- **The packages** (`veylor-windows.yml`'s Package jobs, run 44871895018, x64
+  and ARM64): both identities built as `Veylor.exe` and `VeylorTestnet.exe`,
+  their version resources naming Veylor or Veylor Testnet, `com.veylor` and
+  Zapp LLC, with the page's bundle in `data\railgun`; the installers are
+  `com.veylor.desktop-win-<arch>-mainnet-Setup.exe` and
+  `com.veylor.desktop.testnet-win-<arch>-testnet-Setup.exe`, and no output,
+  file of the app or manifest field names Vizor.
+- **Installed.** Veylor Testnet's installer ran silently; Apps & features
+  names it Veylor Testnet and its publisher Zapp LLC, the Start menu's
+  shortcut is Veylor Testnet, and the app kept running with its window titled
+  Veylor Testnet and no WebView2 before an unlock. (The first install's window
+  read Veylor: Dart titled it over the runner. Fixed 2026-11-21.)
+- **The archive through the wallet library**: the check program with the
+  app's own `rust_lib_zcash_wallet.dll`, a mainnet first sync reading the
+  archive for 90 s. On x64 the page asked for 180 files and 179 came back (one
+  was in flight when it stopped), over five connections; on ARM64 110 of 110,
+  over four. Every connection went to `digest.anon.inc` through the stand-in by
+  name, and none failed. (An earlier run's check passed without the library,
+  whose dependencies it hadn't found; the check now requires it.)
 
 Not run: anything with a wallet in the app (the page in Veylor itself, behind
 the unlock: the real bridge, Tor, sends, deposits and bridges, the archive in
