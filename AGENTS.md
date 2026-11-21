@@ -630,8 +630,10 @@ own way, and a malformed or unknown id fails the build:
     and assets, as workflow artifacts for 30 days. Nothing is published.
   - **Signing:** unsigned, with no update feed, so Windows's SmartScreen warns
     on the installer until a code-signing certificate signs it.
-  - **Caches:** as Linux's, per architecture. Cargokit's target directory
-    survives between the two identities, so the second builds Rust
+  - **Caches:** the Cargo registry and pub caches. There is no compiler cache:
+    sccache spawns rustc with the whole command line, which for the Tor crates
+    passes Windows's limit, so each run builds Rust afresh; cargokit's target
+    directory survives between the two identities, so the second builds Rust
     incrementally.
 
 Every store follows from the identity, never from a renamed key, so nothing is
