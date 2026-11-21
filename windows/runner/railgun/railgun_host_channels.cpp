@@ -70,12 +70,13 @@ const EncodableValue* Argument(const EncodableValue* arguments, const char* key)
 bool IntegerArgument(const EncodableValue* arguments, const char* key, int64_t* out) {
   const EncodableValue* value = Argument(arguments, key);
   if (value == nullptr) return false;
-  if (const auto* small = std::get_if<int32_t>(value)) {
-    *out = *small;
+  // Not `small`: rpcndr.h, which windows.h pulls in, defines it as `char`.
+  if (const auto* narrow = std::get_if<int32_t>(value)) {
+    *out = *narrow;
     return true;
   }
-  if (const auto* large = std::get_if<int64_t>(value)) {
-    *out = *large;
+  if (const auto* wide = std::get_if<int64_t>(value)) {
+    *out = *wide;
     return true;
   }
   return false;
