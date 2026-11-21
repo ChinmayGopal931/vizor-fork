@@ -1,0 +1,454 @@
+name: Veylor Windows
+
+# Builds Veylor's Windows desktop app into Velopack packages per architecture
+# and network, and keeps them as workflow artifacts; it publishes nothing. The
+# identities are com.veylor.desktop (mainnet) and com.veylor.desktop.testnet
+# (testnet), the form factor desktop (the default), and Shielded USD is
+# compiled in: its Railgun page runs in WebView2, on the system's Evergreen
+# runtime (docs/private-usd-windows.md). The build runs upstream's packaging
+# script, scripts/package-windows-velopack.ps1, with the arguments its lane
+# passes (`fastlane windows package`; AGENTS.md, "Desktop identity"): the
+# lane's Ruby has no Windows ARM64 platform in Gemfile.lock. The packages are
+# unsigned and have no update feed.
+#
+# A first job checks the Railgun page host against the hosts checklist
+# (docs/private-usd-railgun-hosts.md) on both architectures, with the host's
+# own code and the real bundle and a stand-in for the Rust bridge; the package
+# job checks the archive again through the wallet library it built. A third
+# job runs the Rust tests that pin the page's host lists, limits and protocol
+# across Android, iOS, the Mac, Linux and Windows.
+
+on:
+  workflow_dispatch:
+    inputs:
+      public_release:
+        description: "Stamp the builds as the public VEYLOR_VERSION, not -internal.<run>"
+        type: boolean
+        default: false
+  push:
+    branches: [main, feat/windows-desktop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: veylor-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The version a CI build carries: <version>-internal.<run number>, or
+  # <version> for a run dispatched with public_release.
+  VEYLOR_VERSION: 0.9.0
+  # Flutter comes from .fvmrc through fvm and is checked against
+  # scripts/release-config/flutter-sdk.json. The tools below are pinned by
+  # version here and by SHA-256 in the matrix; vpk is the Velopack CLI that
+  # matches the runner's velopack_libc (windows/runner/CMakeLists.txt).
+  FVM_VERSION: 4.3.1
+  SCCACHE_VERSION: v0.19.0
+  VPK_VERSION: 0.0.1589-ga2c5a97
+  FVM_USE_GIT_CACHE: "false"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_NOLOGO: "1"
+
+jobs:
+  railgun-page:
+    name: Railgun page (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-latest
+            cmake_arch: x64
+          - arch: arm64
+            runner: windows-11-arm
+            cmake_arch: ARM64
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Install the WebView2 Runtime if it is missing
+        run: |
+          # The Evergreen runtime's registration, per machine or per user.
+          $client = "{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+          $keys = @(
+            "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\$client",
+            "HKLM:\SOFTWARE\Microsoft\EdgeUpdate\Clients\$client",
+            "HKCU:\Software\Microsoft\EdgeUpdate\Clients\$client"
+          )
+          $version = $keys | ForEach-Object { (Get-ItemProperty -Path $_ -ErrorAction SilentlyContinue).pv } |
+            Where-Object { $_ -and $_ -ne "0.0.0.0" } | Select-Object -First 1
+          if (-not $version) {
+            $setup = Join-Path $env:RUNNER_TEMP "MicrosoftEdgeWebview2Setup.exe"
+            Invoke-WebRequest "https://go.microsoft.com/fwlink/p/?LinkId=2124703" -OutFile $setup
+            Start-Process -FilePath $setup -ArgumentList "/silent", "/install" -Wait
+            Remove-Item $setup
+            $version = $keys | ForEach-Object { (Get-ItemProperty -Path $_ -ErrorAction SilentlyContinue).pv } |
+              Where-Object { $_ -and $_ -ne "0.0.0.0" } | Select-Object -First 1
+          }
+          Write-Host "WebView2 Runtime: $version"
+          [System.Environment]::OSVersion.VersionString
+
+      - name: Build the page host's check program
+        run: |
+          cmake -S windows/runner/tests/railgun_page -B build/railgun-page-check -A ${{ matrix.cmake_arch }}
+          cmake --build build/railgun-page-check --config Release
+
+      # Every mode of the checklist's section 7, nothing spent: the page, its
+      # world, its filter and headers, a Sepolia first sync to `synced` with
+      # every connection through the stand-in (the WebView2 Runtime's programs
+      # firewalled off everything but loopback), the store kept and wiped, and
+      # a mainnet start asking the host for the archive.
+      - name: Check the page host against the hosts checklist
+        run: |
+          python -I scripts/windows-railgun/check_railgun_page.py `
+            --check build/railgun-page-check/Release/railgun_page_check.exe `
+            --bundle ios/Runner/Railgun/railgun `
+            --report "${{ runner.temp }}/railgun-page-${{ matrix.arch }}.json" `
+            --firewall
+
+      - name: Upload the check's report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: railgun-page-check-${{ matrix.arch }}
+          path: ${{ runner.temp }}/railgun-page-${{ matrix.arch }}.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+  package:
+    name: Package (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-latest
+            cmake_arch: x64
+            fvm_asset: windows-x64
+            fvm_sha256: 88867842466eca560ad2481a479d3e5e5de2d7fbaa37eaaa4983030da6f471cb
+            sccache_target: x86_64-pc-windows-msvc
+            sccache_sha256: 28be8c61f6b2c89b9eb2869f6af7f78e6f992e78a8abae0ce855fcc129cbeac1
+          - arch: arm64
+            runner: windows-11-arm
+            cmake_arch: ARM64
+            fvm_asset: windows-arm64
+            fvm_sha256: 04e8c4e8d5496b19d8c93c8052dc9cb69f1140899d90fb47286db96e49cd49dc
+            sccache_target: aarch64-pc-windows-msvc
+            sccache_sha256: 66d20f1ea5e29f4f309136323635b864e1d8f0a8b587abbc22271bc22d439a5a
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Allow long paths
+        run: git config --global core.longpaths true
+
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Install Rust
+        id: rust
+        run: |
+          # Cargokit builds with `rustup run stable`, as upstream's lanes do.
+          rustup toolchain install stable --profile minimal
+          rustc +stable --version
+          "version=$((rustc +stable --version).Split(' ')[1])" >> $env:GITHUB_OUTPUT
+          # ring builds its ARM64 assembly with clang.
+          if ("${{ matrix.arch }}" -eq "arm64" -and (Test-Path "C:\Program Files\LLVM\bin\clang.exe")) {
+            "C:\Program Files\LLVM\bin" >> $env:GITHUB_PATH
+          }
+
+      - name: Install sccache
+        env:
+          SCCACHE_TARGET: ${{ matrix.sccache_target }}
+          SCCACHE_SHA256: ${{ matrix.sccache_sha256 }}
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP "sccache"
+          $name = "sccache-$env:SCCACHE_VERSION-$env:SCCACHE_TARGET"
+          $archive = Join-Path $dir "$name.zip"
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          Invoke-WebRequest "https://github.com/mozilla/sccache/releases/download/$env:SCCACHE_VERSION/$name.zip" -OutFile $archive
+          if ((Get-FileHash -Algorithm SHA256 $archive).Hash -ne $env:SCCACHE_SHA256) { throw "sccache's checksum differs" }
+          Expand-Archive $archive -DestinationPath $dir
+          Remove-Item $archive
+          $exe = Get-ChildItem -Path $dir -Recurse -Filter sccache.exe | Select-Object -First 1
+          # Cargokit's target directory survives between the two flavors, and the
+          # compiler cache carries Rust builds from one run to the next.
+          "RUSTC_WRAPPER=$($exe.FullName)" >> $env:GITHUB_ENV
+          "SCCACHE_DIR=$HOME\.cache\sccache" >> $env:GITHUB_ENV
+          "SCCACHE_CACHE_SIZE=4G" >> $env:GITHUB_ENV
+          & $exe.FullName --version
+
+      - name: Restore the Cargo registry
+        id: cargo-registry
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: cargo-registry-windows-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: cargo-registry-windows-
+
+      - name: Restore the compiler cache
+        id: sccache
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/.cache/sccache
+          key: sccache-windows-${{ matrix.arch }}-rust-${{ steps.rust.outputs.version }}-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            sccache-windows-${{ matrix.arch }}-rust-${{ steps.rust.outputs.version }}-
+            sccache-windows-${{ matrix.arch }}-
+
+      - name: Restore the pub cache
+        id: pub-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/AppData/Local/Pub/Cache
+          key: pub-cache-windows-${{ hashFiles('pubspec.lock', 'rust_builder/cargokit/build_tool/pubspec.lock') }}
+          restore-keys: pub-cache-windows-
+
+      - name: Install fvm and Flutter
+        env:
+          FVM_ASSET: ${{ matrix.fvm_asset }}
+          FVM_SHA256: ${{ matrix.fvm_sha256 }}
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP "fvm"
+          $archive = Join-Path $env:RUNNER_TEMP "fvm-$env:FVM_VERSION-$env:FVM_ASSET.zip"
+          Invoke-WebRequest "https://github.com/leoafarias/fvm/releases/download/$env:FVM_VERSION/fvm-$env:FVM_VERSION-$env:FVM_ASSET.zip" -OutFile $archive
+          if ((Get-FileHash -Algorithm SHA256 $archive).Hash -ne $env:FVM_SHA256) { throw "fvm's checksum differs" }
+          Expand-Archive $archive -DestinationPath $dir
+          Remove-Item $archive
+          # fvm.exe on x64; on ARM64 fvm.bat over its own ARM64 Dart.
+          $fvm = Get-ChildItem -Path $dir -Recurse -Include fvm.exe, fvm.bat | Select-Object -First 1
+          $fvm.DirectoryName >> $env:GITHUB_PATH
+          $env:PATH = "$($fvm.DirectoryName);$env:PATH"
+          $env:FVM_CACHE_PATH = "$HOME\fvm"
+          "FVM_CACHE_PATH=$env:FVM_CACHE_PATH" >> $env:GITHUB_ENV
+          fvm --version
+
+          # Upstream's Flutter pin: .fvmrc's version at the release config's
+          # framework commit.
+          $pin = Get-Content -Raw scripts/release-config/flutter-sdk.json | ConvertFrom-Json
+          $fvmrc = Get-Content -Raw .fvmrc | ConvertFrom-Json
+          if ($fvmrc.flutter -ne $pin.version) { throw ".fvmrc and flutter-sdk.json pin different Flutter versions" }
+          fvm install $pin.version
+          if ($LASTEXITCODE -ne 0) { throw "fvm install failed" }
+          $actual = git -C "$env:FVM_CACHE_PATH\versions\$($pin.version)" rev-parse HEAD
+          if ($actual -ne $pin.revision) { throw "Flutter $($pin.version) is at $actual, not the pinned $($pin.revision)" }
+          fvm flutter --disable-analytics
+          fvm flutter --version
+          # The packaging script builds what this Dart SDK's ABI targets.
+          fvm dart scripts/windows-build-arch.dart
+
+      - name: Install the Velopack CLI
+        run: |
+          dotnet tool install --global vpk --version $env:VPK_VERSION
+          "$HOME\.dotnet\tools" >> $env:GITHUB_PATH
+
+      # Upstream's own packaging regression checks, on fixtures (no build).
+      - name: Check the packaging script
+        run: |
+          pwsh -NoProfile -File scripts/test-windows-packaging.ps1
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-windows-packaging.ps1
+
+      - name: Build and package Veylor
+        env:
+          RELEASE_VERSION: ${{ inputs.public_release && env.VEYLOR_VERSION || format('{0}-internal.{1}', env.VEYLOR_VERSION, github.run_number) }}
+          RELEASE_BUILD_NUMBER: ${{ github.run_number }}
+          ARCH: ${{ matrix.arch }}
+          VIZOR_PRIVATE_USD_ENABLED: "true"
+        run: |
+          $flavors = @(
+            @{ Flavor = "veylor"; AppId = "com.veylor.desktop"; Network = "mainnet" },
+            @{ Flavor = "veylor-testnet"; AppId = "com.veylor.desktop.testnet"; Network = "testnet" }
+          )
+          foreach ($flavor in $flavors) {
+            Write-Host "==> $($flavor.AppId) ($env:ARCH)"
+            # The arguments `fastlane windows package` passes, with no signing
+            # and no update feed (unsigned for now: no signing key or feed key
+            # is in the environment, so the build checks for no updates).
+            powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/package-windows-velopack.ps1 `
+              -ApplicationId $flavor.AppId -Network $flavor.Network -Arch $env:ARCH `
+              -Version $env:RELEASE_VERSION -BuildNumber $env:RELEASE_BUILD_NUMBER `
+              -OutputDir "dist\windows\velopack\$($flavor.Flavor)" `
+              -UpdateRepositoryUrl "https://github.com/${{ github.repository }}"
+            if ($LASTEXITCODE -ne 0) { throw "packaging $($flavor.AppId) failed" }
+            # Nothing of the app or its package shows Vizor's identity, and the
+            # app compiled with the settings it should.
+            python -I scripts/check-veylor-windows-package.py `
+              --pack-dir "build\windows\$env:ARCH\runner\Release" `
+              --output-dir "dist\windows\velopack\$($flavor.Flavor)" `
+              --app-id $flavor.AppId --arch $env:ARCH `
+              --version $env:RELEASE_VERSION --build-number $env:RELEASE_BUILD_NUMBER
+            if ($LASTEXITCODE -ne 0) { throw "the $($flavor.AppId) package check failed" }
+          }
+
+      # The archive through the wallet library this job built, as the app
+      # fetches it: the page asks the host, which fetches through the
+      # stand-in for the bridge, by name, on connections kept as Android's.
+      - name: Check the archive through the wallet library
+        run: |
+          cmake -S windows/runner/tests/railgun_page -B build/railgun-page-check -A ${{ matrix.cmake_arch }}
+          cmake --build build/railgun-page-check --config Release
+          Copy-Item "build\windows\${{ matrix.arch }}\runner\Release\rust_lib_zcash_wallet.dll" build/railgun-page-check/Release/
+          python -I scripts/windows-railgun/check_railgun_page.py `
+            --check build/railgun-page-check/Release/railgun_page_check.exe `
+            --bundle ios/Runner/Railgun/railgun `
+            --report "${{ runner.temp }}/railgun-archive-${{ matrix.arch }}.json" `
+            --modes supported,environment,archive
+
+      - name: Upload Veylor
+        uses: actions/upload-artifact@v6
+        with:
+          name: Veylor-windows-${{ matrix.arch }}
+          path: dist/windows/velopack/veylor/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+      - name: Upload Veylor Testnet
+        uses: actions/upload-artifact@v6
+        with:
+          name: Veylor-Testnet-windows-${{ matrix.arch }}
+          path: dist/windows/velopack/veylor-testnet/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+      - name: Upload the archive check's report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: railgun-archive-check-${{ matrix.arch }}
+          path: ${{ runner.temp }}/railgun-archive-${{ matrix.arch }}.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+      # Keep the caches once the Rust library has built, even when a later
+      # step failed, so the next run starts from them.
+      - name: See what the build left
+        id: built
+        if: always()
+        run: |
+          if (Get-ChildItem -Path build/windows -Recurse -Filter rust_lib_zcash_wallet.dll -ErrorAction SilentlyContinue) {
+            "rust=true" >> $env:GITHUB_OUTPUT
+          }
+          if ($env:RUSTC_WRAPPER) {
+            & $env:RUSTC_WRAPPER --show-stats
+            & $env:RUSTC_WRAPPER --stop-server 2>$null
+          }
+          Get-PSDrive C, D -ErrorAction SilentlyContinue | Format-Table Name, Used, Free
+
+      - name: Save the compiler cache
+        if: always() && steps.built.outputs.rust == 'true' && steps.sccache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ~/.cache/sccache
+          key: ${{ steps.sccache.outputs.cache-primary-key }}
+
+      - name: Save the Cargo registry
+        if: always() && steps.built.outputs.rust == 'true' && steps.cargo-registry.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ steps.cargo-registry.outputs.cache-primary-key }}
+
+      - name: Save the pub cache
+        if: always() && steps.built.outputs.rust == 'true' && steps.pub-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ~/AppData/Local/Pub/Cache
+          key: ${{ steps.pub-cache.outputs.cache-primary-key }}
+
+  # The Rust tests that hold the Railgun page's host lists together (the
+  # bridge's allowlist, Kotlin's, Swift's and Linux's hosts, which Windows
+  # compiles, and the page's CSP), its archive and protocol, Windows's archive
+  # fetch limits and transport hello, and the fetch itself
+  # (rust/src/railgun_bridge.rs, rust/src/railgun_archive.rs).
+  pins:
+    name: Railgun page pins
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Install the build packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang cmake pkg-config libudev-dev
+
+      - name: Install Rust
+        id: rust
+        run: |
+          if ! command -v rustup >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs |
+              sh -s -- -y --profile minimal --default-toolchain none
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+            export PATH="$HOME/.cargo/bin:$PATH"
+          fi
+          rustup toolchain install stable --profile minimal
+          echo "version=$(rustc +stable --version | cut -d ' ' -f 2)" >> "$GITHUB_OUTPUT"
+
+      - name: Install sccache
+        run: |
+          dir="$RUNNER_TEMP/sccache"
+          archive="sccache-${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+          mkdir -p "$dir"
+          curl -fsSL -o "$dir/$archive" \
+            "https://github.com/mozilla/sccache/releases/download/${SCCACHE_VERSION}/${archive}"
+          echo "aa73c7270c997894038c0d8f0d297865f57569e1687883322bc431713d4bb9dd  $dir/$archive" | sha256sum --check
+          tar -xzf "$dir/$archive" -C "$dir" --strip-components=1
+          rm "$dir/$archive"
+          {
+            echo "RUSTC_WRAPPER=$dir/sccache"
+            echo "SCCACHE_DIR=$HOME/.cache/sccache"
+            echo "SCCACHE_CACHE_SIZE=3G"
+          } >> "$GITHUB_ENV"
+
+      - name: Restore the Cargo registry
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: cargo-registry-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: cargo-registry-
+
+      - name: Restore the compiler cache
+        id: sccache
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/.cache/sccache
+          key: sccache-pins-rust-${{ steps.rust.outputs.version }}-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            sccache-pins-rust-${{ steps.rust.outputs.version }}-
+            sccache-pins-
+
+      - name: Run the pin tests
+        id: pins
+        working-directory: rust
+        run: |
+          cargo +stable test --locked --lib -- railgun_bridge::tests railgun_archive::tests --test-threads=1
+
+      - name: Save the compiler cache
+        if: always() && steps.sccache.outputs.cache-hit != 'true' && steps.pins.outcome != 'skipped'
+        uses: actions/cache/save@v5
+        with:
+          path: ~/.cache/sccache
+          key: ${{ steps.sccache.outputs.cache-primary-key }}
