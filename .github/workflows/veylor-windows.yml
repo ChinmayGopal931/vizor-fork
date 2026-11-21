@@ -260,20 +260,6 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "the $($flavor.AppId) package check failed" }
           }
 
-      # The archive through the wallet library this job built, as the app
-      # fetches it: the page asks the host, which fetches through the
-      # stand-in for the bridge, by name, on connections kept as Android's.
-      - name: Check the archive through the wallet library
-        run: |
-          cmake -S windows/runner/tests/railgun_page -B build/railgun-page-check -A ${{ matrix.cmake_arch }}
-          cmake --build build/railgun-page-check --config Release
-          Copy-Item "build\windows\${{ matrix.arch }}\runner\Release\rust_lib_zcash_wallet.dll" build/railgun-page-check/Release/
-          python -I scripts/windows-railgun/check_railgun_page.py `
-            --check build/railgun-page-check/Release/railgun_page_check.exe `
-            --bundle ios/Runner/Railgun/railgun `
-            --report "${{ runner.temp }}/railgun-archive-${{ matrix.arch }}.json" `
-            --modes supported,environment,archive
-
       - name: Upload Veylor
         uses: actions/upload-artifact@v6
         with:
@@ -292,6 +278,20 @@ jobs:
           compression-level: 0
           retention-days: 30
 
+      # The archive through the wallet library this job built, as the app
+      # fetches it: the page asks the host, which fetches through the
+      # stand-in for the bridge, by name, on connections kept as Android's.
+      - name: Check the archive through the wallet library
+        run: |
+          cmake -S windows/runner/tests/railgun_page -B build/railgun-page-check -A ${{ matrix.cmake_arch }}
+          cmake --build build/railgun-page-check --config Release
+          Copy-Item "build\windows\${{ matrix.arch }}\runner\Release\rust_lib_zcash_wallet.dll" build/railgun-page-check/Release/
+          python -I scripts/windows-railgun/check_railgun_page.py `
+            --check build/railgun-page-check/Release/railgun_page_check.exe `
+            --bundle ios/Runner/Railgun/railgun `
+            --report "${{ runner.temp }}/railgun-archive-${{ matrix.arch }}.json" `
+            --modes supported,environment,archive
+
       - name: Upload the archive check's report
         if: always()
         uses: actions/upload-artifact@v6
@@ -309,7 +309,11 @@ jobs:
       - name: Install and start Veylor Testnet
         run: |
           $setup = Get-ChildItem dist/windows/velopack/veylor-testnet -Filter "*-Setup.exe" | Select-Object -First 1
-          Start-Process -FilePath $setup.FullName -ArgumentList "--silent" -Wait
+          # Not Start-Process -Wait: it waits for the whole process tree, and the installer starts the app.
+          $installer = Start-Process -FilePath $setup.FullName -ArgumentList "--silent" -PassThru
+          $null = $installer.Handle  # keeps the exit code readable once it has exited
+          if (-not $installer.WaitForExit(300000)) { throw "the installer did not finish in 5 minutes" }
+          if ($installer.ExitCode -ne 0) { throw "the installer exited with $($installer.ExitCode)" }
           $entry = Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\com.veylor.desktop.testnet"
           $entry | Select-Object DisplayName, Publisher, DisplayIcon, InstallLocation | Format-List
           if ($entry.DisplayName -ne "Veylor Testnet") { throw "Apps & features names it '$($entry.DisplayName)'" }
