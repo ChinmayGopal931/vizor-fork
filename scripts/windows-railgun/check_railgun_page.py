@@ -29,7 +29,7 @@ mnemonic, key or page message is printed.
 
 usage: check_railgun_page.py --check <railgun_page_check.exe> --bundle <dir>
                              [--work <dir>] [--report <json>] [--firewall]
-                             [--modes supported,environment,sync,reopen,reload,archive,wipe]
+                             [--modes supported,environment,sync,reopen,reload,archive,wipe] [--expect-library]
 
 Beside the wallet library (`rust_lib_zcash_wallet.dll` next to the check
 program) the archive is fetched for real, through the stand-in; without it
@@ -303,6 +303,8 @@ def main() -> int:
     parser.add_argument("--firewall", action="store_true")
     parser.add_argument("--timeout", type=int, default=1800)
     parser.add_argument("--modes", default="supported,environment,sync,reopen,reload,archive,wipe")
+    # The wallet library is beside the check program (the package job's run): the archive must go through its fetch.
+    parser.add_argument("--expect-library", action="store_true")
     args = parser.parse_args()
     modes = set(args.modes.split(","))
 
@@ -467,6 +469,8 @@ def main() -> int:
             counts = step(archive, "counts").get("archive") or {}
             run.report["archive"] = counts
             run.check((counts.get("requests") or 0) > 0, "the page asks the host for Anon's archive")
+            if args.expect_library:
+                run.check(counts.get("available") is True, f"the wallet library's fetch is here ({counts.get('library')})")
             dialled = [entry for entry in archive["connects"] if entry.get("host") == ARCHIVE_HOST]
             run.report["archive_connections"] = len(dialled)
             if counts.get("available"):

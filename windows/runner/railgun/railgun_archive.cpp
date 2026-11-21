@@ -29,6 +29,8 @@ struct Library {
   FetchFn fetch = nullptr;
   SessionFn network_changed = nullptr;
   SessionFn close = nullptr;
+  // Why the fetch isn't here, for the check program; empty once found.
+  std::string problem;
 };
 
 const Library& WalletLibrary() {
@@ -36,10 +38,15 @@ const Library& WalletLibrary() {
     Library found;
     HMODULE module = ::GetModuleHandleW(L"rust_lib_zcash_wallet.dll");
     if (module == nullptr) {
-      // Beside the executable only, never from the search path.
-      module = ::LoadLibraryExW(L"rust_lib_zcash_wallet.dll", nullptr, LOAD_LIBRARY_SEARCH_APPLICATION_DIR);
+      // Beside the executable, with its own dependencies (the C runtime) from System32: never the search path or the
+      // current directory. The app never gets here (Dart has loaded the library); the check program does.
+      module = ::LoadLibraryExW(L"rust_lib_zcash_wallet.dll", nullptr,
+                                LOAD_LIBRARY_SEARCH_APPLICATION_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
     }
-    if (module == nullptr) return found;
+    if (module == nullptr) {
+      found.problem = "the wallet library did not load (" + std::to_string(::GetLastError()) + ")";
+      return found;
+    }
     found.open = reinterpret_cast<OpenFn>(::GetProcAddress(module, "veylor_railgun_archive_open"));
     found.fetch = reinterpret_cast<FetchFn>(::GetProcAddress(module, "veylor_railgun_archive_fetch"));
     found.network_changed =
@@ -47,7 +54,9 @@ const Library& WalletLibrary() {
     found.close = reinterpret_cast<SessionFn>(::GetProcAddress(module, "veylor_railgun_archive_close"));
     if (found.open == nullptr || found.fetch == nullptr || found.network_changed == nullptr ||
         found.close == nullptr) {
-      return Library();
+      Library missing;
+      missing.problem = "the wallet library has no archive fetch";
+      return missing;
     }
     return found;
   }();
@@ -115,6 +124,8 @@ void AnswerArchiveRequest(ICoreWebView2Environment* environment, ICoreWebView2We
     args->put_Response(response.Get());
   }
 }
+
+std::string ArchiveLibraryProblem() { return WalletLibrary().problem; }
 
 RailgunArchive::RailgunArchive(int bridge_port) {
   const Library& library = WalletLibrary();

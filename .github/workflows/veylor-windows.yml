@@ -290,7 +290,7 @@ jobs:
             --check build/railgun-page-check/Release/railgun_page_check.exe `
             --bundle ios/Runner/Railgun/railgun `
             --report "${{ runner.temp }}/railgun-archive-${{ matrix.arch }}.json" `
-            --modes supported,environment,archive
+            --modes supported,environment,archive --expect-library
 
       - name: Upload the archive check's report
         if: always()

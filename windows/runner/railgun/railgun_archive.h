@@ -28,6 +28,9 @@
 // for rail-squid. It logs nothing.
 namespace railgun_windows {
 
+// Why the wallet library's archive fetch isn't here, for the check program (tests/railgun_page): empty when it is.
+std::string ArchiveLibraryProblem();
+
 class RailgunArchive {
  public:
   // The archive's requests of a page whose bridge listens on loopback `bridge_port`.

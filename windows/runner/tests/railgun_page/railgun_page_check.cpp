@@ -29,6 +29,7 @@
 
 #include "private_usd/railgun_json.h"
 #include "private_usd/railgun_protocol.h"
+#include "railgun/railgun_archive.h"
 #include "railgun/railgun_dispatch.h"
 #include "railgun/railgun_page_host.h"
 #include "railgun/railgun_requests.h"
@@ -242,8 +243,11 @@ void PrintCounts(std::function<void(bool ok)> next) {
   std::string archive = "null";
   if (railgun_windows::RailgunPage* page = RailgunPageHost::Get().page()) {
     const auto& counts = page->archive().counts();
+    std::string library = railgun_windows::ArchiveLibraryProblem();
+    if (library.empty()) library = page->archive().available() ? "found" : "the archive session did not open";
     archive = "{\"available\":" + std::string(page->archive().available() ? "true" : "false") +
-              ",\"requests\":" + std::to_string(counts.requests) + ",\"successes\":" +
+              ",\"library\":" + Quote(library) + ",\"requests\":" + std::to_string(counts.requests) +
+              ",\"successes\":" +
               std::to_string(counts.successes) + ",\"errors\":" + std::to_string(counts.errors) +
               ",\"failures\":" + std::to_string(counts.failures) + "}";
   }
