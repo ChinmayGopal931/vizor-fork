@@ -76,6 +76,10 @@ class RailgunPageHost {
   // Closes the page, then deletes its store, every account's wallet with it.
   void Wipe(Done done);
 
+  // The app is going: closes the page and lets go of every WebView2 object while COM is still up (the host is a
+  // static, destroyed after the apartment). Loads and wipes still waiting are dropped unanswered.
+  void Shutdown();
+
   // A loaded page that is still open.
   bool IsOpen() const;
 

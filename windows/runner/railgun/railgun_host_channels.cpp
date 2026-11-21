@@ -186,8 +186,8 @@ RailgunHostChannels::~RailgunHostChannels() {
   host.SetEventSink(nullptr);
   if (methods_) methods_->SetMethodCallHandler(nullptr);
   if (events_) events_->SetStreamHandler(nullptr);
-  // The engine is going: so is its page.
-  host.Close();
+  // The engine is going: so is its page, and every WebView2 object with it, while COM is still up.
+  host.Shutdown();
   host.Attach(nullptr, nullptr);
 }
 

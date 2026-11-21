@@ -250,6 +250,24 @@ void RailgunPageHost::Wipe(Done done) {
   WhenBrowsersExited([this, waiting]() { RemoveStore(1, std::move(*waiting)); });
 }
 
+void RailgunPageHost::Shutdown() {
+  ClosePage(Error::Disconnected("closed"));
+  closed_pages_.clear();
+  environment_.Reset();
+  for (auto& entry : retired_) {
+    ComPtr<ICoreWebView2Environment5> environment5;
+    if (SUCCEEDED(entry.second.environment.As(&environment5))) {
+      environment5->remove_BrowserProcessExited(entry.second.token);
+    }
+  }
+  retired_.clear();
+  Dispatch::Get().Cancel(exit_timer_);
+  exit_timer_ = 0;
+  exit_waiters_.clear();
+  sink_ = nullptr;
+  buffered_.clear();
+}
+
 void RailgunPageHost::RemoveStore(int attempt, Done done) {
   std::error_code error;
   if (page_ != nullptr) {

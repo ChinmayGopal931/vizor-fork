@@ -595,7 +595,8 @@ int wmain(int argc, wchar_t** argv) {
     ::TranslateMessage(&message);
     ::DispatchMessageW(&message);
   }
-  host.Close();
+  g_headers.reset();
+  host.Shutdown();
   ::DestroyWindow(window);
   ::CoUninitialize();
   return g_exit;
