@@ -21,12 +21,15 @@ mnemonic, key or page message is printed.
                connection through the stand-in, by name (with --firewall, the
                WebView2 Runtime's programs may reach nothing but loopback)
   reopen       the store kept: the same wallet opens from IndexedDB
+  reload       a page, closed, then one on another bridge in the same process
+               (as after a route change), each reaching the RPC through its
+               own, and the store wiped there
   archive      a mainnet start with the archive: the page asks the host for it
   wipe         the store deleted whole
 
 usage: check_railgun_page.py --check <railgun_page_check.exe> --bundle <dir>
                              [--work <dir>] [--report <json>] [--firewall]
-                             [--modes supported,environment,sync,reopen,archive,wipe]
+                             [--modes supported,environment,sync,reopen,reload,archive,wipe]
 
 Beside the wallet library (`rust_lib_zcash_wallet.dll` next to the check
 program) the archive is fetched for real, through the stand-in; without it
@@ -299,7 +302,7 @@ def main() -> int:
     parser.add_argument("--report", type=Path)
     parser.add_argument("--firewall", action="store_true")
     parser.add_argument("--timeout", type=int, default=1800)
-    parser.add_argument("--modes", default="supported,environment,sync,reopen,archive,wipe")
+    parser.add_argument("--modes", default="supported,environment,sync,reopen,reload,archive,wipe")
     args = parser.parse_args()
     modes = set(args.modes.split(","))
 
@@ -423,6 +426,34 @@ def main() -> int:
             run.check("level-js-railgun-sepolia" in databases, "the engine's IndexedDB is kept between runs")
             for name in ("start", "openWallet", "refresh"):
                 run.check(step(reopen, name).get("ok") is True, f"reopen: {name}")
+
+        if "reload" in modes:
+            second = StandIn(hosts)
+            mark = time.time()
+            reload = run.mode(
+                "reload",
+                "reload",
+                args.work / "reload",
+                ["--rpc", SEPOLIA_RPC, "--second-proxy-port", str(second.port)],
+            )
+            for name in ("first load", "second load", "wipe"):
+                run.check(step(reload, name).get("ok") is True, f"reload: {name}")
+            run.report["reload"] = {
+                name: step(reload, name).get("ms") for name in ("first load", "second load", "wipe")
+            }
+            first = (step(reload, "first reach").get("value") or {}).get("status")
+            again = (step(reload, "second reach").get("value") or {}).get("status")
+            run.check(first == 200 and again == 200, "each page reaches the RPC")
+            # The same host both times: a socket the first page pooled would carry the second's request with no
+            # new CONNECT, through the first bridge's route (U19).
+            rpc_host = "ethereum-sepolia-rpc.publicnode.com"
+            run.check(any(entry.get("host") == rpc_host for entry in reload["connects"]), "the first page goes through the first bridge")
+            second_hosts = {entry.get("host") for entry in second.since(mark)}
+            run.check(rpc_host in second_hosts, "the second page goes through its own bridge")
+            closed = (step(reload, "first close").get("epoch") or 0) / 1000
+            late = [entry.get("host") for entry in run.stand_in.since(closed)] if closed else ["(no close time)"]
+            run.report["reload"]["first_bridge_after_close"] = late
+            run.check(not late, "nothing goes through the first bridge once its page closed")
 
         if "archive" in modes:
             archive = run.mode(

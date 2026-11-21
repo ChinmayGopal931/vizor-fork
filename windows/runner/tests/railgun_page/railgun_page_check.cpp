@@ -4,9 +4,9 @@
 // scripts/windows-railgun/check_railgun_page.py runs the modes and judges the lines. It prints no mnemonic, key or
 // page message: the wallet it opens is BIP-39's public test wallet, and nothing is spent.
 //
-//   railgun_page_check --mode <supported|environment|sync|reopen|wipe> --bundle <dir> --data <dir>
+//   railgun_page_check --mode <supported|environment|sync|reopen|reload|wipe> --bundle <dir> --data <dir>
 //                      --proxy-port <port> [--network sepolia|mainnet] [--rpc <url>] [--archive] [--seconds <n>]
-//                      [--mnemonic <words>] [--key <hex>] [--blocked-host <host>]
+//                      [--mnemonic <words>] [--key <hex>] [--blocked-host <host>] [--second-proxy-port <port>]
 #include <windows.h>
 
 #include <wrl.h>
@@ -57,6 +57,8 @@ struct Options {
   std::string mnemonic;
   std::string key;
   std::string blocked_host;
+  // `reload`'s second bridge: the page after the first closes goes through it.
+  int second_proxy_port = 0;
 };
 
 Options g_options;
@@ -146,19 +148,21 @@ void Evaluate(const std::string& step, const std::wstring& script, std::function
   });
 }
 
-void Load(std::function<void(bool ok)> next) {
+void LoadOn(int port, const std::string& step, std::function<void(bool ok)> next) {
   const long long started = Ms();
-  RailgunPageHost::Get().Load(g_options.proxy_port, false, [next, started](const Error* error) {
+  RailgunPageHost::Get().Load(port, false, [next, started, step](const Error* error) {
     if (error != nullptr) {
-      Print("{\"step\":\"load\",\"ok\":false,\"error\":" + ErrorJson(*error) + "}");
+      Print("{\"step\":" + Quote(step) + ",\"ok\":false,\"error\":" + ErrorJson(*error) + "}");
       g_exit = 1;
       next(false);
       return;
     }
-    Print("{\"step\":\"load\",\"ok\":true,\"ms\":" + std::to_string(Ms() - started) + "}");
+    Print("{\"step\":" + Quote(step) + ",\"ok\":true,\"ms\":" + std::to_string(Ms() - started) + "}");
     next(true);
   });
 }
+
+void Load(std::function<void(bool ok)> next) { LoadOn(g_options.proxy_port, "load", next); }
 
 // One page call. Only the result's own keys are printed: its values can name the wallet. A call whose step went on
 // without it (`abandoned` set) is not reported when its answer comes.
@@ -407,6 +411,17 @@ std::wstring ReplaceAll(std::wstring text, const std::wstring& from, const std::
   return text;
 }
 
+// One request from the page to the allowed RPC, through whichever bridge its environment names.
+constexpr wchar_t kReachScript[] = LR"JS((async () => {
+  try {
+    const response = await fetch(RPC_URL, {
+      method: 'POST', cache: 'no-store', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_chainId', params: [] }),
+    });
+    return { status: response.status };
+  } catch (e) { return { failed: String(e?.name ?? e) }; }
+})())JS";
+
 // The page's databases, before anything opens one: a store kept from an earlier run shows here (H9).
 constexpr wchar_t kDatabasesScript[] =
     LR"JS((async () => ({ databases: (await indexedDB.databases()).map((db) => db.name).sort() }))())JS";
@@ -433,6 +448,40 @@ void BuildSteps(Steps* steps) {
           return;
         }
         Print("{\"step\":\"wipe\",\"ok\":true}");
+        next(true);
+      });
+    });
+    return;
+  }
+  if (mode == "reload") {
+    // As the app after a route change, a lock or the idle close: a page, closed, then a page on another bridge in
+    // the same process, made once the first one's browser process has exited; then the store wiped there.
+    const std::wstring reach = ReplaceAll(kReachScript, L"RPC_URL", Utf16(Quote(g_options.rpc)));
+    steps->Add([](std::function<void(bool)> next) { LoadOn(g_options.proxy_port, "first load", next); });
+    steps->Add([reach](std::function<void(bool)> next) { Evaluate("first reach", reach, next); });
+    steps->Add([](std::function<void(bool)> next) {
+      RailgunPageHost::Get().Close();
+      // The wall clock, which the stand-ins' logs keep: nothing goes through the first bridge after it.
+      const long long epoch = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                  std::chrono::system_clock::now().time_since_epoch())
+                                  .count();
+      Print("{\"step\":\"first close\",\"ok\":true,\"epoch\":" + std::to_string(epoch) + ",\"ms\":" +
+            std::to_string(Ms()) + "}");
+      next(true);
+    });
+    steps->Add([](std::function<void(bool)> next) { LoadOn(g_options.second_proxy_port, "second load", next); });
+    steps->Add([reach](std::function<void(bool)> next) { Evaluate("second reach", reach, next); });
+    steps->Add([](std::function<void(bool)> next) {
+      const long long started = Ms();
+      RailgunPageHost::Get().Wipe([next, started](const Error* error) {
+        std::error_code ignored;
+        const bool gone = !std::filesystem::exists(RailgunPageHost::Get().paths().user_data_folder, ignored);
+        if (error != nullptr || !gone) {
+          Fail("wipe", error != nullptr ? error->message : "the store is still there");
+          next(false);
+          return;
+        }
+        Print("{\"step\":\"wipe\",\"ok\":true,\"ms\":" + std::to_string(Ms() - started) + "}");
         next(true);
       });
     });
@@ -528,6 +577,8 @@ bool ReadOptions(int argc, wchar_t** argv) {
       g_options.key = Arg(argc, argv, &i);
     } else if (name == "--blocked-host") {
       g_options.blocked_host = Arg(argc, argv, &i);
+    } else if (name == "--second-proxy-port") {
+      g_options.second_proxy_port = std::atoi(Arg(argc, argv, &i).c_str());
     } else {
       return false;
     }
