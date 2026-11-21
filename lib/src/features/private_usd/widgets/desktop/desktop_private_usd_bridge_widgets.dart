@@ -232,7 +232,7 @@ class DesktopPrivateUsdKeepVisibleRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final l10n = context.l10n;
-    final detail = privateUsdLinuxWording
+    final detail = privateUsdComputerWording
         ? l10n.privateUsdKeepVisibleDetailLinux
         : l10n.privateUsdKeepVisibleDetailDesktop;
     final awake = l10n.privateUsdKeepDisplayAwakeDesktop;

@@ -14846,7 +14846,7 @@ abstract class AppLocalizations {
   /// **'The quote had expired by the time it arrived. Check that your Mac\'s clock is right, then try again.'**
   String get privateUsdConvertQuoteClockAheadDesktop;
 
-  /// In the Linux app: the message on the bridge screens when a quote arrived already expired, which usually means the computer's clock is wrong.
+  /// In the Linux and Windows apps: the message on the bridge screens when a quote arrived already expired, which usually means the computer's clock is wrong.
   ///
   /// In en, this message translates to:
   /// **'The quote had expired by the time it arrived. Check that your computer\'s clock is right, then try again.'**
@@ -15632,7 +15632,7 @@ abstract class AppLocalizations {
   /// **'If it\'s covered, minimised or your Mac sleeps, the bridge pauses until you\'re back.'**
   String get privateUsdKeepVisibleDetailDesktop;
 
-  /// Tooltip of the glyph in the Linux app's slim keep-Veylor-visible row on a bridge's progress screen: the bridge pauses while Veylor's window is minimised or the computer is locked or asleep, and goes on when the user is back.
+  /// Tooltip of the glyph in the Linux and Windows apps' slim keep-Veylor-visible row on a bridge's progress screen: the bridge pauses while Veylor's window is minimised or the computer is locked or asleep, and goes on when the user is back.
   ///
   /// In en, this message translates to:
   /// **'If it\'s minimised, or your computer locks or sleeps, the bridge pauses until you\'re back.'**
@@ -16082,7 +16082,7 @@ abstract class AppLocalizations {
   /// **'Your Mac builds a zero-knowledge proof of the payment. This can take a few minutes. Keep Veylor open, with its window showing.'**
   String get privateUsdReverseProvingNoteDesktop;
 
-  /// Note under the progress steps of a shielded-USD-to-ZEC bridge in the Linux app while the computer builds the zero-knowledge proof for the escrow payment, which can take minutes; the window must stay visible meanwhile.
+  /// Note under the progress steps of a shielded-USD-to-ZEC bridge in the Linux and Windows apps while the computer builds the zero-knowledge proof for the escrow payment, which can take minutes; the window must stay visible meanwhile.
   ///
   /// In en, this message translates to:
   /// **'Your computer builds a zero-knowledge proof of the payment. This can take a few minutes. Keep Veylor open, with its window showing.'**
@@ -16622,7 +16622,7 @@ abstract class AppLocalizations {
   /// **'Your Mac builds a zero-knowledge proof. This takes a few seconds.'**
   String get privateUsdSendInfoStepProofDesktop;
 
-  /// In the Linux app: the second step in the send info card, where the computer builds a zero-knowledge proof.
+  /// In the Linux and Windows apps: the second step in the send info card, where the computer builds a zero-knowledge proof.
   ///
   /// In en, this message translates to:
   /// **'Your computer builds a zero-knowledge proof. This takes a few seconds.'**
@@ -16682,7 +16682,7 @@ abstract class AppLocalizations {
   /// **'Your Mac builds a zero-knowledge proof so nobody can see what you send. This takes a few seconds. Keep Veylor open, with its window showing.'**
   String get privateUsdSendProvingDetailDesktop;
 
-  /// In the Linux app: the body of the send and withdraw progress screen while the zero-knowledge proof is built. The window must stay showing, because the proof pauses while it's hidden.
+  /// In the Linux and Windows apps: the body of the send and withdraw progress screen while the zero-knowledge proof is built. The window must stay showing, because the proof pauses while it's hidden.
   ///
   /// In en, this message translates to:
   /// **'Your computer builds a zero-knowledge proof so nobody can see what you send. This takes a few seconds. Keep Veylor open, with its window showing.'**
@@ -16946,7 +16946,7 @@ abstract class AppLocalizations {
   /// **'Your Mac builds a proof, and the dollars leave Railgun for that address.'**
   String get privateUsdWithdrawInfoStepProofDesktop;
 
-  /// In the Linux app: the second step in the withdraw info card, where the computer builds a proof and the dollars leave Railgun for the address.
+  /// In the Linux and Windows apps: the second step in the withdraw info card, where the computer builds a proof and the dollars leave Railgun for the address.
   ///
   /// In en, this message translates to:
   /// **'Your computer builds a proof, and the dollars leave Railgun for that address.'**

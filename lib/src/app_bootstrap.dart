@@ -114,9 +114,10 @@ class AppBootstrapState {
 
   /// Whether this platform's Railgun host can run Private USD's page: Android
   /// always, iOS from iOS 17, the Mac from macOS 14, Linux where WebKit's
-  /// sandbox starts, nothing else. `null` when the iOS handler did not answer
-  /// yet, and always on Linux; it is asked again after the first frame. Only
-  /// builds with Private USD ask; the rest keep `false`.
+  /// sandbox starts, Windows where the WebView2 Runtime is installed, nothing
+  /// else. `null` when the iOS handler did not answer yet, and always on
+  /// Linux; it is asked again after the first frame. Only builds with Private
+  /// USD ask; the rest keep `false`.
   final bool? railgunHostSupported;
 
   /// The saved NEAR swap privacy setting, or `null` when it could not be read

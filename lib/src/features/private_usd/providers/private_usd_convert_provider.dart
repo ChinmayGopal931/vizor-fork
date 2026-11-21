@@ -876,7 +876,7 @@ class PrivateUsdConvertNotifier
         quoting: false,
         clearQuote: !onReview,
         quoteError: (l10n) => kDesktopFormFactor
-            ? (privateUsdLinuxWording
+            ? (privateUsdComputerWording
                   ? l10n.privateUsdConvertQuoteClockAheadLinux
                   : l10n.privateUsdConvertQuoteClockAheadDesktop)
             : l10n.privateUsdConvertQuoteClockAhead,

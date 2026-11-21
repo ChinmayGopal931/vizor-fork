@@ -271,12 +271,18 @@ enum PrivateUsdFailureReason {
   bridgeDown('bridge_down', [r'bridge is not running']),
   sandboxFailed('sandbox_failed', [r'sandbox']),
   pageStorageFailed('page_storage_failed', [r'storage could not be made']),
-  osUnsupported('os_unsupported', [r'needs macos']),
+  osUnsupported('os_unsupported', [
+    r'needs macos',
+    r'needs the webview2 runtime',
+  ]),
+  // Windows's host: WebView2 or the page's window would not start.
+  webviewFailed('webview_failed', [r'webview2', r'page.s window']),
   contentRulesFailed('content_rules_failed', [r'content rules']),
   hostFailed('host_failed', [
     r'host process did not start',
     r'link could not be made',
     r'railgun host failed',
+    r'railgun host is not set up',
   ]),
   replyUnreadable('reply_unreadable', [r'reply is unreadable']),
   dataNotRemoved('data_not_removed', [r'data could not be removed']),

@@ -148,10 +148,15 @@ void main() {
     );
   });
 
-  // The Mac's and Linux's desktop hosts fetch it too, where they run the page.
+  // The Mac's, Linux's and Windows's desktop hosts fetch it too, where they
+  // run the page.
   test('desktop hosts fetch the archive where they run the page', () async {
     final start = FutureProvider.autoDispose(privateUsdArchiveSyncOf);
-    for (final platform in [TargetPlatform.macOS, TargetPlatform.linux]) {
+    for (final platform in [
+      TargetPlatform.macOS,
+      TargetPlatform.linux,
+      TargetPlatform.windows,
+    ]) {
       debugDefaultTargetPlatformOverride = platform;
       for (final supported in [true, false]) {
         final container = containerWith(
