@@ -228,7 +228,12 @@ not start.
   `scripts/check-veylor-windows-package.py` checks each: the defines it
   compiled with (no keyed RPC URL), the executable's name and version resource,
   the page's bundle, and the installer's and package's names and manifest.
-  Upstream's packaging checks run on fixtures first, under PowerShell 7.
+  The job then installs Veylor Testnet silently and checks what Windows shows
+  of it: Apps & features names it Veylor Testnet and its publisher Zapp LLC, the
+  Start menu's shortcut is Veylor Testnet (none names Vizor), and the app keeps
+  running, its window titled Veylor Testnet, with no WebView2 of its own before
+  an unlock. Upstream's packaging checks run on fixtures first, under
+  PowerShell 7.
 
 ## Pins
 
@@ -304,6 +309,104 @@ item. Items not named here hold as on Android.
 - **H35.** The keep-awake flag is `SetThreadExecutionState`.
 - **H37.** Windows's host messages read as the others', with two of their own.
 
-## What has run
+## What has run (2026-11-21)
 
-See "What has run (2026-11-21)" below.
+On GitHub's runners only: no Windows machine, no wallet and nothing spent. The
+page ran BIP-39's public test wallet, read-only, through a SOCKS5 stand-in for
+the bridge (`scripts/windows-railgun/check_railgun_page.py`) that accepts what
+the bridge accepts and logs each `CONNECT`.
+
+- **The spike, on the host's own code** (`veylor-windows.yml`'s Railgun page
+  jobs, the check program; x64 on Windows Server 2025, ARM64 on Windows 11
+  25H2, WebView2 Runtime 157):
+  - **The page.** It loaded from `veylor-railgun://app` and said it was ready
+    in 0.8 to 2.4 s (5 to 6 s for the runtime's first start on a fresh x64
+    runner): a
+    secure context, `crypto.subtle`, WebAssembly (instantiated under
+    `'wasm-unsafe-eval'`), IndexedDB, `localStorage` and a module worker from
+    `blob:`; `document.visibilityState` visible and 493 timer turns in 2 s
+    under the stand-in for the Flutter view, so unthrottled.
+  - **The transport.** `start`, `openWallet`, `refresh` and the debug page's
+    `noteKeys` answered, and the `scan`, `refresh`, `screening` and `synced`
+    events came through; no `log` event from a page loaded without debug.
+  - **A Sepolia first sync** reached `synced` in 44 to 45 s on x64 and 53 to
+    55 s on ARM64 (the refresh answered after 21 s and 25 to 26 s), with the
+    note-key workers' 12,253 of 12,287 points prepared in two workers (four
+    cores). Opened again on the same store, the engine's IndexedDB
+    (`level-js-railgun-sepolia`) was there before `start`, and the refresh
+    answered in 1.6 to 3.3 s.
+  - **Every connection through the stand-in, by name.** Every `CONNECT` was a
+    hostname (SOCKS5 type 3) on 443 (publicnode's Sepolia RPC, the screening
+    node and the Sepolia list), and the stand-in refused none. With Windows's
+    firewall blocking the WebView2 Runtime's program from every address but
+    loopback, the sync went through as before; sampled during it, its six
+    processes held only loopback TCP connections (38 seen on x64), and no UDP
+    socket.
+  - **The filter and the CSP.** A host the CSP allows but the filter was told
+    to refuse failed in the page and was never dialled, and so did one off the
+    CSP. Anon's archive answered for the page's origin: without the wallet
+    library, a readable 502, never dialled.
+  - **Headers.** On the wire (DevTools' `requestWillBeSentExtraInfo`), every
+    request's User-Agent was `Mozilla/5.0` and its `Accept-Language` en-US,
+    with no `Sec-CH-UA*`, and `navigator.userAgentData` had no brands. The
+    first run, before DevTools' override, sent `Sec-CH-UA*` on every request
+    (fixed 2026-11-21).
+  - **The quota.** Chromium enforces 60% of the volume for the page's origin
+    (DevTools' `Storage.getUsageAndQuota`); the page's own estimate reported its
+    usage plus 10 GiB, which the first run took for the quota.
+  - **The archive.** A mainnet `start` with the archive asked the host for it
+    (ten requests in 90 s), and without the wallet library none was dialled.
+  - **The wipe** removed the store whole once the browser process had exited.
+
+Not run: anything with a wallet in the app (the page in Veylor itself, behind
+the unlock: the real bridge, Tor, sends, deposits and bridges, the archive in
+the app and the checklist's real sync, 7.3), the keep-awake hold, the
+settlement reminder, the session lifecycle (lock, sleep, display off, fast user
+switching), a covered or minimised window's throttling, a screen reader, and
+Windows 10.
+
+## Trying it on a Windows 11 ARM computer (or VM)
+
+Nothing here needs a wallet with funds; a testnet wallet is enough.
+
+1. **Install.** From a `Veylor Windows` run's artifacts take
+   `Veylor-Testnet-windows-arm64` (or `Veylor-windows-arm64` for mainnet), unzip
+   it and run `com.veylor.desktop.testnet-win-arm64-testnet-Setup.exe`. The
+   installer is unsigned: SmartScreen says "Windows protected your PC" until
+   "More info", then "Run anyway". Velopack installs per user, in
+   `%LOCALAPPDATA%\com.veylor.desktop.testnet`, with Start menu and desktop
+   shortcuts named Veylor Testnet, and starts the app. The x64 packages run
+   too, emulated, but the ARM64 ones are native.
+2. **Shielded USD shows** only where the WebView2 Runtime is (Windows 11 has
+   it): after the unlock, Home's Shielded USD strip sits under the transparent
+   tray. Opening it starts Railgun's first sync, which the sidebar's second
+   readout then follows; on Sepolia a new wallet's takes about a minute.
+3. **The page's processes.** Task Manager shows WebView2's processes
+   (`msedgewebview2.exe`) under Veylor Testnet while the page is open. Other
+   apps run WebView2 too, so to see only Veylor's connections, in PowerShell:
+
+   ```powershell
+   $veylor = (Get-Process VeylorTestnet).Id
+   $all = Get-CimInstance Win32_Process -Filter "Name = 'msedgewebview2.exe'"
+   $browser = @($all | Where-Object ParentProcessId -eq $veylor)
+   $page = @($all | Where-Object { $_.ProcessId -in $browser.ProcessId -or $_.ParentProcessId -in $browser.ProcessId })
+   Get-NetTCPConnection -OwningProcess $page.ProcessId | Format-Table LocalAddress, RemoteAddress, RemotePort, State
+   Get-NetUDPEndpoint -OwningProcess $page.ProcessId -ErrorAction SilentlyContinue
+   ```
+
+   Every connection is to `127.0.0.1` (the bridge) and there is no UDP
+   endpoint; `VeylorTestnet.exe` itself holds the connections out.
+4. **The lifecycle.** Lock (Win+L) during a first sync and unlock: the sync
+   goes on from where it was, and nothing fails. Minimise and restore the same
+   way. `powercfg /requests` (as administrator) lists `VeylorTestnet.exe` under
+   DISPLAY and SYSTEM while Shielded USD keeps the computer awake (a first
+   sync, a bridge with a key step to come), and not otherwise.
+5. **The settlement reminder.** With a USD → ZEC bridge waiting on "Authorize
+   settlement" and another app in front, Veylor's taskbar button flashes and
+   the default sound plays.
+6. **The failure codes**, if something fails:
+   `%APPDATA%\com.veylor\Veylor Testnet\diagnostics\private-usd-*.jsonl` (or
+   Settings, which copies them).
+7. **Remove** from Settings > Apps: the uninstaller deletes the app's data,
+   the Railgun page's store (`%LOCALAPPDATA%\com.veylor\Veylor Testnet\
+   railgun-page`) with it.

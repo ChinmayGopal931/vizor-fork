@@ -23,7 +23,7 @@ class PrivateUsdChannels {
   PrivateUsdChannels(const PrivateUsdChannels&) = delete;
   PrivateUsdChannels& operator=(const PrivateUsdChannels&) = delete;
 
-  // Every message of the app's window, after Flutter has seen it.
+  // Every message of the app's window, before Flutter's handlers see it; it only watches.
   void OnWindowMessage(HWND window, UINT message, WPARAM wparam, LPARAM lparam);
 
  private:
