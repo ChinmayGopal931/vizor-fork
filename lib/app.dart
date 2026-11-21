@@ -20,6 +20,8 @@ import 'src/core/lifecycle/signing_shutdown_host.dart';
 import 'src/core/lifecycle/app_shutdown_signal.dart';
 import 'src/core/config/swap_feature_config.dart';
 import 'src/core/config/network_config.dart';
+import 'src/core/config/private_usd_feature_config.dart'
+    show kPrivateUsdBuildEnabled;
 import 'src/core/layout/app_layout.dart';
 import 'src/core/layout/mobile/mobile_window_policy.dart';
 import 'src/core/navigation/mobile_exit_back_guard.dart';
@@ -183,6 +185,7 @@ import 'src/providers/windows_update_provider.dart';
 import 'src/core/logging/log_redaction.dart';
 import 'src/core/storage/secure_storage_diagnostics.dart';
 import 'src/core/storage/wallet_paths.dart';
+import 'src/features/private_usd/services/private_usd_diagnostics.dart';
 import 'src/core/widgets/linux_keyring_gate.dart';
 import 'src/core/storage/linux_keyring_coordinator.dart';
 import 'src/features/payment_links/services/gift_claim_setup_coordinator.dart';
@@ -248,6 +251,10 @@ Future<void> initializeZcashWalletRuntime() async {
   WidgetsFlutterBinding.ensureInitialized();
   await _registerAppFonts();
   await SecureStorageDiagnostics.instance.initialize();
+  // Shielded USD's failure codes, on desktop only: the phones keep none.
+  if (kDesktopFormFactor && kPrivateUsdBuildEnabled) {
+    PrivateUsdDiagnostics.instance.enable();
+  }
   log('runtime: initializing RustLib');
   await RustLib.init();
   _startVotingObservabilityLogging();

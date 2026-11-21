@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/config/private_usd_feature_config.dart';
+import '../../../core/layout/app_form_factor.dart' show kDesktopFormFactor;
 import '../../../rust/api/private_usd.dart' as rust;
 import '../models/private_usd_messages.dart';
 import '../models/private_usd_record_key.dart';
 import '../models/railgun_models.dart';
 import '../private_usd_copy.dart';
+import 'private_usd_diagnostics.dart';
 import 'private_usd_engine.dart';
 import 'private_usd_pause.dart';
 import 'private_usd_spend_guard.dart';
@@ -195,11 +197,28 @@ class PrivateUsdReverseFunding {
   /// Funds [key]'s conversion once. Never throws: the outcome, and [states]
   /// say what happened.
   Future<PrivateUsdFundingResult> fund(PrivateUsdRecordKey key) async {
-    if (_disposed) return PrivateUsdFundingResult.dropped;
+    if (_disposed) {
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.outcome(
+          PrivateUsdDiagnosticOp.fundPreparing,
+          PrivateUsdDiagnosticOutcome.dropped,
+        );
+      }
+      return PrivateUsdFundingResult.dropped;
+    }
     if (states.value[key]?.running ?? false) {
       return PrivateUsdFundingResult.running;
     }
-    if (!_engine.canRun) return PrivateUsdFundingResult.dropped;
+    if (!_engine.canRun) {
+      // The engine refuses to run: locked, in the background or drained.
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.outcome(
+          PrivateUsdDiagnosticOp.fundPreparing,
+          PrivateUsdDiagnosticOutcome.paused,
+        );
+      }
+      return PrivateUsdFundingResult.dropped;
+    }
     final ticket = _engine.ticket();
     final generation = _generations[key] ?? 0;
     _set(
@@ -214,6 +233,16 @@ class PrivateUsdReverseFunding {
         () => _fund(key, ticket, generation),
       );
     } on rust.ApiPrivateUsdError catch (failure) {
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          _diagnosticOp(key),
+          failure,
+          outcome:
+              failure.code == rust.ApiPrivateUsdErrorCode.fundingCostChanged
+              ? PrivateUsdDiagnosticOutcome.costChanged
+              : null,
+        );
+      }
       switch (failure.code) {
         case rust.ApiPrivateUsdErrorCode.cancelled:
           result = PrivateUsdFundingResult.dropped;
@@ -225,6 +254,9 @@ class PrivateUsdReverseFunding {
           error = (l10n) => privateUsdReverseStepMessage(l10n, failure.code);
       }
     } on PrivateUsdSpendBusyException catch (busy) {
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(_diagnosticOp(key), busy);
+      }
       // A send not seen in a block yet holds the wallet's notes.
       error = (l10n) => switch (busy.status) {
         PrivateUsdSpendStatus.sending || PrivateUsdSpendStatus.unreadable =>
@@ -233,6 +265,16 @@ class PrivateUsdReverseFunding {
         _ => l10n.privateUsdReverseError,
       };
     } catch (failure) {
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          _diagnosticOp(key),
+          failure,
+          // A page that died under the proof dropped it: nothing was paid.
+          outcome: failure is RailgunHostException && failure.code.pageGone
+              ? PrivateUsdDiagnosticOutcome.dropped
+              : null,
+        );
+      }
       if (_isDrop(failure)) {
         result = PrivateUsdFundingResult.dropped;
       } else {
@@ -353,6 +395,17 @@ class PrivateUsdReverseFunding {
       // The progress screen prices it when it shows.
     }
   }
+
+  /// The step [key]'s payment had reached, for its failure codes (desktop
+  /// only: `private_usd_diagnostics.dart`).
+  PrivateUsdDiagnosticOp _diagnosticOp(PrivateUsdRecordKey key) =>
+      switch (states.value[key]?.stage) {
+        PrivateUsdFundingStage.proving => PrivateUsdDiagnosticOp.fundProving,
+        PrivateUsdFundingStage.submitting =>
+          PrivateUsdDiagnosticOp.fundSubmitting,
+        PrivateUsdFundingStage.preparing ||
+        null => PrivateUsdDiagnosticOp.fundPreparing,
+      };
 
   // A page that died under the proof dropped it too: nothing was paid.
   static bool _isDrop(Object failure) =>

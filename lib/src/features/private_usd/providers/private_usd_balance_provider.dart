@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app_bootstrap.dart';
 import '../../../core/config/private_usd_feature_config.dart';
+import '../../../core/layout/app_form_factor.dart' show kDesktopFormFactor;
 import '../../../core/storage/app_secure_store.dart';
 import '../../../providers/app_security_provider.dart';
 import '../../../providers/private_usd_lifecycle_provider.dart';
@@ -15,6 +16,7 @@ import '../models/private_usd_record_key.dart';
 import '../models/railgun_models.dart';
 import '../services/private_usd_balance_cache.dart';
 import '../services/private_usd_balance_repository.dart';
+import '../services/private_usd_diagnostics.dart';
 import '../services/private_usd_pause.dart';
 import '../services/railgun_engine.dart';
 import '../services/railgun_host_channel.dart';
@@ -42,6 +44,12 @@ final privateUsdRailgunHeadsProvider = Provider<PrivateUsdRailgunHeads>((ref) {
         return await rust_private_usd.privateUsdRailgunHead(network: network);
       } catch (error) {
         privateUsdLog('Railgun head unread (${error.runtimeType})');
+        if (kDesktopFormFactor) {
+          PrivateUsdDiagnostics.instance.failure(
+            PrivateUsdDiagnosticOp.railgunHead,
+            error,
+          );
+        }
         return null;
       }
     },
@@ -216,19 +224,50 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
       _shownIfMounted(await sync.timeout(timeout));
       return true;
     } on TimeoutException {
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.outcome(
+          PrivateUsdDiagnosticOp.balanceRefresh,
+          PrivateUsdDiagnosticOutcome.timeout,
+        );
+      }
       firstSync?.end();
       _failed();
       // The page keeps at it; a late result still shows, and no other
       // refresh starts meanwhile.
       try {
         _shownIfMounted(await sync);
+        if (kDesktopFormFactor) {
+          PrivateUsdDiagnostics.instance.outcome(
+            PrivateUsdDiagnosticOp.balanceRefresh,
+            PrivateUsdDiagnosticOutcome.late,
+          );
+        }
         return true;
-      } catch (_) {}
-    } on PrivateUsdPause {
+      } catch (error) {
+        if (kDesktopFormFactor) {
+          PrivateUsdDiagnostics.instance.failure(
+            PrivateUsdDiagnosticOp.balanceRefresh,
+            error,
+          );
+        }
+      }
+    } on PrivateUsdPause catch (pause) {
       // A lock, switch or route change closed the page: not a failure.
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          PrivateUsdDiagnosticOp.balanceRefresh,
+          pause,
+        );
+      }
       _settled();
     } catch (error) {
       privateUsdLog('refresh failed (${error.runtimeType})');
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          PrivateUsdDiagnosticOp.balanceRefresh,
+          error,
+        );
+      }
       _failed(
         rpc:
             error is RailgunHostException &&

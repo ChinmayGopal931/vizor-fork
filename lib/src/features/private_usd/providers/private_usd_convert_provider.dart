@@ -17,6 +17,7 @@ import '../models/private_usd_messages.dart';
 import '../models/private_usd_record_key.dart';
 import '../private_usd_copy.dart';
 import '../services/private_usd_attestation.dart';
+import '../services/private_usd_diagnostics.dart';
 import '../services/private_usd_engine.dart';
 import '../services/private_usd_pause.dart';
 import '../services/private_usd_zec_quote_search.dart';
@@ -243,15 +244,33 @@ abstract class PrivateUsdConvertFlowNotifier<
       return null;
     } on rust.ApiPrivateUsdError catch (error) {
       privateUsdLog('the issuance failed (${error.code.name})');
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          PrivateUsdDiagnosticOp.issueTokens,
+          error,
+        );
+      }
       return (AppLocalizations l10n) =>
           privateUsdErrorMessage(l10n, error.code) ??
           l10n.privateUsdConvertErrorTokensUnavailable;
     } on PrivateUsdAttestationException catch (error) {
       privateUsdLog('the issuance failed (${error.code.name})');
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          PrivateUsdDiagnosticOp.issueTokens,
+          error,
+        );
+      }
       return (AppLocalizations l10n) =>
           privateUsdAttestationMessage(l10n, error.code);
     } catch (error) {
       privateUsdLog('the issuance failed (${error.runtimeType})');
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          PrivateUsdDiagnosticOp.issueTokens,
+          error,
+        );
+      }
       return (AppLocalizations l10n) =>
           l10n.privateUsdConvertErrorTokensUnavailable;
     }
@@ -343,6 +362,16 @@ abstract class PrivateUsdConvertFlowNotifier<
     _pending = Timer(debounce, () async {
       if (!current()) return;
       if (!ref.read(privateUsdEngineProvider).canRun) {
+        // The engine refuses to run (locked, in the background or drained):
+        // the quote waits.
+        if (kDesktopFormFactor) {
+          PrivateUsdDiagnostics.instance.outcome(
+            state is PrivateUsdConvertState
+                ? PrivateUsdDiagnosticOp.quote
+                : PrivateUsdDiagnosticOp.reverseQuote,
+            PrivateUsdDiagnosticOutcome.paused,
+          );
+        }
         requestQuote(
           run,
           onQuote: onQuote,
@@ -650,18 +679,33 @@ class PrivateUsdConvertNotifier
         relayerClaims: relayerClaims,
       );
       var result = await accept();
-      if (!ref.mounted) return null;
+      if (!ref.mounted) {
+        if (kDesktopFormFactor) _flowGone();
+        return null;
+      }
       if (result.kind == rust.ApiAcceptKind.tokensNeeded) {
         // The maker wants a Privacy Pass token and none is held: nothing
         // opened. Get today's once, then accept the same index again; with
         // none to be had, end the record. Never in a loop.
         final failure = await issueTokens();
-        if (!ref.mounted) return null;
+        if (!ref.mounted) {
+          if (kDesktopFormFactor) _flowGone();
+          return null;
+        }
         if (failure == null) {
           result = await accept();
-          if (!ref.mounted) return null;
+          if (!ref.mounted) {
+            if (kDesktopFormFactor) _flowGone();
+            return null;
+          }
         }
         if (failure != null || result.kind == rust.ApiAcceptKind.tokensNeeded) {
+          if (kDesktopFormFactor) {
+            PrivateUsdDiagnostics.instance.outcome(
+              PrivateUsdDiagnosticOp.accept,
+              PrivateUsdDiagnosticOutcome.tokensUnavailable,
+            );
+          }
           unawaited(_abandonQuietly(engine, account, quote.index));
           startFailed(
             failure ?? ((l10n) => l10n.privateUsdConvertErrorTokensUnavailable),
@@ -676,13 +720,29 @@ class PrivateUsdConvertNotifier
           // Handled above.
           return null;
         case rust.ApiAcceptKind.nothingSent:
+          if (kDesktopFormFactor) {
+            PrivateUsdDiagnostics.instance.outcome(
+              PrivateUsdDiagnosticOp.accept,
+              PrivateUsdDiagnosticOutcome.nothingSent,
+              nothingSent: result.cause,
+            );
+          }
           startFailed(
             (l10n) => privateUsdNothingSentMessage(l10n, result.cause),
           );
           return null;
       }
     } on rust.ApiPrivateUsdError catch (error) {
-      if (!ref.mounted) return null;
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          PrivateUsdDiagnosticOp.accept,
+          error,
+        );
+      }
+      if (!ref.mounted) {
+        if (kDesktopFormFactor) _flowGone();
+        return null;
+      }
       switch (error.code) {
         // Refused before anything was saved.
         case rust.ApiPrivateUsdErrorCode.quoteExpired:
@@ -701,19 +761,41 @@ class PrivateUsdConvertNotifier
         default:
           break;
       }
-    } on PrivateUsdPause {
+    } on PrivateUsdPause catch (pause) {
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          PrivateUsdDiagnosticOp.accept,
+          pause,
+        );
+      }
       // Rust may have saved it, and the engine picks a saved record up.
       return backToReview();
     } catch (error) {
       privateUsdLog('accept failed (${error.runtimeType})');
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          PrivateUsdDiagnosticOp.accept,
+          error,
+        );
+      }
     }
     // Maybe opened: an accept that failed after its record was saved is
     // under way all the same.
     if (await _isUnderWay(engine, account, quote.index)) return path;
-    if (!ref.mounted) return null;
+    if (!ref.mounted) {
+      if (kDesktopFormFactor) _flowGone();
+      return null;
+    }
     startFailed((l10n) => l10n.privateUsdConvertStartFailed);
     return null;
   }
+
+  /// "Convert" stopped because this flow was gone (desktop only:
+  /// `private_usd_diagnostics.dart`).
+  void _flowGone() => PrivateUsdDiagnostics.instance.outcome(
+    PrivateUsdDiagnosticOp.confirm,
+    PrivateUsdDiagnosticOutcome.flowGone,
+  );
 
   @override
   void replaceExpiredQuote() {
@@ -747,6 +829,12 @@ class PrivateUsdConvertNotifier
       await engine.abandon(account, index: index);
     } catch (error) {
       privateUsdLog('abandon failed (${error.runtimeType})');
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          PrivateUsdDiagnosticOp.abandon,
+          error,
+        );
+      }
     }
   }
 
@@ -806,10 +894,15 @@ class PrivateUsdConvertNotifier
 
   void _quoteFailed(Object error) {
     if (showsUnderWay(error)) return;
+    if (kDesktopFormFactor) {
+      PrivateUsdDiagnostics.instance.failure(
+        PrivateUsdDiagnosticOp.quote,
+        error,
+      );
+    }
     final PrivateUsdText? message = switch (error) {
-      PrivateUsdNoQuoteFitsException() => (
-        l10n,
-      ) => l10n.privateUsdConvertZecNoQuote,
+      PrivateUsdNoQuoteFitsException() =>
+        (l10n) => l10n.privateUsdConvertZecNoQuote,
       rust.ApiPrivateUsdError(:final code) => privateUsdErrorText(code),
       PrivateUsdPause() => null,
       _ => (l10n) => l10n.privateUsdConvertErrorGeneric,

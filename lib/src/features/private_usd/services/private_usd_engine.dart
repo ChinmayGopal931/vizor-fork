@@ -3,9 +3,11 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/config/private_usd_feature_config.dart';
+import '../../../core/layout/app_form_factor.dart' show kDesktopFormFactor;
 import '../../../rust/api/private_usd.dart' as rust;
 import '../models/private_usd_record_key.dart';
 import 'private_usd_deposit_backend.dart';
+import 'private_usd_diagnostics.dart';
 import 'private_usd_pause.dart';
 import 'private_usd_swap_backend.dart';
 import 'private_usd_tokens_service.dart';
@@ -499,6 +501,12 @@ class PrivateUsdEngine {
         nap = await _pass(epoch);
       } catch (error) {
         privateUsdLog('a pass failed (${error.runtimeType})');
+        if (kDesktopFormFactor) {
+          PrivateUsdDiagnostics.instance.failure(
+            PrivateUsdDiagnosticOp.loopPass,
+            error,
+          );
+        }
         nap = PrivateUsdEngineTiming.restart;
       }
       if (epoch != _epoch || !canRun) return;
@@ -524,6 +532,12 @@ class PrivateUsdEngine {
       accounts = await _backend.accountsWithUnfinished();
     } catch (error) {
       privateUsdLog('listing conversions failed (${error.runtimeType})');
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          PrivateUsdDiagnosticOp.loopPass,
+          error,
+        );
+      }
       return _shorter(nap, PrivateUsdEngineTiming.restart);
     }
     if (epoch != _epoch) return null;
@@ -534,6 +548,12 @@ class PrivateUsdEngine {
         records = await loadRecords(account);
       } catch (error) {
         privateUsdLog('reading conversions failed (${error.runtimeType})');
+        if (kDesktopFormFactor) {
+          PrivateUsdDiagnostics.instance.failure(
+            PrivateUsdDiagnosticOp.loopPass,
+            error,
+          );
+        }
         nap = _shorter(nap, PrivateUsdEngineTiming.restart);
         continue;
       }
@@ -556,6 +576,12 @@ class PrivateUsdEngine {
         reverse = await loadReverseRecords(account);
       } catch (error) {
         privateUsdLog('reading conversions failed (${error.runtimeType})');
+        if (kDesktopFormFactor) {
+          PrivateUsdDiagnostics.instance.failure(
+            PrivateUsdDiagnosticOp.loopPass,
+            error,
+          );
+        }
         nap = _shorter(nap, PrivateUsdEngineTiming.restart);
         continue;
       }
@@ -685,6 +711,12 @@ class PrivateUsdEngine {
         case rust.ApiPrivateUsdErrorCode.busy:
           break;
         default:
+          if (kDesktopFormFactor) {
+            PrivateUsdDiagnostics.instance.failure(
+              _diagnosticOp(book.direction),
+              error,
+            );
+          }
           _failed(book, key, current, _problemOf(error.code));
       }
       return PrivateUsdEngineTiming.retry;
@@ -692,6 +724,12 @@ class PrivateUsdEngine {
       return PrivateUsdEngineTiming.retry;
     } catch (error) {
       privateUsdLog('an advance failed (${error.runtimeType})');
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          _diagnosticOp(book.direction),
+          error,
+        );
+      }
       _failed(book, key, current, rust.ApiPrivateUsdErrorCode.other);
       return PrivateUsdEngineTiming.retry;
     } finally {
@@ -713,6 +751,14 @@ class PrivateUsdEngine {
     if (problem == null) {
       _put(book, key, result.status.copyWith(checkedAt: now));
       return;
+    }
+    // The step failed and Rust folded it into [problem].
+    if (kDesktopFormFactor) {
+      PrivateUsdDiagnostics.instance.outcome(
+        _diagnosticOp(book.direction),
+        PrivateUsdDiagnosticOutcome.failed,
+        code: problem,
+      );
     }
     final since = book.statuses[key]?.failingSince ?? now;
     _put(
@@ -754,6 +800,13 @@ class PrivateUsdEngine {
 
   bool _shows(DateTime failingSince, DateTime now) =>
       now.difference(failingSince) >= PrivateUsdEngineTiming.problemAfter;
+
+  /// A [direction]'s advances, for their failure codes (desktop only:
+  /// `private_usd_diagnostics.dart`).
+  static PrivateUsdDiagnosticOp _diagnosticOp(PrivateUsdDirection direction) =>
+      direction == PrivateUsdDirection.forward
+      ? PrivateUsdDiagnosticOp.advance
+      : PrivateUsdDiagnosticOp.reverseAdvance;
 
   /// An error an advance threw, as one of the problems the progress screen
   /// explains (Rust folds a failed step's own code).
@@ -1326,6 +1379,12 @@ class PrivateUsdEngine {
           _depositNextAt = _now().add(PrivateUsdEngineTiming.retry);
         default:
           privateUsdLog('a deposit pass failed (${error.code.name})');
+          if (kDesktopFormFactor) {
+            PrivateUsdDiagnostics.instance.failure(
+              PrivateUsdDiagnosticOp.deposits,
+              error,
+            );
+          }
           final previous = deposits.value;
           _publishDeposits(
             PrivateUsdDepositsStatus(
@@ -1346,6 +1405,12 @@ class PrivateUsdEngine {
       again();
     } catch (error) {
       privateUsdLog('a deposit pass failed (${error.runtimeType})');
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          PrivateUsdDiagnosticOp.deposits,
+          error,
+        );
+      }
       if (deposits.value?.inFlight ?? false) {
         _depositNextAt = _now().add(PrivateUsdEngineTiming.restart);
       }

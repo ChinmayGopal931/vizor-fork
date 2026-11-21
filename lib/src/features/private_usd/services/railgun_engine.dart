@@ -5,7 +5,9 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/config/private_usd_feature_config.dart';
+import '../../../core/layout/app_form_factor.dart' show kDesktopFormFactor;
 import '../models/railgun_models.dart';
+import 'private_usd_diagnostics.dart';
 import 'private_usd_pause.dart';
 import 'railgun_host_channel.dart';
 
@@ -347,7 +349,9 @@ class RailgunEngine {
       _using = true;
       final epoch = _epoch;
       try {
-        final session = await _sessionFor(accountUuid);
+        final session = await (kDesktopFormFactor
+            ? _sessionForRecorded(accountUuid)
+            : _sessionFor(accountUuid));
         return await use(session);
       } on RailgunHostException catch (e) {
         if (epoch != _epoch) throw const RailgunEngineInterruptedException();
@@ -528,6 +532,23 @@ class RailgunEngine {
     await close();
   }
 
+  /// [_sessionFor], keeping the codes of an open that fails (desktop only:
+  /// `private_usd_diagnostics.dart`).
+  Future<RailgunSession> _sessionForRecorded(String accountUuid) {
+    final epoch = _epoch;
+    return _sessionFor(accountUuid).catchError((Object error) {
+      PrivateUsdDiagnostics.instance.failure(
+        PrivateUsdDiagnosticOp.open,
+        error,
+        // A close meanwhile (a lock, a switch, a route change) ended it.
+        outcome: epoch != _epoch
+            ? PrivateUsdDiagnosticOutcome.interrupted
+            : null,
+      );
+      throw error;
+    });
+  }
+
   Future<RailgunSession> _sessionFor(String accountUuid) async {
     final current = _session;
     if (current != null &&
@@ -615,6 +636,16 @@ class RailgunEngine {
         privateUsdLog(
           '$method failed (${error.code.name}): '
           '${error.debugMessage(secrets: session.secrets)}',
+        );
+      }
+      // Release builds too, on desktop: the codes only, never the message.
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          PrivateUsdDiagnosticOp.ofPageMethod(method),
+          error,
+          outcome: session._epoch != _epoch
+              ? PrivateUsdDiagnosticOutcome.interrupted
+              : null,
         );
       }
       throw error;
@@ -821,6 +852,12 @@ class RailgunSession {
     );
     if (refreshed.screening == RailgunScreening.failed) {
       privateUsdLog('Railgun screening failed');
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.outcome(
+          PrivateUsdDiagnosticOp.screening,
+          PrivateUsdDiagnosticOutcome.failed,
+        );
+      }
     }
     return refreshed;
   }

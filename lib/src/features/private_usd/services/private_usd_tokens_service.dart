@@ -1,6 +1,8 @@
 import '../../../core/config/private_usd_feature_config.dart';
+import '../../../core/layout/app_form_factor.dart' show kDesktopFormFactor;
 import '../../../rust/api/private_usd.dart' as rust;
 import 'private_usd_attestation.dart';
+import 'private_usd_diagnostics.dart';
 import 'private_usd_swap_backend.dart';
 
 /// The makers' Privacy Pass tokens, fetched ahead for the day's challenge
@@ -61,10 +63,28 @@ class PrivateUsdTokensService {
       await issue();
     } on rust.ApiPrivateUsdError catch (error) {
       privateUsdLog('the token prefetch failed (${error.code.name})');
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          PrivateUsdDiagnosticOp.prefetchTokens,
+          error,
+        );
+      }
     } on PrivateUsdAttestationException catch (error) {
       privateUsdLog('the token prefetch failed (${error.code.name})');
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          PrivateUsdDiagnosticOp.prefetchTokens,
+          error,
+        );
+      }
     } catch (error) {
       privateUsdLog('the token prefetch failed (${error.runtimeType})');
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          PrivateUsdDiagnosticOp.prefetchTokens,
+          error,
+        );
+      }
     }
   }
 
