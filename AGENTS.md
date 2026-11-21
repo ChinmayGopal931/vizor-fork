@@ -545,6 +545,90 @@ number above the last upload, and the keyed RPC JSON through
 the id, but app-link verification (`assetlinks.json`) and zecSwap's token
 issuer allowlist name the shipped id.
 
+## Android direct APK (verifiable)
+
+Veylor's APK for direct download, beside Google Play, is the same app
+(`com.veylor.app`), built so that anyone can check it comes from this
+repository's code. Play's copy carries Google's Play App Signing key and this
+one Veylor's APK-only key, so neither updates the other; a user switches by
+uninstalling.
+
+- **What it compiles.** The Play build's settings plus `VIZOR_DEGOOGLED=true`:
+  `scripts/build-android-reproducible.sh --flavor veylor --universal
+  --build-name 1.0.3 --build-number 10 --signing unsigned --degoogled`. The
+  flavor defines `VIZOR_FORM_FACTOR=mobile`, `VIZOR_PRIVATE_USD_ENABLED=true`,
+  `ZCASH_DEFAULT_NETWORK=main` and `VIZOR_APPLICATION_ID=com.veylor.app`, and
+  nothing else: the price and wallet-link URLs keep their defaults, and there
+  is no keyed RPC file (a build anyone can reproduce holds no secret). Neither
+  build defines `VIZOR_RELEASE_VERSION`, so both show v0.0.0 in Settings; pass
+  `--release-version` here once the Play build does. Upstream's builds keep
+  `--flavor vizor`, the default, unchanged (`scripts/test_fdroid_tools.py`
+  pins both commands).
+- **One universal APK** with all three ABIs, versionCode the Play build's
+  number: one file for the website to link and for a user to check. It is
+  larger than an arm64-only APK, since a phone keeps the other ABIs' libraries
+  too; without `--universal` the builder still makes one APK per ABI.
+- **The build.** `.github/workflows/veylor-android.yml`, dispatched with
+  `version` and `build_number` (`gh workflow run veylor-android.yml --ref main
+  -f version=1.0.3 -f build_number=10`), builds the APK twice from scratch, on
+  ubuntu-22.04 and ubuntu-24.04, from different checkout and toolchain paths,
+  with no caches. Each build installs the pinned toolchain with
+  `scripts/veylor-android-release/install-toolchain.sh`: Temurin JDK, the
+  Android SDK packages, Flutter at `scripts/release-config/flutter-sdk.json`,
+  Rust at `android-reproducible-rust-version.txt`. Only when the two APKs are
+  byte-identical does the run attest the APK
+  (`actions/attest-build-provenance`) and keep it as the artifact
+  `veylor-<version>-<build>-unsigned`; otherwise it lists what differs
+  (`scripts/veylor-android-release/compare_apks.py`, then diffoscope) and
+  fails. The run signs and publishes nothing.
+- **Signing, on the owner's Mac.** `gh run download <run> -n
+  veylor-1.0.3-10-unsigned -D <dir>`, then `scripts/sign-veylor-apk.sh
+  --unsigned <dir>/veylor-1.0.3-10-unsigned.apk`. The script:
+  - checks the APK's attestation and contents, then signs a copy with
+    apksigner (v2 and v3 only, the build's alignment kept);
+  - uses `~/keys/veylor/veylor-apk.jks` (PKCS12, alias `apk`), whose password
+    lives only in the login Keychain ("Veylor Android APK keystore", account
+    `veylor-apk`) and reaches apksigner in its environment, never a command
+    line or a log; the key never goes to GitHub;
+  - refuses any certificate but the one in
+    `scripts/release-config/veylor-android-certificate-sha256.txt`;
+  - checks with apksigcopier (pinned with hashes in
+    `scripts/veylor-android-release/requirements.txt`) that the signed APK is
+    the unsigned one plus the signature, byte for byte;
+  - writes `veylor-X.Y.Z-N.apk`, `veylor-X.Y.Z-N-unsigned.apk` and
+    `SHA256SUMS` to `dist/veylor-android/vX.Y.Z/`.
+- **Publishing.** A release `veylor-android/vX.Y.Z` at the commit the
+  attestation names, with those three files and the notes from
+  `release_notes/veylor-android-vX.Y.Z.md`; the script prints the
+  `gh release create` command. Never latest (`--latest=false`): the Mac's DMG
+  link and update feed resolve through "latest". The website links the files
+  by their tag.
+- **Paths.** Both flavors build under `/tmp/vizor-android-reproducible`: the APK
+  embeds the canonical source path (Dart's plugin registrant) and cargo home
+  (the C sources the Rust library compiles), which a rebuild must therefore
+  share. It embeds nothing of the checkout's or the toolchain's location; each
+  CI build reports what it found (`host-paths-*.txt` in the artifact).
+
+What a user runs to check a download (the release notes carry this):
+
+1. `gh attestation verify veylor-1.0.3-10-unsigned.apk --repo
+   ChinmayGopal931/vizor-fork`: this repository's workflow built the file, and
+   the output names the commit.
+2. `apksigcopier compare veylor-1.0.3-10.apk --unsigned
+   veylor-1.0.3-10-unsigned.apk` (`pip install apksigcopier`, with the Android
+   SDK's `apksigner` on PATH): the signed APK is that build plus a signature,
+   as F-Droid checks reproducible builds.
+3. `apksigner verify --print-certs veylor-1.0.3-10.apk`: `Signer #1
+   certificate SHA-256 digest:
+   83f16e2037b09e731e51b3472466db43c4a962ada1fb4e40eaa4c3215a2174f5`
+   (`83:F1:6E:20:…:21:74:F5`), Veylor's APK key.
+4. To rebuild it on Linux x86_64: check out the release's tag, run
+   `scripts/veylor-android-release/install-toolchain.sh --prefix <dir>
+   --accept-android-sdk-licenses` and `. <dir>/env.sh`, then the builder
+   command above. `build/app/outputs/flutter-apk/app-release.apk` has the
+   unsigned APK's SHA-256, and `apksigcopier compare` takes it in place of the
+   downloaded unsigned APK.
+
 ## Desktop identity (VIZOR_APPLICATION_ID)
 
 Veylor's desktop apps are `com.veylor.desktop` ("Veylor") and
