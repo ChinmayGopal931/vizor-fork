@@ -31,9 +31,11 @@ on:
 permissions:
   contents: read
 
+# A push cancels the CI run before it on the same branch, but never a public
+# release run, which has a group of its own (as veylor-linux.yml's).
 concurrency:
-  group: veylor-windows-${{ github.ref }}
-  cancel-in-progress: true
+  group: veylor-windows-${{ github.ref }}-${{ inputs.public_release && 'release' || 'ci' }}
+  cancel-in-progress: ${{ !inputs.public_release }}
 
 env:
   # The version a CI build carries: <version>-internal.<run number>, or
@@ -126,6 +128,11 @@ jobs:
     name: Package (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 300
+    # id-token and attestations: write sign each package file's build provenance.
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     strategy:
       fail-fast: false
       matrix:
@@ -259,6 +266,17 @@ jobs:
               --version $env:RELEASE_VERSION --build-number $env:RELEASE_BUILD_NUMBER
             if ($LASTEXITCODE -ne 0) { throw "the $($flavor.AppId) package check failed" }
           }
+
+      # Signed build provenance (Sigstore, through GitHub's attestations) for
+      # every file Velopack wrote: the installer, the portable zip and the
+      # update package. Anyone checks one with
+      # `gh attestation verify <file> --repo ChinmayGopal931/vizor-fork`.
+      - name: Attest the packages
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: |
+            dist/windows/velopack/veylor/*
+            dist/windows/velopack/veylor-testnet/*
 
       - name: Upload Veylor
         uses: actions/upload-artifact@v6
