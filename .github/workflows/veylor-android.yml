@@ -43,6 +43,11 @@ env:
   VEYLOR_VERSION: ${{ inputs.version || '1.0.3' }}
   VEYLOR_BUILD_NUMBER: ${{ inputs.build_number || '10' }}
 
+# `bash -eo pipefail`, so a failing command fails its pipeline.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   build:
     name: Build (${{ matrix.leg }}, ${{ matrix.runner }})
@@ -144,13 +149,29 @@ jobs:
               sys.exit("unexpected build settings: " + "; ".join(problems))
           PY
 
+      # Maven Central sometimes turns a runner away (429 Too Many Requests),
+      # and Flutter's own retry waits 100 ms. A build that failed fetching its
+      # dependencies starts again a minute later, at most twice, from the same
+      # commit (the builder copies it afresh; its caches keep what it fetched).
+      # Any other failure fails the step.
       - name: Build the unsigned APK
         working-directory: ${{ matrix.checkout }}
         run: |
           . "$VEYLOR_ANDROID_TOOLCHAIN_DIR/env.sh"
-          scripts/build-android-reproducible.sh --flavor veylor --universal \
-            --build-name "$VEYLOR_VERSION" --build-number "$VEYLOR_BUILD_NUMBER" \
-            --signing unsigned --degoogled
+          for attempt in 1 2 3; do
+            log="$RUNNER_TEMP/build-attempt-$attempt.log"
+            if scripts/build-android-reproducible.sh --flavor veylor --universal \
+              --build-name "$VEYLOR_VERSION" --build-number "$VEYLOR_BUILD_NUMBER" \
+              --signing unsigned --degoogled 2>&1 | tee "$log"; then
+              break
+            fi
+            pattern="Received status code (429|5[0-9][0-9])|Could not (GET|HEAD) '|Read timed out|Connection reset|spurious network error|Got socket error"
+            if [ "$attempt" = 3 ] || ! grep -Eq "$pattern" "$log"; then
+              exit 1
+            fi
+            echo "::warning::Build attempt $attempt failed fetching dependencies; trying again in a minute"
+            sleep 60
+          done
           df -h /
 
       - name: Check the APK
