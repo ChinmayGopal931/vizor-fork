@@ -1083,6 +1083,102 @@ mod tests {
         assert_eq!(linux_methods, kotlin_methods, "railgun_protocol.h kMethods");
     }
 
+    /// Windows's host serves Linux's `kHosts` and protocol (it compiles those
+    /// files unchanged, so the tests above cover it) and fetches the archive
+    /// itself, through `railgun_archive`: from the page's archive, with
+    /// Android's limits, User-Agent and pool (`RailgunArchiveFetch.kt`,
+    /// `ConfigAwareConnectionPool`'s five connections and five minutes). Its
+    /// page's User-Agent is Android's too, and its transport hands the page
+    /// Android's port with Android's hello (`RailgunProtocol.INIT`), the one
+    /// `index.js` waits for: a hello that differs leaves the page never ready.
+    #[test]
+    fn the_windows_host_fetches_the_archive_and_hands_over_the_port_as_android_does() {
+        use crate::railgun_archive;
+
+        let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let read = |path: &str| {
+            std::fs::read_to_string(repo.join(path))
+                .unwrap_or_else(|error| panic!("read {path}: {error}"))
+        };
+        let literal = |source: &str, prefix: &str| -> String {
+            let rest = source
+                .split(prefix)
+                .nth(1)
+                .unwrap_or_else(|| panic!("`{prefix}`"));
+            rest[..rest.find('"').unwrap()].to_owned()
+        };
+        let number = |source: &str, prefix: &str| -> u64 {
+            let rest = source
+                .split(prefix)
+                .nth(1)
+                .unwrap_or_else(|| panic!("`{prefix}`"));
+            rest[..rest.find('\n').unwrap()]
+                .split('*')
+                .map(|factor| {
+                    factor
+                        .trim()
+                        .trim_end_matches('L')
+                        .replace('_', "")
+                        .parse::<u64>()
+                        .unwrap_or_else(|error| panic!("`{prefix}` {factor}: {error}"))
+                })
+                .product()
+        };
+
+        let page = read("android/railgun-web/src/archive-sync.js");
+        let base = page
+            .split("base: 'https://")
+            .nth(1)
+            .expect("an archive base in ARCHIVES");
+        let archive_host = &base[..base.find('/').expect("a path after the archive host")];
+        let requests = read("windows/runner/railgun/railgun_requests.h");
+        assert_eq!(literal(&requests, "kArchiveHost[] = \""), archive_host);
+        assert_eq!(railgun_archive::ARCHIVE_HOST, archive_host);
+
+        let kotlin =
+            read("android/app/src/main/kotlin/com/keplr/vizor/railgun/RailgunArchiveFetch.kt");
+        let android_agent = literal(
+            &read("android/app/src/main/kotlin/com/keplr/vizor/railgun/RailgunWebViewHost.kt"),
+            "const val USER_AGENT = \"",
+        );
+        assert_eq!(railgun_archive::USER_AGENT, android_agent);
+        assert_eq!(literal(&requests, "kUserAgent[] = \""), android_agent);
+        assert_eq!(
+            railgun_archive::MAX_BYTES as u64,
+            number(&kotlin, "const val MAX_BYTES = ")
+        );
+        assert_eq!(
+            railgun_archive::DEADLINE.as_millis() as u64,
+            number(&kotlin, "private const val DEADLINE_MS = ")
+        );
+        assert_eq!(
+            railgun_archive::CONNECT_TIMEOUT.as_millis() as u64,
+            number(&kotlin, "private const val CONNECT_TIMEOUT_MS = ")
+        );
+        assert_eq!(
+            railgun_archive::STALL.as_millis() as u64,
+            number(&kotlin, "private const val READ_TIMEOUT_MS = ")
+        );
+        assert_eq!(railgun_archive::MAX_IDLE, 5);
+        assert_eq!(railgun_archive::KEEP_ALIVE.as_secs(), 5 * 60);
+
+        let init = literal(
+            &read("android/app/src/main/kotlin/com/keplr/vizor/railgun/RailgunProtocol.kt"),
+            "const val INIT = \"",
+        );
+        let index = read("android/railgun-web/src/index.js");
+        let page_init = index
+            .split("const INIT = '")
+            .nth(1)
+            .expect("`INIT` in index.js");
+        assert_eq!(&page_init[..page_init.find('\'').unwrap()], init);
+        let transport = read("windows/runner/railgun/railgun_page.cpp");
+        assert!(
+            transport.contains(&format!("data: '{init}', ports: [channel.port2]")),
+            "the Windows transport hands the page its port with `{init}`"
+        );
+    }
+
     /// The string literals of a C++ initializer between `open` and `close`,
     /// sorted.
     fn cpp_strings(source: &str, open: &str, close: &str) -> Vec<String> {
