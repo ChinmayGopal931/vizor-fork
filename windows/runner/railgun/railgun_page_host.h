@@ -61,6 +61,8 @@ class RailgunPageHost {
   // Whether the page can run here: the system's Evergreen WebView2 Runtime, new enough. Without it Shielded USD stays
   // hidden.
   static bool IsSupported();
+  // The stable WebView2 Runtime's version, or empty: read without starting it.
+  static std::wstring RuntimeVersion();
 
   // Loads a fresh page, closing the one before it, with every connection through the bridge at `bridge_port`;
   // `done` is called once, when the page says it is ready, or with why it won't.

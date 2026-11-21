@@ -37,8 +37,8 @@ constexpr UINT kWipeRetryMs = 500;
 // - No QUIC (it can't go through SOCKS5) and no WebRTC UDP (the page also deletes WebRTC, shims.js).
 // - No background services (component updates, domain reliability reports, pings): they would only be refused.
 // - No accessibility tree: the page shows nothing, and a screen reader must not find it.
-// - No native occlusion (the page's window sits under the Flutter view) and no User-Agent client hints, which name
-//   the runtime's version and the OS beside the fixed User-Agent.
+// - No native occlusion: the page's window sits under the Flutter view. (The page's User-Agent client hints go with
+//   DevTools' override, railgun_page.cpp: no switch turns them off.)
 std::wstring BrowserArguments(int bridge_port) {
   return L"--proxy-server=socks5://127.0.0.1:" + std::to_wstring(bridge_port) +
          L" --proxy-bypass-list=<-loopback>"
@@ -50,7 +50,7 @@ std::wstring BrowserArguments(int bridge_port) {
          L" --disable-domain-reliability"
          L" --no-pings"
          L" --disable-renderer-accessibility"
-         L" --disable-features=CalculateNativeWinOcclusion,UserAgentClientHint";
+         L" --disable-features=CalculateNativeWinOcclusion";
 }
 
 // The options every environment shares: the stable runtime only.
@@ -110,17 +110,23 @@ void RailgunPageHost::Attach(HWND parent, HWND focus_owner) {
 
 void RailgunPageHost::SetPaths(Paths paths) { paths_ = std::move(paths); }
 
-bool RailgunPageHost::IsSupported() {
+std::wstring RailgunPageHost::RuntimeVersion() {
   ComPtr<CoreWebView2EnvironmentOptions> options = BaseOptions();
   LPWSTR version = nullptr;
   if (!options || FAILED(::GetAvailableCoreWebView2BrowserVersionStringWithOptions(nullptr, options.Get(), &version)) ||
       version == nullptr) {
-    return false;
+    return std::wstring();
   }
-  int comparison = -1;
-  const bool recent = SUCCEEDED(::CompareBrowserVersions(version, kMinimumRuntime, &comparison)) && comparison >= 0;
+  std::wstring found(version);
   ::CoTaskMemFree(version);
-  return recent;
+  return found;
+}
+
+bool RailgunPageHost::IsSupported() {
+  const std::wstring version = RuntimeVersion();
+  int comparison = -1;
+  return !version.empty() && SUCCEEDED(::CompareBrowserVersions(version.c_str(), kMinimumRuntime, &comparison)) &&
+         comparison >= 0;
 }
 
 void RailgunPageHost::Load(int bridge_port, bool debug, Done done) {

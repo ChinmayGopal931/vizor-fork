@@ -314,6 +314,7 @@ def main() -> int:
     try:
         if "supported" in modes:
             supported = run.mode("supported", "supported", args.work / "unused", [])
+            run.report["runtime"] = step(supported, "supported").get("runtime")
             run.check(step(supported, "supported").get("value") is True, "the WebView2 Runtime is here and new enough")
 
         if "environment" in modes:

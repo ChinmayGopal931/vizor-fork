@@ -416,7 +416,8 @@ void BuildSteps(Steps* steps) {
   if (mode == "supported") {
     steps->Add([](std::function<void(bool)> next) {
       Print(std::string("{\"step\":\"supported\",\"ok\":true,\"value\":") +
-            (RailgunPageHost::IsSupported() ? "true" : "false") + "}");
+            (RailgunPageHost::IsSupported() ? "true" : "false") + ",\"runtime\":" +
+            Quote(Utf8(RailgunPageHost::RuntimeVersion())) + "}");
       next(true);
     });
     return;
