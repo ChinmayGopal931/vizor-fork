@@ -603,11 +603,14 @@ uninstalling.
   `gh release create` command. Never latest (`--latest=false`): the Mac's DMG
   link and update feed resolve through "latest". The website links the files
   by their tag.
-- **Paths.** Both flavors build under `/tmp/vizor-android-reproducible`: the APK
-  embeds the canonical source path (Dart's plugin registrant) and cargo home
-  (the C sources the Rust library compiles), which a rebuild must therefore
-  share. It embeds nothing of the checkout's or the toolchain's location; each
-  CI build reports what it found (`host-paths-*.txt` in the artifact).
+- **Paths.** Both flavors build under `/tmp/vizor-android-reproducible`: each
+  `libapp.so` embeds the canonical source path (Dart's plugin registrant), so a
+  rebuild must build there too, and the Rust library carries its cargo home
+  only as the remapped `/vizor/cargo`. Nothing of the checkout's, the
+  toolchain's or the home directory's location reaches the APK (the
+  `/home/runner` in the Railgun page's curve25519 wasm comes with that
+  committed file); each CI build reports what it found (`host-paths-*.txt` in
+  the artifact).
 
 What a user runs to check a download (the release notes carry this):
 
