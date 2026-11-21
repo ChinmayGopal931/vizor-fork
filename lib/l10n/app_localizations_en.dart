@@ -8738,6 +8738,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'Your bridges, sends and withdrawals will show here.';
 
   @override
+  String get privateUsdActivityFeeLost => 'Bridge didn\'t start';
+
+  @override
+  String get privateUsdActivityFeeLostDetail => 'market maker fee not refunded';
+
+  @override
   String privateUsdActivityFrom(String address) {
     return 'from $address';
   }
@@ -8869,6 +8875,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'The market maker is busy with other bridges. Try again in a few minutes.';
 
   @override
+  String get privateUsdConvertErrorOpenFee =>
+      'The market maker asks a fee Veylor won\'t pay, so nothing was sent.';
+
+  @override
   String get privateUsdConvertErrorRelayer =>
       'The relayer that completes bridges can\'t be reached right now. Try again in a moment.';
 
@@ -8957,6 +8967,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get privateUsdConvertNewQuote => 'Refresh quote';
+
+  @override
+  String get privateUsdConvertOpenFee => 'Market maker fee';
+
+  @override
+  String privateUsdConvertOpenFeeValue(String amount) {
+    return '$amount · not refunded';
+  }
 
   @override
   String get privateUsdConvertOpeningSlow =>
@@ -9109,6 +9127,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Keep Veylor open until the market maker confirms your deposit, a few minutes. Then the relayer claims your dollars, and you can leave.';
 
   @override
+  String get privateUsdConvertResultFeeKept =>
+      'The bridge didn\'t start. The market maker keeps its fee; the rest of your ZEC never left your wallet.';
+
+  @override
+  String get privateUsdConvertResultFeeNotHonoured =>
+      'The quote ran out before the market maker saw its fee. If the fee still confirms, it isn\'t refunded.';
+
+  @override
   String get privateUsdConvertResultMakerCancelled =>
       'The market maker called the swap off before your ZEC was sent. Your ZEC never left your wallet.';
 
@@ -9236,6 +9262,17 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get privateUsdConvertWaitFeeConfirming =>
+      'Waiting for the market maker\'s fee to confirm';
+
+  @override
+  String get privateUsdConvertWaitFeeSeen =>
+      'Waiting for the market maker to see the fee';
+
+  @override
+  String get privateUsdConvertWaitFunds => 'Waiting for your ZEC to confirm';
+
+  @override
   String get privateUsdConvertWaitSyncing =>
       'Waiting for your Zcash wallet to sync';
 
@@ -9248,6 +9285,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get privateUsdConvertZecIncludesFee =>
       'Includes the Zcash network fee';
+
+  @override
+  String get privateUsdConvertZecIncludesFees =>
+      'Includes the network and market maker fees';
 
   @override
   String get privateUsdConvertZecNoQuote =>
@@ -9395,6 +9436,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get privateUsdDetailFunding => 'Escrow payment';
+
+  @override
+  String get privateUsdDetailOpenFee => 'Market maker fee payment';
 
   @override
   String get privateUsdDetailPayout => 'Payout';

@@ -11178,6 +11178,14 @@
   "@privateUsdActivityEmpty": {
     "description": "Placeholder in the activity list on the Shielded USD screen before there is any activity."
   },
+  "privateUsdActivityFeeLost": "Bridge didn't start",
+  "@privateUsdActivityFeeLost": {
+    "description": "Title of an activity row, and of the result on the bridge progress screen, for a bridge from ZEC that never started after the market maker's fee was paid and confirmed: that fee isn't refunded."
+  },
+  "privateUsdActivityFeeLostDetail": "market maker fee not refunded",
+  "@privateUsdActivityFeeLostDetail": {
+    "description": "Subtitle of the activity row for a bridge that never started after its fee was paid: the ZEC fee paid to the market maker isn't refunded."
+  },
   "privateUsdActivityFrom": "from {address}",
   "@privateUsdActivityFrom": {
     "description": "Subtitle of a received Shielded USD activity row naming the sender; {address} is a shortened Railgun address such as 0zk1qy…8f3a.",
@@ -11347,6 +11355,10 @@
   "@privateUsdConvertErrorMakerBusy": {
     "description": "Error on the bridge screens when the market maker is busy with other bridges; nothing was sent."
   },
+  "privateUsdConvertErrorOpenFee": "The market maker asks a fee Veylor won't pay, so nothing was sent.",
+  "@privateUsdConvertErrorOpenFee": {
+    "description": "Shown on the bridge screen when the market maker asks a fee before it opens the swap that is above Veylor's limit, or payable in a way Veylor refuses. Nothing was paid."
+  },
   "privateUsdConvertErrorRelayer": "The relayer that completes bridges can't be reached right now. Try again in a moment.",
   "@privateUsdConvertErrorRelayer": {
     "description": "Error on the bridge screens when the relayer that completes bridges cannot be reached; nothing was sent."
@@ -11466,6 +11478,19 @@
   "privateUsdConvertNewQuote": "Refresh quote",
   "@privateUsdConvertNewQuote": {
     "description": "Button on the bridge review that asks the market maker for a new quote after the old one expired."
+  },
+  "privateUsdConvertOpenFee": "Market maker fee",
+  "@privateUsdConvertOpenFee": {
+    "description": "Row label on the bridge review and in a bridge's details: the ZEC fee the market maker asks before it opens the swap, which is never refunded."
+  },
+  "privateUsdConvertOpenFeeValue": "{amount} · not refunded",
+  "@privateUsdConvertOpenFeeValue": {
+    "description": "Value of the market maker fee row on the bridge review and in a bridge's details: the fee, and that it isn't refunded, even if the bridge doesn't finish; {amount} is the fee with its unit, such as 0.0002 ZEC.",
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
   },
   "privateUsdConvertOpeningSlow": "The market maker hasn't opened the swap yet. Nothing has been sent.",
   "@privateUsdConvertOpeningSlow": {
@@ -11639,6 +11664,14 @@
   "@privateUsdConvertRelayerReviewNote": {
     "description": "Note on the bridge review screen, and on the progress screen until the relayer holds the claim, when the relayer claims for the user: Veylor must stay open a few minutes until the market maker confirms the ZEC deposit, after which the user may leave the app."
   },
+  "privateUsdConvertResultFeeKept": "The bridge didn't start. The market maker keeps its fee; the rest of your ZEC never left your wallet.",
+  "@privateUsdConvertResultFeeKept": {
+    "description": "Result on the bridge progress screen, and the note in its details, when a bridge ended before it started but after the market maker's fee was paid and confirmed: that fee isn't refunded."
+  },
+  "privateUsdConvertResultFeeNotHonoured": "The quote ran out before the market maker saw its fee. If the fee still confirms, it isn't refunded.",
+  "@privateUsdConvertResultFeeNotHonoured": {
+    "description": "Result on the bridge progress screen when a bridge ended because its quote expired before the market maker saw its fee confirmed. The fee may still confirm, and then isn't refunded."
+  },
   "privateUsdConvertResultMakerCancelled": "The market maker called the swap off before your ZEC was sent. Your ZEC never left your wallet.",
   "@privateUsdConvertResultMakerCancelled": {
     "description": "Result body when a bridge ended with nothing sent: the market maker cancelled the swap before Veylor sent the ZEC, so no ZEC left the wallet."
@@ -11806,6 +11839,18 @@
       }
     }
   },
+  "privateUsdConvertWaitFeeConfirming": "Waiting for the market maker's fee to confirm",
+  "@privateUsdConvertWaitFeeConfirming": {
+    "description": "Detail under the first bridge progress step, and the Home banner, while the fee paid to the market maker before it opens the swap waits for a Zcash block."
+  },
+  "privateUsdConvertWaitFeeSeen": "Waiting for the market maker to see the fee",
+  "@privateUsdConvertWaitFeeSeen": {
+    "description": "Detail under the first bridge progress step, and the Home banner, while the market maker's fee is confirmed but the market maker hasn't seen it yet; Veylor asks it again."
+  },
+  "privateUsdConvertWaitFunds": "Waiting for your ZEC to confirm",
+  "@privateUsdConvertWaitFunds": {
+    "description": "Detail under the 'Sending your ZEC' bridge step while the deposit waits for ZEC on its way back to the wallet, such as the change from the market maker's fee, to confirm."
+  },
   "privateUsdConvertWaitSyncing": "Waiting for your Zcash wallet to sync",
   "@privateUsdConvertWaitSyncing": {
     "description": "Detail under the active bridge progress step while the user's Zcash wallet is still syncing and the bridge waits for it."
@@ -11821,6 +11866,10 @@
   "privateUsdConvertZecIncludesFee": "Includes the Zcash network fee",
   "@privateUsdConvertZecIncludesFee": {
     "description": "Note under the ZEC amount on the bridge screen and its review: the amount already includes the Zcash network fee."
+  },
+  "privateUsdConvertZecIncludesFees": "Includes the network and market maker fees",
+  "@privateUsdConvertZecIncludesFees": {
+    "description": "Note under the ZEC a bridge pays when its quote asks a market maker fee: the total includes the Zcash network fees and that fee."
   },
   "privateUsdConvertZecNoQuote": "No quote fits this amount. Try a different amount, or use it all for the maximum.",
   "@privateUsdConvertZecNoQuote": {
@@ -12039,6 +12088,10 @@
   "privateUsdDetailFunding": "Escrow payment",
   "@privateUsdDetailFunding": {
     "description": "Row label in a shielded-USD-to-ZEC bridge's details for the Ethereum transaction that paid the shielded USD into escrow."
+  },
+  "privateUsdDetailOpenFee": "Market maker fee payment",
+  "@privateUsdDetailOpenFee": {
+    "description": "Row label in a bridge's details for the Zcash transaction that paid the market maker's fee."
   },
   "privateUsdDetailPayout": "Payout",
   "@privateUsdDetailPayout": {

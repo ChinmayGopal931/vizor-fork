@@ -204,6 +204,22 @@ pub(crate) struct SwapQuote {
     /// The maker's own gas and Zcash fee this quote charges.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub network_cost: Option<Amount>,
+    /// What a forward quote asks the wallet to pay before the maker opens
+    /// the swap; absent where the maker asks none. Never refunded.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub open_fee: Option<OpenFee>,
+}
+
+/// A forward quote's open fee: the maker's gas for opening the swap and, if
+/// no deposit follows, for cancelling it. It is the maker's from the moment
+/// it is paid, and no part of the deposit.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct OpenFee {
+    /// Zatoshis, in one shielded payment mined before the quote expires.
+    pub zat: u64,
+    /// The unified address it is paid to, this quote's alone.
+    pub address: String,
 }
 
 impl SwapQuote {
@@ -524,6 +540,46 @@ impl fmt::Debug for ZcashTransaction {
     }
 }
 
+/// A forward quote's open fee as the wallet paid it: one shielded payment,
+/// kept before it is first sent so it is sent again, never built twice.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct OpenFeePayment {
+    pub tx_id: ZcashTxId,
+    /// The transaction's bytes, in hex.
+    pub raw: String,
+    pub expiry_height: u64,
+    /// The payment's own network fee, where the wallet knows it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub network_fee_zat: Option<u64>,
+}
+
+impl fmt::Debug for OpenFeePayment {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "OpenFeePayment({:?})", self.tx_id)
+    }
+}
+
+impl OpenFeePayment {
+    pub(crate) fn new(transaction: ZcashTransaction, network_fee_zat: Option<u64>) -> Self {
+        Self {
+            tx_id: transaction.tx_id,
+            raw: transaction.raw,
+            expiry_height: transaction.expiry_height,
+            network_fee_zat,
+        }
+    }
+
+    /// The transaction alone, as it is sent again and followed.
+    pub(crate) fn transaction(&self) -> ZcashTransaction {
+        ZcashTransaction {
+            tx_id: self.tx_id.clone(),
+            raw: self.raw.clone(),
+            expiry_height: self.expiry_height,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub(crate) enum RefundCause {
@@ -541,6 +597,9 @@ pub(crate) enum NothingSentCause {
     Mismatch,
     DepositWindowMissed,
     MakerCancelled,
+    /// The quote expired before the maker saw its open fee in a block: the
+    /// fee, if it is mined after all, is the maker's.
+    FeeNotHonoured,
 }
 
 /// How a forward swap ended.
@@ -584,6 +643,15 @@ pub(crate) enum DepositProgress<'a> {
     /// short.
     Started,
     Kept(&'a ZcashTransaction),
+}
+
+/// How far a forward swap's open fee got, as [`DepositProgress`] for the
+/// deposit: marked started before it is created, kept before it is sent.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum OpenFeeProgress<'a> {
+    NotStarted,
+    Started,
+    Kept(&'a OpenFeePayment),
 }
 
 /// What the app keeps about a forward swap it accepted. Its keys derive from
@@ -642,6 +710,17 @@ pub(crate) struct ForwardRecord {
     pub fee_expires_at: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ticket: Option<Ticket>,
+    /// What the quote's open fee may cost in all, the fee and the payment's
+    /// network fee, as approved at accept; only where the quote asks one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub open_fee_max_total_zat: Option<u64>,
+    /// The open fee's payment was started: marked before it is created, so an
+    /// interruption finds it in the wallet rather than paying again.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub open_fee_attempted: bool,
+    /// The open fee's payment, kept before it is first sent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub open_fee_payment: Option<OpenFeePayment>,
 }
 
 /// Where a forward swap stands, by what its record keeps: the stage while
@@ -683,6 +762,14 @@ impl ForwardRecord {
         }
     }
 
+    pub(crate) fn open_fee_progress(&self) -> OpenFeeProgress<'_> {
+        match (&self.open_fee_payment, self.open_fee_attempted) {
+            (Some(payment), _) => OpenFeeProgress::Kept(payment),
+            (None, true) => OpenFeeProgress::Started,
+            (None, false) => OpenFeeProgress::NotStarted,
+        }
+    }
+
     pub(crate) fn finished(&self) -> bool {
         self.outcome.is_some()
     }
@@ -714,6 +801,13 @@ impl ForwardRecord {
         // An outcome reads only with the time it ended.
         if self.outcome.is_some() && self.finished_at.is_none() {
             return Err("an ended swap has no end time".into());
+        }
+        // An open fee is paid only for a quote that asks one.
+        let paying = self.open_fee_max_total_zat.is_some()
+            || self.open_fee_attempted
+            || self.open_fee_payment.is_some();
+        if paying && self.quote.open_fee.is_none() {
+            return Err("an open fee is paid for a quote that asks none".into());
         }
         Ok(())
     }

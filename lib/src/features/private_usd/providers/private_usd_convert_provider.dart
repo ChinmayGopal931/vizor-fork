@@ -37,6 +37,11 @@ abstract final class PrivateUsdConvertTiming {
   /// won't accept one about to run out.
   static const expiryMargin = Duration(seconds: 20);
 
+  /// A quote that asks an open fee stops being offered this long before it
+  /// expires: Rust pays the fee only with a minute of the quote left, the
+  /// time it has to be mined.
+  static const openFeeExpiryMargin = Duration(seconds: 80);
+
   static const tick = Duration(seconds: 1);
 }
 
@@ -487,7 +492,7 @@ class PrivateUsdConvertState
 
   @override
   DateTime? get offeredUntil =>
-      quote?.expiresAt.subtract(PrivateUsdConvertTiming.expiryMargin);
+      quote == null ? null : privateUsdZecQuoteOfferedUntil(quote!);
 
   /// The quote leaves something after the relayer's fee.
   bool get paysOut => quote != null && quote!.receives > BigInt.zero;
@@ -868,7 +873,7 @@ class PrivateUsdConvertNotifier
     if (!takesQuote(forReview: forReview)) return;
     final onReview = state.step != PrivateUsdConvertStep.amount;
     final arrivedExpired = !clock().isBefore(
-      quote.expiresAt.subtract(PrivateUsdConvertTiming.expiryMargin),
+      privateUsdZecQuoteOfferedUntil(quote),
     );
     if (arrivedExpired) {
       // On the review the expired quote stays, so "Refresh quote" does too.
@@ -914,6 +919,15 @@ class PrivateUsdConvertNotifier
     );
   }
 }
+
+/// When [quote] stops being offered: before Rust would refuse its accept, a
+/// minute and more ahead where it asks an open fee.
+DateTime privateUsdZecQuoteOfferedUntil(PrivateUsdZecQuote quote) =>
+    quote.expiresAt.subtract(
+      quote.asksOpenFee
+          ? PrivateUsdConvertTiming.openFeeExpiryMargin
+          : PrivateUsdConvertTiming.expiryMargin,
+    );
 
 /// [accountUuid]'s conversion under way in either direction, read from the
 /// records (opening a convert screen, or after the app died mid-accept):

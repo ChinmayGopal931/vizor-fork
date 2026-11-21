@@ -68,6 +68,9 @@ pub(crate) enum SwapErrorCode {
     /// A deposit's authorization is used, or another deposit of the same
     /// address is on its way (`409`).
     Conflict,
+    /// The quote's open fee is in no block the maker has seen (`402`): pay
+    /// it, or wait for it and accept again.
+    FeeRequired,
 }
 
 impl SwapErrorCode {
@@ -86,6 +89,7 @@ impl SwapErrorCode {
             "alreadySpent" => Self::AlreadySpent,
             "tokenRequired" => Self::TokenRequired,
             "conflict" => Self::Conflict,
+            "feeRequired" => Self::FeeRequired,
             _ => return None,
         })
     }

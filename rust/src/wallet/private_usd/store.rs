@@ -5,6 +5,7 @@
 //! the relayer, and since schema 5 it may rescue a payout Railgun sent back,
 //! so paid records are kept. Since schema 6 indices are counted per seed and
 //! ZIP-32 index, not per account, and the counters survive the account.
+//! Since schema 7 a forward record may pay its quote's open fee.
 //!
 //! A plain SQLite file in app-private storage, opened per call (WAL,
 //! `synchronous = FULL`, a busy timeout), migrated by `PRAGMA user_version`.
@@ -26,9 +27,10 @@ const FILE_NAME: &str = "swaps.db";
 /// 1: swaps, the send log and the joint accounts. 2: deposits. 3: records of
 /// the windows contract. 4: claims handed to the relayer. 5: rescues of
 /// returned payouts, and paid forward records kept for them. 6: the index
-/// counters per seed and ZIP-32 index. A build refuses a store newer than
-/// itself, never resetting it.
-const SCHEMA_VERSION: i32 = 6;
+/// counters per seed and ZIP-32 index. 7: forward records that pay their
+/// quote's open fee. A build refuses a store newer than itself, never
+/// resetting it.
+const SCHEMA_VERSION: i32 = 7;
 const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 /// Finished records kept per direction. Reverse `REFUNDED` and forward
 /// `PAID` ones are kept beyond it: a rescue may still be possible.
@@ -238,12 +240,16 @@ impl SwapStore {
             }
             // 1 → 2: the deposits tables join. 2 → 3, 3 → 4 and 4 → 5
             // change no table. 5 → 6: the index counters per seed join; the
-            // per-account ones stay until each is folded in.
-            1..=5 => {
+            // per-account ones stay until each is folded in. 6 → 7 changes
+            // no table: records gain the open fee, which a build that knows
+            // 6 would not read.
+            1..=6 => {
                 if version == 1 {
                     tx.execute_batch(SCHEMA_V2).map_err(sql)?;
                 }
-                tx.execute_batch(SCHEMA_V6).map_err(sql)?;
+                if version <= 5 {
+                    tx.execute_batch(SCHEMA_V6).map_err(sql)?;
+                }
                 tx.pragma_update(None, "user_version", SCHEMA_VERSION)
                     .map_err(sql)?;
             }
@@ -890,8 +896,9 @@ mod tests {
     }
 
     /// Forward record fixtures: accepted, depositing, deposited, paid,
-    /// refunded, ended unsent, with a ticket, and with its claim held by the
-    /// relayer.
+    /// refunded, ended unsent, with a ticket, with its claim held by the
+    /// relayer, rescued, paying its quote's open fee, and ended with that fee
+    /// unseen.
     fn forward_states() -> Vec<String> {
         let head = format!(
             r#"{{"index":7,"quote":{{"quoteId":"{}","maker":"{MAKER}","makerShare":"{}","makerProof":"{}","chainId":11155111,"contract":"{CONTRACT}","token":"{TOKEN}","amount":"1000000","depositZat":202021,"expiresAt":1790000300}},"swapId":"{}","zcashHeight":4200000,"acceptedAt":1790000000,"receives":"977550","relayerFee":"20000""#,
@@ -949,7 +956,25 @@ mod tests {
                 hex(65, 0x17),
                 ticket()
             ),
+            format!(
+                r#"{},"openFeeMaxTotalZat":30000,"openFeeAttempted":true,"openFeePayment":{{"txId":"{}","raw":"0600","expiryHeight":4200040,"networkFeeZat":10000}}}}"#,
+                with_open_fee(&head),
+                "ef".repeat(32)
+            ),
+            format!(
+                r#"{},"outcome":{{"type":"nothing_sent","cause":"FEE_NOT_HONOURED"}},"finishedAt":1790000300,"openFeeMaxTotalZat":30000,"openFeeAttempted":true}}"#,
+                with_open_fee(&head)
+            ),
         ]
+    }
+
+    /// `head` with its quote asking an open fee.
+    fn with_open_fee(head: &str) -> String {
+        head.replacen(
+            r#""expiresAt":1790000300}"#,
+            r#""expiresAt":1790000300,"openFee":{"zat":20000,"address":"utest1fee"}}"#,
+            1,
+        )
     }
 
     /// Reverse record fixtures: previewed, accepted, sending (with a ticket),
@@ -1158,13 +1183,13 @@ mod tests {
         assert_eq!(store.take_index(SPACE, ACCOUNT).unwrap(), next + 1);
     }
 
-    /// A store schema 1, 3, 4 or 5 wrote opens at schema 6: the deposits
+    /// A store schema 1, 3, 4, 5 or 6 wrote opens at schema 7: the deposits
     /// tables and the seed's index counters join schema 1's, and every
     /// record, the active pointer and the send log stay as they were. The
     /// account's counter is folded into its seed's on the next index taken.
     #[test]
     fn an_older_store_migrates_keeping_its_records() {
-        for version in [1, 3, 4, 5] {
+        for version in [1, 3, 4, 5, 6] {
             older_store_migrates_keeping_its_records(version);
         }
     }
@@ -1175,6 +1200,9 @@ mod tests {
         conn.execute_batch(SCHEMA).unwrap();
         if version >= 2 {
             conn.execute_batch(SCHEMA_V2).unwrap();
+        }
+        if version >= 6 {
+            conn.execute_batch(SCHEMA_V6).unwrap();
         }
         conn.pragma_update(None, "user_version", version).unwrap();
         let json = forward_json();
@@ -1209,7 +1237,7 @@ mod tests {
             .query_row("PRAGMA user_version", [], |row| row.get(0))
             .unwrap();
         assert_eq!(version, SCHEMA_VERSION);
-        assert_eq!(SCHEMA_VERSION, 6);
+        assert_eq!(SCHEMA_VERSION, 7);
         assert_eq!(
             store.active(ACCOUNT, Direction::Forward).unwrap(),
             Some(StoredRecord::Forward(Box::new(forward(&json))))

@@ -31,6 +31,23 @@ pub(crate) const RELAYER_CLAIM_WAIT_BLOCKS: u64 = 5;
 pub(crate) const MAX_T0_TO_T1_SECONDS: u64 = 2 * 60 * 60;
 /// An accept is not sent this close to the quote's expiry.
 pub(crate) const ACCEPT_MARGIN_SECONDS: u64 = 15;
+/// A quote's open fee is paid, and sent again, only with this much of the
+/// quote's life left: it counts once mined, and paid any later it is likely
+/// lost (zecSwap's `OPEN_FEE_MARGIN`).
+pub(crate) const OPEN_FEE_MARGIN_SECONDS: u64 = 60;
+/// An open fee no block has yet is sent again this often.
+pub(crate) const OPEN_FEE_RESEND_SECONDS: u64 = 30;
+/// How long an accept waits before it is posted again while the maker has
+/// not seen the open fee, where the maker names no wait; the least it waits
+/// where it does; the least from the second wait on (a gateway may let each
+/// caller only a few accepts a minute through); and the most any wait is.
+pub(crate) const FEE_WAIT_SECONDS: u64 = 5;
+pub(crate) const FEE_WAIT_MIN_SECONDS: u64 = 1;
+pub(crate) const FEE_PACE_SECONDS: u64 = 12;
+pub(crate) const FEE_WAIT_MAX_SECONDS: u64 = 30;
+/// How long an accept of a quote whose fee was paid waits before it is posted
+/// again after a `5xx` or no answer, where the maker names no wait.
+pub(crate) const UNANSWERED_ACCEPT_WAIT_SECONDS: u64 = 12;
 /// Railgun's shield fee, in basis points.
 pub(crate) const RAILGUN_FEE_BPS: u128 = 25;
 /// Basis points in one.
@@ -196,6 +213,10 @@ pub(crate) struct Deployment {
     pub escrow_confirmations: u32,
     /// The soonest `t0` a forward deposit may be paid for.
     pub min_seconds_to_t0: u64,
+    /// The most a forward quote's open fee may ask, in zatoshis: a quote that
+    /// asks more is refused before anything is paid. The fee is the one
+    /// amount in a swap that rests on trust in the maker.
+    pub max_open_fee_zat: u64,
     /// The screening time shown to the user.
     pub screening_seconds: u32,
     pub explorer_tx_prefix: &'static str,
@@ -298,6 +319,8 @@ const MAINNET: Deployment = Deployment {
     zcash_confirmations: 2,
     escrow_confirmations: 3,
     min_seconds_to_t0: 15 * 60,
+    // The reference CLI's `--max-open-fee`; mainnet asks no fee yet.
+    max_open_fee_zat: 500_000,
     screening_seconds: 60 * 60,
     explorer_tx_prefix: "https://etherscan.io/tx/",
     railscan_tx_prefix: "https://railscan.io/ethereum/tx/",
@@ -370,6 +393,8 @@ const TESTNET: Deployment = Deployment {
     zcash_confirmations: 2,
     escrow_confirmations: 2,
     min_seconds_to_t0: 9 * 60,
+    // Sepolia's fee is the maker's minimum, 20,000 zatoshis.
+    max_open_fee_zat: 500_000,
     screening_seconds: 60,
     explorer_tx_prefix: "https://sepolia.etherscan.io/tx/",
     railscan_tx_prefix: "https://railscan.io/sepolia/tx/",

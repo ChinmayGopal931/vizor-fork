@@ -84,6 +84,9 @@ pub enum ApiPrivateUsdErrorCode {
     /// pins: a contract that is not the pinned windows contract, or terms
     /// that are not the pin's. Never followed.
     WrongDeployment,
+    /// The maker asks an open fee above the cap, or payable outside Orchard
+    /// or on another network: the quote is dropped with nothing paid.
+    OpenFeeRefused,
 }
 
 /// A Private USD failure. Its Dart `toString()` is the message.
@@ -143,6 +146,7 @@ fn api_code(code: ErrorCode) -> ApiPrivateUsdErrorCode {
         ErrorCode::ChainUnreadable => Api::EthereumUnreachable,
         ErrorCode::IndicesInUse => Api::Other,
         ErrorCode::AmountUnquotable => Api::AmountRefused,
+        ErrorCode::OpenFeeRefused => Api::OpenFeeRefused,
     }
 }
 
@@ -651,6 +655,13 @@ pub struct ApiForwardQuote {
     /// accept takes.
     pub max_total_zat: Option<u64>,
     pub fee_expires_at: Option<i64>,
+    /// What the maker asks before it opens the swap, in zatoshis, paid apart
+    /// from the deposit and never refunded; `None` where it asks none.
+    pub open_fee_zat: Option<u64>,
+    /// The open fee's payment's network fee from this wallet now; `None`
+    /// without a fee, or when one transaction cannot pay it (the quote is
+    /// then unpayable).
+    pub open_fee_network_zat: Option<u64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -673,6 +684,9 @@ pub enum ApiNothingSentCause {
     Mismatch,
     DepositWindowMissed,
     MakerCancelled,
+    /// The quote expired before the maker saw its open fee, or the maker
+    /// never opened the swap it was paid for: a fee mined is the maker's.
+    FeeNotHonoured,
 }
 
 pub struct ApiAcceptResult {
@@ -700,6 +714,15 @@ pub enum ApiForwardWait {
     /// refund. If the maker never refunds, the claim goes out from
     /// `late_claim_at`.
     Unwinding,
+    /// The open fee is paid and waits for a block; it is sent again every
+    /// half minute meanwhile.
+    FeeConfirming,
+    /// The open fee is mined; the maker has not seen it yet, and the accept
+    /// is posted again as it asks until the quote expires.
+    FeeAccepting,
+    /// The deposit waits for ZEC on its way to spendable, such as the open
+    /// fee's change.
+    FundsPending,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -766,6 +789,17 @@ pub struct ApiForwardRecord {
     pub refund_cause: Option<ApiRefundCause>,
     pub nothing_sent_cause: Option<ApiNothingSentCause>,
     pub ended_at: Option<i64>,
+    /// The maker's open fee the quote asked, in zatoshis; `None` where it
+    /// asked none.
+    pub open_fee_zat: Option<u64>,
+    /// The open fee's payment's own network fee, where the wallet knows it.
+    pub open_fee_network_zat: Option<u64>,
+    /// The open fee's payment, internal byte order hex, as wallet history
+    /// rows carry it: the bridge's row stands in for it.
+    pub open_fee_txid: Option<String>,
+    /// The main wallet shows the open fee's payment in a block: paid, and
+    /// the maker's whatever becomes of the swap.
+    pub open_fee_mined: bool,
 }
 
 pub struct ApiForwardAdvance {
@@ -930,7 +964,7 @@ pub fn private_usd_forward_abandon(
             &account_uuid,
             index,
         ))?;
-        Ok(api_record(&record, None))
+        Ok(api_record(&record, None, false))
     })
 }
 
@@ -1004,7 +1038,7 @@ pub fn private_usd_forward_rescue(
             async |call, op| {
                 call.forward(op, async |forward, store| {
                     let record = forward.rescue(store, index).await?;
-                    Ok(api_record(&record, None))
+                    Ok(api_record(&record, None, false))
                 })
                 .await
             },
@@ -1027,7 +1061,13 @@ pub fn private_usd_forward_records(
         };
         Ok(swap::records::<ForwardRecord>(&store, &account_uuid)?
             .iter()
-            .map(|record| api_record(record, deposit_confirmations(&db_path, network, record)))
+            .map(|record| {
+                api_record(
+                    record,
+                    deposit_confirmations(&db_path, network, record),
+                    open_fee_mined(&db_path, network, record),
+                )
+            })
             .collect())
     })
 }
@@ -2488,6 +2528,8 @@ fn api_quote(quoted: &Quoted) -> ApiForwardQuote {
         deposit_fee_zat: offer.deposit_fee_zatoshi,
         max_total_zat: offer.max_total_zatoshi(),
         fee_expires_at: offer.fee_expires_at.map(seconds),
+        open_fee_zat: offer.quote.open_fee.as_ref().map(|fee| fee.zat),
+        open_fee_network_zat: offer.open_fee_network_zatoshi,
     }
 }
 
@@ -2496,6 +2538,7 @@ fn api_advance(report: &AdvanceReport, db_path: &str, network: WalletNetwork) ->
         record: api_record(
             &report.record,
             deposit_confirmations(db_path, network, &report.record),
+            open_fee_mined(db_path, network, &report.record),
         ),
         wait: report.wait.map(|wait| match wait {
             ForwardWait::Opening => ApiForwardWait::Opening,
@@ -2504,13 +2547,20 @@ fn api_advance(report: &AdvanceReport, db_path: &str, network: WalletNetwork) ->
             ForwardWait::Refunding => ApiForwardWait::Refunding,
             ForwardWait::ZcashSyncing => ApiForwardWait::ZcashSyncing,
             ForwardWait::Unwinding => ApiForwardWait::Unwinding,
+            ForwardWait::FeeConfirming => ApiForwardWait::FeeConfirming,
+            ForwardWait::FeeAccepting => ApiForwardWait::FeeAccepting,
+            ForwardWait::FundsPending => ApiForwardWait::FundsPending,
         }),
         next_poll_ms: u32::try_from(report.next_poll.as_millis()).unwrap_or(u32::MAX),
         problem: report.problem.map(api_code),
     }
 }
 
-fn api_record(record: &ForwardRecord, deposit_confirmations: Option<u32>) -> ApiForwardRecord {
+fn api_record(
+    record: &ForwardRecord,
+    deposit_confirmations: Option<u32>,
+    open_fee_mined: bool,
+) -> ApiForwardRecord {
     let (outcome, refund_cause, nothing_sent_cause) = match &record.outcome {
         None => (None, None, None),
         Some(ForwardOutcome::Paid) => (Some(ApiForwardOutcome::Paid), None, None),
@@ -2568,6 +2618,16 @@ fn api_record(record: &ForwardRecord, deposit_confirmations: Option<u32>) -> Api
         refund_cause,
         nothing_sent_cause,
         ended_at: record.finished_at.map(seconds),
+        open_fee_zat: record.quote.open_fee.as_ref().map(|fee| fee.zat),
+        open_fee_network_zat: record
+            .open_fee_payment
+            .as_ref()
+            .and_then(|payment| payment.network_fee_zat),
+        open_fee_txid: record
+            .open_fee_payment
+            .as_ref()
+            .and_then(|payment| internal_hex(&payment.tx_id)),
+        open_fee_mined,
     }
 }
 
@@ -2597,6 +2657,22 @@ fn deposit_confirmations(
     }
 }
 
+/// Whether the main wallet shows the record's open fee payment in a block;
+/// best effort, false when unknown.
+fn open_fee_mined(db_path: &str, network: WalletNetwork, record: &ForwardRecord) -> bool {
+    let Some(payment) = record.open_fee_payment.as_ref() else {
+        return false;
+    };
+    let Ok(txid) = joint_ops::internal_txid(&payment.tx_id) else {
+        return false;
+    };
+    let expiry = u32::try_from(payment.expiry_height).unwrap_or(u32::MAX);
+    matches!(
+        joint_ops::swap_tx_status(db_path, network, &txid, expiry),
+        Ok(SwapTxStatus::Mined { .. })
+    )
+}
+
 /// A record's transaction id in the wallet DB's byte order, as history rows
 /// carry it.
 fn internal_hex(tx_id: &ZcashTxId) -> Option<String> {
@@ -2614,6 +2690,7 @@ fn api_cause(cause: NothingSentCause) -> ApiNothingSentCause {
         NothingSentCause::Mismatch => ApiNothingSentCause::Mismatch,
         NothingSentCause::DepositWindowMissed => ApiNothingSentCause::DepositWindowMissed,
         NothingSentCause::MakerCancelled => ApiNothingSentCause::MakerCancelled,
+        NothingSentCause::FeeNotHonoured => ApiNothingSentCause::FeeNotHonoured,
     }
 }
 

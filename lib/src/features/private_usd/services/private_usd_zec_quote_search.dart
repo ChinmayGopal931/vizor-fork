@@ -2,7 +2,8 @@ import '../../../rust/api/private_usd.dart' as rust;
 import '../models/private_usd_fees.dart';
 
 /// An offer the wallet can pay now: the maker's quote for [requestedUnits],
-/// its deposit, and the network fee on it.
+/// its deposit, the maker's open fee where it asks one, and the network fees
+/// on them.
 class PrivateUsdZecQuote {
   const PrivateUsdZecQuote({required this.quote, required this.requestedUnits});
 
@@ -14,10 +15,20 @@ class PrivateUsdZecQuote {
 
   int get index => quote.index;
   BigInt get depositZat => quote.depositZat;
-  BigInt get feeZat => quote.depositFeeZat!;
 
-  /// What it costs in all: the deposit and the network fee on it.
-  BigInt get totalZat => depositZat + feeZat;
+  /// The maker asks a fee before it opens the swap, paid apart from the
+  /// deposit and never refunded.
+  bool get asksOpenFee => quote.openFeeZat != null;
+
+  /// That fee; zero where the maker asks none.
+  BigInt get openFeeZat => quote.openFeeZat ?? BigInt.zero;
+
+  /// The Zcash network fees: the deposit's, and the open fee payment's.
+  BigInt get feeZat =>
+      quote.depositFeeZat! + (quote.openFeeNetworkZat ?? BigInt.zero);
+
+  /// What it costs in all: the deposit, the open fee and their network fees.
+  BigInt get totalZat => depositZat + feeZat + openFeeZat;
 
   /// The most the deposit may cost, as accept takes it.
   BigInt get maxTotalZat => quote.maxTotalZat!;
@@ -99,7 +110,8 @@ class PrivateUsdZecQuoteSearch {
   }
 
   // What [basis]'s price buys with [totalZat], less [basis]'s fee or the
-  // least one there is. A deposit pays the maker's network cost on top of
+  // least one there is, and its open fee with that payment's network fee
+  // where it asks one. A deposit pays the maker's network cost on top of
   // the amount, at the same price.
   static int _unitsFor(
     BigInt totalZat,
@@ -107,7 +119,10 @@ class PrivateUsdZecQuoteSearch {
     BigInt leastFeeZat, {
     int? lessThan,
   }) {
-    var depositZat = totalZat - (basis.depositFeeZat ?? leastFeeZat);
+    final openFee = basis.openFeeZat == null
+        ? BigInt.zero
+        : basis.openFeeZat! + (basis.openFeeNetworkZat ?? leastFeeZat);
+    var depositZat = totalZat - (basis.depositFeeZat ?? leastFeeZat) - openFee;
     if (depositZat < BigInt.zero) depositZat = BigInt.zero;
     final amount = BigInt.parse(basis.amount);
     final cost = basis.networkCost == null
@@ -127,7 +142,12 @@ class PrivateUsdZecQuoteSearch {
   }
 
   static PrivateUsdZecQuote _payable(rust.ApiForwardQuote quote, int units) {
-    if (quote.depositFeeZat == null || quote.maxTotalZat == null) {
+    // An open fee no one transaction can pay leaves the deposit unpaid too.
+    final feeUnpayable =
+        quote.openFeeZat != null && quote.openFeeNetworkZat == null;
+    if (quote.depositFeeZat == null ||
+        quote.maxTotalZat == null ||
+        feeUnpayable) {
       throw const rust.ApiPrivateUsdError(
         code: rust.ApiPrivateUsdErrorCode.depositUnpayable,
         message: 'no fee estimate for the deposit',

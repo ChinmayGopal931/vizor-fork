@@ -42,8 +42,9 @@ const _logo = PrivateUsdLogo(size: AppAssetSize.size);
 
 /// A forward conversion's activity row, or null when it moved no money
 /// (nothing sent). Under way, it shows its stage and opens its progress;
-/// paid, the ZEC paid; refunded, that the ZEC came back, with no amount.
-/// Ended, it unfolds into its [details].
+/// paid, the ZEC paid; refunded, that the ZEC came back, with no amount;
+/// ended unstarted after its market maker fee was mined, that fee, which
+/// isn't refunded. Ended, it unfolds into its [details].
 ActivityRowData? buildPrivateUsdActivityRow({
   required BuildContext context,
   required ApiForwardRecord record,
@@ -107,7 +108,7 @@ ActivityRowData? buildPrivateUsdActivityRow({
       final zec = privacyModeEnabled
           ? fixedPrivacyMask()
           : ZecAmount.fromZatoshi(
-              record.maxTotalZat ?? record.depositZat,
+              privateUsdForwardPaidZat(record),
             ).activity.toString();
       return ActivityRowData(
         stableId: base.stableId,
@@ -141,7 +142,31 @@ ActivityRowData? buildPrivateUsdActivityRow({
         onTap: unfold.onTap,
       );
     case ApiForwardOutcome.nothingSent:
-      return null;
+      // The fee is the one thing it moved: its row stands in for the fee's
+      // own transaction, which the feeds leave out.
+      final fee = record.openFeeZat;
+      if (fee == null || !record.openFeeMined) return null;
+      final paid = fee + (record.openFeeNetworkZat ?? BigInt.zero);
+      final zec = privacyModeEnabled
+          ? fixedPrivacyMask()
+          : ZecAmount.fromZatoshi(paid).activity.toString();
+      return ActivityRowData(
+        stableId: base.stableId,
+        title: context.l10n.privateUsdActivityFeeLost,
+        leadingIconName: _glyph,
+        leading: _logo,
+        leadingBackgroundColor: base.leadingBackgroundColor,
+        leadingIconColor: base.leadingIconColor,
+        subtitle: context.l10n.privateUsdActivityFeeLostDetail,
+        amountText: activityAmountTextForFormFactor(
+          PrivateUsdCopy.activityOut(zec),
+        ),
+        amountColor: outgoingAmountColor(colors),
+        statusText: '',
+        timestampText: timestamp,
+        details: unfold.details,
+        onTap: unfold.onTap,
+      );
   }
 }
 

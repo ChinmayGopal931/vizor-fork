@@ -1,5 +1,9 @@
 import '../../../rust/api/private_usd.dart'
-    show ApiNothingSentCause, ApiPrivateUsdErrorCode, ApiRefundCause;
+    show
+        ApiForwardRecord,
+        ApiNothingSentCause,
+        ApiPrivateUsdErrorCode,
+        ApiRefundCause;
 import '../private_usd_copy.dart';
 import '../services/private_usd_attestation.dart';
 import '../services/private_usd_spend_guard.dart' show PrivateUsdSpendStatus;
@@ -68,6 +72,9 @@ String? privateUsdErrorMessage(
     l10n.privateUsdConvertErrorAmountRefused,
   ApiPrivateUsdErrorCode.storeUnreadable => l10n.privateUsdConvertErrorStore,
   ApiPrivateUsdErrorCode.routeBlocked => l10n.privateUsdRouteBlocked,
+  // At quote, Rust refuses an open fee over the cap or payable outside
+  // Orchard.
+  ApiPrivateUsdErrorCode.openFeeRefused => l10n.privateUsdConvertErrorOpenFee,
   ApiPrivateUsdErrorCode.railgunClosed ||
   ApiPrivateUsdErrorCode.zcashRejected ||
   ApiPrivateUsdErrorCode.mismatch ||
@@ -146,7 +153,18 @@ String privateUsdNothingSentMessage(
     l10n.privateUsdConvertResultWindowMissed,
   ApiNothingSentCause.makerCancelled =>
     l10n.privateUsdConvertResultMakerCancelled,
+  ApiNothingSentCause.feeNotHonoured =>
+    l10n.privateUsdConvertResultFeeNotHonoured,
 };
+
+/// Why [record] ended with nothing sent: that the maker keeps its fee, once
+/// the wallet shows the fee in a block, else its cause.
+String privateUsdForwardNothingSentMessage(
+  AppLocalizations l10n,
+  ApiForwardRecord record,
+) => record.openFeeMined
+    ? l10n.privateUsdConvertResultFeeKept
+    : privateUsdNothingSentMessage(l10n, record.nothingSentCause);
 
 /// Why a forward conversion's ZEC came back.
 String privateUsdRefundedMessage(

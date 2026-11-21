@@ -8611,6 +8611,13 @@ class AppLocalizationsKo extends AppLocalizations {
       '브‍리‍지, 보‍내‍기, 출‍금 내‍역‍이 여‍기‍에 표‍시‍돼‍요.';
 
   @override
+  String get privateUsdActivityFeeLost => '브‍리‍지‍가 시‍작‍되‍지 않‍았‍어‍요';
+
+  @override
+  String get privateUsdActivityFeeLostDetail =>
+      '마‍켓 메‍이‍커 수‍수‍료‍는 환‍불‍되‍지 않‍아‍요';
+
+  @override
   String privateUsdActivityFrom(String address) {
     return '보‍낸 곳: $address';
   }
@@ -8741,6 +8748,10 @@ class AppLocalizationsKo extends AppLocalizations {
       '마‍켓 메‍이‍커‍가 다‍른 브‍리‍지‍를 처‍리‍하‍느‍라 바‍빠‍요. 몇 분 후 다‍시 시‍도‍해 주‍세‍요.';
 
   @override
+  String get privateUsdConvertErrorOpenFee =>
+      '마‍켓 메‍이‍커‍가 Veylor‍가 내‍지 않‍는 수‍수‍료‍를 요‍구‍해‍서 아‍무‍것‍도 보‍내‍지 않‍았‍어‍요.';
+
+  @override
   String get privateUsdConvertErrorRelayer =>
       '지‍금‍은 브‍리‍지‍를 완‍료‍하‍는 릴‍레‍이‍어‍에 연‍결‍할 수 없‍어‍요. 잠‍시 후 다‍시 시‍도‍해 주‍세‍요.';
 
@@ -8829,6 +8840,14 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get privateUsdConvertNewQuote => '견‍적 새‍로‍고‍침';
+
+  @override
+  String get privateUsdConvertOpenFee => '마‍켓 메‍이‍커 수‍수‍료';
+
+  @override
+  String privateUsdConvertOpenFeeValue(String amount) {
+    return '$amount · 환‍불 불‍가';
+  }
 
   @override
   String get privateUsdConvertOpeningSlow =>
@@ -8975,6 +8994,14 @@ class AppLocalizationsKo extends AppLocalizations {
       '마‍켓 메‍이‍커‍가 입‍금‍을 확‍인‍할 때‍까‍지 몇 분 동‍안 Veylor‍를 열‍어 두‍세‍요. 그‍다‍음 릴‍레‍이‍어‍가 달‍러‍를 수‍령‍하‍니 앱‍을 나‍가‍도 돼‍요.';
 
   @override
+  String get privateUsdConvertResultFeeKept =>
+      '브‍리‍지‍가 시‍작‍되‍지 않‍았‍어‍요. 마‍켓 메‍이‍커 수‍수‍료‍는 돌‍려‍받‍을 수 없‍고, 나‍머‍지 ZEC‍는 지‍갑‍에‍서 나‍가‍지 않‍았‍어‍요.';
+
+  @override
+  String get privateUsdConvertResultFeeNotHonoured =>
+      '마‍켓 메‍이‍커‍가 수‍수‍료‍를 확‍인‍하‍기 전‍에 견‍적‍이 만‍료‍됐‍어‍요. 수‍수‍료‍가 나‍중‍에 확‍인‍되‍면 환‍불‍되‍지 않‍아‍요.';
+
+  @override
   String get privateUsdConvertResultMakerCancelled =>
       'ZEC‍를 보‍내‍기 전‍에 마‍켓 메‍이‍커‍가 스‍왑‍을 취‍소‍했‍어‍요. ZEC‍는 지‍갑‍에‍서 나‍가‍지 않‍았‍어‍요.';
 
@@ -9101,6 +9128,17 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
+  String get privateUsdConvertWaitFeeConfirming =>
+      '마‍켓 메‍이‍커 수‍수‍료 확‍인‍을 기‍다‍리‍는 중';
+
+  @override
+  String get privateUsdConvertWaitFeeSeen =>
+      '마‍켓 메‍이‍커‍가 수‍수‍료‍를 확‍인‍하‍길 기‍다‍리‍는 중';
+
+  @override
+  String get privateUsdConvertWaitFunds => 'ZEC 확‍인‍을 기‍다‍리‍는 중';
+
+  @override
   String get privateUsdConvertWaitSyncing => 'Zcash 지‍갑 동‍기‍화 대‍기 중';
 
   @override
@@ -9111,6 +9149,10 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get privateUsdConvertZecIncludesFee => 'Zcash 네‍트‍워‍크 수‍수‍료 포‍함';
+
+  @override
+  String get privateUsdConvertZecIncludesFees =>
+      '네‍트‍워‍크 수‍수‍료‍와 마‍켓 메‍이‍커 수‍수‍료 포‍함';
 
   @override
   String get privateUsdConvertZecNoQuote =>
@@ -9250,6 +9292,9 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get privateUsdDetailFunding => '에‍스‍크‍로 결‍제';
+
+  @override
+  String get privateUsdDetailOpenFee => '마‍켓 메‍이‍커 수‍수‍료 결‍제';
 
   @override
   String get privateUsdDetailPayout => '지‍급';

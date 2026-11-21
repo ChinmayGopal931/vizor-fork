@@ -8086,6 +8086,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get privateUsdActivityEmpty => '你的跨链、发送和提取记录会显示在这里。';
 
   @override
+  String get privateUsdActivityFeeLost => '跨链未开始';
+
+  @override
+  String get privateUsdActivityFeeLostDetail => '做市商手续费不予退还';
+
+  @override
   String privateUsdActivityFrom(String address) {
     return '来自 $address';
   }
@@ -8208,6 +8214,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get privateUsdConvertErrorMakerBusy => '做市商正忙于处理其他跨链。请几分钟后重试。';
 
   @override
+  String get privateUsdConvertErrorOpenFee =>
+      '做市商要求的手续费 Veylor 不会支付，因此未发送任何内容。';
+
+  @override
   String get privateUsdConvertErrorRelayer => '目前无法连接负责完成跨链的中继者，请稍后重试。';
 
   @override
@@ -8288,6 +8298,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get privateUsdConvertNewQuote => '刷新报价';
+
+  @override
+  String get privateUsdConvertOpenFee => '做市商手续费';
+
+  @override
+  String privateUsdConvertOpenFeeValue(String amount) {
+    return '$amount · 不予退还';
+  }
 
   @override
   String get privateUsdConvertOpeningSlow => '做市商还没有开启兑换，目前未发送任何资金。';
@@ -8428,6 +8446,14 @@ class AppLocalizationsZh extends AppLocalizations {
       '请保持 Veylor 打开，直到做市商确认你的存入，约需几分钟。之后中继者会领取你的美元，你就可以离开了。';
 
   @override
+  String get privateUsdConvertResultFeeKept =>
+      '跨链未开始。做市商会保留其手续费；其余 ZEC 从未离开钱包。';
+
+  @override
+  String get privateUsdConvertResultFeeNotHonoured =>
+      '做市商确认手续费之前，报价已过期。如果手续费之后仍被确认，将不予退还。';
+
+  @override
   String get privateUsdConvertResultMakerCancelled =>
       '在你的 ZEC 发送之前，做市商取消了兑换。你的 ZEC 从未离开钱包。';
 
@@ -8552,6 +8578,15 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get privateUsdConvertWaitFeeConfirming => '正在等待做市商手续费确认';
+
+  @override
+  String get privateUsdConvertWaitFeeSeen => '正在等待做市商确认手续费';
+
+  @override
+  String get privateUsdConvertWaitFunds => '正在等待你的 ZEC 确认';
+
+  @override
   String get privateUsdConvertWaitSyncing => '等待 Zcash 钱包同步';
 
   @override
@@ -8562,6 +8597,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get privateUsdConvertZecIncludesFee => '含 Zcash 网络手续费';
+
+  @override
+  String get privateUsdConvertZecIncludesFees => '含网络手续费和做市商手续费';
 
   @override
   String get privateUsdConvertZecNoQuote => '没有适合此金额的报价。请尝试其他金额，或使用最大金额。';
@@ -8694,6 +8732,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get privateUsdDetailFunding => '托管付款';
+
+  @override
+  String get privateUsdDetailOpenFee => '做市商手续费付款';
 
   @override
   String get privateUsdDetailPayout => '支付';

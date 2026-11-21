@@ -6,7 +6,7 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `api_advance`, `api_cause`, `api_code`, `api_cost_request`, `api_deposit_pass`, `api_deposit_record`, `api_deposit_terms`, `api_funding_request`, `api_quote`, `api_record`, `api_reverse_advance`, `api_reverse_phase`, `api_reverse_record`, `api_send_record`, `api_token_status`, `api_transact`, `block_on`, `catch`, `deposit_confirmations`, `drive`, `internal_hex`, `late_claim_at`, `no_such_conversion`, `open_context`, `parse_amount`, `parse_network_and_migrate`, `seconds`, `swap_network`, `token_store`, `warm_proving_keys`
+// These functions are ignored because they are not marked as `pub`: `api_advance`, `api_cause`, `api_code`, `api_cost_request`, `api_deposit_pass`, `api_deposit_record`, `api_deposit_terms`, `api_funding_request`, `api_quote`, `api_record`, `api_reverse_advance`, `api_reverse_phase`, `api_reverse_record`, `api_send_record`, `api_token_status`, `api_transact`, `block_on`, `catch`, `deposit_confirmations`, `drive`, `internal_hex`, `late_claim_at`, `no_such_conversion`, `open_context`, `open_fee_mined`, `parse_amount`, `parse_network_and_migrate`, `seconds`, `swap_network`, `token_store`, `warm_proving_keys`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
 
 /// The deployment for the wallet network `"main"` or `"test"`; `None` on
@@ -1449,6 +1449,15 @@ class ApiForwardQuote {
   final BigInt? maxTotalZat;
   final PlatformInt64? feeExpiresAt;
 
+  /// What the maker asks before it opens the swap, in zatoshis, paid apart
+  /// from the deposit and never refunded; `None` where it asks none.
+  final BigInt? openFeeZat;
+
+  /// The open fee's payment's network fee from this wallet now; `None`
+  /// without a fee, or when one transaction cannot pay it (the quote is
+  /// then unpayable).
+  final BigInt? openFeeNetworkZat;
+
   const ApiForwardQuote({
     required this.index,
     required this.expiresAt,
@@ -1460,6 +1469,8 @@ class ApiForwardQuote {
     this.depositFeeZat,
     this.maxTotalZat,
     this.feeExpiresAt,
+    this.openFeeZat,
+    this.openFeeNetworkZat,
   });
 
   @override
@@ -1473,7 +1484,9 @@ class ApiForwardQuote {
       depositZat.hashCode ^
       depositFeeZat.hashCode ^
       maxTotalZat.hashCode ^
-      feeExpiresAt.hashCode;
+      feeExpiresAt.hashCode ^
+      openFeeZat.hashCode ^
+      openFeeNetworkZat.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -1489,7 +1502,9 @@ class ApiForwardQuote {
           depositZat == other.depositZat &&
           depositFeeZat == other.depositFeeZat &&
           maxTotalZat == other.maxTotalZat &&
-          feeExpiresAt == other.feeExpiresAt;
+          feeExpiresAt == other.feeExpiresAt &&
+          openFeeZat == other.openFeeZat &&
+          openFeeNetworkZat == other.openFeeNetworkZat;
 }
 
 /// A flat view of a forward record; the record itself stays in Rust.
@@ -1539,6 +1554,21 @@ class ApiForwardRecord {
   final ApiNothingSentCause? nothingSentCause;
   final PlatformInt64? endedAt;
 
+  /// The maker's open fee the quote asked, in zatoshis; `None` where it
+  /// asked none.
+  final BigInt? openFeeZat;
+
+  /// The open fee's payment's own network fee, where the wallet knows it.
+  final BigInt? openFeeNetworkZat;
+
+  /// The open fee's payment, internal byte order hex, as wallet history
+  /// rows carry it: the bridge's row stands in for it.
+  final String? openFeeTxid;
+
+  /// The main wallet shows the open fee's payment in a block: paid, and
+  /// the maker's whatever becomes of the swap.
+  final bool openFeeMined;
+
   const ApiForwardRecord({
     required this.index,
     required this.swapId,
@@ -1563,6 +1593,10 @@ class ApiForwardRecord {
     this.refundCause,
     this.nothingSentCause,
     this.endedAt,
+    this.openFeeZat,
+    this.openFeeNetworkZat,
+    this.openFeeTxid,
+    required this.openFeeMined,
   });
 
   @override
@@ -1589,7 +1623,11 @@ class ApiForwardRecord {
       outcome.hashCode ^
       refundCause.hashCode ^
       nothingSentCause.hashCode ^
-      endedAt.hashCode;
+      endedAt.hashCode ^
+      openFeeZat.hashCode ^
+      openFeeNetworkZat.hashCode ^
+      openFeeTxid.hashCode ^
+      openFeeMined.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -1618,7 +1656,11 @@ class ApiForwardRecord {
           outcome == other.outcome &&
           refundCause == other.refundCause &&
           nothingSentCause == other.nothingSentCause &&
-          endedAt == other.endedAt;
+          endedAt == other.endedAt &&
+          openFeeZat == other.openFeeZat &&
+          openFeeNetworkZat == other.openFeeNetworkZat &&
+          openFeeTxid == other.openFeeTxid &&
+          openFeeMined == other.openFeeMined;
 }
 
 /// A paid conversion whose payout Railgun's screening sent back to its
@@ -1674,6 +1716,18 @@ enum ApiForwardWait {
   /// refund. If the maker never refunds, the claim goes out from
   /// `late_claim_at`.
   unwinding,
+
+  /// The open fee is paid and waits for a block; it is sent again every
+  /// half minute meanwhile.
+  feeConfirming,
+
+  /// The open fee is mined; the maker has not seen it yet, and the accept
+  /// is posted again as it asks until the quote expires.
+  feeAccepting,
+
+  /// The deposit waits for ZEC on its way to spendable, such as the open
+  /// fee's change.
+  fundsPending,
 }
 
 /// The page's `prepareReverse` params, ready to JSON-encode: `{amount,
@@ -1806,6 +1860,10 @@ enum ApiNothingSentCause {
   mismatch,
   depositWindowMissed,
   makerCancelled,
+
+  /// The quote expired before the maker saw its open fee, or the maker
+  /// never opened the swap it was paid for: a fee mined is the maker's.
+  feeNotHonoured,
 }
 
 /// A Private USD failure. Its Dart `toString()` is the message.
@@ -1878,6 +1936,10 @@ enum ApiPrivateUsdErrorCode {
   /// pins: a contract that is not the pinned windows contract, or terms
   /// that are not the pin's. Never followed.
   wrongDeployment,
+
+  /// The maker asks an open fee above the cap, or payable outside Orchard
+  /// or on another network: the quote is dropped with nothing paid.
+  openFeeRefused,
 }
 
 /// A proved send or withdrawal, as Dart hands it to Rust to keep before it is

@@ -27,7 +27,9 @@ use super::super::evm_rpc::{
     ChainReader, ConfirmedSwap, Head, PaidOut, ReverseChainState, SeenHead, SwapRead, SwapStage,
     SwapState, TransactionStatus,
 };
-use super::super::forward::{Forward, ForwardStep, ForwardView, ForwardWait, ForwardZcash, Quoted};
+use super::super::forward::{
+    Forward, ForwardStep, ForwardView, ForwardWait, ForwardZcash, Funds, Quoted,
+};
 use super::super::joint::SwapTxStatus;
 use super::super::keys::SwapKeyContext;
 use super::super::models::{
@@ -240,6 +242,13 @@ pub(super) struct State {
     pub accepted_late_window: Option<u64>,
     /// What `/v1/info` adds: the contract's windows and kind.
     pub info_windows: Option<Value>,
+    /// The open fee every forward quote asks, zatoshis and address; `None`
+    /// asks none.
+    pub open_fee: Option<(u64, String)>,
+    /// Accepts the maker turns down `402 feeRequired` before it has seen
+    /// the fee, each with this `Retry-After` where one is set.
+    pub fee_unseen_accepts: u32,
+    pub fee_retry_after: Option<u64>,
 
     // The relayer.
     pub relayer: [u8; 20],
@@ -299,6 +308,13 @@ pub(super) struct State {
     pub deposits: Vec<(String, u64)>,
     /// The deposit the wallet created last, as its history shows it.
     pub created: Option<ZcashTransaction>,
+    /// The open fees the wallet paid, and the last one it created.
+    pub fee_payments: Vec<(String, u64)>,
+    pub created_fee: Option<ZcashTransaction>,
+    /// Where a crash cuts the open fee's payment short.
+    pub fee_crash: Option<Crash>,
+    /// What the account's funds are, spendable and on their way.
+    pub funds: Funds,
     pub statuses: HashMap<ZcashTxId, SwapTxStatus>,
     pub submitted: Vec<ZcashTxId>,
     pub discarded: u32,
@@ -391,6 +407,9 @@ impl State {
             reverse_accepts: 0,
             accepted_late_window: Some(late_window()),
             info_windows: None,
+            open_fee: None,
+            fee_unseen_accepts: 0,
+            fee_retry_after: None,
             relayer: pins.relayer,
             relayer_fee: RELAYER_FEE,
             fee_expires_at: None,
@@ -422,6 +441,13 @@ impl State {
             unpayable: false,
             deposits: Vec::new(),
             created: None,
+            fee_payments: Vec::new(),
+            created_fee: None,
+            fee_crash: None,
+            funds: Funds {
+                spendable: 100_000_000,
+                pending: 0,
+            },
             statuses: HashMap::new(),
             submitted: Vec::new(),
             discarded: 0,
@@ -983,21 +1009,22 @@ impl FakeServices {
                 let proof = context.prove_maker(&maker_secret(), UnwrapErr(SysRng));
                 let mut state = self.0.set();
                 state.quote_requests.push(body.clone());
-                answer(
-                    200,
-                    json!({
-                        "quoteId": hex0x(&QUOTE_ID),
-                        "maker": hex0x(&pins.maker),
-                        "makerShare": hex0x(&maker_share().to_affine_bytes()),
-                        "makerProof": hex0x(&proof.to_bytes()),
-                        "chainId": pins.chain_id,
-                        "contract": hex0x(&contract()),
-                        "token": hex0x(&pins.token),
-                        "amount": state.amount.to_string(),
-                        "depositZat": DEPOSIT_ZAT,
-                        "expiresAt": state.quote_expires_at,
-                    }),
-                )
+                let mut quote = json!({
+                    "quoteId": hex0x(&QUOTE_ID),
+                    "maker": hex0x(&pins.maker),
+                    "makerShare": hex0x(&maker_share().to_affine_bytes()),
+                    "makerProof": hex0x(&proof.to_bytes()),
+                    "chainId": pins.chain_id,
+                    "contract": hex0x(&contract()),
+                    "token": hex0x(&pins.token),
+                    "amount": state.amount.to_string(),
+                    "depositZat": DEPOSIT_ZAT,
+                    "expiresAt": state.quote_expires_at,
+                });
+                if let Some((zat, address)) = &state.open_fee {
+                    quote["openFee"] = json!({ "zat": zat, "address": address });
+                }
+                answer(200, quote)
             }
             (&Method::POST, "/v1/reverse/quote") => {
                 let context = SwapContext {
@@ -1057,6 +1084,22 @@ impl FakeServices {
             }
             (&Method::POST, path) if path.ends_with("/accept") => {
                 let mut state = self.0.set();
+                if state.fee_unseen_accepts > 0 {
+                    state.fee_unseen_accepts -= 1;
+                    let mut headers = vec![("content-type".into(), "application/json".into())];
+                    if let Some(seconds) = state.fee_retry_after {
+                        headers.push(("retry-after".into(), seconds.to_string()));
+                    }
+                    return Ok(RoutedResponse {
+                        status: 402,
+                        headers,
+                        body: serde_json::to_vec(&json!({
+                            "code": "feeRequired",
+                            "error": "the open fee is not in a block yet",
+                        }))
+                        .unwrap(),
+                    });
+                }
                 if state.accept_status != 200 {
                     let headers = vec![("content-type".into(), "application/json".into())];
                     return Ok(RoutedResponse {
@@ -1241,8 +1284,12 @@ impl FakeServices {
 
 pub(super) struct FakeZcash(pub World);
 
-/// A proposed deposit: where to, and how much.
-pub(super) struct FakeProposal(String, u64);
+/// A proposed deposit or open fee: where to, how much, and which.
+pub(super) struct FakeProposal {
+    address: String,
+    zatoshi: u64,
+    open_fee: bool,
+}
 
 impl ForwardZcash for FakeZcash {
     type Proposal = FakeProposal;
@@ -1259,6 +1306,10 @@ impl ForwardZcash for FakeZcash {
         Ok(self.0.get().deposit_fee)
     }
 
+    async fn funds(&self) -> Result<Funds> {
+        Ok(self.0.get().funds)
+    }
+
     async fn propose_deposit(
         &self,
         _index: u32,
@@ -1273,12 +1324,49 @@ impl ForwardZcash for FakeZcash {
         if state.crash == Some(Crash::AfterPropose) {
             store::crash_before_next_commit();
         }
-        Ok(FakeProposal(address.to_owned(), zatoshi))
+        Ok(FakeProposal {
+            address: address.to_owned(),
+            zatoshi,
+            open_fee: false,
+        })
+    }
+
+    async fn propose_open_fee(
+        &self,
+        _index: u32,
+        address: &str,
+        zatoshi: u64,
+        max_total: u64,
+    ) -> Result<(FakeProposal, u64)> {
+        let state = self.0.get();
+        if state.unpayable || zatoshi + DEPOSIT_FEE_ZAT > max_total {
+            return fail(ErrorCode::DepositUnpayable, "short");
+        }
+        if state.fee_crash == Some(Crash::AfterPropose) {
+            store::crash_before_next_commit();
+        }
+        let proposal = FakeProposal {
+            address: address.to_owned(),
+            zatoshi,
+            open_fee: true,
+        };
+        Ok((proposal, DEPOSIT_FEE_ZAT))
     }
 
     async fn create_deposit(&self, proposal: FakeProposal) -> Result<ZcashTransaction> {
         let mut state = self.0.set();
-        state.deposits.push((proposal.0, proposal.1));
+        if proposal.open_fee {
+            state
+                .fee_payments
+                .push((proposal.address, proposal.zatoshi));
+            let created = transaction(&format!("openfee{}", state.fee_payments.len()));
+            state.created_fee = Some(created.clone());
+            if state.fee_crash == Some(Crash::AfterCreate) {
+                store::crash_before_next_commit();
+            }
+            return Ok(created);
+        }
+        state.deposits.push((proposal.address, proposal.zatoshi));
         let created = transaction(&format!("deposit{}", state.deposits.len()));
         state.created = Some(created.clone());
         if state.crash == Some(Crash::AfterCreate) {
@@ -1291,10 +1379,18 @@ impl ForwardZcash for FakeZcash {
         self.0.set().discarded += 1;
     }
 
-    async fn find_deposit(&self, _address: &str) -> Result<Option<ZcashTransaction>> {
+    async fn find_deposit(&self, address: &str) -> Result<Option<ZcashTransaction>> {
         let state = self.0.get();
-        Ok(state
-            .created
+        let paying_fee = state
+            .open_fee
+            .as_ref()
+            .is_some_and(|(_, fee_address)| fee_address == address);
+        let created = if paying_fee {
+            &state.created_fee
+        } else {
+            &state.created
+        };
+        Ok(created
             .clone()
             .filter(|created| state.statuses.get(&created.tx_id) != Some(&SwapTxStatus::Expired)))
     }

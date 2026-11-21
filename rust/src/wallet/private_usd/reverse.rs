@@ -1990,11 +1990,14 @@ fn last_word(refusal: &Refusal) -> Option<NothingSentCause> {
         }
         SwapErrorCode::UnknownQuote => Some(NothingSentCause::QuoteExpired),
         SwapErrorCode::TokenRequired => Some(NothingSentCause::MakerUnavailable),
+        // Reverse swaps ask no open fee: a maker that wants one opened
+        // nothing.
         SwapErrorCode::Rejected
         | SwapErrorCode::InvalidRequest
         | SwapErrorCode::UnknownSwap
         | SwapErrorCode::NotFound
-        | SwapErrorCode::MethodNotAllowed => Some(NothingSentCause::MakerRefused),
+        | SwapErrorCode::MethodNotAllowed
+        | SwapErrorCode::FeeRequired => Some(NothingSentCause::MakerRefused),
         SwapErrorCode::Internal | SwapErrorCode::AlreadySpent | SwapErrorCode::Conflict => None,
     }
 }

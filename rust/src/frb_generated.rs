@@ -14562,6 +14562,8 @@ impl SseDecode for crate::api::private_usd::ApiForwardQuote {
         let mut var_depositFeeZat = <Option<u64>>::sse_decode(deserializer);
         let mut var_maxTotalZat = <Option<u64>>::sse_decode(deserializer);
         let mut var_feeExpiresAt = <Option<i64>>::sse_decode(deserializer);
+        let mut var_openFeeZat = <Option<u64>>::sse_decode(deserializer);
+        let mut var_openFeeNetworkZat = <Option<u64>>::sse_decode(deserializer);
         return crate::api::private_usd::ApiForwardQuote {
             index: var_index,
             expires_at: var_expiresAt,
@@ -14573,6 +14575,8 @@ impl SseDecode for crate::api::private_usd::ApiForwardQuote {
             deposit_fee_zat: var_depositFeeZat,
             max_total_zat: var_maxTotalZat,
             fee_expires_at: var_feeExpiresAt,
+            open_fee_zat: var_openFeeZat,
+            open_fee_network_zat: var_openFeeNetworkZat,
         };
     }
 }
@@ -14606,6 +14610,10 @@ impl SseDecode for crate::api::private_usd::ApiForwardRecord {
         let mut var_nothingSentCause =
             <Option<crate::api::private_usd::ApiNothingSentCause>>::sse_decode(deserializer);
         let mut var_endedAt = <Option<i64>>::sse_decode(deserializer);
+        let mut var_openFeeZat = <Option<u64>>::sse_decode(deserializer);
+        let mut var_openFeeNetworkZat = <Option<u64>>::sse_decode(deserializer);
+        let mut var_openFeeTxid = <Option<String>>::sse_decode(deserializer);
+        let mut var_openFeeMined = <bool>::sse_decode(deserializer);
         return crate::api::private_usd::ApiForwardRecord {
             index: var_index,
             swap_id: var_swapId,
@@ -14630,6 +14638,10 @@ impl SseDecode for crate::api::private_usd::ApiForwardRecord {
             refund_cause: var_refundCause,
             nothing_sent_cause: var_nothingSentCause,
             ended_at: var_endedAt,
+            open_fee_zat: var_openFeeZat,
+            open_fee_network_zat: var_openFeeNetworkZat,
+            open_fee_txid: var_openFeeTxid,
+            open_fee_mined: var_openFeeMined,
         };
     }
 }
@@ -14659,6 +14671,9 @@ impl SseDecode for crate::api::private_usd::ApiForwardWait {
             3 => crate::api::private_usd::ApiForwardWait::Refunding,
             4 => crate::api::private_usd::ApiForwardWait::ZcashSyncing,
             5 => crate::api::private_usd::ApiForwardWait::Unwinding,
+            6 => crate::api::private_usd::ApiForwardWait::FeeConfirming,
+            7 => crate::api::private_usd::ApiForwardWait::FeeAccepting,
+            8 => crate::api::private_usd::ApiForwardWait::FundsPending,
             _ => unreachable!("Invalid variant for ApiForwardWait: {}", inner),
         };
     }
@@ -14809,6 +14824,7 @@ impl SseDecode for crate::api::private_usd::ApiNothingSentCause {
             4 => crate::api::private_usd::ApiNothingSentCause::Mismatch,
             5 => crate::api::private_usd::ApiNothingSentCause::DepositWindowMissed,
             6 => crate::api::private_usd::ApiNothingSentCause::MakerCancelled,
+            7 => crate::api::private_usd::ApiNothingSentCause::FeeNotHonoured,
             _ => unreachable!("Invalid variant for ApiNothingSentCause: {}", inner),
         };
     }
@@ -14907,6 +14923,7 @@ impl SseDecode for crate::api::private_usd::ApiPrivateUsdErrorCode {
             27 => crate::api::private_usd::ApiPrivateUsdErrorCode::Other,
             28 => crate::api::private_usd::ApiPrivateUsdErrorCode::Cancelled,
             29 => crate::api::private_usd::ApiPrivateUsdErrorCode::WrongDeployment,
+            30 => crate::api::private_usd::ApiPrivateUsdErrorCode::OpenFeeRefused,
             _ => unreachable!("Invalid variant for ApiPrivateUsdErrorCode: {}", inner),
         };
     }
@@ -22012,6 +22029,8 @@ impl flutter_rust_bridge::IntoDart for crate::api::private_usd::ApiForwardQuote 
             self.deposit_fee_zat.into_into_dart().into_dart(),
             self.max_total_zat.into_into_dart().into_dart(),
             self.fee_expires_at.into_into_dart().into_dart(),
+            self.open_fee_zat.into_into_dart().into_dart(),
+            self.open_fee_network_zat.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -22054,6 +22073,10 @@ impl flutter_rust_bridge::IntoDart for crate::api::private_usd::ApiForwardRecord
             self.refund_cause.into_into_dart().into_dart(),
             self.nothing_sent_cause.into_into_dart().into_dart(),
             self.ended_at.into_into_dart().into_dart(),
+            self.open_fee_zat.into_into_dart().into_dart(),
+            self.open_fee_network_zat.into_into_dart().into_dart(),
+            self.open_fee_txid.into_into_dart().into_dart(),
+            self.open_fee_mined.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -22101,6 +22124,9 @@ impl flutter_rust_bridge::IntoDart for crate::api::private_usd::ApiForwardWait {
             Self::Refunding => 3.into_dart(),
             Self::ZcashSyncing => 4.into_dart(),
             Self::Unwinding => 5.into_dart(),
+            Self::FeeConfirming => 6.into_dart(),
+            Self::FeeAccepting => 7.into_dart(),
+            Self::FundsPending => 8.into_dart(),
             _ => unreachable!(),
         }
     }
@@ -22314,6 +22340,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::private_usd::ApiNothingSentCa
             Self::Mismatch => 4.into_dart(),
             Self::DepositWindowMissed => 5.into_dart(),
             Self::MakerCancelled => 6.into_dart(),
+            Self::FeeNotHonoured => 7.into_dart(),
             _ => unreachable!(),
         }
     }
@@ -22451,6 +22478,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::private_usd::ApiPrivateUsdErr
             Self::Other => 27.into_dart(),
             Self::Cancelled => 28.into_dart(),
             Self::WrongDeployment => 29.into_dart(),
+            Self::OpenFeeRefused => 30.into_dart(),
             _ => unreachable!(),
         }
     }
@@ -28244,6 +28272,8 @@ impl SseEncode for crate::api::private_usd::ApiForwardQuote {
         <Option<u64>>::sse_encode(self.deposit_fee_zat, serializer);
         <Option<u64>>::sse_encode(self.max_total_zat, serializer);
         <Option<i64>>::sse_encode(self.fee_expires_at, serializer);
+        <Option<u64>>::sse_encode(self.open_fee_zat, serializer);
+        <Option<u64>>::sse_encode(self.open_fee_network_zat, serializer);
     }
 }
 
@@ -28279,6 +28309,10 @@ impl SseEncode for crate::api::private_usd::ApiForwardRecord {
             serializer,
         );
         <Option<i64>>::sse_encode(self.ended_at, serializer);
+        <Option<u64>>::sse_encode(self.open_fee_zat, serializer);
+        <Option<u64>>::sse_encode(self.open_fee_network_zat, serializer);
+        <Option<String>>::sse_encode(self.open_fee_txid, serializer);
+        <bool>::sse_encode(self.open_fee_mined, serializer);
     }
 }
 
@@ -28302,6 +28336,9 @@ impl SseEncode for crate::api::private_usd::ApiForwardWait {
                 crate::api::private_usd::ApiForwardWait::Refunding => 3,
                 crate::api::private_usd::ApiForwardWait::ZcashSyncing => 4,
                 crate::api::private_usd::ApiForwardWait::Unwinding => 5,
+                crate::api::private_usd::ApiForwardWait::FeeConfirming => 6,
+                crate::api::private_usd::ApiForwardWait::FeeAccepting => 7,
+                crate::api::private_usd::ApiForwardWait::FundsPending => 8,
                 _ => {
                     unimplemented!("");
                 }
@@ -28414,6 +28451,7 @@ impl SseEncode for crate::api::private_usd::ApiNothingSentCause {
                 crate::api::private_usd::ApiNothingSentCause::Mismatch => 4,
                 crate::api::private_usd::ApiNothingSentCause::DepositWindowMissed => 5,
                 crate::api::private_usd::ApiNothingSentCause::MakerCancelled => 6,
+                crate::api::private_usd::ApiNothingSentCause::FeeNotHonoured => 7,
                 _ => {
                     unimplemented!("");
                 }
@@ -28497,6 +28535,7 @@ impl SseEncode for crate::api::private_usd::ApiPrivateUsdErrorCode {
                 crate::api::private_usd::ApiPrivateUsdErrorCode::Other => 27,
                 crate::api::private_usd::ApiPrivateUsdErrorCode::Cancelled => 28,
                 crate::api::private_usd::ApiPrivateUsdErrorCode::WrongDeployment => 29,
+                crate::api::private_usd::ApiPrivateUsdErrorCode::OpenFeeRefused => 30,
                 _ => {
                     unimplemented!("");
                 }

@@ -573,6 +573,7 @@ ApiForwardRecord previewPrivateUsdRecord({
     refundCause: refundCause,
     nothingSentCause: nothingSentCause,
     endedAt: outcome == null ? null : at(const Duration(minutes: 12)),
+    openFeeMined: false,
   );
 }
 

@@ -27,7 +27,7 @@ use zcash_primitives::transaction::{fees::zip317, TxId};
 use zcash_protocol::consensus::{BlockHeight, Parameters};
 use zecswap_core::{JointAccount, SpendKey, SweepIntent};
 
-use super::forward::ForwardZcash;
+use super::forward::{ForwardZcash, Funds};
 use super::keys::SwapKeyContext;
 use super::models::{
     Direction, JointAccountId, ReverseReceiveEstimate, ReverseReceiveTransaction, ZcashTransaction,
@@ -741,7 +741,8 @@ pub(crate) struct WalletZcash<'a> {
     pub cancel: Arc<AtomicBool>,
 }
 
-/// A deposit proposal in `PROPOSAL_STORE`, under its send flow.
+/// A deposit's or an open fee's proposal in `PROPOSAL_STORE`, under its send
+/// flow.
 pub(crate) struct DepositProposal {
     proposal_id: u64,
     send_flow_id: String,
@@ -903,6 +904,49 @@ impl WalletZcash<'_> {
         }))
     }
 
+    /// Proposes paying exactly `zatoshi` to `address` from the account, with
+    /// no memo, as one ordinary send costing at most `max_total_zatoshi` in
+    /// all, its inputs locked under `send_flow_id`; and its network fee.
+    fn propose_payment(
+        &self,
+        send_flow_id: String,
+        address: &str,
+        zatoshi: u64,
+        max_total_zatoshi: u64,
+    ) -> Result<(DepositProposal, u64)> {
+        let proposal = sync::propose_swap_deposit(
+            self.main_db,
+            self.network,
+            self.account_uuid,
+            &send_flow_id,
+            address,
+            zatoshi,
+            max_total_zatoshi,
+        )
+        .map_err(|error| match error {
+            SwapDepositError::Unpayable(message) => {
+                PrivateUsdError::new(ErrorCode::DepositUnpayable, message)
+            }
+            SwapDepositError::Wallet(message) => wallet_error(message),
+        })?;
+        let needs_sapling_params = proposal.needs_sapling_params;
+        let fee_zatoshi = proposal.fee_zatoshi;
+        let proposal = DepositProposal {
+            proposal_id: proposal.proposal_id,
+            send_flow_id,
+        };
+        // Spending Sapling notes needs the Sapling proving parameters, which
+        // Private USD does not download.
+        if needs_sapling_params {
+            self.discard_deposit(proposal);
+            return fail(
+                ErrorCode::DepositUnpayable,
+                "the payment would spend Sapling funds, which Private USD cannot prove yet",
+            );
+        }
+        Ok((proposal, fee_zatoshi))
+    }
+
     /// Sends a kept transaction once more.
     async fn broadcast_kept(&self, transaction: &ZcashTransaction) -> Result<()> {
         let raw = hex::decode(&transaction.raw).map_err(|_| {
@@ -958,6 +1002,17 @@ impl ForwardZcash for WalletZcash<'_> {
         .map_err(wallet_error)
     }
 
+    async fn funds(&self) -> Result<Funds> {
+        let balance = sync::get_wallet_balance(self.main_db, self.network, self.account_uuid)
+            .map_err(wallet_error)?;
+        Ok(Funds {
+            spendable: balance.orchard.saturating_add(balance.ironwood),
+            pending: balance
+                .orchard_pending
+                .saturating_add(balance.ironwood_pending),
+        })
+    }
+
     async fn propose_deposit(
         &self,
         index: u32,
@@ -966,36 +1021,19 @@ impl ForwardZcash for WalletZcash<'_> {
         max_total_zatoshi: u64,
     ) -> Result<DepositProposal> {
         let send_flow_id = format!("private-usd-deposit:{}:{index}", self.account_uuid);
-        let proposal = sync::propose_swap_deposit(
-            self.main_db,
-            self.network,
-            self.account_uuid,
-            &send_flow_id,
-            address,
-            zatoshi,
-            max_total_zatoshi,
-        )
-        .map_err(|error| match error {
-            SwapDepositError::Unpayable(message) => {
-                PrivateUsdError::new(ErrorCode::DepositUnpayable, message)
-            }
-            SwapDepositError::Wallet(message) => wallet_error(message),
-        })?;
-        let needs_sapling_params = proposal.needs_sapling_params;
-        let proposal = DepositProposal {
-            proposal_id: proposal.proposal_id,
-            send_flow_id,
-        };
-        // Spending Sapling notes needs the Sapling proving parameters, which
-        // Private USD does not download.
-        if needs_sapling_params {
-            self.discard_deposit(proposal);
-            return fail(
-                ErrorCode::DepositUnpayable,
-                "the deposit would spend Sapling funds, which Private USD cannot prove yet",
-            );
-        }
-        Ok(proposal)
+        self.propose_payment(send_flow_id, address, zatoshi, max_total_zatoshi)
+            .map(|(proposal, _)| proposal)
+    }
+
+    async fn propose_open_fee(
+        &self,
+        index: u32,
+        address: &str,
+        zatoshi: u64,
+        max_total_zatoshi: u64,
+    ) -> Result<(DepositProposal, u64)> {
+        let send_flow_id = format!("private-usd-open-fee:{}:{index}", self.account_uuid);
+        self.propose_payment(send_flow_id, address, zatoshi, max_total_zatoshi)
     }
 
     async fn create_deposit(&self, proposal: DepositProposal) -> Result<ZcashTransaction> {

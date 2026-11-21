@@ -120,7 +120,7 @@ class MobilePrivateUsdConvertView extends StatelessWidget {
         readOnly: state.step != PrivateUsdConvertStep.amount,
         maxFractionDigits: 8,
         invalid: state.isAmountInvalid,
-        note: context.l10n.privateUsdConvertZecIncludesFee,
+        note: privateUsdZecIncludesFeeNote(context.l10n, state.quote),
         marketValue: _marketValue(
           state.totalZat,
           zecUsdPrice,
@@ -439,7 +439,7 @@ class MobilePrivateUsdConvertReviewView extends StatelessWidget {
               label: context.l10n.privateUsdConvertYouPay,
               amountText: _masked(_zec(quote.totalZat), privacyModeEnabled),
               asset: SwapAsset.zec,
-              bottomText: context.l10n.privateUsdConvertZecIncludesFee,
+              bottomText: privateUsdZecIncludesFeeNote(context.l10n, quote),
             ),
       receive: quote == null
           ? null

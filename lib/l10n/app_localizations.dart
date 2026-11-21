@@ -14330,6 +14330,18 @@ abstract class AppLocalizations {
   /// **'Your bridges, sends and withdrawals will show here.'**
   String get privateUsdActivityEmpty;
 
+  /// Title of an activity row, and of the result on the bridge progress screen, for a bridge from ZEC that never started after the market maker's fee was paid and confirmed: that fee isn't refunded.
+  ///
+  /// In en, this message translates to:
+  /// **'Bridge didn\'t start'**
+  String get privateUsdActivityFeeLost;
+
+  /// Subtitle of the activity row for a bridge that never started after its fee was paid: the ZEC fee paid to the market maker isn't refunded.
+  ///
+  /// In en, this message translates to:
+  /// **'market maker fee not refunded'**
+  String get privateUsdActivityFeeLostDetail;
+
   /// Subtitle of a received Shielded USD activity row naming the sender; {address} is a shortened Railgun address such as 0zk1qy…8f3a.
   ///
   /// In en, this message translates to:
@@ -14546,6 +14558,12 @@ abstract class AppLocalizations {
   /// **'The market maker is busy with other bridges. Try again in a few minutes.'**
   String get privateUsdConvertErrorMakerBusy;
 
+  /// Shown on the bridge screen when the market maker asks a fee before it opens the swap that is above Veylor's limit, or payable in a way Veylor refuses. Nothing was paid.
+  ///
+  /// In en, this message translates to:
+  /// **'The market maker asks a fee Veylor won\'t pay, so nothing was sent.'**
+  String get privateUsdConvertErrorOpenFee;
+
   /// Error on the bridge screens when the relayer that completes bridges cannot be reached; nothing was sent.
   ///
   /// In en, this message translates to:
@@ -14683,6 +14701,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Refresh quote'**
   String get privateUsdConvertNewQuote;
+
+  /// Row label on the bridge review and in a bridge's details: the ZEC fee the market maker asks before it opens the swap, which is never refunded.
+  ///
+  /// In en, this message translates to:
+  /// **'Market maker fee'**
+  String get privateUsdConvertOpenFee;
+
+  /// Value of the market maker fee row on the bridge review and in a bridge's details: the fee, and that it isn't refunded, even if the bridge doesn't finish; {amount} is the fee with its unit, such as 0.0002 ZEC.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} · not refunded'**
+  String privateUsdConvertOpenFeeValue(String amount);
 
   /// Note on the bridge progress screen when the market maker is slow to open the swap: no ZEC has been sent yet.
   ///
@@ -14900,6 +14930,18 @@ abstract class AppLocalizations {
   /// **'Keep Veylor open until the market maker confirms your deposit, a few minutes. Then the relayer claims your dollars, and you can leave.'**
   String get privateUsdConvertRelayerReviewNote;
 
+  /// Result on the bridge progress screen, and the note in its details, when a bridge ended before it started but after the market maker's fee was paid and confirmed: that fee isn't refunded.
+  ///
+  /// In en, this message translates to:
+  /// **'The bridge didn\'t start. The market maker keeps its fee; the rest of your ZEC never left your wallet.'**
+  String get privateUsdConvertResultFeeKept;
+
+  /// Result on the bridge progress screen when a bridge ended because its quote expired before the market maker saw its fee confirmed. The fee may still confirm, and then isn't refunded.
+  ///
+  /// In en, this message translates to:
+  /// **'The quote ran out before the market maker saw its fee. If the fee still confirms, it isn\'t refunded.'**
+  String get privateUsdConvertResultFeeNotHonoured;
+
   /// Result body when a bridge ended with nothing sent: the market maker cancelled the swap before Veylor sent the ZEC, so no ZEC left the wallet.
   ///
   /// In en, this message translates to:
@@ -15104,6 +15146,24 @@ abstract class AppLocalizations {
   /// **'The swap couldn\'t be completed in time, so it unwinds: your ZEC comes back after the market maker\'s refund. If the market maker hasn\'t refunded by {time}, Veylor claims your dollars instead.'**
   String privateUsdConvertUnwindingUntil(String time);
 
+  /// Detail under the first bridge progress step, and the Home banner, while the fee paid to the market maker before it opens the swap waits for a Zcash block.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the market maker\'s fee to confirm'**
+  String get privateUsdConvertWaitFeeConfirming;
+
+  /// Detail under the first bridge progress step, and the Home banner, while the market maker's fee is confirmed but the market maker hasn't seen it yet; Veylor asks it again.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the market maker to see the fee'**
+  String get privateUsdConvertWaitFeeSeen;
+
+  /// Detail under the 'Sending your ZEC' bridge step while the deposit waits for ZEC on its way back to the wallet, such as the change from the market maker's fee, to confirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for your ZEC to confirm'**
+  String get privateUsdConvertWaitFunds;
+
   /// Detail under the active bridge progress step while the user's Zcash wallet is still syncing and the bridge waits for it.
   ///
   /// In en, this message translates to:
@@ -15127,6 +15187,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Includes the Zcash network fee'**
   String get privateUsdConvertZecIncludesFee;
+
+  /// Note under the ZEC a bridge pays when its quote asks a market maker fee: the total includes the Zcash network fees and that fee.
+  ///
+  /// In en, this message translates to:
+  /// **'Includes the network and market maker fees'**
+  String get privateUsdConvertZecIncludesFees;
 
   /// Error on the bridge screen when no quote fits the entered amount; the user can change the amount or fill in the maximum with the Max button.
   ///
@@ -15331,6 +15397,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Escrow payment'**
   String get privateUsdDetailFunding;
+
+  /// Row label in a bridge's details for the Zcash transaction that paid the market maker's fee.
+  ///
+  /// In en, this message translates to:
+  /// **'Market maker fee payment'**
+  String get privateUsdDetailOpenFee;
 
   /// Row label in a ZEC-to-shielded-USD bridge's details for the Ethereum transaction that paid the dollars out to the user's shielded balance.
   ///
