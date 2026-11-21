@@ -1,0 +1,376 @@
+name: Veylor Android
+
+# Builds the unsigned input of a Veylor Android direct release (AGENTS.md,
+# "Android direct APK (verifiable)"): Veylor's Google Play build of
+# com.veylor.app (mobile, mainnet, Shielded USD on, the default price and
+# wallet-link URLs) plus VIZOR_DEGOOGLED=true, as one universal APK, through
+# upstream's reproducible builder (scripts/build-android-reproducible.sh
+# --flavor veylor --universal) on the pinned toolchain
+# (scripts/veylor-android-release/install-toolchain.sh). Two jobs build it from
+# scratch, on different runner images, checkout paths and toolchain paths; only
+# when the two APKs are byte-identical is the APK attested and kept as the
+# artifact veylor-<version>-<build>-unsigned. Signing happens on the owner's
+# Mac (scripts/sign-veylor-apk.sh); this workflow signs and publishes nothing,
+# and uses no caches, so each build starts from nothing but the commit.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "versionName (--build-name), X.Y.Z, as the Play build's"
+        required: true
+        default: "1.0.3"
+      build_number:
+        description: "versionCode (--build-number), as the Play build's"
+        required: true
+        default: "10"
+  # The branch's CI until the workflow is on main, which dispatch needs. A
+  # change to docs alone changes no byte of the APK.
+  push:
+    branches: [feat/android-apk]
+    paths-ignore: ["**.md"]
+
+permissions:
+  contents: read
+
+# One group per event: a push cancels the branch's earlier push run and never
+# a dispatched build.
+concurrency:
+  group: veylor-android-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+
+env:
+  VEYLOR_VERSION: ${{ inputs.version || '1.0.3' }}
+  VEYLOR_BUILD_NUMBER: ${{ inputs.build_number || '10' }}
+
+jobs:
+  build:
+    name: Build (${{ matrix.leg }}, ${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - leg: first
+            runner: ubuntu-22.04
+            checkout: .
+          - leg: second
+            runner: ubuntu-24.04
+            checkout: rebuild/vizor-fork
+    env:
+      LEG: ${{ matrix.leg }}
+    steps:
+      - name: Check the inputs
+        run: |
+          if [[ ! "$VEYLOR_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "version must be X.Y.Z: $VEYLOR_VERSION" >&2
+            exit 1
+          fi
+          if [[ ! "$VEYLOR_BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+            echo "build_number must be a positive integer: $VEYLOR_BUILD_NUMBER" >&2
+            exit 1
+          fi
+
+      # The toolchain brings its own JDK and Android SDK; the image's, and the
+      # other toolsets below, go to make room for three Rust targets.
+      - name: Free disk space
+        run: |
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/lib/jvm /usr/share/dotnet /opt/ghc \
+            /usr/local/.ghcup /usr/share/swift /usr/local/share/boost \
+            /usr/local/share/powershell /usr/local/share/chromium \
+            /usr/local/lib/node_modules "$AGENT_TOOLSDIRECTORY/CodeQL"
+          sudo docker image prune --all --force > /dev/null 2>&1 || true
+          df -h /
+
+      - uses: actions/checkout@v6
+        with:
+          path: ${{ matrix.checkout }}
+          persist-credentials: false
+
+      - name: Install the toolchain
+        working-directory: ${{ matrix.checkout }}
+        run: |
+          if [ "$LEG" = first ]; then
+            toolchain="$RUNNER_TEMP/veylor-android-toolchain"
+          else
+            toolchain=/opt/veylor-android-toolchain
+            sudo install -d -o "$(id -u)" -g "$(id -g)" "$toolchain"
+          fi
+          echo "VEYLOR_ANDROID_TOOLCHAIN_DIR=$toolchain" >> "$GITHUB_ENV"
+          scripts/veylor-android-release/install-toolchain.sh \
+            --prefix "$toolchain" --accept-android-sdk-licenses
+
+      # The builder's dry run prints the command it will run; its defines must
+      # be exactly the Play build's plus VIZOR_DEGOOGLED.
+      - name: Check the build's settings
+        working-directory: ${{ matrix.checkout }}
+        run: |
+          . "$VEYLOR_ANDROID_TOOLCHAIN_DIR/env.sh"
+          scripts/build-android-reproducible.sh --flavor veylor --universal \
+            --build-name "$VEYLOR_VERSION" --build-number "$VEYLOR_BUILD_NUMBER" \
+            --signing unsigned --degoogled --dry-run | tee "$RUNNER_TEMP/builder-dry-run.txt"
+          python3 -I - "$RUNNER_TEMP/builder-dry-run.txt" <<'PY'
+          import os, shlex, sys
+          text = open(sys.argv[1], encoding="utf-8").read()
+          args = shlex.split(text.split("Command:", 1)[1])
+          defines = {}
+          for arg in args:
+              if arg.startswith("--dart-define="):
+                  key, _, value = arg[len("--dart-define="):].partition("=")
+                  defines[key] = value
+          print("dart-defines:", ", ".join(f"{k}={v}" for k, v in defines.items()))
+          expected = {
+              "VIZOR_FORM_FACTOR": "mobile",
+              "VIZOR_PRIVATE_USD_ENABLED": "true",
+              "ZCASH_DEFAULT_NETWORK": "main",
+              "VIZOR_APPLICATION_ID": "com.veylor.app",
+              "VIZOR_DEGOOGLED": "true",
+          }
+          problems = []
+          if defines != expected:
+              problems.append(f"defines {defines} are not {expected}")
+          if "--split-per-abi" in args:
+              problems.append("the build is split per ABI")
+          for flag, value in (
+              ("--target-platform", "android-arm64,android-arm,android-x64"),
+              ("--build-name", os.environ["VEYLOR_VERSION"]),
+              ("--build-number", os.environ["VEYLOR_BUILD_NUMBER"]),
+          ):
+              if flag not in args or args[args.index(flag) + 1] != value:
+                  problems.append(f"{flag} is not {value}")
+          if problems:
+              sys.exit("unexpected build settings: " + "; ".join(problems))
+          PY
+
+      - name: Build the unsigned APK
+        working-directory: ${{ matrix.checkout }}
+        run: |
+          . "$VEYLOR_ANDROID_TOOLCHAIN_DIR/env.sh"
+          scripts/build-android-reproducible.sh --flavor veylor --universal \
+            --build-name "$VEYLOR_VERSION" --build-number "$VEYLOR_BUILD_NUMBER" \
+            --signing unsigned --degoogled
+          df -h /
+
+      - name: Check the APK
+        working-directory: ${{ matrix.checkout }}
+        run: |
+          . "$VEYLOR_ANDROID_TOOLCHAIN_DIR/env.sh"
+          apk=build/app/outputs/flutter-apk/app-release.apk
+          badging="$(aapt2 dump badging "$apk" | sed -n 1p)"
+          echo "$badging"
+          expected="package: name='com.veylor.app' versionCode='$VEYLOR_BUILD_NUMBER' versionName='$VEYLOR_VERSION'"
+          if [[ "$badging" != "$expected"* ]]; then
+            echo "unexpected package or version" >&2
+            exit 1
+          fi
+          entries="$(unzip -Z1 "$apk")"
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            for library in libapp.so libflutter.so librust_lib_zcash_wallet.so; do
+              if ! grep -qx "lib/$abi/$library" <<< "$entries"; then
+                echo "the APK lacks lib/$abi/$library" >&2
+                exit 1
+              fi
+            done
+          done
+          abis="$(sed -n 's#^lib/\([^/]*\)/.*#\1#p' <<< "$entries" | LC_ALL=C sort -u | tr '\n' ' ')"
+          if [ "$abis" != "arm64-v8a armeabi-v7a x86_64 " ]; then
+            echo "unexpected ABIs: $abis" >&2
+            exit 1
+          fi
+          # scripts/sign-veylor-apk.sh and apksigcopier need none of these.
+          if grep -Eq '^META-INF/(MANIFEST\.MF|[^/]+\.(SF|RSA|DSA|EC))$|/$' <<< "$entries"; then
+            echo "the APK carries a JAR manifest, a v1 signature or a directory entry" >&2
+            exit 1
+          fi
+          if apksigner verify "$apk" > /dev/null 2>&1; then
+            echo "the APK is signed; the workflow must build it unsigned" >&2
+            exit 1
+          fi
+          zipalign -c -P 16 4 "$apk"
+          ls -l "$apk"
+
+      # Which of the build's own paths the APK embeds (none of the checkout's
+      # or the toolchain's, if the builder's canonical paths do their job). It
+      # reports; the comparison below is the check.
+      - name: Look for host paths in the APK
+        working-directory: ${{ matrix.checkout }}
+        run: |
+          contents="$RUNNER_TEMP/apk-contents"
+          report="$RUNNER_TEMP/host-paths-$LEG.txt"
+          rm -rf "$contents"
+          mkdir -p "$contents"
+          unzip -q build/app/outputs/flutter-apk/app-release.apk -d "$contents"
+          : > "$report"
+          for path in "$PWD" "$VEYLOR_ANDROID_TOOLCHAIN_DIR" "$HOME" \
+            /tmp/vizor-android-reproducible /vizor/source /vizor/cargo; do
+            files="$(grep -rlaF -- "$path" "$contents" | sed "s#^$contents/##" | LC_ALL=C sort || true)"
+            if [ -z "$files" ]; then
+              echo "$path: none" | tee -a "$report"
+            else
+              echo "$path: $(wc -l <<< "$files") files" | tee -a "$report"
+              sed 's/^/  /' <<< "$files" | tee -a "$report"
+            fi
+          done
+          rm -rf "$contents"
+
+      - name: Record the build
+        working-directory: ${{ matrix.checkout }}
+        run: |
+          out="$RUNNER_TEMP/veylor-android-$LEG"
+          name="veylor-$VEYLOR_VERSION-$VEYLOR_BUILD_NUMBER-unsigned.apk"
+          rm -rf "$out"
+          mkdir -p "$out"
+          cp build/app/outputs/flutter-apk/app-release.apk "$out/$name"
+          (cd "$out" && sha256sum "$name" > "$name.sha256")
+          {
+            echo "commit: $(git rev-parse HEAD)"
+            echo "ref: $GITHUB_REF"
+            echo "run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID (attempt $GITHUB_RUN_ATTEMPT), $LEG build"
+            echo "runner image: ${ImageOS:-?} ${ImageVersion:-?}; $(. /etc/os-release && echo "$PRETTY_NAME")"
+            echo "checkout: $PWD"
+            echo "toolchain: $VEYLOR_ANDROID_TOOLCHAIN_DIR"
+            cat "$VEYLOR_ANDROID_TOOLCHAIN_DIR/versions.txt"
+            echo "gradle: $(sed -n 's/^distributionUrl=//p' android/gradle/wrapper/gradle-wrapper.properties)"
+            echo "builder:$(sed -n 's/^Command://p' "$RUNNER_TEMP/builder-dry-run.txt")"
+            echo "apk: $name, $(stat -c %s "$out/$name") bytes, sha256 $(cut -d ' ' -f 1 "$out/$name.sha256")"
+          } > "$out/build-info-$LEG.txt"
+          cp "$RUNNER_TEMP/host-paths-$LEG.txt" "$out/host-paths-$LEG.txt"
+          cat "$out/build-info-$LEG.txt"
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: build-${{ matrix.leg }}
+          path: ${{ runner.temp }}/veylor-android-${{ matrix.leg }}/
+          if-no-files-found: error
+          retention-days: 7
+
+  # The builder's dry-run and wrapper tests (upstream's, and the Veylor
+  # flavor's), which need no toolchain.
+  builder-tests:
+    name: Builder tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - run: python3 scripts/test_fdroid_tools.py
+
+  reproduce:
+    name: Compare and attest
+    needs: [build, builder-tests]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    # id-token and attestations: write sign the APK's build provenance.
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Name the APK
+        run: echo "APK_NAME=veylor-$VEYLOR_VERSION-$VEYLOR_BUILD_NUMBER-unsigned.apk" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: build-first
+          path: ${{ runner.temp }}/first
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: build-second
+          path: ${{ runner.temp }}/second
+
+      - name: Compare the two builds
+        id: compare
+        run: |
+          first="$RUNNER_TEMP/first/$APK_NAME"
+          second="$RUNNER_TEMP/second/$APK_NAME"
+          cat "$RUNNER_TEMP/first/build-info-first.txt" "$RUNNER_TEMP/second/build-info-second.txt"
+          if cmp -s "$first" "$second"; then
+            echo "identical=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "identical=false" >> "$GITHUB_OUTPUT"
+          fi
+          python3 -I scripts/veylor-android-release/compare_apks.py "$first" "$second" \
+            --extract "$RUNNER_TEMP/differences" || true
+
+      - name: Show what differs
+        if: steps.compare.outputs.identical != 'true'
+        continue-on-error: true
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends diffoscope-minimal binutils-multiarch
+          # The entries whose contents differ, else the whole APKs (the ZIP
+          # metadata or the bytes around the entries differ).
+          if [ -d "$RUNNER_TEMP/differences/first" ]; then
+            set -- "$RUNNER_TEMP/differences/first" "$RUNNER_TEMP/differences/second"
+          else
+            set -- "$RUNNER_TEMP/first/$APK_NAME" "$RUNNER_TEMP/second/$APK_NAME"
+          fi
+          timeout 50m diffoscope --text "$RUNNER_TEMP/diffoscope.txt" \
+            --max-report-size 20000000 "$@" || true
+          head -c 300000 "$RUNNER_TEMP/diffoscope.txt" || true
+
+      - name: Upload what differs
+        if: steps.compare.outputs.identical != 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: differences
+          path: |
+            ${{ runner.temp }}/diffoscope.txt
+            ${{ runner.temp }}/differences/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Stop unless the builds are identical
+        if: steps.compare.outputs.identical != 'true'
+        run: |
+          echo "The two builds differ: see the comparison above and the differences artifact." >&2
+          exit 1
+
+      # Signed build provenance (Sigstore, through GitHub's attestations): the
+      # APK's SHA-256 bound to this repository, commit and workflow run. Anyone
+      # checks a download with
+      # `gh attestation verify <file> --repo ChinmayGopal931/vizor-fork`.
+      - name: Attest the APK
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: ${{ runner.temp }}/first/${{ env.APK_NAME }}
+
+      - name: Check the attestation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          commit="$(gh attestation verify "$RUNNER_TEMP/first/$APK_NAME" --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/veylor-android.yml" --format json \
+            --jq '.[0].verificationResult.statement.predicate.buildDefinition.resolvedDependencies[0].digest.gitCommit')"
+          if [ "$commit" != "$GITHUB_SHA" ]; then
+            echo "the attestation names ${commit:-no commit}, not $GITHUB_SHA" >&2
+            exit 1
+          fi
+          echo "attested: $APK_NAME, built from $commit"
+
+      - name: Gather the release input
+        run: |
+          out="$RUNNER_TEMP/release"
+          rm -rf "$out"
+          mkdir -p "$out"
+          cp "$RUNNER_TEMP/first/$APK_NAME" "$RUNNER_TEMP/first/$APK_NAME.sha256" \
+            "$RUNNER_TEMP/first/build-info-first.txt" "$RUNNER_TEMP/second/build-info-second.txt" \
+            "$RUNNER_TEMP/first/host-paths-first.txt" "$RUNNER_TEMP/second/host-paths-second.txt" \
+            "$out/"
+          ls -l "$out"
+
+      - name: Upload the attested APK
+        uses: actions/upload-artifact@v6
+        with:
+          name: veylor-${{ env.VEYLOR_VERSION }}-${{ env.VEYLOR_BUILD_NUMBER }}-unsigned
+          path: ${{ runner.temp }}/release/
+          if-no-files-found: error
+          retention-days: 30
