@@ -855,6 +855,12 @@ pub fn private_usd_forward_quote(
 /// setting, kept on the record), the claim goes to the relayer once the
 /// deposit is out and the maker's ready is confirmed, for it to send when
 /// the claim's window opens.
+///
+/// A quote that asks an open fee is not posted here: the fee is paid
+/// (`QuoteExpired` with under a minute of the quote left, and
+/// `DepositUnpayable` unless the wallet also covers the deposit, both with
+/// nothing saved), and the call returns `Accepted`; the advances post the
+/// accept once the wallet shows the fee mined.
 pub fn private_usd_forward_accept(
     db_path: String,
     network: String,
