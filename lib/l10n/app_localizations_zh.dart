@@ -8749,6 +8749,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get privateUsdDetailsUnconfirmed => '尚未打包进区块';
 
   @override
+  String get privateUsdDiagnosticsCopied => '已复制失败代码';
+
+  @override
+  String get privateUsdDiagnosticsCopy => '复制失败代码';
+
+  @override
+  String get privateUsdDiagnosticsCopyFailed => '无法复制失败代码。请重试。';
+
+  @override
+  String get privateUsdDiagnosticsEmpty => '暂无失败代码记录';
+
+  @override
   String get privateUsdEmptyBody => '将 ZEC 跨链为他人看不到的美元：你的余额和付款对象都不会暴露。';
 
   @override

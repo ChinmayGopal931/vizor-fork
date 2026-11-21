@@ -12,6 +12,7 @@ import '../../../core/config/zcash_explorer.dart';
 import '../../../core/config/rpc_endpoint_config.dart';
 import '../../../core/l10n/l10n.dart';
 import '../../../core/layout/app_desktop_shell.dart';
+import '../../../core/layout/app_form_factor.dart' show kDesktopFormFactor;
 import '../../../core/layout/app_main_sidebar.dart';
 import '../../../core/layout/app_pane_scroll_scaffold.dart';
 import '../../../core/navigation/route_stack.dart';
@@ -46,6 +47,7 @@ import '../widgets/private_usd_settings_control.dart';
 import '../../private_usd/providers/private_usd_archive_sync_provider.dart'
     show privateUsdArchiveAvailableProvider;
 import '../../private_usd/providers/private_usd_custom_rpc_provider.dart';
+import '../../private_usd/services/private_usd_diagnostics.dart';
 import '../../private_usd/widgets/desktop/desktop_private_usd_rpc_dialog.dart';
 import '../../../app_bootstrap.dart';
 import '../widgets/enhance_pir_privacy_control.dart';
@@ -712,6 +714,8 @@ class _SettingsList extends ConsumerWidget {
               const _PrivateUsdEthereumRpcRow(),
               const PrivateUsdRelayerClaimsControl(),
               if (showArchiveSync) const PrivateUsdArchiveSyncControl(),
+              // Const, so a build that is not desktop keeps no recorder.
+              if (kDesktopFormFactor) const _PrivateUsdDiagnosticsRow(),
             ],
           ),
         ],
@@ -1160,6 +1164,49 @@ class _PrivateUsdEthereumRpcRow extends ConsumerWidget {
       onTap: () => unawaited(_open(context)),
     );
   }
+}
+
+/// Copies Shielded USD's failure codes (`private_usd_diagnostics.dart`), the
+/// newest that fit, for the user to share. Only codes: no amounts, addresses
+/// or keys. They never leave the computer otherwise.
+class _PrivateUsdDiagnosticsRow extends StatelessWidget {
+  const _PrivateUsdDiagnosticsRow();
+
+  Future<void> _copy(BuildContext context) async {
+    final l10n = context.l10n;
+    final String records;
+    try {
+      records = await PrivateUsdDiagnostics.instance.recent();
+      if (records.isNotEmpty) {
+        await Clipboard.setData(ClipboardData(text: records));
+      }
+    } catch (_) {
+      if (context.mounted) {
+        showAppToast(
+          context,
+          l10n.privateUsdDiagnosticsCopyFailed,
+          iconName: AppIcons.warningCircle,
+          tone: AppToastTone.destructive,
+        );
+      }
+      return;
+    }
+    if (!context.mounted) return;
+    showAppToast(
+      context,
+      records.isEmpty
+          ? l10n.privateUsdDiagnosticsEmpty
+          : l10n.privateUsdDiagnosticsCopied,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => _SettingsRow(
+    key: const ValueKey('settings_private_usd_diagnostics_row'),
+    iconName: AppIcons.copy,
+    label: context.l10n.privateUsdDiagnosticsCopy,
+    onTap: () => unawaited(_copy(context)),
+  );
 }
 
 class _SettingsBlock extends StatelessWidget {

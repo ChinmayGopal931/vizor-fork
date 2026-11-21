@@ -12116,6 +12116,22 @@
   "@privateUsdDetailsUnconfirmed": {
     "description": "Value of the Status row in a send's details before its transaction is included in an Ethereum block."
   },
+  "privateUsdDiagnosticsCopied": "Failure codes copied",
+  "@privateUsdDiagnosticsCopied": {
+    "description": "Toast in desktop Settings once the Shielded USD failure codes are copied to the clipboard."
+  },
+  "privateUsdDiagnosticsCopy": "Copy failure codes",
+  "@privateUsdDiagnosticsCopy": {
+    "description": "Row in desktop Settings' Shielded USD block: copies to the clipboard the short record of codes this computer keeps about what failed in Shielded USD (no amounts, addresses or keys), for the user to share with support. The record never leaves the computer otherwise."
+  },
+  "privateUsdDiagnosticsCopyFailed": "Couldn't copy the failure codes. Try again.",
+  "@privateUsdDiagnosticsCopyFailed": {
+    "description": "Error toast in desktop Settings when the Shielded USD failure codes could not be read or copied."
+  },
+  "privateUsdDiagnosticsEmpty": "No failure codes recorded",
+  "@privateUsdDiagnosticsEmpty": {
+    "description": "Toast in desktop Settings after Copy failure codes when nothing has failed in Shielded USD on this computer, so there is nothing to copy."
+  },
   "privateUsdEmptyBody": "Bridge ZEC into dollars nobody else can see: not your balance, and not who you pay.",
   "@privateUsdEmptyBody": {
     "description": "Body of the empty-state card on the Shielded USD screen, inviting the user to bridge ZEC into shielded dollars and saying what stays private."

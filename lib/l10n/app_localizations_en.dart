@@ -9450,6 +9450,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get privateUsdDetailsUnconfirmed => 'Not in a block yet';
 
   @override
+  String get privateUsdDiagnosticsCopied => 'Failure codes copied';
+
+  @override
+  String get privateUsdDiagnosticsCopy => 'Copy failure codes';
+
+  @override
+  String get privateUsdDiagnosticsCopyFailed =>
+      'Couldn\'t copy the failure codes. Try again.';
+
+  @override
+  String get privateUsdDiagnosticsEmpty => 'No failure codes recorded';
+
+  @override
   String get privateUsdEmptyBody =>
       'Bridge ZEC into dollars nobody else can see: not your balance, and not who you pay.';
 
