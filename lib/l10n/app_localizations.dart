@@ -15434,6 +15434,30 @@ abstract class AppLocalizations {
   /// **'Not in a block yet'**
   String get privateUsdDetailsUnconfirmed;
 
+  /// Toast in desktop Settings once the Shielded USD failure codes are copied to the clipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Failure codes copied'**
+  String get privateUsdDiagnosticsCopied;
+
+  /// Row in desktop Settings' Shielded USD block: copies to the clipboard the short record of codes this computer keeps about what failed in Shielded USD (no amounts, addresses or keys), for the user to share with support. The record never leaves the computer otherwise.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy failure codes'**
+  String get privateUsdDiagnosticsCopy;
+
+  /// Error toast in desktop Settings when the Shielded USD failure codes could not be read or copied.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t copy the failure codes. Try again.'**
+  String get privateUsdDiagnosticsCopyFailed;
+
+  /// Toast in desktop Settings after Copy failure codes when nothing has failed in Shielded USD on this computer, so there is nothing to copy.
+  ///
+  /// In en, this message translates to:
+  /// **'No failure codes recorded'**
+  String get privateUsdDiagnosticsEmpty;
+
   /// Body of the empty-state card on the Shielded USD screen, inviting the user to bridge ZEC into shielded dollars and saying what stays private.
   ///
   /// In en, this message translates to:

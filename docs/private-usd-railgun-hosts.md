@@ -385,6 +385,16 @@ Shared Dart and the shared page do all of this; a host must only let it run.
   answers 403 or 429, and a screening node does, fails as `RPC_FAILED`
   (`rw/src/rpc-probe.js`); map it to `rpc_failed`, and Dart offers another
   RPC.
+- **H37. Failure codes (desktop).** On the Mac and Linux, Dart keeps a short
+  coded record of what failed (`private_usd_diagnostics.dart`, AGENTS.md
+  "Failure codes"): for a failed call, the host's code and a reason matched
+  from its message, in
+  `<support>/diagnostics/private-usd-*.jsonl`, never the message itself. The
+  host does nothing for it, but its codes and its messages' wording are what
+  the table reads ("the page did not load", "loading the page timed out",
+  "the page's content process stopped", "the bridge is not running", …): a
+  host whose message changes reads `unknown` until the table gains its
+  pattern. The phones record nothing.
 
 ## 7. Checking a host without spending
 

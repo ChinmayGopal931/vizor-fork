@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/config/private_usd_feature_config.dart';
+import '../core/layout/app_form_factor.dart' show kDesktopFormFactor;
 import '../features/private_usd/providers/railgun_engine_provider.dart'
     show RailgunEngineWallets;
+import '../features/private_usd/services/private_usd_diagnostics.dart';
 import '../features/private_usd/services/private_usd_swap_backend.dart';
 import '../features/private_usd/services/railgun_engine.dart'
     show RailgunWalletDeletion;
@@ -157,6 +159,12 @@ class PrivateUsdLifecycle {
       privateUsdLog(
         'preparing the Railgun wallet deletion failed (${error.runtimeType})',
       );
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          PrivateUsdDiagnosticOp.prepareWalletDeletion,
+          error,
+        );
+      }
       return null;
     }
   }
@@ -175,6 +183,12 @@ class PrivateUsdLifecycle {
       privateUsdLog(
         'deleting the Railgun wallet failed (${error.runtimeType})',
       );
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          PrivateUsdDiagnosticOp.deleteWallet,
+          error,
+        );
+      }
     } finally {
       deletion.discard();
     }

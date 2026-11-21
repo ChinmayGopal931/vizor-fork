@@ -2,11 +2,13 @@ import 'dart:async';
 import 'dart:math';
 
 import '../../../core/config/private_usd_feature_config.dart';
+import '../../../core/layout/app_form_factor.dart' show kDesktopFormFactor;
 import '../../../core/storage/wallet_paths.dart';
 import '../../../rust/api/private_usd.dart' as rust;
 import '../models/private_usd_messages.dart';
 import '../models/private_usd_send.dart';
 import '../models/railgun_models.dart';
+import 'private_usd_diagnostics.dart';
 import 'private_usd_engine.dart';
 import 'private_usd_spend_guard.dart';
 import 'private_usd_swap_backend.dart';
@@ -288,7 +290,16 @@ class PrivateUsdSender {
     PrivateUsdSendCost confirmed, {
     void Function(PrivateUsdSendStep step)? onStep,
   }) {
-    if (!_canRun) return Future.value(const PrivateUsdSendNotSent());
+    if (!_canRun) {
+      // The engine refuses to run: locked, in the background or drained.
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.outcome(
+          PrivateUsdDiagnosticOp.sendPrice,
+          PrivateUsdDiagnosticOutcome.paused,
+        );
+      }
+      return Future.value(const PrivateUsdSendNotSent());
+    }
     final ticket = _engine.ticket();
     return _track(() async {
       try {
@@ -378,11 +389,23 @@ class PrivateUsdSender {
     try {
       quote = await _held(accountUuid, request, confirmed);
     } on rust.ApiPrivateUsdError catch (error) {
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          PrivateUsdDiagnosticOp.sendPrice,
+          error,
+        );
+      }
       return PrivateUsdSendNotSent(
         (l10n) => privateUsdSendErrorMessage(l10n, error.code),
       );
     } catch (error) {
       privateUsdLog('no send cost (${error.runtimeType})');
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          PrivateUsdDiagnosticOp.sendPrice,
+          error,
+        );
+      }
       return const PrivateUsdSendNotSent();
     }
     // Never proved above the cap, nor above the fee the user confirmed.
@@ -392,7 +415,15 @@ class PrivateUsdSender {
     if (quote.fee > confirmed.networkFee) {
       return PrivateUsdSendRepriced(quote.cost);
     }
-    if (!_isCurrent(ticket)) return const PrivateUsdSendNotSent();
+    if (!_isCurrent(ticket)) {
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.outcome(
+          PrivateUsdDiagnosticOp.sendPrice,
+          PrivateUsdDiagnosticOutcome.dropped,
+        );
+      }
+      return const PrivateUsdSendNotSent();
+    }
     final sendId = _newSendId();
     onStep(PrivateUsdSendStep.proving);
     final RailgunRelayedProof proof;
@@ -405,12 +436,26 @@ class PrivateUsdSender {
       );
     } catch (error) {
       privateUsdLog('nothing was proved (${error.runtimeType})');
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          PrivateUsdDiagnosticOp.sendProve,
+          error,
+        );
+      }
       return const PrivateUsdSendNotSent();
     }
     try {
       // The proof took up to 10 minutes: keep it only if the app stayed
       // unlocked and in the foreground and the engine did not move on.
-      if (!_isCurrent(ticket)) return const PrivateUsdSendNotSent();
+      if (!_isCurrent(ticket)) {
+        if (kDesktopFormFactor) {
+          PrivateUsdDiagnostics.instance.outcome(
+            PrivateUsdDiagnosticOp.sendProve,
+            PrivateUsdDiagnosticOutcome.dropped,
+          );
+        }
+        return const PrivateUsdSendNotSent();
+      }
       try {
         final kept = await _backend.put(
           accountUuid,
@@ -429,9 +474,21 @@ class PrivateUsdSender {
           for (final row in _guard.recordsFor(accountUuid))
             if (row.sendId != kept.sendId) row,
         ]);
-      } on PrivateUsdStaleStepException {
+      } on PrivateUsdStaleStepException catch (stale) {
+        if (kDesktopFormFactor) {
+          PrivateUsdDiagnostics.instance.failure(
+            PrivateUsdDiagnosticOp.sendKeep,
+            stale,
+          );
+        }
         return const PrivateUsdSendNotSent();
       } on rust.ApiPrivateUsdError catch (error) {
+        if (kDesktopFormFactor) {
+          PrivateUsdDiagnostics.instance.failure(
+            PrivateUsdDiagnosticOp.sendKeep,
+            error,
+          );
+        }
         switch (error.code) {
           case rust.ApiPrivateUsdErrorCode.busy:
             await _guard.check(accountUuid);
@@ -455,6 +512,12 @@ class PrivateUsdSender {
       } catch (error) {
         // Unknown: ask the log whether it was kept before saying anything.
         privateUsdLog('the keep failed (${error.runtimeType})');
+        if (kDesktopFormFactor) {
+          PrivateUsdDiagnostics.instance.failure(
+            PrivateUsdDiagnosticOp.sendKeep,
+            error,
+          );
+        }
         await _guard.check(accountUuid);
         final kept = _guard
             .recordsFor(accountUuid)
@@ -485,6 +548,12 @@ class PrivateUsdSender {
     try {
       answer = await _backend.transact(accountUuid, sendId);
     } on rust.ApiPrivateUsdError catch (error) {
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          PrivateUsdDiagnosticOp.sendPost,
+          error,
+        );
+      }
       if (error.code == rust.ApiPrivateUsdErrorCode.other) {
         // Not kept after all: nothing went out.
         await _guard.check(accountUuid);
@@ -493,6 +562,12 @@ class PrivateUsdSender {
       return const PrivateUsdSendUnconfirmed(null);
     } catch (error) {
       privateUsdLog('the first post failed (${error.runtimeType})');
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          PrivateUsdDiagnosticOp.sendPost,
+          error,
+        );
+      }
       return const PrivateUsdSendUnconfirmed(null);
     }
     final named = answer.transactions.firstOrNull;

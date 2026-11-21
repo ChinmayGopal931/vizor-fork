@@ -2811,6 +2811,28 @@ How the code keeps to this:
 - `RailgunStartParams.toString` hides `rpcUrls`.
 - `run_device_round.sh --keyed-rpc` checks the logs and files on the device.
 
+**Failure codes (desktop only).** Release builds print nothing, so the
+desktop apps keep a short coded record of what failed in Shielded USD
+(`private_usd_diagnostics.dart`): rotating JSONL in
+`<support>/diagnostics/private-usd-*.jsonl`, 8 files of 256 KB, each opened by
+a session line (version, build, network, OS).
+
+- A line keeps only the op, the host's `RailgunHostErrorCode` or Rust's
+  `ApiPrivateUsdErrorCode`, a reason from a fixed table
+  (`PrivateUsdFailureReason`) that the page's or host's message is matched
+  against, Dart's outcome (timeout, interrupted, paused, dropped, flow
+  gone…), `n` (how many times this run) and the UTC minute. Never the message
+  or any text, a URL, an address, an amount, a txid, an index, an account id
+  or a key. The same failure again within its minute is only counted.
+- Every hook is one call gated on `kDesktopFormFactor`, and
+  `initializeZcashWalletRuntime` enables the recorder on desktop builds with
+  Private USD: the phones record nothing and keep none of it, and tests
+  write nothing.
+- The records stay on the computer. Desktop Settings' "Copy failure codes"
+  (the Shielded USD block) copies the newest 64 KB to the clipboard.
+- A new failure path takes a hook; a page or host message worth telling
+  apart takes a pattern in the table (an unmatched one reads `unknown`).
+
 **Device rounds.** Use the Galaxy A35 over USB, never an emulator, and run
 `ANDROID_SERIAL=RZCX40721QZ scripts/private-usd/run_device_round.sh`:
 

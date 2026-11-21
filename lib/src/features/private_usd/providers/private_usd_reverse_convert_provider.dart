@@ -14,6 +14,7 @@ import '../models/private_usd_reverse_amount.dart';
 import '../models/private_usd_send.dart';
 import '../private_usd_copy.dart';
 import '../services/private_usd_balance_repository.dart';
+import '../services/private_usd_diagnostics.dart';
 import '../services/private_usd_engine.dart';
 import '../services/private_usd_pause.dart';
 import 'private_usd_available_provider.dart';
@@ -290,7 +291,16 @@ class PrivateUsdReverseConvertNotifier
     try {
       await engine.reverseGoAhead(account, index: index);
     } on rust.ApiPrivateUsdError catch (error) {
-      if (!ref.mounted) return null;
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          PrivateUsdDiagnosticOp.goAhead,
+          error,
+        );
+      }
+      if (!ref.mounted) {
+        if (kDesktopFormFactor) _flowGone();
+        return null;
+      }
       switch (error.code) {
         case rust.ApiPrivateUsdErrorCode.fundingCostChanged:
           await _repriced(account, index);
@@ -307,9 +317,21 @@ class PrivateUsdReverseConvertNotifier
           );
       }
       return null;
-    } on PrivateUsdPause {
+    } on PrivateUsdPause catch (pause) {
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          PrivateUsdDiagnosticOp.goAhead,
+          pause,
+        );
+      }
       return backToReview();
-    } catch (_) {
+    } catch (error) {
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          PrivateUsdDiagnosticOp.goAhead,
+          error,
+        );
+      }
       if (ref.mounted) startFailed((l10n) => l10n.privateUsdConvertStartFailed);
       return null;
     }
@@ -320,14 +342,29 @@ class PrivateUsdReverseConvertNotifier
         // The maker wants a Privacy Pass token and none is held: nothing
         // paid. Get today's once, then accept again; with none to be had,
         // call it off. The tokens need this flow.
-        if (!ref.mounted) return null;
+        if (!ref.mounted) {
+          if (kDesktopFormFactor) _flowGone();
+          return null;
+        }
         final failure = await issueTokens();
-        if (!ref.mounted) return null;
+        if (!ref.mounted) {
+          if (kDesktopFormFactor) _flowGone();
+          return null;
+        }
         if (failure == null) {
           result = await engine.reverseAccept(account, index: index);
-          if (!ref.mounted) return null;
+          if (!ref.mounted) {
+            if (kDesktopFormFactor) _flowGone();
+            return null;
+          }
         }
         if (failure != null || result.kind == rust.ApiAcceptKind.tokensNeeded) {
+          if (kDesktopFormFactor) {
+            PrivateUsdDiagnostics.instance.outcome(
+              PrivateUsdDiagnosticOp.reverseAccept,
+              PrivateUsdDiagnosticOutcome.tokensUnavailable,
+            );
+          }
           unawaited(_cancelQuietly(engine, account, index));
           startFailed(
             failure ?? ((l10n) => l10n.privateUsdConvertErrorTokensUnavailable),
@@ -342,6 +379,13 @@ class PrivateUsdReverseConvertNotifier
           // Handled above.
           return null;
         case rust.ApiAcceptKind.nothingSent:
+          if (kDesktopFormFactor) {
+            PrivateUsdDiagnostics.instance.outcome(
+              PrivateUsdDiagnosticOp.reverseAccept,
+              PrivateUsdDiagnosticOutcome.nothingSent,
+              nothingSent: result.cause,
+            );
+          }
           if (ref.mounted) {
             startFailed(
               (l10n) => privateUsdReverseNothingSentMessage(l10n, result.cause),
@@ -349,10 +393,22 @@ class PrivateUsdReverseConvertNotifier
           }
           return null;
       }
-    } on PrivateUsdPause {
+    } on PrivateUsdPause catch (pause) {
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          PrivateUsdDiagnosticOp.reverseAccept,
+          pause,
+        );
+      }
       return backToReview();
     } catch (error) {
       privateUsdLog('accept failed (${error.runtimeType})');
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          PrivateUsdDiagnosticOp.reverseAccept,
+          error,
+        );
+      }
       // The loop accepts again (idempotent); its progress shows it.
       if (await _isUnderWay(engine, account, index)) return path;
       if (ref.mounted) startFailed((l10n) => l10n.privateUsdConvertStartFailed);
@@ -376,6 +432,13 @@ class PrivateUsdReverseConvertNotifier
     }
     _requestQuote(units);
   }
+
+  /// "Convert" stopped because this flow was gone (desktop only:
+  /// `private_usd_diagnostics.dart`).
+  void _flowGone() => PrivateUsdDiagnostics.instance.outcome(
+    PrivateUsdDiagnosticOp.reverseConfirm,
+    PrivateUsdDiagnosticOutcome.flowGone,
+  );
 
   Future<bool> _isUnderWay(
     PrivateUsdEngine engine,
@@ -402,6 +465,12 @@ class PrivateUsdReverseConvertNotifier
       await engine.reverseCancel(account, index: index);
     } catch (error) {
       privateUsdLog('cancel failed (${error.runtimeType})');
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          PrivateUsdDiagnosticOp.reverseCancel,
+          error,
+        );
+      }
     }
   }
 
@@ -420,7 +489,13 @@ class PrivateUsdReverseConvertNotifier
         step: PrivateUsdConvertStep.review,
         startError: (l10n) => l10n.privateUsdReverseErrorCostChanged,
       );
-    } catch (_) {
+    } catch (error) {
+      if (kDesktopFormFactor) {
+        PrivateUsdDiagnostics.instance.failure(
+          PrivateUsdDiagnosticOp.reprice,
+          error,
+        );
+      }
       if (ref.mounted) startFailed((l10n) => l10n.privateUsdConvertStartFailed);
     }
   }
@@ -491,6 +566,12 @@ class PrivateUsdReverseConvertNotifier
 
   void _quoteFailed(Object error, BigInt total) {
     if (showsUnderWay(error)) return;
+    if (kDesktopFormFactor) {
+      PrivateUsdDiagnostics.instance.failure(
+        PrivateUsdDiagnosticOp.reverseQuote,
+        error,
+      );
+    }
     final PrivateUsdText? message = switch (error) {
       rust.ApiPrivateUsdError(:final code) => privateUsdReverseQuoteText(code),
       PrivateUsdPause() => null,
