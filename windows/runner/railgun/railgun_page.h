@@ -95,6 +95,7 @@ class RailgunPage {
  private:
   void OnController(HRESULT result, ICoreWebView2Controller* controller);
   bool Configure();
+  void OverrideUserAgent();
   void Navigate();
   bool Deliver(const std::string& request);
   void OnResourceRequested(ICoreWebView2WebResourceRequestedEventArgs* args);

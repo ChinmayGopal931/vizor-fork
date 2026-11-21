@@ -365,7 +365,7 @@ bool RailgunPage::Configure() {
   controller_->put_Bounds(bounds);
   controller_->put_IsVisible(visible_ ? TRUE : FALSE);
 
-  // The transport goes in before the page loads.
+  // The transport goes in before the page loads, and so does the User-Agent's override.
   const HRESULT added = webview_->AddScriptToExecuteOnDocumentCreated(
       kTransport, Callback<ICoreWebView2AddScriptToExecuteOnDocumentCreatedCompletedHandler>(
                       [this, alive](HRESULT result, LPCWSTR) -> HRESULT {
@@ -373,12 +373,28 @@ bool RailgunPage::Configure() {
                         if (FAILED(result)) {
                           FailLater(Error::Unavailable("the WebView2 page could not start"));
                         } else {
-                          Navigate();
+                          OverrideUserAgent();
                         }
                         return S_OK;
                       })
                       .Get());
   return SUCCEEDED(added);
+}
+
+// WebView2's `put_UserAgent` fixes the string but keeps the User-Agent client hints (`Sec-CH-UA*` and
+// `navigator.userAgentData`), which name the platform and the runtime's version beside it. DevTools' override of the
+// string alone, with no metadata, turns them off, as Android's WebView turns them off for a page whose User-Agent its
+// host set. A runtime that refuses DevTools (a policy) keeps the fixed string and its hints.
+void RailgunPage::OverrideUserAgent() {
+  std::weak_ptr<int> alive = alive_;
+  const std::wstring params = L"{\"userAgent\":\"" + Utf16(kUserAgent) + L"\"}";
+  const HRESULT result = webview_->CallDevToolsProtocolMethod(
+      L"Emulation.setUserAgentOverride", params.c_str(),
+      Callback<ICoreWebView2CallDevToolsProtocolMethodCompletedHandler>([this, alive](HRESULT, LPCWSTR) -> HRESULT {
+        if (!alive.expired() && !closed_) Navigate();
+        return S_OK;
+      }).Get());
+  if (FAILED(result)) Navigate();
 }
 
 void RailgunPage::Navigate() {
