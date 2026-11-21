@@ -7,7 +7,10 @@ import WebKit
 /// The process-wide Railgun page: one page at a time, in a data store of its own whose every connection goes through
 /// the Rust bridge's loopback SOCKS5 port, so the page follows the wallet's route. It outlives Flutter engines; the
 /// Dart engine closes a leftover page when it starts. iOS's `RailgunPageHost`, on AppKit: the page sits in the main
-/// window behind the Flutter view, and memory pressure stands in for iOS's memory warning.
+/// window behind the Flutter view. Unlike iOS's, it never closes the page for memory, as Android's never does: macOS
+/// compresses and swaps rather than ending an app, a pressure warning is routine beside a page this size, and the rest
+/// of a sync (Railgun's transaction list and the wallet's proofs) runs in the page with no call waiting, so closing a
+/// page that looked idle cut it off. Dart closes a page nobody uses after ten minutes.
 @MainActor
 final class RailgunPageHost {
   static let shared = RailgunPageHost()
@@ -39,15 +42,8 @@ final class RailgunPageHost {
   private var generation = 0
   private var sink: ((String) -> Void)?
   private var buffered: [String] = []
-  private let memoryPressure: DispatchSourceMemoryPressure
 
-  private init() {
-    memoryPressure = DispatchSource.makeMemoryPressureSource(eventMask: [.warning, .critical], queue: .main)
-    memoryPressure.setEventHandler { [weak self] in
-      MainActor.assumeIsolated { self?.memoryWarning() }
-    }
-    memoryPressure.activate()
-  }
+  private init() {}
 
   /// A loaded page that is still open.
   var isOpen: Bool { page.map { $0.isLoaded && $0.isOpen } ?? false }
@@ -156,12 +152,6 @@ final class RailgunPageHost {
 
   private func forget(_ closed: RailgunPage) {
     if page === closed { page = nil }
-  }
-
-  // Memory pressure closes an idle page, as iOS's memory warning does; it reopens on the next use.
-  private func memoryWarning() {
-    guard let page, page.isLoaded, page.isOpen, !page.hasPendingCalls else { return }
-    closePage(.disconnected("closed to free memory"))
   }
 
   // MARK: The window

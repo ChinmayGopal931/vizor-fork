@@ -276,6 +276,9 @@ class PrivateUsdReverseConvertNotifier
       clearStartError: true,
     );
     final engine = ref.read(privateUsdEngineProvider);
+    // Kept alive with the engine, so the payment starts even once this flow
+    // is gone (below).
+    final funding = ref.read(privateUsdReverseFundingProvider);
     final index = draft.index;
     final path = PrivateUsdRoutePath(
       direction: PrivateUsdDirection.reverse,
@@ -311,11 +314,11 @@ class PrivateUsdReverseConvertNotifier
     // Gone ahead: the conversion is under way from here, whatever follows.
     try {
       var result = await engine.reverseAccept(account, index: index);
-      if (!ref.mounted) return null;
       if (result.kind == rust.ApiAcceptKind.tokensNeeded) {
         // The maker wants a Privacy Pass token and none is held: nothing
         // paid. Get today's once, then accept again; with none to be had,
-        // call it off.
+        // call it off. The tokens need this flow.
+        if (!ref.mounted) return null;
         final failure = await issueTokens();
         if (!ref.mounted) return null;
         if (failure == null) {
@@ -337,9 +340,11 @@ class PrivateUsdReverseConvertNotifier
           // Handled above.
           return null;
         case rust.ApiAcceptKind.nothingSent:
-          startFailed(
-            (l10n) => privateUsdReverseNothingSentMessage(l10n, result.cause),
-          );
+          if (ref.mounted) {
+            startFailed(
+              (l10n) => privateUsdReverseNothingSentMessage(l10n, result.cause),
+            );
+          }
           return null;
       }
     } on PrivateUsdPause {
@@ -351,12 +356,14 @@ class PrivateUsdReverseConvertNotifier
       if (ref.mounted) startFailed((l10n) => l10n.privateUsdConvertStartFailed);
       return null;
     }
-    // The payment the review showed. It outlives this screen; its proof and
-    // any failure show on the progress, with "Pay" again.
-    unawaited(
-      ref.read(privateUsdReverseFundingProvider).fund(path.keyFor(account)),
-    );
-    return path;
+    // The payment the review showed, which "Convert" authorized: started
+    // whether or not this flow is still up. The progress replaces the review
+    // as soon as the conversion goes under way, often before the maker's
+    // accept answers, and a payment left to this flow then never started,
+    // leaving "Pay" to tap. It outlives the screens; its proof and any
+    // failure show on the progress, with "Pay" again.
+    unawaited(funding.fund(path.keyFor(account)));
+    return ref.mounted ? path : null;
   }
 
   @override

@@ -151,6 +151,7 @@ class ReceiveQrSurface extends StatelessWidget {
     required this.type,
     this.badgeSize = 48,
     this.scanOptimized = false,
+    this.neonFramed = false,
     super.key,
   });
 
@@ -171,15 +172,23 @@ class ReceiveQrSurface extends StatelessWidget {
   /// set, draw black square modules on the theme-invariant QR surface instead.
   final bool scanOptimized;
 
+  /// Desktop only: draw the phones' code, a light cut plate with Veylor's
+  /// helmet in its middle, for a caller that puts it in the phones' lit
+  /// [ReceiveQrFrame] (desktop's Shielded USD receive). The phones always
+  /// draw it, whatever this says.
+  final bool neonFramed;
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     final isDark = AppTheme.of(context) == AppThemeData.dark;
     final isShielded = type == ReceiveAddressType.shielded;
+    // The phones' look. A constant on the phones, so their code is as it was.
+    final framed = kDesktopFormFactor ? neonFramed : true;
     // The neon redesign (mobile) draws every receive code dark on a light
     // plate, never inverted, so its lit frame sits around a code a camera
     // reads as easily as the scan-first one. The dots and the badge stay.
-    final lightPlate = scanOptimized || _mobile;
+    final lightPlate = scanOptimized || framed;
     final usesDarkQrSurface = !lightPlate && (isDark || isShielded);
     final qrColor = lightPlate
         ? _scanOptimizedQrInk
@@ -194,6 +203,7 @@ class ReceiveQrSurface extends StatelessWidget {
     final embeddedImageAsset = _ReceiveQrEmbeddedImage.assetFor(
       type,
       usesDarkQrSurface: usesDarkQrSurface,
+      framed: framed,
     );
 
     return Container(
@@ -202,7 +212,7 @@ class ReceiveQrSurface extends StatelessWidget {
       padding: EdgeInsets.symmetric(horizontal: paddingX, vertical: paddingY),
       // The scan-first plate keeps its shape on every form factor; the
       // decorative one is cut at the corners on mobile, inside its frame.
-      decoration: _mobile && !scanOptimized
+      decoration: framed && !scanOptimized
           ? ShapeDecoration(
               color: qrBackground,
               shape: Neon.chamferBorder(
@@ -212,7 +222,7 @@ class ReceiveQrSurface extends StatelessWidget {
             )
           // Desktop's decorative plate is itself the lit frame: cut at the
           // corners, with a red edge and its glow.
-          : !_mobile && !scanOptimized
+          : !framed && !scanOptimized
           ? ShapeDecoration(
               color: qrBackground,
               shape: Neon.chamferBorder(
@@ -256,8 +266,9 @@ class ReceiveQrSurface extends StatelessWidget {
 }
 
 abstract final class _ReceiveQrEmbeddedImage {
-  /// The neon redesign (mobile) badges every code with Veylor's helmet, cut
-  /// at the corners; desktop names the pool.
+  /// The neon redesign (mobile, and desktop's framed codes) badges every code
+  /// with Veylor's helmet, cut at the corners; desktop's own plates name the
+  /// pool.
   static const _veylor = 'assets/icons/receive_qr_veylor.webp';
   static const _shield = 'assets/icons/receive_qr_shield_crimson.png';
   static const _transparentLight =
@@ -268,8 +279,9 @@ abstract final class _ReceiveQrEmbeddedImage {
   static String assetFor(
     ReceiveAddressType type, {
     required bool usesDarkQrSurface,
+    required bool framed,
   }) {
-    if (_mobile) return _veylor;
+    if (framed) return _veylor;
     return switch (type) {
       ReceiveAddressType.shielded => _shield,
       ReceiveAddressType.transparent =>

@@ -22,6 +22,12 @@ release/vX.Y.Z
 Do not create platform-specific, mainnet-specific, or testnet-specific files
 unless the release process is explicitly changed to support them.
 
+Veylor's macOS releases are the exception: each has
+`release_notes/veylor-macos-vX.Y.Z.md`, which
+`scripts/release-veylor-macos.sh` ships as the Sparkle release notes
+(`Veylor-macos.md`) and which can serve as the GitHub release body. Write them
+for macOS users, in the format below; mark a beta as one in the title.
+
 ## Platform Scope
 
 Unless a release request explicitly says otherwise, draft release notes for the

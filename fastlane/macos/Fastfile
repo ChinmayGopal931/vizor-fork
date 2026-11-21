@@ -50,8 +50,9 @@ MACOS_RELEASE_FLAVOR_CONFIGS = {
     zcash_default_network: "test",
     volume_name: "Install Vizor Testnet Wallet"
   },
-  # Veylor's identity (AGENTS.md, "Desktop identity"). No Sparkle feed or key,
-  # and no release signing, until Veylor has release keys of its own.
+  # Veylor's identity (AGENTS.md, "Desktop identity"). Veylor signs,
+  # notarizes and feeds its releases with its own team and keys through
+  # scripts/release-veylor-macos.sh, so these lanes never sign it.
   "veylor" => {
     app_name: "Veylor",
     artifact_name: "Veylor",

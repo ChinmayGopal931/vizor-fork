@@ -565,7 +565,8 @@ own way, and a malformed or unknown id fails the build:
     Apple Development certificate and the Mac development profile "Veylor
     Desktop Mac Development". The profile lists the Macs a build runs on. To
     add a Mac, register it and regenerate the profile through the App Store
-    Connect API.
+    Connect API. With `--release`, Release builds sign for distribution
+    instead and compile Sparkle in ("Veylor macOS release" below).
   - **Testnet:** the testnet id has no profile yet.
   - **Where signing lives:** the Runner target's signing is set in
     `AppInfo.xcconfig`, not the project file, so the overrides can replace it.
@@ -600,12 +601,63 @@ Packaging follows the same switch: the `veylor` and `veylor-testnet` flavors of
 `VIZOR_WINDOWS_FLAVOR`), `scripts/build-linux-release.sh --flavor veylor` and
 `scripts/package-windows-velopack.ps1 -ApplicationId com.veylor.desktop` make
 `Veylor-macos.dmg`, `Veylor-linux-<arch>.AppImage` and the
-`com.veylor.desktop` Velopack package. Until Veylor has release keys of its own
-there are no updates: Sparkle stays compiled out with no key, the Linux check
-is off, and Windows hides its updater in a build without a feed key. Signing,
-the Apple team, match and the release targets are unchanged (upstream's), and
-the macOS lane refuses to sign a Veylor flavor; on a Mac without upstream's
-team a local build needs an uncommitted signing override.
+`com.veylor.desktop` Velopack package. Those packages have no updates: the
+fastlane builds leave Sparkle out, the Linux check is off, and Windows hides
+its updater in a build without a feed key. The lanes keep upstream's signing,
+Apple team, match and release targets, and the macOS lane refuses to sign a
+Veylor flavor. Veylor's macOS release has its own signing, notarization and
+update feed (below); Linux and Windows have no Veylor release yet.
+
+### Veylor macOS release
+
+`scripts/release-veylor-macos.sh --version 0.9.0 --build-number 1` builds a
+release from a clean tree and publishes nothing:
+
+- **Identity and signing.** For the build it selects
+  `scripts/macos-identity.sh com.veylor.desktop --release`, then restores the
+  earlier overrides. Release then signs with "Developer ID Application: Zapp
+  LLC (63UVRFCV97)" and the "Veylor Desktop Developer ID" profile
+  (MAC_APP_DIRECT), which grants the application identifier and keychain
+  entitlements. The Runner target's Release settings add the hardened runtime
+  and a secure timestamp. The script refuses any identity but Zapp LLC's.
+- **Build.** Mainnet, Shielded USD on, the public RPC (no keyed RPC file):
+  `ZCASH_DEFAULT_NETWORK=main`, `VIZOR_PRIVATE_USD_ENABLED=true`,
+  `VIZOR_RELEASE_VERSION`, and `VIZOR_RELEASE_REPOSITORY` set to the fork.
+  The version comes from `--build-name` and `--build-number`, never
+  pubspec's, which the phones use. `flutter build macos --config-only` and
+  `xcodebuild` build into `build/veylor-release`, so a Veylor running from
+  `build/macos` keeps its bundle.
+- **Sparkle.** `SPARKLE_ENABLED` is compiled in. A staged copy of the app gets
+  `SUFeedURL`
+  (`https://github.com/ChinmayGopal931/vizor-fork/releases/latest/download/appcast.xml`),
+  `SUPublicEDKey`, a required feed signature and verification before
+  extraction, as upstream's lane sets them. Sparkle's helpers and the app are
+  then signed again. Upstream's update-over-Tor handling is unchanged.
+- **Notarization.** `notarytool` with the App Store Connect key named in
+  `~/dev/zapp/ios-zapp/fastlane/.env`, read in place (never copied, printed
+  or committed). The app and the DMG are notarized, stapled, and checked with
+  `spctl --assess` and `stapler validate`. Apple can take hours over a new
+  team's first submissions: the script waits up to 12 hours, and if it stops
+  first, the same command with `--resume` waits on the same submissions
+  without signing again.
+- **DMG.** `Veylor-macos.dmg`, volume "Veylor", with the neon background in
+  `macos/Packaging/DMG/veylor/` (drawn by `render-background.swift`). dmgbuild
+  (pinned with hashes in `scripts/veylor-macos-release/requirements.txt`)
+  writes the window layout itself; nothing scripts Finder.
+- **Appcast.** `generate_appcast` and `sign_update` with Veylor's EdDSA key:
+  the login Keychain's `veylor-desktop` account, backed up (mode 600) in
+  `~/keys/veylor/sparkle/`, which the script uses first. Never print or
+  commit it. `check_appcast.py` checks the feed before it ships.
+
+The assets land in `dist/veylor-macos/vX.Y.Z/`: `Veylor-macos.dmg`,
+`appcast.xml`, `Veylor-macos.md` (the Sparkle release notes, from
+`release_notes/veylor-macos-vX.Y.Z.md`), `SHA256SUMS`, `release-info.txt` and
+the logs. Publish the first three unchanged to a release on the fork tagged
+`veylor-macos/vX.Y.Z`, as a full release, not a pre-release or a draft: the
+website's `releases/latest/download/Veylor-macos.dmg` and the feed resolve
+through "latest", so any later release that becomes latest carries
+`appcast.xml` too. The DMG's name never carries the version, and each release
+takes a higher build number.
 
 ## Deep-link Host (VIZOR_DEEPLINK_BASE_URL)
 
@@ -833,7 +885,8 @@ When asked to prepare user-facing release notes or a changelog for a release,
 read `release_notes/README.md` and create `release_notes/vX.Y.Z.md`.
 Unless the request explicitly says otherwise, draft desktop release notes for
 Windows, Linux, and macOS from desktop user-facing changes only. Exclude
-mobile-only changes.
+mobile-only changes. Veylor's macOS releases use
+`release_notes/veylor-macos-vX.Y.Z.md` ("Veylor macOS release").
 
 ### clear-app.sh
 
@@ -2086,7 +2139,10 @@ action (checked 2026-11-19): the same provider calls, guards, confirmations
 and states, differing only in layout, mouse and keyboard, the Mac's own
 behaviour and wording. The Mac's host, the bridge's desktop screens and hooks,
 what desktop keeps different, how it differs from iOS's and what has run are in
-`docs/private-usd-macos.md`. Before changing it,
+`docs/private-usd-macos.md`. What every Railgun page host must do (the channel,
+the page, the bridge, Anon's archive and its connections), item by item against
+Android's, is in `docs/private-usd-railgun-hosts.md`: read it before changing a
+host or writing a new one. Before changing it,
 read `docs/private-usd-android-plan.md`: §3.5 lists the invariants and why
 each one exists. The pinned config and defines are in
 `docs/private-usd-reference.md` §7. Progress and deviations are in
@@ -2522,7 +2578,14 @@ the Mac's, answer `unavailable`), Dart `services/private_usd_tokens_service.dart
     both number the first leaf of mainnet's tree 1 as tree 0's leaf 65,536,
     and records keep that number. Transactions come in sequence, each
     verification hash continuing the chain: the chain, not the sequence,
-    shows none is missing, so a sequence that skips a number is kept.
+    shows none is missing, so a sequence that skips a number is kept. A
+    sealed chunk names its blocks, and so does the tip, from its first
+    event's to its last's, so each mostly starts some blocks after the one
+    before ends: the tip is taken when it starts after the last sealed chunk,
+    as each chunk is after the one before. The positions and the chain, not
+    the block numbers, show that nothing between them is missing, but for a
+    tree's last batches: nothing in the events shows where a tree ended,
+    from the archive or from rail-squid.
   - Times come from the shipped block table, never the archive. Records
     carry no archive railgunTxid; a transaction's leaf is hashed from the
     archive's, which the screening node's root check then vouches for. That
@@ -2574,13 +2637,22 @@ the Mac's, answer `unavailable`), Dart `services/private_usd_tokens_service.dart
   - Android's host fetches the archive for the page through the page's
     bridge (`RailgunArchiveFetch`: 16 MB and a minute an answer at most, a
     fixed User-Agent), and so does the Mac's (`RailgunArchive.swift`, the
-    same limits and User-Agent): WebKit can't intercept `https`, so before a
+    same limits and headers): WebKit can't intercept `https`, so before a
     `start` that reads the archive the Mac runs a fixed prelude in the page,
     which sends archive GETs to the page's own origin (`/anon-archive/`,
     answered through the bridge) and hides the WebKit host from the start's
     archive check (the page reads the archive only where it finds none; its
-    transport took the host at load). iOS starts the page without it. Every
-    archive request depends on the chain's state alone.
+    transport took the host at load). The prelude holds the `webkit` object
+    it changes: WebKit makes it anew after a garbage collection, which showed
+    the start the host again and kept 0.9.0's first mainnet sync off the
+    archive. iOS starts the page without it. Every archive request depends on
+    the chain's state alone.
+  - A host keeps the archive's connections as Android's `HttpURLConnection`
+    does: one request at a time on each (HTTP/1.1), kept only after an answer
+    read whole (five idle, five minutes), closed when its request fails, and
+    all dropped when the network changes. Never multiplex the requests on one
+    HTTP/2 connection: one that stops answering would take every try the page
+    sends (`docs/private-usd-railgun-hosts.md`, H27).
 
 **Network: Tor and the Railgun page.**
 
@@ -2593,6 +2665,9 @@ the Mac's, answer `unavailable`), Dart `services/private_usd_tokens_service.dart
   intercepts every subresource against a fixed host allowlist. The Kotlin
   and Swift allowlists (`RailgunEndpoints`), the Rust bridge's allowlist and
   the page's CSP must agree; a Rust test in `railgun_bridge.rs` pins them.
+  Its User-Agent is a fixed `Mozilla/5.0` (`RailgunRequests.USER_AGENT`),
+  the archive fetch's too: the WebView's own names the phone's model and its
+  Android build to every host the page reaches.
 - On iOS a Swift `WKWebView` host behind the same channel serves the page
   from `veylor-railgun://app/`, in a data store of its own whose SOCKS5
   proxy is the bridge (no failover), with a `WKContentRuleList` allowlist

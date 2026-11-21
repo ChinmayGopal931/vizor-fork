@@ -902,6 +902,85 @@ mod tests {
         assert!(RAILGUN_PAGE_HOSTS.contains(&archive_host), "{archive_host}");
     }
 
+    /// The Mac fetches the archive with Android's limits and User-Agent
+    /// (`RailgunArchiveFetch.kt`, `RailgunArchive.swift`), and its prelude
+    /// keeps hold of the `webkit` object it changes: WebKit makes that object
+    /// anew after a garbage collection, which showed the page's start the host
+    /// again and kept the Mac's first mainnet sync off the archive.
+    #[test]
+    fn the_mac_fetches_the_archive_with_androids_limits_and_holds_its_prelude() {
+        let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let read = |path: &str| {
+            std::fs::read_to_string(repo.join(path))
+                .unwrap_or_else(|error| panic!("read {path}: {error}"))
+        };
+        // The expression after `prefix` up to the end of its line, as a
+        // number: digits with `_` separators, an optional `L`, and `*`.
+        let number = |source: &str, prefix: &str| -> u64 {
+            let rest = source
+                .split(prefix)
+                .nth(1)
+                .unwrap_or_else(|| panic!("`{prefix}`"));
+            rest[..rest.find('\n').unwrap()]
+                .split('*')
+                .map(|factor| {
+                    factor
+                        .trim()
+                        .trim_end_matches('L')
+                        .replace('_', "")
+                        .parse::<u64>()
+                        .unwrap_or_else(|error| panic!("`{prefix}` {factor}: {error}"))
+                })
+                .product()
+        };
+        let kotlin =
+            read("android/app/src/main/kotlin/com/keplr/vizor/railgun/RailgunArchiveFetch.kt");
+        let mac = read("macos/Runner/Railgun/RailgunArchive.swift");
+
+        let max_bytes = number(&kotlin, "const val MAX_BYTES = ");
+        assert_eq!(max_bytes, 16 * 1024 * 1024);
+        assert_eq!(number(&mac, "static let maxBytes = "), max_bytes);
+        let deadline_ms = number(&kotlin, "private const val DEADLINE_MS = ");
+        assert_eq!(
+            number(&mac, "static let deadline: TimeInterval = ") * 1000,
+            deadline_ms
+        );
+        let connect_ms = number(&kotlin, "private const val CONNECT_TIMEOUT_MS = ");
+        assert_eq!(
+            number(&kotlin, "private const val READ_TIMEOUT_MS = "),
+            connect_ms
+        );
+        assert_eq!(
+            number(&mac, "static let stall: TimeInterval = ") * 1000,
+            connect_ms
+        );
+        let agent = |source: &str, prefix: &str| -> String {
+            let rest = source
+                .split(prefix)
+                .nth(1)
+                .unwrap_or_else(|| panic!("`{prefix}`"));
+            rest[..rest.find('"').unwrap()].to_owned()
+        };
+        assert_eq!(
+            agent(&mac, "static let userAgent = \""),
+            agent(&kotlin, "private const val USER_AGENT = \"")
+        );
+
+        let prelude = mac
+            .split("static let prelude = \"\"\"")
+            .nth(1)
+            .expect("`static let prelude` in RailgunArchive.swift");
+        let prelude = &prelude[..prelude.find("\"\"\"").expect("the end of the prelude")];
+        assert!(
+            prelude.contains("Object.defineProperty(webkit, 'messageHandlers'"),
+            "the prelude hides the host on the webkit object it read"
+        );
+        assert!(
+            prelude.contains("Object.defineProperty(globalThis, marker, { value: webkit"),
+            "the prelude keeps hold of that webkit object"
+        );
+    }
+
     /// The string literals inside `val hosts = setOf(…)`, sorted.
     fn kotlin_hosts(source: &str) -> Vec<String> {
         let start = source
