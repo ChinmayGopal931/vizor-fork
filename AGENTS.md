@@ -698,10 +698,15 @@ A run without `public_release` stays `-internal.<run>` and publishes nothing.
   the commit and the workflow run.
 - **Published by the run.** The `publish` job checks each mainnet file's
   attestation and writes `SHA256SUMS`. It then creates the release
-  `veylor-linux/vX.Y.Z` with the notes from
-  `release_notes/veylor-linux-vX.Y.Z.md`, or replaces the files of one already
-  there. The files on a release are the ones the run built; none passes
-  through a computer.
+  `veylor-linux/vX.Y.Z`, tagged at the commit it built, with the notes from
+  `release_notes/veylor-linux-vX.Y.Z.md`. The files on a release are the ones
+  the run built; none passes through a computer.
+- **A published version keeps its files.** A release already there takes
+  files only from a run of its tag's commit (a publish that failed partway, run
+  again). Anything else takes a new version: new files under a published name
+  would fail the SHA-256 check of everyone who downloaded the old ones.
+- **Never cancelled.** A push cancels the CI run before it, but a
+  `public_release` run has a concurrency group of its own.
 - **Never latest** (`--latest=false`): the Mac's DMG link and update feed
   resolve through "latest". The website links the Linux files by their tag.
 - **Anyone checks a download:**
