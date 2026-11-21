@@ -3,7 +3,7 @@
 The Railgun page host for Veylor's Linux desktop app (2026-11-20), so Shielded
 USD runs there as it does on the Mac: the same Dart screens and providers
 (`docs/private-usd-macos.md`), the same Rust engine, and a host of its own. It
-is Linux only; Windows still hides Shielded USD.
+is Linux only; Windows has a host of its own (`docs/private-usd-windows.md`).
 
 Read AGENTS.md's "Private USD" section and `docs/private-usd-android-plan.md`
 §3.5 first: every invariant there holds on Linux, because the engine and the

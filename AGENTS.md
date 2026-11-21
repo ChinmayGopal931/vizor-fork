@@ -608,7 +608,31 @@ own way, and a malformed or unknown id fails the build:
   copyright Zapp LLC), the
   window title, `veylor_app_icon.ico` and the storage prefix `Veylor`, and
   fails if an inherited `VIZOR_WINDOWS_STORAGE_PREFIX`, `_COMPANY_NAME` or
-  `_PRODUCT_NAME` disagrees. `Vizor.exe` keeps its name.
+  `_PRODUCT_NAME` disagrees. The build keeps `Vizor.exe`, which `flutter run`
+  finds (`BINARY_NAME` stays a literal); a Veylor package names it
+  `Veylor.exe` (`VeylorTestnet.exe` for testnet), as its version resource's
+  original file name, and its authors Zapp LLC, so nothing it installs names
+  Vizor (`scripts/package-windows-velopack.ps1`).
+  - **Builds run on GitHub Actions** (`.github/workflows/veylor-windows.yml`,
+    on the fork, for pushes to `main` and `feat/windows-desktop` and on
+    demand), never on the Mac: x64 on `windows-latest` and ARM64 on
+    `windows-11-arm`, both identities in one job per architecture, through
+    upstream's packaging script with the arguments `fastlane windows package`
+    passes (the lane's Ruby has no Windows ARM64 platform in Gemfile.lock).
+  - **What it builds:** the desktop form factor,
+    `VIZOR_PRIVATE_USD_ENABLED=true` and the run's build number, stamped
+    `<version>-internal.<run>`, or the workflow's `VEYLOR_VERSION` on a
+    dispatch with `public_release`. `scripts/check-veylor-windows-package.py`
+    fails a build whose defines (no keyed RPC URL), executable, version
+    resource, page bundle, installer or package manifest differ or name Vizor.
+  - **What it keeps:** each identity's Velopack installer
+    (`com.veylor.desktop-win-<arch>-mainnet-Setup.exe`), full package, feed
+    and assets, as workflow artifacts for 30 days. Nothing is published.
+  - **Signing:** unsigned, with no update feed, so Windows's SmartScreen warns
+    on the installer until a code-signing certificate signs it.
+  - **Caches:** as Linux's, per architecture. Cargokit's target directory
+    survives between the two identities, so the second builds Rust
+    incrementally.
 
 Every store follows from the identity, never from a renamed key, so nothing is
 shared with an installed Vizor: the macOS container and Keychain access group,
@@ -633,8 +657,8 @@ fastlane builds leave Sparkle out, the Linux check is off, and Windows hides
 its updater in a build without a feed key. The lanes keep upstream's signing,
 Apple team, match and release targets, and the macOS lane refuses to sign a
 Veylor flavor. Veylor's macOS release has its own signing, notarization and
-update feed, and Linux's comes from CI (both below); Windows has no Veylor
-release yet.
+update feed, and Linux's comes from CI (both below); Windows's packages come
+from CI too (above), and it has no Veylor release yet.
 
 ### Veylor macOS release
 
@@ -2179,7 +2203,10 @@ Linux hosts it too (2026-11-20): the page runs in a process of its own on the
 system's WebKitGTK 4.1, always in WebKit's sandbox, and where that can't start
 (no WebKitGTK, or Ubuntu 23.10+ without the .deb's AppArmor profile) Shielded
 USD stays hidden; `docs/private-usd-linux.md` has the host and what has run.
-Windows has no host and hides it. Desktop Home's recent activity and
+Windows hosts it too (2026-11-21): the page runs in WebView2, Chromium as
+Android's WebView is, on the system's Evergreen runtime, and where that is
+missing Shielded USD stays hidden; `docs/private-usd-windows.md` has the host
+and what has run. Desktop Home's recent activity and
 Activity list the phone's Shielded USD rows, bridges included, and leave out
 the wallet transactions a bridge row stands in for
 (`desktopPrivateUsdFeedEntries`). Desktop follows the phone's flows action for
@@ -2222,11 +2249,20 @@ Code:
   and `linux/runner/railgun_page/` (`veylor-railgun-page`, the page process:
   WebKitGTK loaded at run time, the page, the archive fetch and the hosts);
   `scripts/package-linux-deb.sh` makes the .deb with its AppArmor profile.
+- C++ (Windows): `windows/runner/railgun/` (the channels, the page host and
+  its WebView2 page, the request filter and the archive's deferrals),
+  `private_usd_channels.cpp` and `session_lifecycle.cpp`, which compile
+  Linux's `railgun_protocol`, `railgun_json` and `railgun_endpoints`
+  unchanged: keep those three free of GLib and GTK. The archive's fetch is
+  `rust/src/railgun_archive.rs` (Windows only, over a C ABI).
+  `windows/runner/tests/railgun_page` is the host's check program (not
+  shipped), which `scripts/windows-railgun/check_railgun_page.py` runs
+  against a stand-in for the bridge on CI.
 - The Railgun page: `android/app/src/main/assets/railgun/`, built from
   `android/railgun-web/`; the same build copies it as is to
   `ios/Runner/Railgun/railgun/`, which the macOS target references as a folder
-  and the Linux build installs into the bundle's `data/railgun` (no third
-  copy).
+  and the Linux and Windows builds install into the bundle's `data/railgun`
+  (no third copy).
 - Copy: ARB messages whose keys start with `privateUsd` (the chart's
   `portfolioChart`, the sync line's `neonSync`), in Korean and Chinese
   too. `PrivateUsdCopy` keeps only what is never translated and the few
@@ -2369,8 +2405,17 @@ Code:
   keep-awake flag is an idle inhibitor (`gtk_application_inhibit`, else
   `org.freedesktop.ScreenSaver`), and the settlement reminder the window's
   urgency hint and the desktop's alert sound. Desktop messages that name the
-  Mac say "your computer" on Linux (`privateUsd…Linux`,
-  `privateUsdLinuxWording`).
+  Mac say "your computer" on Linux and Windows (`privateUsd…Linux`,
+  `privateUsdComputerWording`).
+- **On Windows** the foreground is the same, with what the embedder reports: a
+  minimised or hidden window is `hidden`, a covered one is not detected (so
+  Private USD runs on behind other windows, as on Linux), and a locked
+  session, another session in front, a computer going to sleep and the
+  display off are `hidden` too (`session_lifecycle.cpp`, from the session's and
+  the power notifications, on `flutter/lifecycle`). The page is hidden
+  meanwhile (`put_IsVisible`), so WebView2 throttles it. The keep-awake flag is
+  `SetThreadExecutionState`, and the settlement reminder flashes the taskbar
+  button and plays the default sound.
 
 **Separate databases.** Rust owns both, in
 `<support>/private_usd_<walletDbName>_<network>/` (`getPrivateUsdDirPath`):
@@ -2631,8 +2676,8 @@ the Mac's, answer `unavailable`), Dart `services/private_usd_tokens_service.dart
   SDK's rescan still calls it). Each names the exact source of the pinned
   engine and fails the build against any other: re-check them when
   bumping it.
-- **Anon's archive** (Android, the Mac and Linux, mainnet, Settings, on by
-  default; `archive*.js`):
+- **Anon's archive** (Android, the Mac, Linux and Windows, mainnet, Settings,
+  on by default; `archive*.js`):
   - It gives commitments and the transaction list only. Unshields and
     nullifiers come from rail-squid: the archive drops a nullifier spent
     again in another tree, and a missing unshield stops the txid sync at its
@@ -2715,9 +2760,13 @@ the Mac's, answer `unavailable`), Dart `services/private_usd_tokens_service.dart
     archive. Linux's page process does the same (`railgun_archive.cc`: the
     prelude defines `messageHandlers` on the page's `webkit` object and holds
     that object; libsoup through the bridge, with the same limits and
-    headers). iOS starts the page without it. Every archive request depends
-    on the chain's state alone. What every host must do:
-    `docs/private-usd-railgun-hosts.md`.
+    headers). Windows's page is Chromium, as Android's, so it needs no
+    prelude: the host answers the page's archive GETs from WebView2's
+    `WebResourceRequested`, through the wallet library's fetch
+    (`railgun_archive.rs`; Windows's HTTP stacks have no SOCKS5 client), with
+    the same limits, headers and connections. iOS starts the page without it.
+    Every archive request depends on the chain's state alone. What every host
+    must do: `docs/private-usd-railgun-hosts.md`.
   - A host keeps the archive's connections as Android's `HttpURLConnection`
     does: one request at a time on each (HTTP/1.1), kept only after an answer
     read whole (five idle, five minutes), closed when its request fails, and
@@ -2734,10 +2783,12 @@ the Mac's, answer `unavailable`), Dart `services/private_usd_tokens_service.dart
   `com.zcash.wallet/railgun` (no Dart WebView plugin and no injected JS
   bridge). It loads only its own assets through `WebViewAssetLoader` and
   intercepts every subresource against a fixed host allowlist. The Kotlin
-  and Swift allowlists (`RailgunEndpoints`), Linux's (`kHosts`), the Rust
-  bridge's allowlist and the page's CSP must agree; Rust tests in
-  `railgun_bridge.rs` pin them, and Linux's events and methods to Kotlin's
-  (CI's `pins` job in `veylor-linux.yml`).
+  and Swift allowlists (`RailgunEndpoints`), Linux's (`kHosts`, which Windows
+  compiles), the Rust bridge's allowlist and the page's CSP must agree; Rust
+  tests in `railgun_bridge.rs` pin them, Linux's events and methods to
+  Kotlin's, and Windows's archive fetch, User-Agent and transport hello to
+  Android's (CI's `pins` jobs in `veylor-linux.yml` and
+  `veylor-windows.yml`).
   Its User-Agent is a fixed `Mozilla/5.0` (`RailgunRequests.USER_AGENT`),
   the archive fetch's too: the WebView's own names the phone's model and its
   Android build to every host the page reaches.
@@ -2763,6 +2814,20 @@ the Mac's, answer `unavailable`), Dart `services/private_usd_tokens_service.dart
   23.10 and later allow bubblewrap's user namespace only under an AppArmor
   profile, which the .deb installs for the page process (`/opt/veylor`) and
   an AppImage can't.
+- On Windows the page runs in WebView2 in Veylor's own process: an
+  environment per page, whose browser's only proxy is the bridge
+  (`--proxy-server`, no loopback bypass, every local lookup resolving to
+  nothing, no QUIC), made once the last page's browser process has exited.
+  The page loads from `veylor-railgun://app/` (registered secure, with an
+  authority), its store is the environment's user data folder in the
+  identity's local app data, and `WebResourceRequested` serves its files,
+  answers the archive and refuses everything off the allowlist. A script of
+  the host's, run before the page's own, hands the page Android's
+  `MessagePort` bridged to `chrome.webview`, so the page is unchanged. Its
+  User-Agent is `Mozilla/5.0` with no client hints (DevTools' override), its
+  `Accept-Language` `en-US`, SmartScreen is off, and its 1×1 window sits
+  under the Flutter view, disabled, with no accessibility tree. Where the
+  Evergreen WebView2 Runtime is missing, `supported` is false.
 - The page's traffic leaves only through the Rust loopback SOCKS5 bridge
   (`railgun_bridge.rs`), which uses arti when Tor is on. Its direct
   connections try IPv6 and IPv4 side by side (hyper-util's connector, as
