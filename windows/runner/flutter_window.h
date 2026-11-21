@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "private_usd_channels.h"
 #include "win32_window.h"
 
 // A window that does nothing but host a Flutter view.
@@ -45,6 +46,9 @@ class FlutterWindow : public Win32Window {
       password_input_source_channel_;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>>
       caps_lock_channel_;
+  // Shielded USD's Railgun page, keep-awake, settlement reminder and session
+  // lifecycle (docs/private-usd-windows.md).
+  std::unique_ptr<PrivateUsdChannels> private_usd_channels_;
   std::vector<std::string> pending_payment_uris_;
   bool payment_uri_dart_ready_ = false;
 

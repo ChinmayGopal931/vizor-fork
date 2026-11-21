@@ -157,3 +157,10 @@ install(DIRECTORY "${PROJECT_BUILD_DIR}/${FLUTTER_ASSET_DIR_NAME}"
 install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
   CONFIGURATIONS Profile;Release
   COMPONENT Runtime)
+
+# Shielded USD's Railgun page bundle in data/railgun: the copy
+# android/railgun-web/build.mjs writes for iOS, which the Mac and Linux serve
+# too (no further copy). The host serves it as veylor-railgun://app/
+# (docs/private-usd-windows.md).
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../ios/Runner/Railgun/railgun/"
+  DESTINATION "${INSTALL_BUNDLE_DATA_DIR}/railgun" COMPONENT Runtime)

@@ -448,6 +448,10 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  // Before Dart's bootstrap asks the Railgun page host whether it is supported.
+  private_usd_channels_ = std::make_unique<PrivateUsdChannels>(
+      flutter_controller_->engine()->messenger(), GetHandle(),
+      flutter_controller_->view()->GetNativeWindow());
   password_input_source_channel_ = CreatePasswordInputSourceChannel(
       flutter_controller_->engine()->messenger(),
       flutter_controller_->view()->GetNativeWindow());
@@ -562,6 +566,8 @@ void FlutterWindow::OnDestroy() {
       channel->reset();
     }
   }
+  // Closes the Railgun page while the window it sits in still exists.
+  private_usd_channels_.reset();
   pending_payment_uris_.clear();
   controller.reset();
 
@@ -588,6 +594,11 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
   if (activation_message_ != 0 && message == activation_message_) {
     PresentPrimaryWindow(hwnd);
     return kSingleInstanceActivationAcknowledged;
+  }
+
+  // Watches the session and the window for Shielded USD; consumes nothing.
+  if (private_usd_channels_) {
+    private_usd_channels_->OnWindowMessage(hwnd, message, wparam, lparam);
   }
 
   if (message == WM_COPYDATA) {
