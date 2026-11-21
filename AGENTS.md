@@ -565,9 +565,10 @@ uninstalling.
   `--flavor vizor`, the default, unchanged (`scripts/test_fdroid_tools.py`
   pins both commands).
 - **One universal APK** with all three ABIs, versionCode the Play build's
-  number: one file for the website to link and for a user to check. It is
-  larger than an arm64-only APK, since a phone keeps the other ABIs' libraries
-  too; without `--universal` the builder still makes one APK per ABI.
+  number: one file for the website to link and for a user to check. It costs
+  size: 1.0.3 is 299 MB (arm64 alone would be about 123 MB), and a phone keeps
+  the whole file, the other ABIs' libraries too. Without `--universal` the
+  builder still makes one APK per ABI.
 - **The build.** `.github/workflows/veylor-android.yml`, dispatched with
   `version` and `build_number` (`gh workflow run veylor-android.yml --ref main
   -f version=1.0.3 -f build_number=10`), builds the APK twice from scratch, on
