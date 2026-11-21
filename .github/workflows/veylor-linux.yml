@@ -1,8 +1,9 @@
 name: Veylor Linux
 
 # Builds Veylor's Linux desktop app into an AppImage and a .deb per
-# architecture and network, and keeps them as workflow artifacts; it publishes
-# nothing. The identities are com.veylor.desktop (mainnet) and
+# architecture and network, attests each one's build provenance and keeps them
+# as workflow artifacts. A run dispatched with public_release also publishes
+# the mainnet packages (the publish job, at the end). The identities are com.veylor.desktop (mainnet) and
 # com.veylor.desktop.testnet (testnet), the form factor desktop (the default),
 # and Shielded USD is compiled in: its Railgun page runs in
 # veylor-railgun-page, on the system's WebKitGTK, in WebKit's sandbox
@@ -26,14 +27,17 @@ on:
 permissions:
   contents: read
 
+# A push cancels the CI run before it on the same branch, but never a public
+# release run, which has a group of its own and is never cancelled: a release
+# stopped between its jobs would leave a release half made.
 concurrency:
-  group: veylor-linux-${{ github.ref }}
-  cancel-in-progress: true
+  group: veylor-linux-${{ github.ref }}-${{ inputs.public_release && 'release' || 'ci' }}
+  cancel-in-progress: ${{ !inputs.public_release }}
 
 env:
   # The version a CI build carries: release/v<version>-internal.<run number>,
   # or release/v<version> for a run dispatched with public_release.
-  VEYLOR_VERSION: 0.9.0
+  VEYLOR_VERSION: 0.9.1
   # Flutter comes from .fvmrc through fvm and is checked against
   # scripts/release-config/flutter-sdk.json. The tools below are pinned by
   # version here and by SHA-256 in the matrix.
@@ -519,7 +523,10 @@ jobs:
   # the release are the ones this run built and attested, never a copy that
   # passed through a computer. The release is never marked latest: the Mac's
   # DMG link and update feed resolve through "latest" (AGENTS.md, "Veylor Linux
-  # release"). A release already there gets the new files in place.
+  # release"). Its tag is the commit the files were built from. A release
+  # already there takes new files only from a run of that same commit (a
+  # publish that failed partway, run again): files built from another commit
+  # take a new version, never a published one's name.
   publish:
     name: Publish the release
     if: ${{ inputs.public_release }}
@@ -536,7 +543,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           pattern: Veylor-linux-*
-          path: downloaded
+          path: ${{ runner.temp }}/downloaded
           merge-multiple: true
 
       - name: Check every file's attestation and write SHA256SUMS
@@ -544,17 +551,21 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          mkdir -p assets
-          cp downloaded/appimage/Veylor-linux-x86_64.AppImage downloaded/appimage/Veylor-linux-aarch64.AppImage assets/
-          cp downloaded/deb/veylor_"$VEYLOR_VERSION"_amd64.deb downloaded/deb/veylor_"$VEYLOR_VERSION"_arm64.deb assets/
-          cd assets
-          for file in *; do
+          # Outside the checkout, which has an assets/ of its own: only these
+          # four files and SHA256SUMS are ever published.
+          files=(Veylor-linux-x86_64.AppImage Veylor-linux-aarch64.AppImage
+            "veylor_${VEYLOR_VERSION}_amd64.deb" "veylor_${VEYLOR_VERSION}_arm64.deb")
+          mkdir "$RUNNER_TEMP/release"
+          cp "$RUNNER_TEMP"/downloaded/appimage/Veylor-linux-{x86_64,aarch64}.AppImage \
+            "$RUNNER_TEMP"/downloaded/deb/veylor_"$VEYLOR_VERSION"_{amd64,arm64}.deb "$RUNNER_TEMP/release/"
+          cd "$RUNNER_TEMP/release"
+          test "$(ls | wc -l)" -eq 4
+          for file in "${files[@]}"; do
             gh attestation verify "$file" --repo "$GITHUB_REPOSITORY" \
               --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/veylor-linux.yml" > /dev/null
             echo "attested: $file"
           done
-          sha256sum Veylor-linux-x86_64.AppImage Veylor-linux-aarch64.AppImage \
-            veylor_"$VEYLOR_VERSION"_amd64.deb veylor_"$VEYLOR_VERSION"_arm64.deb > SHA256SUMS
+          sha256sum "${files[@]}" > SHA256SUMS
           cat SHA256SUMS
 
       - name: Publish veylor-linux/v${{ env.VEYLOR_VERSION }}
@@ -565,10 +576,15 @@ jobs:
           tag="veylor-linux/v$VEYLOR_VERSION"
           notes="release_notes/veylor-linux-v$VEYLOR_VERSION.md"
           if gh release view "$tag" > /dev/null 2>&1; then
-            gh release upload "$tag" assets/* --clobber
+            tag_commit=$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .sha)
+            if [ "$tag_commit" != "$GITHUB_SHA" ]; then
+              echo "::error::$tag is published from $tag_commit; this run built $GITHUB_SHA. Raise VEYLOR_VERSION for a new release."
+              exit 1
+            fi
+            gh release upload "$tag" "$RUNNER_TEMP"/release/* --clobber
             gh release edit "$tag" --notes-file "$notes" --latest=false
           else
-            gh release create "$tag" assets/* --target "$GITHUB_SHA" \
+            gh release create "$tag" "$RUNNER_TEMP"/release/* --target "$GITHUB_SHA" \
               --title "Veylor $VEYLOR_VERSION (beta) for Linux" \
               --notes-file "$notes" --latest=false
           fi
