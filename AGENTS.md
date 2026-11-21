@@ -690,181 +690,24 @@ takes a higher build number.
 ### Veylor Linux release
 
 `gh workflow run veylor-linux.yml --ref main -f public_release=true` builds
-`VEYLOR_VERSION` (set in the workflow) for x86_64 and aarch64. A run without
-`public_release` stays `-internal.<run>`.
+`VEYLOR_VERSION` (set in the workflow) for x86_64 and aarch64 and publishes it.
+A run without `public_release` stays `-internal.<run>` and publishes nothing.
 
-- **Assets.** Publish the mainnet four: `Veylor-linux-<arch>.AppImage` and
-  `veylor_<version>_<amd64|arm64>.deb`. The testnet ones stay unpublished.
-  Add `SHA256SUMS`, and the notes from `release_notes/veylor-linux-vX.Y.Z.md`.
-- **The release.** Tag it `veylor-linux/vX.Y.Z` and never mark it latest
-  (`--latest=false`): the Mac's DMG link and update feed resolve through
-  "latest". The website links the Linux assets by that tag.
-- **What it isn't.** The AppImages are unsigned (`LINUX_APPIMAGE_UNSIGNED`),
-  the .debs come from no repository, and nothing updates itself. A new
-  version is a new release with new links.
-
-## Deep-link Host (VIZOR_DEEPLINK_BASE_URL)
-
-The HTTPS origin Veylor claims for incoming links has **one** knob on
-Android and Dart: `--dart-define=VIZOR_DEEPLINK_BASE_URL` (default
-`https://link.vizor.cash`).
-
-- Dart is the source of truth: `VizorDeepLink` reads the define through
-  `String.fromEnvironment`.
-- Gradle derives its value from the same place. Flutter forwards every
-  dart-define as `-Pdart-defines=<base64("KEY=VALUE")>,...`, and
-  `android/app/build.gradle.kts` decodes that property to fill the
-  `vizorDeeplinkHost` manifest placeholder and `BuildConfig
-  .VIZOR_DEEPLINK_HOST`. There is deliberately no separate Gradle
-  property or environment variable — a second knob could disagree with
-  the compiled-in Dart origin and silently break verified app links.
-  Invoking Gradle directly (no dart-defines) falls back to the default.
-- iOS is the exception: it keeps `VIZOR_DEEPLINK_HOST` in the Flutter
-  xcconfigs (`ios/Flutter/{Debug,Profile,Release}.xcconfig`), which feed
-  `Info.plist` and `Runner.entitlements`. Change the host there too.
-- The Android intent-filter claims the host with no path constraint, so
-  the bare origin (empty path on Android), `/`, and
-  `/payment-links/open` all open the app. Path filtering belongs to
-  Dart's `classifyIncomingLink`, which drops unknown paths on the origin
-  silently.
-
-## Localization (VIZOR_I18N_PREVIEW)
-
-Read [docs/i18n/developer-guide.md](docs/i18n/developer-guide.md) before adding
-or changing user-facing text, ARB files, language selection, or copy that native
-code draws. [docs/i18n/README.md](docs/i18n/README.md) indexes the translation
-rules, adding a language, and Rust-originated text.
-
-- **After editing translations or updating `intl`, run
-  `fvm dart run tool/l10n/generate.dart`. `flutter gen-l10n` alone does not
-  regenerate the bundled font subsets.** `--watch` is optional for translation
-  work; do not auto-start it with normal app runs or builds.
-- Korean bundles Pretendard's 11,172 modern Hangul syllables and supported
-  jamo; Chinese bundles Noto Sans SC's 8,105 TGH 2013 characters. New UI and
-  date/number-formatting characters are included automatically. Unsupported
-  characters retain system fallback.
-- Commit the generated `assets/fonts/Vizor*UI-VF.ttf`,
-  `tool/l10n/ui_fonts.manifest.json`, and `tool/l10n/ui_font_characters.json`
-  with translation changes; never edit these generated files by hand.
-- Check freshness with `python3 tool/l10n/ui_fonts.py --check`. Screenshot
-  tests must load the shipped subsets, not substitute external/system fonts.
-
-## Mainnet Block-Time Table
-
-On mainnet, wallet birthday conversions (import date to height, seed-phrase
-screen height to date) never send lightwalletd a wallet-derived height. They
-read `rust/src/wallet/block_times/mainnet_data.rs`, a generated table of
-header times every 1,000 blocks. The only request left is the chain tip.
-
-- The weekly `Update mainnet block times` workflow appends entries after two
-  endpoints agree, and opens a PR for a person to merge.
-- Bootstrap or refresh before a release cut with
-  `scripts/update-mainnet-block-times.py` (needs `grpcurl`); validate offline
-  with `--check`. Never edit the data file by hand.
-- The Railgun page ships an Ethereum mainnet table the same way
-  (`android/railgun-web/src/block-times-mainnet.js`, from
-  `scripts/update-railgun-block-times.py`, in the same workflow). It dates
-  the records the page reads from Anon's archive. The page ships as its
-  built bundle, so an update to the table rebuilds it (the workflow does);
-  that step may fail on its own without holding back the Zcash tables.
-
-## Image Assets
-
-New raster image assets must be converted to lossless WebP before inclusion.
-Preserve their dimensions and decoded pixels, and update app, Widgetbook, and
-test references to `.webp`. For illustrations, use
-`scripts/convert-illustrations-to-webp.py` (`--apply` writes verified conversions).
-
-iOS native tab icons intentionally duplicate the Flutter SVGs in Xcode's asset
-catalog. Before changing tab icons or their loading path, read
-[docs/ios-native-tab-bar.md](docs/ios-native-tab-bar.md#icon-assets-and-synchronization)
-and refresh/check both copies with `scripts/sync-ios-native-tab-icons.py`.
-
-## Transaction Record Hero
-
-A transaction record opens on its type's icon (the one its activity row
-shows, from `activityKindIconName`) cast in liquid metal:
-`TransactionTypeHero` draws `assets/icons/<name>.svg` through `LiquidMetal`
-(`lib/src/core/widgets/liquid_metal.dart`, the NU7 announcement's shader) via
-`SvgShapeImage`, which rasterizes the SVG for the shader's shape. A Gift Card
-record shows the card instead, at 70% of the full card. There are no 3D
-models. Tests hold every `LiquidMetal` still
-(`LiquidMetal.debugDisableMotion`, set in `test/flutter_test_config.dart`) so
-screens with it can settle. Veylor keeps the hero but not upstream's castle
-engraving behind the record: `_RecordBackdrop` draws nothing, as the neon
-redesign drops painted backgrounds.
-
-## Editing Figma
-
-When the user explicitly asks you to modify a Figma file or design, read
-`FIGMA-AI-FIX.md` completely before starting and use it as the instructions and
-reference for that work.
-
-## Figma Visual Verification
-
-Use the widget-test capture as the default visual-comparison path in both
-directions: when applying an existing Flutter implementation to Figma and when
-implementing a Figma design in Flutter, then capturing the result to find and
-correct differences from the design.
-
-- Represent the required screen and state as a deterministic scenario in
-  `lib/figma_compare/figma_compare_scenarios.dart`. Prefer reusing an existing
-  Widgetbook fixture. The scenario must not depend on production wallet data,
-  storage, network, or Rust state.
-- Match the Figma reference's form factor, logical viewport, theme, locale,
-  content, and component state. Use the widget-test renderer for normal
-  desktop and mobile iterations:
-
-  ```bash
-  scripts/figma-compare.sh widget \
-    --scenario <scenario> \
-    --theme <dark|light>
-
-  scripts/figma-compare.sh widget \
-    --form-factor mobile \
-    --scenario <mobile-scenario> \
-    --theme <dark|light>
-  ```
-
-- Compare `content.widget.png` with the corresponding Figma capture side by
-  side and, when practical, with an overlay or image diff. After implementing
-  from Figma, correct the Flutter code and repeat the widget capture until no
-  actionable visual difference remains. Do not use Widgetbook chrome as
-  comparison evidence.
-- For desktop typography, font weight can render differently across Figma,
-  macOS, Windows, and Linux because platform font rasterization differs. Treat
-  the weight as matching when Flutter's configured `fontWeight` value matches
-  Figma's weight setting; do not choose a different weight solely to force
-  pixel-level visual parity. Continue to verify font family, size, line height,
-  letter spacing, wrapping, and positioning normally.
-- If the required state is not registered, add a reusable deterministic
-  capture scenario before falling back to a running platform app. Temporary
-  production routes, bootstrap overrides, or provider changes are a last
-  resort and must be removed before completion.
-- Use native macOS or iOS Simulator captures only for a final check of behavior
-  the widget-test renderer cannot represent, such as operating-system chrome,
-  the real window shell, native insets, or a material platform-rendering
-  difference. Keep the widget capture as the primary app-content comparison.
-- A request to compare an implementation with Figma does not authorize any
-  Figma mutation. Do not copy, move, or edit Figma nodes unless the user
-  explicitly requests a Figma change. When they do, read `FIGMA-AI-FIX.md` in
-  full and follow its target-approval, copy-only, and visual-parity workflow.
-
-## Figma Layer Interpretation
-
-When reading or implementing Figma designs, distinguish app UI from
-operating-system chrome and presentation-only background layers.
-
-- Ignore layers named `_MacOS Light Mode` and `_MacOS Dark Mode`. These are
-  operating-system screenshots/images placed behind the design for presentation
-  context only, and are not part of the app UI.
-- In a `Screen` frame, ignore any `Controls` layer that is a sibling of
-  `Window Contents`. This represents the native OS window title/status bar
-  controls, not app content.
-- If a Figma screen uses this structure, treat the meaningful app UI as starting
-  inside `Window Contents`, specifically from the `Trailing Pane` layer onward.
-- Do not recreate, style, test, or otherwise implement the ignored OS/background
-  layers unless the user explicitly asks to work on native window chrome.
+- **Attested.** Every AppImage and .deb gets signed build provenance
+  (`actions/attest-build-provenance`): its SHA-256 bound to this repository,
+  the commit and the workflow run.
+- **Published by the run.** The `publish` job checks each mainnet file's
+  attestation and writes `SHA256SUMS`. It then creates the release
+  `veylor-linux/vX.Y.Z` with the notes from
+  `release_notes/veylor-linux-vX.Y.Z.md`, or replaces the files of one already
+  there. The files on a release are the ones the run built; none passes
+  through a computer.
+- **Never latest** (`--latest=false`): the Mac's DMG link and update feed
+  resolve through "latest". The website links the Linux files by their tag.
+- **Anyone checks a download:**
+  `gh attestation verify <file> --repo ChinmayGopal931/vizor-fork`.
+- **Not yet:** the AppImages are unsigned (`LINUX_APPIMAGE_UNSIGNED`), the .debs
+  come from no repository, and nothing updates itself.
 
 ### Hardware Wallet QR Codes
 
