@@ -28,6 +28,11 @@ Veylor's macOS releases are the exception: each has
 (`Veylor-macos.md`) and which can serve as the GitHub release body. Write them
 for macOS users, in the format below; mark a beta as one in the title.
 
+Veylor's Android direct APK releases have
+`release_notes/veylor-android-vX.Y.Z.md`, the body of the release
+`veylor-android/vX.Y.Z`. Besides the changes, it carries the steps that check a
+download (AGENTS.md, "Android direct APK (verifiable)").
+
 ## Platform Scope
 
 Unless a release request explicitly says otherwise, draft release notes for the
