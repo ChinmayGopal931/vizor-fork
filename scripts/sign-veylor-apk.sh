@@ -11,8 +11,9 @@ APK (verifiable)"):
 
   1. The unsigned APK is com.veylor.app with all three ABIs, unsigned,
      aligned, and attested by .github/workflows/veylor-android.yml.
-  2. apksigner signs a copy with APK Signature Schemes v2 and v3 only, keeping
-     the build's alignment, so it adds the signature and nothing else.
+  2. apksigner signs a copy with APK Signature Scheme v3 (and v2 where the
+     minSdkVersion needs it), keeping the build's alignment, so it adds the
+     signature and nothing else.
   3. apksigner verifies it, and its certificate must be the one in
      scripts/release-config/veylor-android-certificate-sha256.txt.
   4. apksigcopier compare: the signed APK is the unsigned one plus the
@@ -220,9 +221,11 @@ unset keystore_password
 log "Verifying the signature"
 verification="$("${apksigner}" verify --verbose --print-certs "${signed_part}")" ||
   die "apksigner rejects the signed APK"
+# apksigner leaves v2 out when the APK's minSdkVersion verifies v3 on every
+# device it installs on (Veylor's is 30, Android 11; v3 is checked from 9), so
+# a v3 signature is what must be there, and v2 may or may not be.
 for line in \
   "Verified using v1 scheme (JAR signing): false" \
-  "Verified using v2 scheme (APK Signature Scheme v2): true" \
   "Verified using v3 scheme (APK Signature Scheme v3): true" \
   "Number of signers: 1"; do
   grep -qxF "${line}" <<<"${verification}" || die "apksigner did not report: ${line}"
