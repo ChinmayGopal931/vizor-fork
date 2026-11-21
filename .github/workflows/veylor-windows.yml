@@ -255,11 +255,13 @@ jobs:
           dotnet tool install --global vpk --version $env:VPK_VERSION
           "$HOME\.dotnet\tools" >> $env:GITHUB_PATH
 
-      # Upstream's own packaging regression checks, on fixtures (no build).
+      # Upstream's own packaging regression checks, on fixtures (no build),
+      # under PowerShell 7: Windows PowerShell 5.1's ConvertFrom-Json does not
+      # unroll the fixture's argument list.
       - name: Check the packaging script
         run: |
           pwsh -NoProfile -File scripts/test-windows-packaging.ps1
-          powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-windows-packaging.ps1
+          pwsh -NoProfile -File scripts/test-windows-packaging.ps1 -NativeProbe
 
       - name: Build and package Veylor
         env:
