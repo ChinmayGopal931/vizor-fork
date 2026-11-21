@@ -166,16 +166,16 @@ void LoadOn(int port, const std::string& step, std::function<void(bool ok)> next
 void Load(std::function<void(bool ok)> next) { LoadOn(g_options.proxy_port, "load", next); }
 
 // One page call. Only the result's own keys are printed: its values can name the wallet. A call whose step went on
-// without it (`abandoned` set) is not reported when its answer comes.
+// without it (`abandoned` set) is not reported when its answer comes. Its line names `step`, else the method.
 void Call(const std::string& method_name, const std::string& params_json, std::function<void(bool ok)> next,
           std::function<void(const std::string& result_json)> result = nullptr,
-          std::shared_ptr<bool> abandoned = nullptr) {
+          std::shared_ptr<bool> abandoned = nullptr, const std::string& step = std::string()) {
   const railgun_protocol::Method* method = railgun_protocol::FindMethod(method_name);
   const railgun_protocol::Method debug_method = {method_name.c_str(), 600};
   if (method == nullptr) method = &debug_method;
   const long long started = Ms();
   const railgun_protocol::Method copy = *method;
-  const std::string name = method_name;
+  const std::string name = step.empty() ? method_name : step;
   RailgunPageHost::Get().Call(copy, params_json, [name, next, result, started, abandoned](
                                                      const Error* error, const std::string& result_json) {
     if (abandoned && *abandoned) return;
@@ -524,11 +524,24 @@ void BuildSteps(Steps* steps) {
         Print("{\"step\":\"refresh\",\"ok\":true,\"stopped\":true,\"ms\":" + std::to_string(Ms()) + "}");
         next(true);
       });
+      auto finish = [answered, next](bool ok) {
+        *answered = true;
+        next(ok);
+      };
+      const bool reopening = g_options.mode == "reopen";
       Call(
           "refresh", "{}",
-          [answered, next](bool ok) {
-            *answered = true;
-            next(ok);
+          [answered, finish, reopening](bool ok) {
+            if (ok || !reopening || *answered) {
+              finish(ok);
+              return;
+            }
+            // A notes scan breaks off on a tree root the RPC hasn't caught up to; the app's next refresh tries again,
+            // and so does this, once, 15 s later. A store that doesn't open fails both.
+            Dispatch::Get().After(15000, [answered, finish]() {
+              if (*answered) return;
+              Call("refresh", "{}", finish, nullptr, answered, "refresh again");
+            });
           },
           nullptr, answered);
     });

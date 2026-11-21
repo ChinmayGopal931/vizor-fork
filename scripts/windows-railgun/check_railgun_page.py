@@ -175,17 +175,29 @@ def powershell(script: str) -> str:
     ).stdout
 
 
-def webview_sockets() -> dict:
-    """The WebView2 Runtime's processes' TCP connections and UDP endpoints."""
+def webview_sockets(owner: int) -> dict:
+    """The TCP connections and UDP endpoints of the WebView2 processes the check program `owner` started.
+
+    Only the page's own: its browser process is the check program's child, and the browser's renderer, GPU,
+    network and crash processes are its children. Other apps' WebView2 (Widgets, Search) talk to Microsoft directly
+    and are counted apart, as `others`.
+    """
     out = powershell(
-        "$ids = @(Get-Process msedgewebview2 -ErrorAction SilentlyContinue | ForEach-Object Id);"
+        "$all = @(Get-CimInstance Win32_Process -Filter \"Name = 'msedgewebview2.exe'\" -ErrorAction SilentlyContinue);"
+        f"$parents = @([uint32]{int(owner)}); $ids = @();"
+        "for ($depth = 0; $depth -lt 4; $depth++) {"
+        " $children = @($all | Where-Object { ($parents -contains $_.ParentProcessId) -and ($ids -notcontains $_.ProcessId) } |"
+        "   ForEach-Object { [uint32]$_.ProcessId });"
+        " if ($children.Count -eq 0) { break }; $ids += $children; $parents = $children"
+        "};"
+        "$others = $all.Count - $ids.Count;"
         "if ($ids.Count -gt 0) {"
         " $tcp = @(Get-NetTCPConnection -OwningProcess $ids -ErrorAction SilentlyContinue |"
         "   Select-Object LocalAddress,LocalPort,RemoteAddress,RemotePort,State);"
         " $udp = @(Get-NetUDPEndpoint -OwningProcess $ids -ErrorAction SilentlyContinue |"
         "   Select-Object LocalAddress,LocalPort);"
-        " @{processes=$ids.Count; tcp=$tcp; udp=$udp} | ConvertTo-Json -Compress -Depth 4"
-        "} else { '{\"processes\":0,\"tcp\":[],\"udp\":[]}' }"
+        " @{processes=$ids.Count; others=$others; tcp=$tcp; udp=$udp} | ConvertTo-Json -Compress -Depth 4"
+        "} else { @{processes=0; others=$others; tcp=@(); udp=@()} | ConvertTo-Json -Compress -Depth 4 }"
     ).strip()
     try:
         sample = json.loads(out or "{}")
@@ -260,7 +272,7 @@ class Run:
         if sample_sockets:
             def sample() -> None:
                 while process.poll() is None:
-                    samples.append(webview_sockets())
+                    samples.append(webview_sockets(process.pid))
                     time.sleep(5)
 
             sampler = threading.Thread(target=sample, daemon=True)
@@ -407,13 +419,16 @@ def main() -> int:
             udp = [endpoint for sample in sync.get("sockets", []) for endpoint in sample.get("udp", [])]
             run.report["sockets"] = {
                 "samples": len(sync.get("sockets", [])),
+                "processes": max((sample.get("processes") or 0 for sample in sync.get("sockets", [])), default=0),
+                # Other apps' WebView2 processes on the runner, not sampled.
+                "others": max((sample.get("others") or 0 for sample in sync.get("sockets", [])), default=0),
                 "tcp": len(tcp),
                 "outside_loopback": outside[:10],
                 "udp": udp[:10],
             }
-            run.check(bool(tcp), "the WebView2 processes' sockets were sampled")
-            run.check(not outside, "the WebView2 processes held no TCP connection off loopback")
-            run.check(not udp, "the WebView2 processes held no UDP socket")
+            run.check(bool(tcp), "the page's WebView2 processes' sockets were sampled")
+            run.check(not outside, "the page's WebView2 processes held no TCP connection off loopback")
+            run.check(not udp, "the page's WebView2 processes held no UDP socket")
 
         if "reopen" in modes:
             reopen = run.mode(
@@ -426,8 +441,13 @@ def main() -> int:
             databases = (step(reopen, "databases").get("value") or {}).get("databases") or []
             run.report["databases"] = databases
             run.check("level-js-railgun-sepolia" in databases, "the engine's IndexedDB is kept between runs")
-            for name in ("start", "openWallet", "refresh"):
+            for name in ("start", "openWallet"):
                 run.check(step(reopen, name).get("ok") is True, f"reopen: {name}")
+            first = step(reopen, "refresh")
+            if first.get("ok") is not True and first:
+                # Tried again once, as the app's next refresh would (a root the RPC hadn't caught up to).
+                run.report["reopen_retried"] = (first.get("error") or {}).get("message")
+            run.check(first.get("ok") is True or step(reopen, "refresh again").get("ok") is True, "reopen: refresh")
 
         if "reload" in modes:
             second = StandIn(hosts)
