@@ -543,7 +543,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           pattern: Veylor-linux-*
-          path: downloaded
+          path: ${{ runner.temp }}/downloaded
           merge-multiple: true
 
       - name: Check every file's attestation and write SHA256SUMS
@@ -551,17 +551,21 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          mkdir -p assets
-          cp downloaded/appimage/Veylor-linux-x86_64.AppImage downloaded/appimage/Veylor-linux-aarch64.AppImage assets/
-          cp downloaded/deb/veylor_"$VEYLOR_VERSION"_amd64.deb downloaded/deb/veylor_"$VEYLOR_VERSION"_arm64.deb assets/
-          cd assets
-          for file in *; do
+          # Outside the checkout, which has an assets/ of its own: only these
+          # four files and SHA256SUMS are ever published.
+          files=(Veylor-linux-x86_64.AppImage Veylor-linux-aarch64.AppImage
+            "veylor_${VEYLOR_VERSION}_amd64.deb" "veylor_${VEYLOR_VERSION}_arm64.deb")
+          mkdir "$RUNNER_TEMP/release"
+          cp "$RUNNER_TEMP"/downloaded/appimage/Veylor-linux-{x86_64,aarch64}.AppImage \
+            "$RUNNER_TEMP"/downloaded/deb/veylor_"$VEYLOR_VERSION"_{amd64,arm64}.deb "$RUNNER_TEMP/release/"
+          cd "$RUNNER_TEMP/release"
+          test "$(ls | wc -l)" -eq 4
+          for file in "${files[@]}"; do
             gh attestation verify "$file" --repo "$GITHUB_REPOSITORY" \
               --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/veylor-linux.yml" > /dev/null
             echo "attested: $file"
           done
-          sha256sum Veylor-linux-x86_64.AppImage Veylor-linux-aarch64.AppImage \
-            veylor_"$VEYLOR_VERSION"_amd64.deb veylor_"$VEYLOR_VERSION"_arm64.deb > SHA256SUMS
+          sha256sum "${files[@]}" > SHA256SUMS
           cat SHA256SUMS
 
       - name: Publish veylor-linux/v${{ env.VEYLOR_VERSION }}
@@ -577,10 +581,10 @@ jobs:
               echo "::error::$tag is published from $tag_commit; this run built $GITHUB_SHA. Raise VEYLOR_VERSION for a new release."
               exit 1
             fi
-            gh release upload "$tag" assets/* --clobber
+            gh release upload "$tag" "$RUNNER_TEMP"/release/* --clobber
             gh release edit "$tag" --notes-file "$notes" --latest=false
           else
-            gh release create "$tag" assets/* --target "$GITHUB_SHA" \
+            gh release create "$tag" "$RUNNER_TEMP"/release/* --target "$GITHUB_SHA" \
               --title "Veylor $VEYLOR_VERSION (beta) for Linux" \
               --notes-file "$notes" --latest=false
           fi
