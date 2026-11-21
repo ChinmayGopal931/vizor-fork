@@ -24,11 +24,6 @@ on:
         description: "versionCode (--build-number), as the Play build's"
         required: true
         default: "10"
-  # The branch's CI until the workflow is on main, which dispatch needs. A
-  # change to docs alone changes no byte of the APK.
-  push:
-    branches: [feat/android-apk]
-    paths-ignore: ["**.md"]
 
 permissions:
   contents: read

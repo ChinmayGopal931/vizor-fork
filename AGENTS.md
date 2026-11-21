@@ -586,7 +586,8 @@ uninstalling.
   veylor-1.0.3-10-unsigned -D <dir>`, then `scripts/sign-veylor-apk.sh
   --unsigned <dir>/veylor-1.0.3-10-unsigned.apk`. The script:
   - checks the APK's attestation and contents, then signs a copy with
-    apksigner (v2 and v3 only, the build's alignment kept);
+    apksigner (v3, the build's alignment kept; apksigner leaves v2 out, since
+    minSdkVersion 30 verifies v3 on every device that installs it);
   - uses `~/keys/veylor/veylor-apk.jks` (PKCS12, alias `apk`), whose password
     lives only in the login Keychain ("Veylor Android APK keystore", account
     `veylor-apk`) and reaches apksigner in its environment, never a command
@@ -616,8 +617,12 @@ uninstalling.
 What a user runs to check a download (the release notes carry this):
 
 1. `gh attestation verify veylor-1.0.3-10-unsigned.apk --repo
-   ChinmayGopal931/vizor-fork`: this repository's workflow built the file, and
-   the output names the commit.
+   ChinmayGopal931/vizor-fork --signer-workflow
+   ChinmayGopal931/vizor-fork/.github/workflows/veylor-android.yml`: this
+   repository's workflow built the file. Outside a terminal it prints nothing
+   and only its exit status tells; `--format json --jq
+   '.[].verificationResult.signature.certificate.sourceRepositoryDigest'`
+   prints the commit, which must be the release tag's.
 2. `apksigcopier compare veylor-1.0.3-10.apk --unsigned
    veylor-1.0.3-10-unsigned.apk` (`pip install apksigcopier`, with the Android
    SDK's `apksigner` on PATH): the signed APK is that build plus a signature,
