@@ -6,6 +6,7 @@ import importlib.util
 import json
 import os
 import pathlib
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -377,6 +378,89 @@ class AndroidReproducibleBuildScriptTest(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 2)
         self.assertIn("FLUTTER_BIN must be an absolute path", result.stderr)
+
+def _dry_run_command(*arguments: str) -> list[str]:
+    environment = os.environ.copy()
+    environment.pop("FLUTTER_BIN", None)
+    result = subprocess.run(
+        [str(REPRODUCIBLE_BUILD_PATH), *arguments, "--dry-run"],
+        check=True,
+        cwd=ROOT,
+        env=environment,
+        capture_output=True,
+        text=True,
+    )
+    return shlex.split(result.stdout.split("Command:", 1)[1])
+
+
+class VeylorReproducibleBuildTest(unittest.TestCase):
+    """Veylor's direct APK must compile exactly the Play build's settings."""
+
+    def test_veylor_flavor_builds_the_play_settings_as_one_apk(self) -> None:
+        command = _dry_run_command(
+            "--flavor", "veylor", "--universal",
+            "--build-name", "1.0.3", "--build-number", "10",
+            "--signing", "unsigned", "--degoogled",
+        )
+        self.assertEqual(
+            command,
+            [
+                "fvm", "flutter", "build", "apk", "--release",
+                "--target-platform", "android-arm64,android-arm,android-x64",
+                "--build-name", "1.0.3", "--build-number", "10",
+                "--dart-define=VIZOR_FORM_FACTOR=mobile",
+                "--dart-define=VIZOR_PRIVATE_USD_ENABLED=true",
+                "--dart-define=ZCASH_DEFAULT_NETWORK=main",
+                "--dart-define=VIZOR_APPLICATION_ID=com.veylor.app",
+                "--dart-define=VIZOR_DEGOOGLED=true",
+            ],
+        )
+        with_version = _dry_run_command(
+            "--flavor", "veylor", "--universal",
+            "--build-name", "1.0.3", "--build-number", "10",
+            "--release-version", "1.0.3", "--signing", "unsigned",
+        )
+        self.assertIn("--dart-define=VIZOR_RELEASE_VERSION=1.0.3", with_version)
+
+    def test_vizor_flavor_command_is_unchanged(self) -> None:
+        command = _dry_run_command(
+            "--build-name", "0.0.35", "--build-number", "350999",
+            "--release-version", "0.0.35", "--signing", "unsigned", "--degoogled",
+        )
+        self.assertEqual(
+            command,
+            [
+                "fvm", "flutter", "build", "apk", "--release", "--split-per-abi",
+                "--target-platform", "android-arm64,android-arm,android-x64",
+                "--build-name", "0.0.35", "--build-number", "350999",
+                "--dart-define=VIZOR_FORM_FACTOR=mobile",
+                "--dart-define=VIZOR_RELEASE_VERSION=0.0.35",
+                "--dart-define=VIZOR_COINGECKO_PRICE_BASE_URL=https://functions.vizor.cash/api/v3",
+                "--dart-define=VIZOR_WALLET_LINK_BACKEND_URL=https://functions.vizor.cash",
+                "--dart-define=VIZOR_DEGOOGLED=true",
+            ],
+        )
+
+    def test_rejects_inconsistent_options(self) -> None:
+        common = ["--build-name", "1.0.3", "--build-number", "10", "--signing", "unsigned"]
+        cases = (
+            (["--flavor", "play"], "--flavor must be vizor or veylor"),
+            ([], "--release-version must start with an X.Y.Z version"),
+            (["--flavor", "veylor", "--universal", "--target-abi", "arm64-v8a"],
+             "--universal builds every ABI"),
+        )
+        for extra, message in cases:
+            with self.subTest(extra=extra):
+                result = subprocess.run(
+                    [str(REPRODUCIBLE_BUILD_PATH), *common, *extra, "--dry-run"],
+                    check=False,
+                    cwd=ROOT,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(result.returncode, 2)
+                self.assertIn(message, result.stderr)
+
 
 class AndroidReproducibleRustWrapperTest(unittest.TestCase):
     def _run_with_fake_rustup(self, *, installed: bool) -> tuple[subprocess.CompletedProcess, pathlib.Path]:
