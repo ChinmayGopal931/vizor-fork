@@ -77,8 +77,13 @@ bytes = "1"
 http = "1"
 http-body = "1"
 http-body-util = "0.1"
-hyper = "1"
+hyper = { version = "1", features = ["client", "http1"] }
 hyper-rustls = { version = "0.27", default-features = false, features = ["http1", "http2", "ring", "tls12", "webpki-roots"] }
+# Windows's Railgun page host fetches Anon's archive through `railgun_archive`
+# (HTTP/1.1 over its own TLS); both are already in the graph through
+# hyper-rustls.
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
+webpki-roots = "1"
 hyper-util = { version = "0.1", features = ["client-legacy", "http1", "http2", "tokio"] }
 tower-service = "0.3"
 time = "0.3"
