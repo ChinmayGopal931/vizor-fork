@@ -10,6 +10,7 @@
 #include "flutter/generated_plugin_registrant.h"
 #include "single_instance.h"
 #include "caps_lock_channel.h"
+#include "private_usd/private_usd_channels.h"
 
 struct _MyApplication {
   GtkApplication parent_instance;
@@ -217,6 +218,7 @@ static void my_application_activate(GApplication* application) {
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
   register_payment_uri_channel(self, view);
   register_caps_lock_channel(view, window);
+  register_private_usd_channels(view, window, GTK_APPLICATION(application));
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }

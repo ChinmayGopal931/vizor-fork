@@ -2889,6 +2889,25 @@ M8 status (2026-10-14): the non-device parts are done.
   stores identical to `main`'s but for record times and the same five newer
   unshields. The Nord was not run.
 
+- **D-159 (owner, 2026-11-20): the archive's tip is taken where it starts,
+  and Android's page names no phone.** The Mac's parity review
+  (`docs/private-usd-railgun-hosts.md`, section 8) found two things in the
+  shared page and Android's host. The archive names a sealed chunk's blocks,
+  and the tip's, from its first event's to its last's, so the tip starts some
+  blocks after the last sealed chunk ends (26,440,026 after 26,439,999 that
+  day); the page took the tip only at the block right after, so every sync
+  far behind read the tip's days from rail-squid and the transaction list
+  left the archive for the rest of the page. The owner's rule was to change
+  it only as Anon's own client does: Anon's wallet (0.14.1) takes the tip as
+  everything after the last sealed chunk and joins them by sequence and the
+  verification hashes, never by the tip's first block. The page now takes a
+  tip that starts after the last sealed chunk, as it takes each sealed chunk
+  after the one before, and keeps its own stronger checks: every file's
+  checksum, the tree positions and the verification hashes. The page's
+  WebView sent its default User-Agent, which names the phone's model and
+  Android build, to the RPC, rail-squid, the screening nodes and the artifact
+  hosts; it now sends the archive fetch's `Mozilla/5.0`.
+
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's
   `zakura-client-backend` pins `digest =0.11.0-pre.9` (through

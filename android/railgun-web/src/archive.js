@@ -2,6 +2,13 @@
 // that is replaced every few seconds. Every path depends on the chain alone. Every event file is checked against the
 // SHA-256 the archive publishes for it before it is used, and anything unexpected is an `ArchiveUnavailable`, on which
 // the sync turns to rail-squid.
+//
+// A chunk's block range, and the tip's, runs from its first block with an event to its last: the archive seals the
+// tip's oldest events into a chunk, whole blocks at a time, and the tip goes on at its next event. So a range mostly
+// starts some blocks after the one before ends, the blocks between holding no event (238 of the 243 seams between
+// mainnet's sealed chunks on 2026-11-20). The block numbers show only that two ranges don't overlap; what shows that no
+// event is missing between them is what the events carry: commitments run on by tree position (archive-sync.js), and
+// transactions continue the verification hashes (archive-txids.js).
 import { pauseMark, pausedSince } from './page-clock.js';
 
 /** The archive can't be used from here on: the sync goes on from rail-squid. */
@@ -199,8 +206,9 @@ export function archive(base, chainId, { fetch = globalThis.fetch, retryMs = RET
     },
 
     /**
-     * The tip of `manifest`, starting the block after `after` (the last sealed chunk's end): its event files of
-     * `kinds`. A tip replaced since the manifest was read fails as `TipMoved`.
+     * The tip of `manifest`, starting after `after` (the last sealed chunk's end), at its first block with an event,
+     * as a sealed chunk starts after the one before: its event files of `kinds`. A tip replaced since the manifest was
+     * read fails as `TipMoved`.
      */
     async tip(manifest, after, kinds) {
       const query = `?v=${manifest.tipChecksum}`;
@@ -209,7 +217,9 @@ export function archive(base, chainId, { fetch = globalThis.fetch, retryMs = RET
       const meta = decode(bytes, 'tip/meta.json');
       if (
         !reads(meta.formatVersion, KNOWN.tipFormat) ||
-        meta.startBlock !== after + 1 ||
+        !Number.isSafeInteger(meta.startBlock) ||
+        !Number.isSafeInteger(meta.endBlock) ||
+        !(meta.startBlock > after) ||
         !(meta.endBlock >= meta.startBlock - 1)
       ) {
         throw new ArchiveUnavailable(`the tip does not follow block ${after}`);
@@ -231,8 +241,8 @@ export function archive(base, chainId, { fetch = globalThis.fetch, retryMs = RET
 /**
  * Every sealed chunk overlapping `fromBlock` and on, then the tip, from `reader` (`archive`): `{startBlock, endBlock,
  * <kinds>}` in block order, each starting after the last, `prefetch` chunks downloading ahead. The manifest is read
- * again before the tip, and chunks sealed since come first; a tip that moved is read again. The tip must start the
- * block after the last sealed chunk, or the range ends there as an `ArchiveUnavailable`.
+ * again before the tip, and chunks sealed since come first; a tip that moved is read again. The tip must start after
+ * the last sealed chunk ends, or the range ends there as an `ArchiveUnavailable`.
  */
 export async function* archiveRange(reader, fromBlock, kinds, { prefetch = 4 } = {}) {
   let manifest = await reader.manifest();

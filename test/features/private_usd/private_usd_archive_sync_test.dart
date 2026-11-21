@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/app_bootstrap.dart';
 import 'package:zcash_wallet/src/core/config/rpc_endpoint_config.dart';
+import 'package:zcash_wallet/src/core/layout/app_form_factor.dart';
 import 'package:zcash_wallet/src/core/storage/app_secure_store.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/railgun_models.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_archive_sync_provider.dart';
@@ -23,6 +24,7 @@ void main() {
   ProviderContainer containerWith({
     required PrivateUsdArchiveSyncStore store,
     String railgunNetwork = 'mainnet',
+    bool railgunHostSupported = false,
   }) {
     final container = ProviderContainer(
       overrides: [
@@ -36,6 +38,7 @@ void main() {
             rpcEndpointConfig: defaultRpcEndpointConfig('main'),
             themeMode: ThemeMode.dark,
             privacyModeEnabled: false,
+            railgunHostSupported: railgunHostSupported,
             isPasswordConfigured: true,
             isUnlocked: true,
             passwordRotationRecoveryFailed: false,
@@ -101,6 +104,67 @@ void main() {
       isFalse,
       reason: "the iOS host doesn't fetch it for the page",
     );
+  });
+
+  test("the Mac's page starts on the archive where its host runs the page, "
+      'on mainnet, with the setting on', () async {
+    final start = FutureProvider.autoDispose(privateUsdArchiveSyncOf);
+    Future<bool> starts(ProviderContainer container) =>
+        container.read(start.future);
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+
+    expect(
+      await starts(
+        containerWith(
+          store: MemoryArchiveSyncStore(),
+          railgunHostSupported: true,
+        ),
+      ),
+      isTrue,
+    );
+    expect(
+      await starts(
+        containerWith(
+          store: MemoryArchiveSyncStore(false),
+          railgunHostSupported: true,
+        ),
+      ),
+      isFalse,
+    );
+    expect(
+      await starts(containerWith(store: MemoryArchiveSyncStore())),
+      isFalse,
+      reason: 'below macOS 14 no host runs the page',
+    );
+    expect(
+      await starts(
+        containerWith(
+          store: MemoryArchiveSyncStore(),
+          railgunNetwork: 'sepolia',
+          railgunHostSupported: true,
+        ),
+      ),
+      isFalse,
+    );
+  });
+
+  // The Mac's and Linux's desktop hosts fetch it too, where they run the page.
+  test('desktop hosts fetch the archive where they run the page', () async {
+    final start = FutureProvider.autoDispose(privateUsdArchiveSyncOf);
+    for (final platform in [TargetPlatform.macOS, TargetPlatform.linux]) {
+      debugDefaultTargetPlatformOverride = platform;
+      for (final supported in [true, false]) {
+        final container = containerWith(
+          store: MemoryArchiveSyncStore(),
+          railgunHostSupported: supported,
+        );
+        expect(
+          await container.read(start.future),
+          kDesktopFormFactor && supported,
+          reason: '${platform.name}, host supported: $supported',
+        );
+      }
+    }
   });
 
   test(

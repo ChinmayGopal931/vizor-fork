@@ -160,8 +160,9 @@ bool privateUsdEngineEnabledFor({
 
 /// Whether [platform] runs the Railgun page in a [formFactor] build: on the
 /// phones every Android build, and iOS where its host says so (iOS 17 and
-/// later); on desktop the Mac where its host says so (macOS 14 and later).
-/// Windows and Linux have no host yet.
+/// later); on desktop the Mac where its host says so (macOS 14 and later) and
+/// Linux where its host says so (WebKitGTK 4.1 installed, and WebKit's sandbox
+/// starts). Windows has no host yet.
 bool privateUsdPlatformHostsPage({
   required AppFormFactor formFactor,
   required TargetPlatform platform,
@@ -170,5 +171,7 @@ bool privateUsdPlatformHostsPage({
   AppFormFactor.mobile =>
     platform == TargetPlatform.android ||
         (platform == TargetPlatform.iOS && hostSupported),
-  AppFormFactor.desktop => platform == TargetPlatform.macOS && hostSupported,
+  AppFormFactor.desktop =>
+    (platform == TargetPlatform.macOS || platform == TargetPlatform.linux) &&
+        hostSupported,
 };

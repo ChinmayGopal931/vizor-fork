@@ -16,6 +16,7 @@ import '../../../swap/models/swap_activity_status_mapper.dart';
 import '../../../swap/models/swap_status_presentation.dart';
 import '../../../swap/widgets/mobile/mobile_swap_review_header.dart';
 import '../../../swap/widgets/mobile/mobile_swap_status_content.dart';
+import '../../models/private_usd_desktop_wording.dart';
 import '../../models/private_usd_record_key.dart';
 import '../../private_usd_copy.dart';
 import '../../providers/private_usd_conversion_provider.dart';
@@ -231,7 +232,9 @@ class DesktopPrivateUsdKeepVisibleRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final l10n = context.l10n;
-    final detail = l10n.privateUsdKeepVisibleDetailDesktop;
+    final detail = privateUsdLinuxWording
+        ? l10n.privateUsdKeepVisibleDetailLinux
+        : l10n.privateUsdKeepVisibleDetailDesktop;
     final awake = l10n.privateUsdKeepDisplayAwakeDesktop;
     return Padding(
       key: const ValueKey('desktop_private_usd_progress_keep_open'),

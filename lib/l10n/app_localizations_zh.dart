@@ -8393,6 +8393,10 @@ class AppLocalizationsZh extends AppLocalizations {
       '报价送达时已过期。请检查 Mac 的时间是否准确，然后重试。';
 
   @override
+  String get privateUsdConvertQuoteClockAheadLinux =>
+      '报价送达时已过期。请检查电脑的时间是否准确，然后重试。';
+
+  @override
   String privateUsdConvertQuoteExpires(String minutesSeconds) {
     return '报价剩余有效时间 $minutesSeconds';
   }
@@ -8852,6 +8856,10 @@ class AppLocalizationsZh extends AppLocalizations {
       '如果窗口被遮挡、最小化，或 Mac 进入睡眠，跨链会暂停，直到你回来。';
 
   @override
+  String get privateUsdKeepVisibleDetailLinux =>
+      '如果窗口被最小化，或电脑锁屏或进入睡眠，跨链会暂停，直到你回来。';
+
+  @override
   String get privateUsdLoadFailed => '无法加载余额，请稍后重试。';
 
   @override
@@ -9106,6 +9114,10 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get privateUsdReverseProvingNoteDesktop =>
       '你的 Mac 正在为此付款生成零知识证明，可能需要几分钟。请保持 Veylor 打开并让其窗口保持可见。';
+
+  @override
+  String get privateUsdReverseProvingNoteLinux =>
+      '你的电脑正在为此付款生成零知识证明，可能需要几分钟。请保持 Veylor 打开并让其窗口保持可见。';
 
   @override
   String get privateUsdReverseRailgunFee => 'Railgun 转为公开手续费';
@@ -9424,6 +9436,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get privateUsdSendInfoStepProofDesktop => '你的 Mac 会生成零知识证明，需要几秒钟。';
 
   @override
+  String get privateUsdSendInfoStepProofLinux => '你的电脑会生成零知识证明，需要几秒钟。';
+
+  @override
   String get privateUsdSendInfoTitle => '发送隐私 USD';
 
   @override
@@ -9453,6 +9468,10 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get privateUsdSendProvingDetailDesktop =>
       '你的 Mac 正在生成零知识证明，让任何人都看不到你发送的内容。这需要几秒钟。请保持 Veylor 打开并让其窗口保持可见。';
+
+  @override
+  String get privateUsdSendProvingDetailLinux =>
+      '你的电脑正在生成零知识证明，让任何人都看不到你发送的内容。这需要几秒钟。请保持 Veylor 打开并让其窗口保持可见。';
 
   @override
   String privateUsdSendProvingPercent(int percent) {
@@ -9607,6 +9626,10 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get privateUsdWithdrawInfoStepProofDesktop =>
       '你的 Mac 会生成证明，然后美元会离开 Railgun，转到该地址。';
+
+  @override
+  String get privateUsdWithdrawInfoStepProofLinux =>
+      '你的电脑会生成证明，然后美元会离开 Railgun，转到该地址。';
 
   @override
   String get privateUsdWithdrawInfoTitle => '提取后将公开';

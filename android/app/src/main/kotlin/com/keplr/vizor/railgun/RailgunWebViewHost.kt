@@ -123,6 +123,8 @@ internal class RailgunWebViewHost(
             settings.domStorageEnabled = true
             settings.allowFileAccess = false
             settings.allowContentAccess = false
+            // The WebView's own names the phone's model and its Android build to every host the page reaches.
+            settings.userAgentString = RailgunRequests.USER_AGENT
             webChromeClient = Chrome(debug)
         }
 
@@ -359,6 +361,12 @@ internal object RailgunRequests {
     const val ASSETS_DIR = "railgun/"
     const val ASSETS_PATH = "/assets/$ASSETS_DIR"
     const val PAGE_URL = "$PAGE_ORIGIN${ASSETS_PATH}index.html"
+
+    /**
+     * The User-Agent of every request the page makes, and of the host's archive fetches ([RailgunArchiveFetch]): the
+     * same for every phone, naming no model, build or version.
+     */
+    const val USER_AGENT = "Mozilla/5.0"
     private const val HTTPS = "https"
     private const val DEFAULT_PORT = -1
 

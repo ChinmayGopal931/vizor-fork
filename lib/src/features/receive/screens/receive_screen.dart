@@ -28,6 +28,7 @@ import '../../../providers/wallet_provider.dart';
 import '../../../providers/zec_price_change_provider.dart';
 import '../services/request_qr_export.dart';
 import '../services/zec_request_draft.dart';
+import '../widgets/mobile/receive_qr_frame.dart';
 import '../widgets/receive_address_widgets.dart';
 import '../widgets/request/request_amount_card.dart';
 import '../widgets/request/request_amount_model.dart';
@@ -1210,14 +1211,29 @@ class _ReceiveQrCard extends StatelessWidget {
                 children: [
                   Positioned(
                     top: 0,
-                    child: ReceiveQrSurface(
-                      address: address,
-                      size: _qrSurfaceSize,
-                      paddingX: _qrPaddingX,
-                      paddingY: _qrPaddingY,
-                      type: type,
-                      scanOptimized: scanOptimizedQr,
-                    ),
+                    // The phones' code in their lit frame, Veylor's helmet in
+                    // its middle; its plate gives the frame's gap back, so the
+                    // block keeps its size and the code its side. A Keystone
+                    // account's scan-first code stays as it was.
+                    child: scanOptimizedQr
+                        ? ReceiveQrSurface(
+                            address: address,
+                            size: _qrSurfaceSize,
+                            paddingX: _qrPaddingX,
+                            paddingY: _qrPaddingY,
+                            type: type,
+                            scanOptimized: true,
+                          )
+                        : ReceiveQrFrame(
+                            child: ReceiveQrSurface(
+                              address: address,
+                              size: _qrSurfaceSize,
+                              paddingX: _qrPaddingX - kReceiveQrFrameGap,
+                              paddingY: _qrPaddingY - kReceiveQrFrameGap,
+                              type: type,
+                              neonFramed: true,
+                            ),
+                          ),
                   ),
                   if (type == ReceiveAddressType.shielded)
                     Positioned(

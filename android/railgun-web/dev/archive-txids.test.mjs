@@ -28,15 +28,15 @@ const FAR = { blockNumber: FROM + 100_000, timestamp: blockTime(FROM + 100_000) 
 const hex = (value) => BigInt(value).toString(16).padStart(64, '0');
 
 /**
- * `count` transactions, three to a block, each verification hash continuing the chain: as the archive records them,
- * and as rail-squid lists them.
+ * `count` transactions, three to a block (or in the block `blockOf` gives each sequence), each verification hash
+ * continuing the chain: as the archive records them, and as rail-squid lists them.
  */
-function transactions(count) {
+function transactions(count, blockOf = (sequence) => FROM + Math.floor(sequence / 3)) {
   const archived = [];
   const listed = [];
   let previous;
   for (let sequence = 0; sequence < count; sequence += 1) {
-    const blockNumber = FROM + Math.floor(sequence / 3);
+    const blockNumber = blockOf(sequence);
     const record = {
       version: 2,
       sequence,
@@ -181,6 +181,29 @@ test("a gap in the archive's sequence alone, every transaction there and the cha
   assert.deepEqual(sync.left, []);
   assert.deepEqual(sync.asked, [], 'rail-squid not asked while the archive has more');
   assert.deepEqual(verifications(sync.kept), verifications(listed.slice(0, 50)));
+});
+
+// Three to a block, but none from FROM + 20 to FROM + 24: the last sealed chunk names its blocks through FROM + 19,
+// its last transaction's, and the tip from FROM + 25, its first's, as on mainnet.
+const seamed = (sequence) => FROM + Math.floor(sequence / 3) + (sequence >= 60 ? 5 : 0);
+
+test('a tip that starts blocks after the last sealed chunk ends keeps the list on the archive, the chain whole', async () => {
+  const { archived, listed } = transactions(75, seamed);
+  const sync = txidSync({ archived, listed });
+  for (let batch = 0; batch < 3; batch += 1) await sync.next();
+  assert.deepEqual(sync.left, []);
+  assert.deepEqual(sync.asked, [], 'rail-squid not asked while the archive has more');
+  assert.ok(sync.server.asked.includes('tip/transactions.json.gz'));
+  assert.deepEqual(verifications(sync.kept), verifications(listed));
+});
+
+test('a transaction missing between the last sealed chunk and the tip breaks the verification hashes: rail-squid gives it', async () => {
+  const { archived, listed } = transactions(75, seamed);
+  // The archive without the tip's first block, as a tip that started a block late would be.
+  const sync = txidSync({ archived: archived.filter(({ blockNumber }) => blockNumber !== FROM + 25), listed });
+  for (let batch = 0; batch < 3; batch += 1) await sync.next();
+  assert.match(sync.left[0], /transaction 63 breaks the verification hashes/);
+  assert.deepEqual(verifications(sync.kept), verifications(listed));
 });
 
 test("rail-squid down after the archive's last transaction keeps what the archive gave, and fails nothing", async () => {

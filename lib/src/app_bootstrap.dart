@@ -1,8 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart' show kDebugMode, visibleForTesting;
-import 'package:flutter/material.dart' show ThemeMode;
+import 'package:flutter/material.dart' show ThemeMode, WidgetsBinding;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -112,9 +113,10 @@ class AppBootstrapState {
   final bool? enhancePirEnabled;
 
   /// Whether this platform's Railgun host can run Private USD's page: Android
-  /// always, iOS from iOS 17, nothing else. `null` when the iOS handler did
-  /// not answer yet; it is asked again after the first frame. Only builds
-  /// with Private USD ask; the rest keep `false`.
+  /// always, iOS from iOS 17, the Mac from macOS 14, Linux where WebKit's
+  /// sandbox starts, nothing else. `null` when the iOS handler did not answer
+  /// yet, and always on Linux; it is asked again after the first frame. Only
+  /// builds with Private USD ask; the rest keep `false`.
   final bool? railgunHostSupported;
 
   /// The saved NEAR swap privacy setting, or `null` when it could not be read
@@ -345,10 +347,22 @@ Future<AppBootstrapState> loadAppBootstrap({
     );
     final portfolioChart = await readPortfolioChartPreferences(storage);
     final enhancePirEnabled = await readEnhancePirEnabledPreference(storage);
-    // Known before the first frame, so the router's synchronous guards see it.
-    final railgunHostSupported = kPrivateUsdBuildEnabled
-        ? await queryRailgunHostSupported()
-        : false;
+    // Known before the first frame, so the router's synchronous guards see it;
+    // except on Linux, whose host answers once its sandbox check has run in a
+    // process of its own (about a second): it is asked after the first frame
+    // instead (`RailgunHostSupportedNotifier`), so it never delays the start.
+    final railgunHostSupported = !kPrivateUsdBuildEnabled
+        ? false
+        : Platform.isLinux
+        ? null
+        : await queryRailgunHostSupported();
+    // Linux's check starts once the first frame is up, so its answer is in
+    // by the time the unlocked wallet asks.
+    if (kPrivateUsdBuildEnabled && Platform.isLinux) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => unawaited(queryRailgunHostSupported()),
+      );
+    }
     final flipToHideBalanceEnabled = await _readPlainBool(
       storage,
       key: kFlipToHideBalanceEnabledKey,

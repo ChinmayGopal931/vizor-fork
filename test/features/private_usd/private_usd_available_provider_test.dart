@@ -155,6 +155,33 @@ void main() {
     );
   });
 
+  // Linux's host says yes only once WebKit's sandbox has started for it: a
+  // page never runs without it.
+  test(
+    'desktop hosts the page on the Mac and Linux where the host says so',
+    () {
+      bool hosts(TargetPlatform platform, {required bool hostSupported}) =>
+          privateUsdPlatformHostsPage(
+            formFactor: AppFormFactor.desktop,
+            platform: platform,
+            hostSupported: hostSupported,
+          );
+      for (final platform in [TargetPlatform.macOS, TargetPlatform.linux]) {
+        expect(
+          hosts(platform, hostSupported: true),
+          isTrue,
+          reason: platform.name,
+        );
+        expect(
+          hosts(platform, hostSupported: false),
+          isFalse,
+          reason: platform.name,
+        );
+      }
+      expect(hosts(TargetPlatform.windows, hostSupported: true), isFalse);
+    },
+  );
+
   // The swap engine runs for every account's conversions whatever the
   // kill switch or the active account, but only in mobile builds with the
   // define and a deployment, on a platform that hosts the page: desktop stays

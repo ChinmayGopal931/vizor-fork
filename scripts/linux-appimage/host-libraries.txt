@@ -110,3 +110,9 @@ libxkbcommon.so.0*
 libxml2.so.2*
 libz.so.1*
 libzstd.so.1*
+
+# Shielded USD's page process loads the system's WebKitGTK, its JavaScriptCore
+# and libsoup at run time; the AppImage never carries them.
+libwebkit2gtk-*.so*
+libjavascriptcoregtk-*.so*
+libsoup-*.so*

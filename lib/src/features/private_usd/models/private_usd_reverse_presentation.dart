@@ -11,6 +11,7 @@ import '../../swap/models/swap_status_presentation.dart';
 import '../services/private_usd_engine.dart';
 import '../services/private_usd_reverse_funding.dart';
 import 'private_usd_balances.dart';
+import 'private_usd_desktop_wording.dart';
 import 'private_usd_explorer.dart';
 import 'private_usd_fees.dart';
 import 'private_usd_messages.dart';
@@ -391,11 +392,13 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation(
         : null,
     callOffPaid: !unpaid,
     showsKeepOpen: true,
-    // On the Mac the window must stay visible: WebKit suspends the page that
+    // On desktop the window must stay visible: WebKit suspends the page that
     // proves while it is hidden.
     provingNote: proving
         ? (kDesktopFormFactor
-              ? l10n.privateUsdReverseProvingNoteDesktop
+              ? (privateUsdLinuxWording
+                    ? l10n.privateUsdReverseProvingNoteLinux
+                    : l10n.privateUsdReverseProvingNoteDesktop)
               : l10n.privateUsdReverseProvingNote)
         : null,
     title: l10n.privateUsdConvertProgressTitle,
