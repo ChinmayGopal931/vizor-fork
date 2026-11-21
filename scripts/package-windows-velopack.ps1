@@ -20,6 +20,14 @@ param(
   [string]$CodeSignParams = $env:VIZOR_WINDOWS_CODE_SIGN_PARAMS,
   [string]$CodeSignParallel = $env:VIZOR_WINDOWS_CODE_SIGN_PARALLEL,
   [string]$CodeSignExclude = $env:VIZOR_WINDOWS_CODE_SIGN_EXCLUDE,
+  # The build's number, stamped into the version resource and the
+  # VIZOR_RELEASE_BUILD_NUMBER define; the build name is then -Version's
+  # numbers. Empty keeps pubspec.yaml's version, as upstream's builds do.
+  [string]$BuildNumber = $env:VIZOR_RELEASE_BUILD_NUMBER,
+  # true compiles Shielded USD in (AGENTS.md, "Private USD"); it shows where
+  # the WebView2 Runtime runs its Railgun page (docs/private-usd-windows.md).
+  # Empty: not passed.
+  [string]$PrivateUsdEnabled = $env:VIZOR_PRIVATE_USD_ENABLED,
   [ValidateSet("x64", "arm64")]
   [string]$Arch = "x64",
   [switch]$Msi,
@@ -315,8 +323,8 @@ if (-not [string]::IsNullOrEmpty($ApplicationId)) {
     throw "VIZOR_APPLICATION_ID must be a package name such as com.veylor.desktop, not '$ApplicationId'."
   }
   $VeylorIdentity = switch -CaseSensitive ($ApplicationId) {
-    "com.veylor.desktop" { @{ Network = "mainnet"; Title = "Veylor"; StoragePrefix = "Veylor" } }
-    "com.veylor.desktop.testnet" { @{ Network = "testnet"; Title = "Veylor Testnet"; StoragePrefix = "VeylorTestnet" } }
+    "com.veylor.desktop" { @{ Network = "mainnet"; Title = "Veylor"; StoragePrefix = "Veylor"; PackedExeName = "Veylor.exe" } }
+    "com.veylor.desktop.testnet" { @{ Network = "testnet"; Title = "Veylor Testnet"; StoragePrefix = "VeylorTestnet"; PackedExeName = "VeylorTestnet.exe" } }
     default { throw "No Windows identity is defined for VIZOR_APPLICATION_ID '$ApplicationId'. Use com.veylor.desktop or com.veylor.desktop.testnet." }
   }
   if (-not $PSBoundParameters.ContainsKey("Network")) {
@@ -370,6 +378,11 @@ $CompanyName = "com.keplr"
 $CopyrightHolder = "com.keplr"
 $ProductName = $PackTitle
 $AppIconPath = Join-Path $repoRoot "windows\runner\resources\app_icon.ico"
+# The executable as built (CMake's BINARY_NAME, which `flutter run` needs), and
+# as packaged: a Veylor package names it after Veylor, so nothing it installs
+# says Vizor.
+$PackedExeName = "Vizor.exe"
+$PackAuthors = ""
 if ($VeylorIdentity) {
   # The package, app data, secure storage and single-instance lock all follow
   # the identity, so nothing is shared with an installed Vizor. CMake checks
@@ -379,6 +392,9 @@ if ($VeylorIdentity) {
   $ProductName = $VeylorIdentity.Title
   $WindowsStoragePrefix = $VeylorIdentity.StoragePrefix
   $AppIconPath = Join-Path $repoRoot "windows\runner\resources\veylor_app_icon.ico"
+  $PackedExeName = $VeylorIdentity.PackedExeName
+  # The publisher Apps & features and the package's metadata name.
+  $PackAuthors = "Zapp LLC"
   $env:VIZOR_APPLICATION_ID = $ApplicationId
 } else {
   Remove-Item Env:VIZOR_APPLICATION_ID -ErrorAction SilentlyContinue
@@ -388,7 +404,7 @@ $env:VIZOR_WINDOWS_COMPANY_NAME = $CompanyName
 $env:VIZOR_WINDOWS_FILE_DESCRIPTION = $PackTitle
 $env:VIZOR_WINDOWS_INTERNAL_NAME = $PackTitle
 $env:VIZOR_WINDOWS_LEGAL_COPYRIGHT = "Copyright (C) 2026 $CopyrightHolder. All rights reserved."
-$env:VIZOR_WINDOWS_ORIGINAL_FILENAME = "Vizor.exe"
+$env:VIZOR_WINDOWS_ORIGINAL_FILENAME = $PackedExeName
 $env:VIZOR_WINDOWS_PRODUCT_NAME = $ProductName
 $env:VIZOR_WINDOWS_STORAGE_PREFIX = $WindowsStoragePrefix
 
@@ -441,6 +457,24 @@ $flutterBuildArgs = @(
   "--dart-define=VIZOR_COINGECKO_PRICE_BASE_URL=$CoinGeckoPriceBaseUrl",
   "--dart-define=VIZOR_WALLET_LINK_BACKEND_URL=$WalletLinkBackendUrl"
 )
+$PrivateUsdEnabled = "$PrivateUsdEnabled".Trim()
+if (-not [string]::IsNullOrEmpty($PrivateUsdEnabled)) {
+  if ($PrivateUsdEnabled -cnotmatch '^(true|false)$') {
+    throw "VIZOR_PRIVATE_USD_ENABLED must be true or false, not '$PrivateUsdEnabled'."
+  }
+  $flutterBuildArgs += "--dart-define=VIZOR_PRIVATE_USD_ENABLED=$PrivateUsdEnabled"
+}
+$BuildNumber = "$BuildNumber".Trim()
+if (-not [string]::IsNullOrEmpty($BuildNumber)) {
+  if ($BuildNumber -cnotmatch '^[1-9][0-9]*$') {
+    throw "VIZOR_RELEASE_BUILD_NUMBER must be a positive integer, not '$BuildNumber'."
+  }
+  $flutterBuildArgs += @(
+    "--build-name", ($Version -replace '-.*$', ''),
+    "--build-number", $BuildNumber,
+    "--dart-define=VIZOR_RELEASE_BUILD_NUMBER=$BuildNumber"
+  )
+}
 
 $cmakeCache = Join-Path $repoRoot "build\windows\$Arch\CMakeCache.txt"
 if (Test-Path $cmakeCache) {
@@ -456,6 +490,9 @@ if ($LASTEXITCODE -ne 0) {
 if (-not (Test-Path $mainExe)) {
   throw "Windows release build did not produce $mainExe"
 }
+if ($PackedExeName -ne "Vizor.exe") {
+  Rename-Item -LiteralPath $mainExe -NewName $PackedExeName
+}
 
 $packArgs = @(
   "pack",
@@ -465,7 +502,7 @@ $packArgs = @(
   "--packVersion", $Version,
   "--channel", $Channel,
   "--packDir", $packDir,
-  "--mainExe", "Vizor.exe",
+  "--mainExe", $PackedExeName,
   "--outputDir", $resolvedOutputDir,
   "--icon", $AppIconPath,
   "--delta", "None",
@@ -475,6 +512,10 @@ $packArgs = @(
 
 if ($Arch -eq "arm64") {
   $packArgs += @("--runtime", "win-arm64")
+}
+
+if (-not [string]::IsNullOrEmpty($PackAuthors)) {
+  $packArgs += @("--packAuthors", $PackAuthors)
 }
 
 if ($Msi) {
