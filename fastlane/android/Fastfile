@@ -85,7 +85,7 @@ platform :android do
         "fvm flutter build appbundle",
         "--release",
         # Store builds must compile the mobile token set — release
-        # builds have no form-factor guard (see AGENTS.md).
+        # builds have no form-factor guard (see docs/form-factor.md).
         "--dart-define=VIZOR_FORM_FACTOR=mobile",
         "--dart-define=#{shell_escape("VIZOR_RELEASE_VERSION=#{metadata.fetch(:asset_version)}")}",
         "--dart-define=#{shell_escape("VIZOR_COINGECKO_PRICE_BASE_URL=#{coingecko_price_base_url}")}",

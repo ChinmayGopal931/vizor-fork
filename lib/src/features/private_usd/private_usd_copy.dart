@@ -22,6 +22,10 @@ abstract final class PrivateUsdCopy {
       '0zk$symbol'; // l10n-ignore: currency ticker
   static String homeZecEquivalent(String zec) =>
       '≈ $zec ZEC'; // l10n-ignore: amount format
+
+  /// An amount known only roughly: "≈ 0.25 ZEC".
+  static String approximately(String amount) =>
+      '≈ $amount'; // l10n-ignore: amount format
   static String activityIn(String usd) => '+$usd';
   static String activityOut(String usd) => '−$usd';
   static String activityDetail(String a, String b) => '$a · $b';

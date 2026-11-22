@@ -206,14 +206,12 @@ void main() {
       WidgetTester tester,
       PrivateUsdConvertState state, {
       bool relayerClaims = false,
-      bool torOffDisclosure = false,
     }) => pump(
       tester,
       MobilePrivateUsdConvertReviewView(
         state: state,
         privacyModeEnabled: false,
         relayerClaims: relayerClaims,
-        torOffDisclosure: torOffDisclosure,
         onBack: () {},
         onConfirm: () {},
         onRefreshQuote: () {},
@@ -249,26 +247,6 @@ void main() {
       expect(
         button(tester, 'mobile_private_usd_review_convert').onPressed,
         isNotNull,
-      );
-    });
-
-    testWidgets('with a maker asking for tokens and Tor off, the review '
-        'discloses the link', (tester) async {
-      await pumpReview(
-        tester,
-        previewPrivateUsdConvertState(
-          quote: previewPrivateUsdQuote(),
-          step: PrivateUsdConvertStep.review,
-        ),
-        torOffDisclosure: true,
-      );
-      expect(
-        find.textContaining(testL10n.privateUsdTokensTorOffDisclosure),
-        findsOneWidget,
-      );
-      expect(
-        find.textContaining(testL10n.privateUsdConvertBackgroundNote),
-        findsOneWidget,
       );
     });
 

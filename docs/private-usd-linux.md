@@ -5,7 +5,7 @@ USD runs there as it does on the Mac: the same Dart screens and providers
 (`docs/private-usd-macos.md`), the same Rust engine, and a host of its own. It
 is Linux only; Windows has a host of its own (`docs/private-usd-windows.md`).
 
-Read AGENTS.md's "Private USD" section and `docs/private-usd-android-plan.md`
+Read `docs/private-usd.md` and `docs/private-usd-android-plan.md`
 §3.5 first: every invariant there holds on Linux, because the engine and the
 Dart flows are the phones' and the Mac's own. What every Railgun page host must
 do is [docs/private-usd-railgun-hosts.md](private-usd-railgun-hosts.md) (H1 to
@@ -49,8 +49,9 @@ channel contract, method for method and code for code
 - `railgun_frames.h/.cc`: the link to the page process, a socket pair carrying
   length-prefixed frames (deliver, visible, quit; message, undelivered,
   closed). Neither end logs a payload.
-- `private_usd_channels.cc`: Privacy Pass attestation (`unavailable`, as on
-  iOS and the Mac), the keep-awake flag and the settlement reminder (below).
+- `private_usd_channels.cc`: the keep-awake flag and the settlement reminder
+  (below). The Privacy Pass attestation stub went with the token client on
+  2026-11-21 (progress D-161).
 - `session_lifecycle.cc`: the session away (below).
 
 Registration is `register_private_usd_channels` in `my_application.cc`'s

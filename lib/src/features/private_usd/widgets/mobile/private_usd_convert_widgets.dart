@@ -594,6 +594,16 @@ class PrivateUsdQuoteLedger extends StatelessWidget {
           context.l10n.privateUsdConvertMakerCost,
           formatPrivateUsd(networkCost),
         ),
+      // Paid before the swap opens, and the maker's whatever follows.
+      if (quote.asksOpenFee)
+        (
+          context.l10n.privateUsdConvertOpenFee,
+          context.l10n.privateUsdConvertOpenFeeValue(
+            _masked(
+              ZecAmount.fromZatoshi(quote.openFeeZat).activity.toString(),
+            ),
+          ),
+        ),
     ];
     return PrivateUsdLedgerCard(
       key: const ValueKey('mobile_private_usd_quote_ledger'),
@@ -604,6 +614,15 @@ class PrivateUsdQuoteLedger extends StatelessWidget {
     );
   }
 }
+
+/// What the ZEC a bridge pays includes, under its amount: the network fee,
+/// and the market maker's fee where [quote] asks one.
+String privateUsdZecIncludesFeeNote(
+  AppLocalizations l10n,
+  PrivateUsdZecQuote? quote,
+) => quote?.asksOpenFee == true
+    ? l10n.privateUsdConvertZecIncludesFees
+    : l10n.privateUsdConvertZecIncludesFee;
 
 /// A priced reverse quote's ledger: the escrow value, and Railgun's unshield
 /// fee and the broadcast fee to the cent, which together make the total paid

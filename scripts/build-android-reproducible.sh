@@ -6,14 +6,27 @@ usage() {
 Usage: scripts/build-android-reproducible.sh \
   --build-name X.Y.Z \
   --build-number CODE \
-  --release-version VERSION \
+  [--release-version VERSION] \
   --signing required|unsigned \
+  [--flavor vizor|veylor] [--universal] \
   [--target-abi all|arm64-v8a|armeabi-v7a|x86_64] [--degoogled] [--offline] [--dry-run]
 
 Builds Android APKs from a clean copy of HEAD under Vizor's canonical Linux
 build path. The default target is all three ABIs. Direct Release and F-Droid
 must both use this entry point so Flutter and Rust embed the same source/cache
 paths.
+
+--flavor picks the app's compile-time settings (default vizor):
+  vizor   Vizor's Direct Release and F-Droid: --release-version is required,
+          and the price and wallet-link URLs are functions.vizor.cash's.
+  veylor  Veylor's Google Play build: com.veylor.app, mainnet, Shielded USD
+          on, the price and wallet-link URLs at their defaults. It defines
+          VIZOR_RELEASE_VERSION only when --release-version is given, as the
+          Play build does not.
+
+--universal builds one APK with every ABI (app-release.apk, versionCode
+--build-number, as Play's) instead of one APK per ABI; it needs
+--target-abi all.
 
 Google Play integrations are included by default. Pass --degoogled for Direct
 Release and F-Droid to exclude them with VIZOR_DEGOOGLED=true.
@@ -31,6 +44,8 @@ target_abi="all"
 offline="false"
 dry_run="false"
 degoogled="false"
+flavor="vizor"
+universal="false"
 
 while (($# > 0)); do
   case "$1" in
@@ -56,6 +71,14 @@ while (($# > 0)); do
       ;;
     --degoogled)
       degoogled="true"
+      shift
+      ;;
+    --flavor)
+      flavor="${2:-}"
+      shift 2
+      ;;
+    --universal)
+      universal="true"
       shift
       ;;
     --offline)
@@ -86,12 +109,21 @@ if [[ ! "${build_number}" =~ ^[0-9]+$ ]] || ((10#${build_number} <= 0)); then
   echo "--build-number must be a positive integer: ${build_number:-<missing>}" >&2
   exit 2
 fi
-if [[ ! "${release_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then
+if [[ "${flavor}" != "vizor" && "${flavor}" != "veylor" ]]; then
+  echo "--flavor must be vizor or veylor: ${flavor:-<missing>}" >&2
+  exit 2
+fi
+if [[ ( "${flavor}" == "vizor" || -n "${release_version}" ) &&
+      ! "${release_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then
   echo "--release-version must start with an X.Y.Z version: ${release_version:-<missing>}" >&2
   exit 2
 fi
 if [[ "${signing}" != "required" && "${signing}" != "unsigned" ]]; then
   echo "--signing must be required or unsigned: ${signing:-<missing>}" >&2
+  exit 2
+fi
+if [[ "${universal}" == "true" && "${target_abi}" != "all" ]]; then
+  echo "--universal builds every ABI; it cannot be combined with --target-abi ${target_abi}" >&2
   exit 2
 fi
 
@@ -135,24 +167,54 @@ if [[ -n "${FLUTTER_BIN:-}" ]]; then
   flutter_command=("${FLUTTER_BIN}")
 fi
 
-build_args=(
-  build apk
-  --release
-  --split-per-abi
+if [[ "${universal}" == "true" ]]; then
+  output_apks=(app-release.apk)
+  layout="universal"
+else
+  output_apks=()
+  for abi in "${output_abis[@]}"; do
+    output_apks+=("app-${abi}-release.apk")
+  done
+  layout="split"
+fi
+
+build_args=(build apk --release)
+if [[ "${universal}" != "true" ]]; then
+  build_args+=(--split-per-abi)
+fi
+build_args+=(
   --target-platform "${target_platforms}"
   --build-name "${build_name}"
   --build-number "${build_number}"
   --dart-define=VIZOR_FORM_FACTOR=mobile
-  --dart-define="VIZOR_RELEASE_VERSION=${release_version}"
-  --dart-define=VIZOR_COINGECKO_PRICE_BASE_URL=https://functions.vizor.cash/api/v3
-  --dart-define=VIZOR_WALLET_LINK_BACKEND_URL=https://functions.vizor.cash
 )
+case "${flavor}" in
+  vizor)
+    build_args+=(
+      --dart-define="VIZOR_RELEASE_VERSION=${release_version}"
+      --dart-define=VIZOR_COINGECKO_PRICE_BASE_URL=https://functions.vizor.cash/api/v3
+      --dart-define=VIZOR_WALLET_LINK_BACKEND_URL=https://functions.vizor.cash
+    )
+    ;;
+  veylor)
+    # Exactly the Play bundle's defines (docs/releases.md, "Android direct APK
+    # (verifiable)"), so the APK behaves as Play's build does.
+    build_args+=(
+      --dart-define=VIZOR_PRIVATE_USD_ENABLED=true
+      --dart-define=ZCASH_DEFAULT_NETWORK=main
+      --dart-define=VIZOR_APPLICATION_ID=com.veylor.app
+    )
+    if [[ -n "${release_version}" ]]; then
+      build_args+=(--dart-define="VIZOR_RELEASE_VERSION=${release_version}")
+    fi
+    ;;
+esac
 if [[ "${degoogled}" == "true" ]]; then
   build_args+=(--dart-define=VIZOR_DEGOOGLED=true)
 fi
 
-printf 'Reproducible Android build: name=%s number=%s release=%s signing=%s targetAbi=%s offline=%s\n' \
-  "${build_name}" "${build_number}" "${release_version}" "${signing}" "${target_abi}" "${offline}"
+printf 'Reproducible Android build: flavor=%s name=%s number=%s release=%s signing=%s targetAbi=%s layout=%s offline=%s\n' \
+  "${flavor}" "${build_name}" "${build_number}" "${release_version:-<none>}" "${signing}" "${target_abi}" "${layout}" "${offline}"
 printf 'Canonical source: %s\n' "${canonical_source}"
 printf 'Command:'
 printf ' %q' "${flutter_command[@]}" "${build_args[@]}"
@@ -261,8 +323,7 @@ cargo "${cargo_fetch_args[@]}"
 
 output_dir="${repository_root}/build/app/outputs/flutter-apk"
 mkdir -p "${output_dir}"
-for abi in "${output_abis[@]}"; do
-  apk="app-${abi}-release.apk"
+for apk in "${output_apks[@]}"; do
   source_apk="${canonical_source}/build/app/outputs/flutter-apk/${apk}"
   if [[ ! -s "${source_apk}" ]]; then
     echo "Expected APK is missing or empty: ${source_apk}" >&2

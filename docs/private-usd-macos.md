@@ -7,7 +7,7 @@ rescue, on the phone's engine and providers ("The bridge" below).
 Linux and Windows have hosts of their own (`docs/private-usd-linux.md`,
 `docs/private-usd-windows.md`).
 
-Read AGENTS.md's "Private USD" section and `docs/private-usd-android-plan.md`
+Read `docs/private-usd.md` and `docs/private-usd-android-plan.md`
 §3.5 first: every invariant there holds on the Mac, because the Rust engine and
 the Dart flows are the phones' own. The iOS host, which this one follows, is in
 `docs/private-usd-ios-reference.md` §6.
@@ -37,8 +37,9 @@ for code (`com.zcash.wallet/railgun` and `/events`: `supported`, `load`,
   folder `android/railgun-web/build.mjs` writes for iOS, as a folder reference
   in Copy Bundle Resources. There is no third copy, and the bundle did not
   change.
-- `macos/Runner/PrivateUsdAttestationHandler.swift`: Privacy Pass attestation
-  answers `unavailable`, as on iOS.
+- The Privacy Pass attestation channel (`PrivateUsdAttestationHandler.swift`,
+  which answered `unavailable`) went with the token client on 2026-11-21
+  (progress D-161).
 - Registration: `MainFlutterWindow.registerPrivateUsdChannels`, in
   `awakeFromNib`, before Dart's bootstrap asks `supported`.
 
@@ -132,7 +133,7 @@ Android: mainnet only, behind Settings' "Sync history from Anon's archive"
 (`privateUsdArchiveSyncProvider`, on by default, the phone's setting and
 storage), which `privateUsdArchiveAvailableProvider` offers on the Mac wherever
 its host runs the page (macOS 14 and later). iOS still starts the page without
-it. The page and its rules are Android's, unchanged (AGENTS.md, "Anon's
+it. The page and its rules are Android's, unchanged (docs/private-usd.md, "Anon's
 archive"); only the host is new (`macos/Runner/Railgun/RailgunArchive.swift`).
 What every host must do for the archive, and for the page as a whole, item by
 item against Android's, is in `docs/private-usd-railgun-hosts.md`.

@@ -693,10 +693,6 @@ class _Round {
         if (directory.existsSync()) directory.deleteSync(recursive: true);
       }
     }
-    final tokens = File(
-      inSupport('private_usd_tokens_${ZcashNetwork.testnet.name}.json'),
-    );
-    if (tokens.existsSync()) tokens.deleteSync();
     // On iOS the page's data store is the app's to remove (a Mac can't reach
     // an iPhone's), and removing it creates no web view. Android's runner
     // wipes app_webview before the app starts.

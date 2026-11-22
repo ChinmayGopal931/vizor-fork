@@ -525,9 +525,12 @@ PrivateUsdConvertState previewPrivateUsdConvertState({
 
 /// A forward record of 0.5 ZEC for $15.50, accepted [ago] before
 /// [previewPrivateUsdNow], on the testnet windows contract (`t1` two hours
-/// on, its late window an hour).
+/// on, its late window an hour); with [openFeeTxid], one whose market maker
+/// fee of 20,000 zatoshis was paid.
 ApiForwardRecord previewPrivateUsdRecord({
   int index = 7,
+  String? openFeeTxid,
+  bool openFeeMined = false,
   ApiForwardPhase phase = ApiForwardPhase.confirming,
   ApiForwardOutcome? outcome,
   ApiRefundCause? refundCause,
@@ -573,6 +576,11 @@ ApiForwardRecord previewPrivateUsdRecord({
     refundCause: refundCause,
     nothingSentCause: nothingSentCause,
     endedAt: outcome == null ? null : at(const Duration(minutes: 12)),
+    openFeeZat: openFeeTxid == null ? null : BigInt.from(20000),
+    openFeeNetworkZat: openFeeTxid == null ? null : BigInt.from(10000),
+    openFeeTxid: openFeeTxid,
+    openFeeMined: openFeeTxid != null && openFeeMined,
+    openFeePending: openFeeTxid != null && !openFeeMined,
   );
 }
 

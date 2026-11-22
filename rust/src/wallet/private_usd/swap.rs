@@ -24,7 +24,6 @@ use super::models::{
 };
 use super::relayer_client::RelayerClient;
 use super::store::SwapStore;
-use super::tokens::{TokenPins, TokenStore};
 use super::transport::{HttpTransport, Refusal, SwapErrorCode, SwapHttpError};
 use super::{fail, terms, with_operations, ErrorCode, PrivateUsdError, Result};
 use crate::wallet::network::WalletNetwork;
@@ -320,7 +319,6 @@ pub(crate) async fn check_maker<T: HttpTransport>(
     pins: &Deployment,
     makers: &MakerChecks,
     reverse: bool,
-    token_pins: &TokenPins,
 ) -> Result<()> {
     let network = pins.network;
     if makers.checked(network, reverse) {
@@ -350,18 +348,6 @@ pub(crate) async fn check_maker<T: HttpTransport>(
         return fail(
             ErrorCode::Unavailable,
             "the maker takes no conversions to ZEC now",
-        );
-    }
-    // A return key shown to only some devices would mark the tokens they
-    // get back.
-    if info
-        .token_return_key
-        .as_deref()
-        .is_some_and(|key| key != token_pins.return_key)
-    {
-        return fail(
-            ErrorCode::TokensRefused,
-            "the maker returns tokens under another key",
         );
     }
     makers.mark(network, reverse);
@@ -620,23 +606,10 @@ pub(crate) struct SwapCall<'s> {
     pub lightwalletd_url: &'s str,
     /// The keyed Ethereum RPC URL, or empty for publicnode. Never stored.
     pub eth_rpc_url: &'s str,
-    /// The device's token store (`tokens.rs`); `None` for a call that
-    /// neither pays nor collects, which gets one kept in memory alone.
-    pub tokens_path: Option<&'s Path>,
     pub keys: &'s SwapKeyContext,
 }
 
 impl<'s> SwapCall<'s> {
-    /// The device's token store, or one kept in memory alone for a call
-    /// that neither pays nor collects.
-    pub(crate) fn tokens(&self) -> TokenStore {
-        let pins = TokenPins::of(self.pins());
-        match self.tokens_path {
-            Some(path) => TokenStore::open(path, pins),
-            None => TokenStore::detached(pins),
-        }
-    }
-
     pub(crate) fn pins(&self) -> &'static Deployment {
         deployment::deployment(self.keys.network())
     }
@@ -659,8 +632,28 @@ impl<'s> SwapCall<'s> {
 mod tests {
     use std::time::Duration;
 
-    use super::{nap, Wake};
+    use super::{nap, transport, Wake};
+    use crate::network_privacy::test_route_policy::lock_route_policy;
+    use crate::wallet::private_usd::engine::{self, OpHandle};
     use crate::wallet::private_usd::evm_rpc::{Head, SeenHead};
+    use crate::wallet::routed_http::RoutedRequest;
+
+    /// An accept's requests (`SwapCall::forward_accepting`) run on
+    /// `transport(None)`, which no cancel stops; every other call's stop on
+    /// their op's. Judged on a request the transport refuses before any
+    /// network, a plain `http` one: stopped, it says so first.
+    #[tokio::test]
+    async fn only_a_calls_own_transport_stops_on_its_cancel() {
+        let _route = lock_route_policy();
+        let op_id = rand::random::<u32>();
+        let op = OpHandle::begin(op_id).unwrap();
+        engine::cancel_op(op_id);
+        let request = || RoutedRequest::get("http://localhost/", Duration::from_secs(5), 1_024);
+        let stopped = transport(Some(&op)).send(request()).await.unwrap_err();
+        assert!(stopped.message.contains("cancelled"), "{}", stopped.message);
+        let goes = transport(None).send(request()).await.unwrap_err();
+        assert!(!goes.message.contains("cancelled"), "{}", goes.message);
+    }
 
     /// A block made at `timestamp`, first read at `seen_at`.
     fn seen(timestamp: u64, seen_at: u64) -> SeenHead {

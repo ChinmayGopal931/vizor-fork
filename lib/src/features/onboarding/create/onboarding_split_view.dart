@@ -61,7 +61,7 @@ enum OnboardingStep {
 
 extension OnboardingStepX on OnboardingStep {
   // Sidebar step labels follow the Figma sidebar verbatim (mixed casing as
-  // drawn) — see the sentence-case exception in AGENTS.md.
+  // drawn) — see the sentence-case exception in docs/copy.md.
   String label(AppLocalizations l10n) => switch (this) {
     OnboardingStep.intro => l10n.onboardingStepIntroToZcash,
     OnboardingStep.addressTypes => l10n.onboardingStepAddressTypes,

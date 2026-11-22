@@ -124,7 +124,7 @@ MI3 evidence (2026-10-17, code only):
 - [ ] MI6.2 Send and withdraw proof time and memory
 - [ ] MI6 gate
 
-## MI7. Tokens and App Attest (deferred: no maker requires tokens)
+## MI7. Tokens and App Attest (dropped 2026-11-21: Veylor has no token client, progress D-161)
 
 - [ ] MI7.1 Swift attestation handler
 - [ ] MI7.2 The token protocol's iOS form (with EI6)

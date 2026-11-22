@@ -110,9 +110,12 @@ pub(crate) use send::{
 // Private USD: the deposit split, its fee preview and the joint sweep proposal.
 pub(crate) use send::{
     broadcast_raw, broadcast_rejected, create_stored_proposal_transactions,
-    estimate_swap_deposit_fee, propose_joint_sweep, propose_swap_deposit, CreatedTransaction,
-    SwapDepositError, SwapProposal,
+    create_stored_proposal_transactions_expiring_by, estimate_swap_deposit_fee,
+    propose_joint_sweep, propose_swap_deposit, CreatedTransaction, PaymentDeadline,
+    SwapDepositError, SwapProposal, DEADLINE_TOO_NEAR,
 };
+#[cfg(test)]
+pub(crate) use send::{deadline_expiry_height, DEADLINE_EXPIRY_SLACK_BLOCKS};
 pub(crate) use send::{get_orchard_migration_immediate_plan, get_orchard_migration_private_plan};
 // Internal-only re-export for `sync_engine::run_sync_impl`'s
 // auto-resubmit pass. Not part of the `wallet::sync` public surface.

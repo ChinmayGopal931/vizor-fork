@@ -15,7 +15,7 @@ set(FLUTTER_RUN_BINARY_NAME "${BINARY_NAME}")
 set(APPLICATION_ID "app.keplr.${APP_IDENTIFIER}")
 
 # The VIZOR_APPLICATION_ID environment variable selects Veylor's identity
-# (AGENTS.md, "Desktop identity"); without it the build keeps upstream's. The
+# (docs/releases.md, "Desktop identity"); without it the build keeps upstream's. The
 # identity renames the executable too: path_provider_linux names the support
 # directory after the executable when it cannot load libgio-2.0.so, so a shared
 # name would share the wallet data of an installed Vizor.

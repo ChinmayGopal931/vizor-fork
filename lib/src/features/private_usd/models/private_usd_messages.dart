@@ -1,7 +1,10 @@
 import '../../../rust/api/private_usd.dart'
-    show ApiNothingSentCause, ApiPrivateUsdErrorCode, ApiRefundCause;
+    show
+        ApiForwardRecord,
+        ApiNothingSentCause,
+        ApiPrivateUsdErrorCode,
+        ApiRefundCause;
 import '../private_usd_copy.dart';
-import '../services/private_usd_attestation.dart';
 import '../services/private_usd_spend_guard.dart' show PrivateUsdSpendStatus;
 import '../../../core/l10n/l10n.dart';
 
@@ -52,15 +55,6 @@ String? privateUsdErrorMessage(
   ApiPrivateUsdErrorCode.zcashWallet => l10n.privateUsdConvertErrorWallet,
   ApiPrivateUsdErrorCode.depositUnpayable =>
     l10n.privateUsdConvertErrorUnpayable,
-  ApiPrivateUsdErrorCode.tokensRefused =>
-    l10n.privateUsdConvertErrorTokensUnavailable,
-  ApiPrivateUsdErrorCode.tokensNeeded =>
-    l10n.privateUsdConvertResultMakerUnavailable,
-  ApiPrivateUsdErrorCode.tokensUnreachable => l10n.privateUsdTokensUnreachable,
-  ApiPrivateUsdErrorCode.tokensDeviceRefused =>
-    l10n.privateUsdTokensDeviceRefused,
-  ApiPrivateUsdErrorCode.noTokensToday => l10n.privateUsdTokensNoneToday,
-  ApiPrivateUsdErrorCode.keystore => l10n.privateUsdTokensKeystore,
   ApiPrivateUsdErrorCode.quoteExpired => l10n.privateUsdConvertQuoteRanOut,
   ApiPrivateUsdErrorCode.makerUnavailable => l10n.privateUsdConvertErrorMaker,
   ApiPrivateUsdErrorCode.makerBusy => l10n.privateUsdConvertErrorMakerBusy,
@@ -68,6 +62,11 @@ String? privateUsdErrorMessage(
     l10n.privateUsdConvertErrorAmountRefused,
   ApiPrivateUsdErrorCode.storeUnreadable => l10n.privateUsdConvertErrorStore,
   ApiPrivateUsdErrorCode.routeBlocked => l10n.privateUsdRouteBlocked,
+  // At quote, Rust refuses an open fee over the cap or payable outside
+  // Orchard.
+  ApiPrivateUsdErrorCode.openFeeRefused => l10n.privateUsdConvertErrorOpenFee,
+  // At accept, Rust pays no open fee while the wallet catches up.
+  ApiPrivateUsdErrorCode.walletSyncing => l10n.privateUsdConvertFeeWaitsForSync,
   ApiPrivateUsdErrorCode.railgunClosed ||
   ApiPrivateUsdErrorCode.zcashRejected ||
   ApiPrivateUsdErrorCode.mismatch ||
@@ -109,25 +108,7 @@ String privateUsdProblemMessage(
   ApiPrivateUsdErrorCode.mismatch => l10n.privateUsdConvertProblemMismatch,
   ApiPrivateUsdErrorCode.storeUnreadable => l10n.privateUsdConvertErrorStore,
   ApiPrivateUsdErrorCode.routeBlocked => l10n.privateUsdConvertProblemRoute,
-  // The token gate's, while a resumed accept waits for the issuance.
-  ApiPrivateUsdErrorCode.tokensNeeded => l10n.privateUsdConvertProblemTokens,
-  ApiPrivateUsdErrorCode.tokensRefused ||
-  ApiPrivateUsdErrorCode.tokensUnreachable => l10n.privateUsdTokensUnreachable,
-  ApiPrivateUsdErrorCode.tokensDeviceRefused =>
-    l10n.privateUsdTokensDeviceRefused,
-  ApiPrivateUsdErrorCode.noTokensToday => l10n.privateUsdTokensNoneToday,
-  ApiPrivateUsdErrorCode.keystore => l10n.privateUsdTokensKeystore,
   _ => l10n.privateUsdConvertProblemUnexpected,
-};
-
-/// What to say when the phone could not attest an issuance.
-String privateUsdAttestationMessage(
-  AppLocalizations l10n,
-  PrivateUsdAttestationErrorCode code,
-) => switch (code) {
-  PrivateUsdAttestationErrorCode.unavailable =>
-    l10n.privateUsdTokensUnavailable,
-  PrivateUsdAttestationErrorCode.keystore => l10n.privateUsdTokensKeystore,
 };
 
 /// Why a forward conversion ended with nothing sent.
@@ -146,16 +127,33 @@ String privateUsdNothingSentMessage(
     l10n.privateUsdConvertResultWindowMissed,
   ApiNothingSentCause.makerCancelled =>
     l10n.privateUsdConvertResultMakerCancelled,
+  ApiNothingSentCause.feeNotHonoured =>
+    l10n.privateUsdConvertResultFeeNotHonoured,
 };
 
-/// Why a forward conversion's ZEC came back.
+/// Why [record] ended with nothing sent: that the maker keeps its fee, once
+/// the wallet shows the fee in a block, else its cause.
+String privateUsdForwardNothingSentMessage(
+  AppLocalizations l10n,
+  ApiForwardRecord record,
+) => record.openFeeMined
+    ? l10n.privateUsdConvertResultFeeKept
+    : privateUsdNothingSentMessage(l10n, record.nothingSentCause);
+
+/// Why a forward conversion's ZEC came back, and with [feeKept] (its quote
+/// asked an open fee, paid before the swap opened) that the market maker
+/// keeps its fee.
 String privateUsdRefundedMessage(
   AppLocalizations l10n,
-  ApiRefundCause? cause,
-) => switch (cause) {
-  ApiRefundCause.makerCancelled ||
-  null => l10n.privateUsdConvertResultRefundedMaker,
-  ApiRefundCause.notClaimedInTime => l10n.privateUsdConvertResultRefundedLate,
+  ApiRefundCause? cause, {
+  bool feeKept = false,
+}) => switch ((cause, feeKept)) {
+  (ApiRefundCause.notClaimedInTime, false) =>
+    l10n.privateUsdConvertResultRefundedLate,
+  (ApiRefundCause.notClaimedInTime, true) =>
+    l10n.privateUsdConvertResultRefundedLateFeeKept,
+  (_, false) => l10n.privateUsdConvertResultRefundedMaker,
+  (_, true) => l10n.privateUsdConvertResultRefundedMakerFeeKept,
 };
 
 /// What to say when a reverse quote fails before anything but a swap index

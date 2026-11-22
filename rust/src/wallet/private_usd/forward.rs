@@ -29,6 +29,17 @@
 //! The record stays paid, and paid records are kept beyond the history
 //! limit for it.
 //!
+//! A quote may ask an open fee (`open_fee.rs`): the maker's gas for opening
+//! the swap, paid in ZEC before it opens and never refunded. It is checked
+//! against the cap and paid only to an Orchard-only address of our network,
+//! from a quote that lives long enough for a block to mine it, with that
+//! much of the quote left. The record is saved, the payment marked started,
+//! created to expire with the quote, kept, then sent, and sent again while
+//! no block has it; the accept goes only once Veylor's own wallet shows it
+//! mined, and is posted again through `402 feeRequired` until the quote
+//! expires, never after. A payment is never built twice, and an answer lost
+//! is made up from the swap's `Opened` on chain.
+//!
 //! The driver runs over seams: [`ChainReader`], [`HttpTransport`],
 //! [`ForwardZcash`] (the wallet's side, [`WalletZcash`]) and [`Clock`]. The
 //! engine tests fake all but the keys and the store.
@@ -40,8 +51,9 @@ use zecswap_core::{JointAccount, NetworkType, RescueAuthorization, SpendKey, Ter
 use zeroize::Zeroizing;
 
 use super::deployment::{
-    self, Deployment, ACCEPT_MARGIN_SECONDS, MAX_SECONDS_TO_T0, MAX_T0_TO_T1_SECONDS,
-    READY_DEPTH_BLOCKS, REVEAL_MARGIN_SECONDS, SIGNATURE_TTL_SECONDS,
+    self, Deployment, ACCEPT_MARGIN_SECONDS, FEE_WAIT_SECONDS, MAX_SECONDS_TO_T0,
+    MAX_T0_TO_T1_SECONDS, OPEN_FEE_RESEND_SECONDS, READY_DEPTH_BLOCKS, REVEAL_MARGIN_SECONDS,
+    SIGNATURE_TTL_SECONDS, UNANSWERED_ACCEPT_WAIT_SECONDS,
 };
 use super::engine::{self, Activity, Clock, MakerChecks, Offer, OpHandle, SystemClock};
 use super::evm_rpc::{ChainReader, EvmRpc, SwapStage, SwapState};
@@ -50,8 +62,9 @@ use super::keys::SwapKeyContext;
 use super::maker_client::MakerClient;
 use super::models::{
     Amount, ClaimHold, DepositProgress, Direction, ForwardOutcome, ForwardRecord, Hex,
-    NothingSentCause, RefundCause, RelayerTerms, SwapAcceptance, SwapNote, SwapPayout, SwapQuote,
-    SwapRescue, Word, ZcashTransaction,
+    NothingSentCause, OpenFee, OpenFeePayment, OpenFeeProgress, RefundCause, RelayerTerms,
+    SwapAcceptance, SwapAccepted, SwapNote, SwapPayout, SwapQuote, SwapRescue, Word,
+    ZcashTransaction,
 };
 use super::relayer_client::RelayerClient;
 use super::store::SwapStore;
@@ -59,14 +72,17 @@ use super::swap::{
     self, find, load, payout_after_fees, pinned_relayer_terms, quote_error, require_payout_fee,
     require_pays_out, save, serves, update, ClaimWindow, PostError, SwapCall, Wake, WindowView,
 };
-use super::tokens::{self, AcceptError, Payment, TokenStore};
 use super::transport::{HttpTransport, Refusal, SwapErrorCode, SwapHttpError};
-use super::{fail, indices, terms, ErrorCode, PrivateUsdError, Result};
+use super::{fail, indices, open_fee, terms, ErrorCode, PrivateUsdError, Result};
 use crate::wallet::routed_http::RoutedHttp;
 
 /// A maker's open can queue behind others; past this after the quote's
 /// expiry it is not coming, or too late to deposit into.
 const OPEN_GRACE_SECONDS: u64 = 5 * 60;
+/// A swap the chain shows opened though its accept went unanswered, whose
+/// `Opened` no confirmed block shows yet: past the open grace, its event is
+/// looked for this much longer before the swap is given up.
+const OPENED_EVENT_GRACE_SECONDS: u64 = 5 * 60;
 /// `caught_up` polls a confirmed read this often, this many times.
 const CATCH_UP_POLLS: u32 = 30;
 const CATCH_UP_INTERVAL: Duration = Duration::from_secs(2);
@@ -92,6 +108,16 @@ pub(crate) enum ForwardWait {
     /// refund for its late window: the deposit comes back with the refund,
     /// or from `t1 + LATE` the claim goes out after all.
     Unwinding,
+    /// The open fee is paid and in no block yet: sent again every half
+    /// minute while the quote leaves it the time to be mined.
+    FeeConfirming,
+    /// The open fee is mined, and the maker has not seen it yet or its
+    /// accept went unanswered: the accept is posted again as the maker asks,
+    /// until the quote expires.
+    FeeAccepting,
+    /// No deposit fits the funds spendable now, and more are on their way,
+    /// such as the change of the open fee's payment.
+    FundsPending,
 }
 
 /// One look at a forward swap.
@@ -118,10 +144,16 @@ fn wake(wait: ForwardWait) -> Wake {
     match wait {
         // The maker's open or ready, or a window, on Ethereum.
         ForwardWait::Opening | ForwardWait::Confirming => Wake::EthereumBlock,
-        // The deposit or the sweep home, or the main wallet's scan.
-        ForwardWait::DepositUnsettled | ForwardWait::Refunding | ForwardWait::ZcashSyncing => {
-            Wake::ZcashBlock
-        }
+        // The deposit or the sweep home, the main wallet's scan, or the open
+        // fee or its change in a block.
+        ForwardWait::DepositUnsettled
+        | ForwardWait::Refunding
+        | ForwardWait::ZcashSyncing
+        | ForwardWait::FeeConfirming
+        | ForwardWait::FundsPending => Wake::ZcashBlock,
+        // The maker's next answer, which `advance_report` times by the
+        // accept's own wait.
+        ForwardWait::FeeAccepting => Wake::After(Duration::from_secs(FEE_WAIT_SECONDS)),
         // The maker's refund, any time in a window hours wide.
         ForwardWait::Unwinding => Wake::After(UNWINDING_NAP),
     }
@@ -132,9 +164,6 @@ fn wake(wait: ForwardWait) -> Wake {
 pub(crate) enum AcceptOutcome {
     /// The maker opened the swap, or is opening it: the engine follows it.
     Accepted,
-    /// The maker wants a Privacy Pass token, which this build cannot pay.
-    /// Nothing opened; the record waits, unanswered, to be abandoned.
-    TokensNeeded,
     /// Over before anything was sent.
     NothingSent(NothingSentCause),
 }
@@ -156,19 +185,36 @@ pub(crate) struct AdvanceReport {
     pub problem: Option<ErrorCode>,
 }
 
+/// The account's Orchard and Ironwood funds, in zatoshis: what a payment may
+/// spend now, and what is on its way to spendable (change and fresh
+/// receipts).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct Funds {
+    pub spendable: u64,
+    pub pending: u64,
+}
+
 /// The wallet's Zcash side of a forward swap.
 pub(crate) trait ForwardZcash {
-    /// A stored deposit proposal: consumed by `create_deposit`, else released
-    /// by `discard_deposit`.
+    /// A stored deposit or open fee proposal: consumed by `create_deposit`,
+    /// else released by `discard_deposit`.
     type Proposal;
 
     /// The chain's height now: a new swap's joint account is born there.
     async fn chain_height(&self) -> Result<u64>;
     /// Whether the main wallet has scanned to the chain's live tip.
     async fn synced(&self) -> Result<bool>;
+    /// How far the main wallet has scanned without a gap; `None` before its
+    /// first scan.
+    async fn scanned_height(&self) -> Result<Option<u64>>;
     /// The deposit's network fee from the wallet now, or `None` unless one
     /// transaction can pay it. Nothing is locked.
     async fn deposit_fee(&self, address: &str, zatoshi: u64) -> Result<Option<u64>>;
+    /// One logical action's fee at the wallet's next target height (ZIP 317:
+    /// 5,000 zatoshis before NU7, 1,000 from it).
+    async fn marginal_fee(&self) -> Result<u64>;
+    /// The account's funds a payment may spend.
+    async fn funds(&self) -> Result<Funds>;
     /// Proposes paying `zatoshi` to `address` in one transaction costing at
     /// most `max_total_zatoshi` in all, and locks its inputs.
     async fn propose_deposit(
@@ -178,10 +224,30 @@ pub(crate) trait ForwardZcash {
         zatoshi: u64,
         max_total_zatoshi: u64,
     ) -> Result<Self::Proposal>;
-    /// Signs and stores the proposed deposit without sending it.
+    /// Proposes the open fee's payment: exactly `zatoshi` to `address` with
+    /// an empty memo, in one transaction costing at most `max_total_zatoshi`
+    /// in all, its inputs locked; with its network fee.
+    async fn propose_open_fee(
+        &self,
+        index: u32,
+        address: &str,
+        zatoshi: u64,
+        max_total_zatoshi: u64,
+    ) -> Result<(Self::Proposal, u64)>;
+    /// Signs and stores a proposed deposit or open fee without sending it.
     async fn create_deposit(&self, proposal: Self::Proposal) -> Result<ZcashTransaction>;
+    /// Signs and stores a proposed open fee without sending it, expiring a
+    /// few blocks after `deadline` (unix seconds, its quote's `expiresAt`)
+    /// rather than the ordinary 40 or 120: neither a resend nor the wallet's
+    /// resubmission can then have it mined long after its quote.
+    async fn create_open_fee(
+        &self,
+        proposal: Self::Proposal,
+        deadline: u64,
+    ) -> Result<ZcashTransaction>;
     fn discard_deposit(&self, proposal: Self::Proposal);
-    /// A deposit to `address` the wallet created that may still land.
+    /// A payment to `address` the wallet created that may still land: a
+    /// deposit, or an open fee.
     async fn find_deposit(&self, address: &str) -> Result<Option<ZcashTransaction>>;
     async fn deposit_status(&self, deposit: &ZcashTransaction) -> Result<SwapTxStatus>;
     /// Sends a kept transaction once more.
@@ -228,6 +294,15 @@ impl<Z: ForwardZcash> Drop for ProposedDeposit<'_, Z> {
     }
 }
 
+/// What paying a started record's open fee came to.
+enum FeePaying {
+    Paid(OpenFeePayment),
+    /// Too little of the quote is left: nothing was paid, nor will be.
+    TooLate,
+    /// The main wallet trails the Zcash tip: nothing paid yet.
+    Syncing,
+}
+
 enum Deposit {
     /// A deposit is out, or kept to be sent again.
     Kept,
@@ -235,6 +310,9 @@ enum Deposit {
     Unpayable(NothingSentCause),
     /// None is out, and the wallet must scan to the tip first.
     Syncing,
+    /// None is out, and the deposit waits for funds on their way to
+    /// spendable, such as the open fee's change.
+    FundsPending,
 }
 
 #[derive(Clone, Copy)]
@@ -341,9 +419,6 @@ where
     zcash: &'a Z,
     clock: &'a K,
     makers: &'a MakerChecks,
-    /// The device's Privacy Pass tokens, which pay for accepts the maker
-    /// asks a token for, and come back once the deposit is out.
-    tokens: &'a TokenStore,
     op: Option<&'a OpHandle>,
 }
 
@@ -362,7 +437,6 @@ where
         zcash: &'a Z,
         clock: &'a K,
         makers: &'a MakerChecks,
-        tokens: &'a TokenStore,
         op: Option<&'a OpHandle>,
     ) -> Self {
         let pins = deployment::deployment(keys.network());
@@ -377,7 +451,6 @@ where
             zcash,
             clock,
             makers,
-            tokens,
             op,
         }
     }
@@ -392,14 +465,7 @@ where
         let session = engine::session();
         self.pins.swap_contract()?;
         swap::require_none_under_way(store, self.account)?;
-        swap::check_maker(
-            &self.maker,
-            self.pins,
-            self.makers,
-            false,
-            self.tokens.pins(),
-        )
-        .await?;
+        swap::check_maker(&self.maker, self.pins, self.makers, false).await?;
         let contracts = [(self.chain, self.pins.maker)];
         // The relayer's terms don't wait on the index: both are asked at once.
         let (index, relayer) = tokio::join!(
@@ -421,6 +487,18 @@ where
                 "the quote is for another deployment",
             );
         }
+        // An open fee over the cap, or payable outside Orchard, or a fee
+        // quote too short to pay it in time or too long, is refused before
+        // anything is offered: the index is spent all the same.
+        if let Some(fee) = &quote.open_fee {
+            open_fee::check_open_fee(fee, self.zcash_network(), self.pins.max_open_fee_zat)?;
+            open_fee::check_quote_life(
+                &quote,
+                self.clock.now(),
+                self.pins.open_fee_min_quote_life_seconds,
+                self.pins.open_fee_max_quote_life_seconds,
+            )?;
+        }
         let receives = payout_after_fees(quote.amount, relayer.fee);
         // The preview pays the quote's share; the deposit itself goes to the
         // joint address of the confirmed on-chain terms.
@@ -428,7 +506,19 @@ where
             .keys
             .joint(index, &terms::quote_maker_share(&quote)?)?
             .unified_address(self.zcash_network());
-        let deposit_fee_zatoshi = self.zcash.deposit_fee(&address, quote.deposit_zat).await?;
+        let mut deposit_fee_zatoshi = self.zcash.deposit_fee(&address, quote.deposit_zat).await?;
+        let open_fee_network_zatoshi = match &quote.open_fee {
+            Some(fee) => {
+                // The fee's payment spends notes the deposit's estimate
+                // counted on, and the deposit may then take an input more:
+                // its approved total allows one action more, which the
+                // review shows inside the most it may cost.
+                let slack = self.zcash.marginal_fee().await?;
+                deposit_fee_zatoshi = deposit_fee_zatoshi.and_then(|fee| fee.checked_add(slack));
+                self.zcash.deposit_fee(&fee.address, fee.zat).await?
+            }
+            None => None,
+        };
         let offer = Offer {
             network: self.keys.network(),
             quote,
@@ -436,6 +526,7 @@ where
             fee_expires_at: relayer.fee_expires_at,
             receives,
             deposit_fee_zatoshi,
+            open_fee_network_zatoshi,
         };
         engine::put_offer(
             self.account,
@@ -453,6 +544,11 @@ where
     /// quote once more and never takes another index. `relayer_claims` is
     /// kept on the new record: a later change of the setting leaves this
     /// swap as it began.
+    ///
+    /// A quote that asks an open fee is not posted here: the fee is checked
+    /// against the time left and the wallet's funds, proposed, the record
+    /// saved with the payment started, then created, kept and sent, and the
+    /// engine accepts once a block has it (`open_with_fee`).
     pub(crate) async fn accept(
         &self,
         store: &mut SwapStore,
@@ -472,7 +568,7 @@ where
                     "the quote is no longer held: quote again",
                 )
             })?;
-        let quote = offer.quote;
+        let quote = offer.quote.clone();
         require_payout_fee(quote.amount, offer.relayer_fee)?;
         if offer.deposit_fee_zatoshi.is_none() {
             return fail(
@@ -487,13 +583,33 @@ where
             );
         }
         require_time_to_accept(&quote, now)?;
+        // The maker's proof is checked before anything is paid.
         let acceptance = self.acceptance(index, &quote)?;
+        // Read before the fee is proposed: nothing waits on the network
+        // between its last time check and its creation.
+        let zcash_height = self.zcash.chain_height().await?;
+        let open_fee = match &quote.open_fee {
+            Some(fee) => {
+                // A wallet catching up would see the fee mined, and deposit,
+                // too late: nothing is saved or paid, and the offer holds.
+                open_fee::require_scanned(self.zcash.scanned_height().await?, zcash_height)?;
+                let proposed = self
+                    .propose_open_fee(index, &quote, fee, &offer, max_total_zatoshi)
+                    .await?;
+                // The fee is a key step: a lock or the background that came
+                // while it was proposed stops it here, nothing saved, and the
+                // guard releases the proposal.
+                engine::check_cancelled(self.op)?;
+                Some(proposed)
+            }
+            None => None,
+        };
         let swap_id = terms::swap_id(&self.pins.maker, &self.keys.user_share(index)?);
         let record = ForwardRecord {
             index,
             quote,
             swap_id: Hex(swap_id),
-            zcash_height: self.zcash.chain_height().await?,
+            zcash_height,
             accepted_at: self.clock.now(),
             receives: offer.receives,
             relayer_fee: offer.relayer_fee,
@@ -513,9 +629,22 @@ where
             t1: None,
             fee_expires_at: offer.fee_expires_at,
             ticket: None,
+            open_fee_max_total_zat: offer.max_open_fee_total_zatoshi(),
+            // Started before it exists: an interruption from here on finds
+            // it in the wallet rather than paying again.
+            open_fee_attempted: open_fee.is_some(),
+            open_fee_payment: None,
         };
         save(store, self.account, &record)?;
         engine::remove_offer(self.account, index);
+        if let Some((proposal, network_fee)) = open_fee {
+            // Saved as started: cancelled here, the engine finds nothing in
+            // the wallet and pays it once it may.
+            engine::check_cancelled(self.op)?;
+            self.create_open_fee(store, &record, proposal, network_fee)
+                .await?;
+            return Ok(AcceptOutcome::Accepted);
+        }
         self.post_accept(store, record, &acceptance).await
     }
 
@@ -535,6 +664,16 @@ where
         if record.t0.is_some() {
             return Ok(AcceptOutcome::Accepted);
         }
+        // Its fee first, and the accept only once a block has it.
+        if record.quote.open_fee.is_some() {
+            return match self.open_with_fee(store, &record).await {
+                Ok(ForwardStep::Finished(ForwardOutcome::NothingSent { cause })) => {
+                    Ok(AcceptOutcome::NothingSent(cause))
+                }
+                Ok(_) => Ok(AcceptOutcome::Accepted),
+                Err(error) => Err(error),
+            };
+        }
         // Too late to post again; the engine gives an unanswered accept up
         // once its quote is long expired.
         require_time_to_accept(&record.quote, self.clock.now())?;
@@ -542,43 +681,37 @@ where
         self.post_accept(store, record, &acceptance).await
     }
 
-    /// Posts the acceptance, paying with a token where the maker asks for
-    /// one (`tokens::accept_paying`). The acceptance is built per post: only
-    /// a paid one carries the request for its token back.
+    /// Posts the acceptance and takes the maker's answer.
     async fn post_accept(
         &self,
         store: &mut SwapStore,
         record: ForwardRecord,
         acceptance: &SwapAcceptance,
     ) -> Result<AcceptOutcome> {
-        let posted = tokens::accept_paying(
-            self.tokens,
-            self.clock.now(),
-            record.swap_id,
-            Direction::Forward,
-            async |payment: Option<&Payment>| {
-                let paid = SwapAcceptance {
-                    token_request: payment.map(|payment| payment.token_request.clone()),
-                    ..acceptance.clone()
-                };
-                self.maker
-                    .accept(
-                        &record.quote.quote_id,
-                        &paid,
-                        payment.map(|payment| payment.authorization.0.as_str()),
-                    )
-                    .await
-            },
-        )
-        .await;
+        let posted = self.post_acceptance(&record, acceptance).await;
+        self.accept_answered(store, record, posted)
+    }
+
+    /// Posts `acceptance` for `record`'s quote: the maker's answer.
+    async fn post_acceptance(
+        &self,
+        record: &ForwardRecord,
+        acceptance: &SwapAcceptance,
+    ) -> std::result::Result<SwapAccepted, SwapHttpError> {
+        self.maker.accept(&record.quote.quote_id, acceptance).await
+    }
+
+    /// What the maker's answer to `record`'s accept makes of it: the swap's
+    /// deadlines and ticket kept, or its end where nothing can have opened.
+    fn accept_answered(
+        &self,
+        store: &mut SwapStore,
+        record: ForwardRecord,
+        posted: std::result::Result<SwapAccepted, SwapHttpError>,
+    ) -> Result<AcceptOutcome> {
         let accepted = match posted {
             Ok(accepted) => accepted,
-            // Turned away at the token gate, with no token to pay. A refusal
-            // sends nothing, so nothing opened; the challenge is kept for the
-            // issuance.
-            Err(AcceptError::TokensNeeded { .. }) => return Ok(AcceptOutcome::TokensNeeded),
-            Err(AcceptError::Tokens(error)) => return Err(error),
-            Err(AcceptError::Http(SwapHttpError::Refused(refusal))) => {
+            Err(SwapHttpError::Refused(refusal)) => {
                 match accept_refusal(&refusal) {
                     Some(cause) => {
                         self.finish(
@@ -596,7 +729,7 @@ where
                 }
             }
             // No answer, or one that does not read: maybe opened.
-            Err(AcceptError::Http(error)) => return Err(error.into()),
+            Err(error) => return Err(error.into()),
         };
         let mut opened = record;
         opened.t0 = Some(accepted.t0);
@@ -629,6 +762,332 @@ where
         swap::acceptance(self.keys, self.pins, index, quote)
     }
 
+    // ---- the open fee ----
+
+    /// At accept, before anything is saved: the open fee's payment proposed,
+    /// with its network fee, once the quote leaves it the time to be mined
+    /// and the wallet holds the fee, the deposit and both network fees. A fee
+    /// buys nothing if the deposit cannot follow it.
+    async fn propose_open_fee(
+        &self,
+        index: u32,
+        quote: &SwapQuote,
+        fee: &OpenFee,
+        offer: &Offer,
+        max_total_zatoshi: u64,
+    ) -> Result<(ProposedDeposit<'a, Z>, u64)> {
+        // Time for a block to mine the fee before the quote ends.
+        open_fee::require_time_to_start(
+            quote,
+            self.clock.now(),
+            self.pins.open_fee_min_quote_life_seconds,
+        )?;
+        let max_fee_total = offer.max_open_fee_total_zatoshi().ok_or_else(|| {
+            PrivateUsdError::new(
+                ErrorCode::DepositUnpayable,
+                "the open fee does not fit one transaction from this wallet",
+            )
+        })?;
+        let needed = max_fee_total.saturating_add(max_total_zatoshi);
+        if self.zcash.funds().await?.spendable < needed {
+            return fail(
+                ErrorCode::DepositUnpayable,
+                "the wallet cannot pay the open fee, the deposit and their network fees",
+            );
+        }
+        let (proposal, network_fee) = self
+            .zcash
+            .propose_open_fee(index, &fee.address, fee.zat, max_fee_total)
+            .await?;
+        let proposal = ProposedDeposit {
+            zcash: self.zcash,
+            proposal: Some(proposal),
+        };
+        // Proposing can wait on the wallet write lock: the time is judged
+        // again, by the same least life, right before the payment is
+        // created and stored.
+        open_fee::require_time_to_start(
+            quote,
+            self.clock.now(),
+            self.pins.open_fee_min_quote_life_seconds,
+        )?;
+        Ok((proposal, network_fee))
+    }
+
+    /// Creates the proposed open fee's payment for `record`, whose record was
+    /// marked started before, keeps it, then sends it.
+    async fn create_open_fee(
+        &self,
+        store: &mut SwapStore,
+        record: &ForwardRecord,
+        proposal: ProposedDeposit<'_, Z>,
+        network_fee: u64,
+    ) -> Result<OpenFeePayment> {
+        let created = self
+            .zcash
+            .create_open_fee(proposal.take(), record.quote.expires_at)
+            .await?;
+        let payment = OpenFeePayment::new(created, Some(network_fee));
+        // Kept before it is first sent.
+        let mut current: ForwardRecord = load(store, self.account, record.index)?;
+        current.open_fee_payment = Some(payment.clone());
+        update(store, self.account, &current)?;
+        // Sent only while the quote leaves it the time to be mined: creating
+        // it can wait long on the wallet's lock. One kept unsent ends with
+        // its expiry, and the sync withholds it (`withheld_fee_txids`).
+        if open_fee::time_to_pay(&current.quote, self.clock.now()) {
+            self.send_open_fee(&current, &payment).await?;
+        }
+        Ok(payment)
+    }
+
+    /// Sends the kept payment, and notes when, sent or not, for its resends:
+    /// a send that failed waits its half minute too.
+    async fn send_open_fee(&self, record: &ForwardRecord, payment: &OpenFeePayment) -> Result<()> {
+        let mut pace = engine::fee_pace(self.account, record.index);
+        pace.sent_at = Some(self.clock.now());
+        engine::put_fee_pace(self.account, record.index, pace);
+        self.zcash.broadcast(&payment.transaction()).await
+    }
+
+    /// A swap whose quote asks an open fee, until the maker answers its
+    /// accept. The fee is paid once, if the quote still leaves it the time
+    /// to be mined, and never built again: a payment started is looked for
+    /// in the wallet first. It is sent again every half minute while no
+    /// block has it and the quote leaves it the time, and the swap is given
+    /// up when the quote expires with it unmined. Once Veylor's wallet shows
+    /// it mined, the accept is posted.
+    async fn open_with_fee(
+        &self,
+        store: &mut SwapStore,
+        record: &ForwardRecord,
+    ) -> Result<ForwardStep> {
+        let Some(fee) = record.quote.open_fee.clone() else {
+            return fail(ErrorCode::Other, "the quote asks no open fee");
+        };
+        let current = self.with_found_fee(store, record, &fee).await?;
+        let payment = match current.open_fee_payment.clone() {
+            Some(payment) => payment,
+            None => match self.pay_open_fee(store, &current, &fee).await? {
+                FeePaying::Paid(payment) => payment,
+                // Too late to pay: dropped, with nothing paid.
+                FeePaying::TooLate => {
+                    return self.end_unopened(store, &current, NothingSentCause::QuoteExpired)
+                }
+                // Paid once the wallet is at the tip, if the quote then
+                // still allows it.
+                FeePaying::Syncing => return Ok(waiting(ForwardWait::ZcashSyncing)),
+            },
+        };
+        let current: ForwardRecord = load(store, self.account, record.index)?;
+        let status = self.zcash.deposit_status(&payment.transaction()).await?;
+        if matches!(status, SwapTxStatus::Mined { .. }) {
+            return self.accept_with_fee(store, current).await;
+        }
+        let now = self.clock.now();
+        if now >= current.quote.expires_at {
+            // A fee the wallet shows unmined may still have opened the swap,
+            // in a block a reorg took back: the chain says.
+            if self.chain.swap(&current.swap_id.0).await?.is_some() {
+                return self.not_on_chain(store, &current, false).await;
+            }
+            // Never accepted. A payment that can still be mined is the
+            // maker's if it is; one provably expired paid nothing.
+            let cause = if status == SwapTxStatus::Expired {
+                NothingSentCause::QuoteExpired
+            } else {
+                NothingSentCause::FeeNotHonoured
+            };
+            return self.end_unopened(store, &current, cause);
+        }
+        // With less time left, what went out may still be mined in time, and
+        // nothing more is sent.
+        let pace = engine::fee_pace(self.account, current.index);
+        let due = pace
+            .sent_at
+            .is_none_or(|sent| now >= sent.saturating_add(OPEN_FEE_RESEND_SECONDS));
+        if due && open_fee::time_to_pay(&current.quote, now) && status != SwapTxStatus::Expired {
+            match self.send_open_fee(&current, &payment).await {
+                Ok(()) => {}
+                // The node refused it, such as one near its expiry, which
+                // follows the quote's: what went out before stands, and the
+                // chain says what became of it. A payment it already holds
+                // or has mined reads as sent.
+                Err(error) if error.code == ErrorCode::ZcashRejected => log::warn!(
+                    "private usd: forward swap {}: the node refused the open fee sent again",
+                    current.index
+                ),
+                // No answer, or no route: the step's failure, as any send's,
+                // and the next send waits its half minute.
+                Err(error) => return Err(error),
+            }
+        }
+        Ok(waiting(ForwardWait::FeeConfirming))
+    }
+
+    /// `record` with the open fee's payment an interruption cut short, found
+    /// again in the wallet: a started payment is never built before it is
+    /// looked for.
+    async fn with_found_fee(
+        &self,
+        store: &mut SwapStore,
+        record: &ForwardRecord,
+        fee: &OpenFee,
+    ) -> Result<ForwardRecord> {
+        let mut current = record.clone();
+        if current.open_fee_progress() != OpenFeeProgress::Started {
+            return Ok(current);
+        }
+        if let Some(found) = self.zcash.find_deposit(&fee.address).await? {
+            current.open_fee_payment = Some(OpenFeePayment::new(found, None));
+            update(store, self.account, &current)?;
+        }
+        Ok(current)
+    }
+
+    /// Pays the open fee of a record saved before its payment was created,
+    /// should the time left still allow it: the deployment's least fee quote
+    /// life, as at the bridge. `TooLate`, with nothing paid, once it does
+    /// not, judged before the payment is proposed and again right before it
+    /// is created: a stored payment is one the wallet's sync sends again
+    /// until it is mined or expires, a few blocks after the quote. `Syncing`,
+    /// nothing paid yet, while the wallet trails the tip, as at the bridge.
+    async fn pay_open_fee(
+        &self,
+        store: &mut SwapStore,
+        record: &ForwardRecord,
+        fee: &OpenFee,
+    ) -> Result<FeePaying> {
+        // Only with the time the user's bridge needed to start it.
+        if open_fee::time_left(&record.quote, self.clock.now())
+            < self.pins.open_fee_min_quote_life_seconds
+        {
+            return Ok(FeePaying::TooLate);
+        }
+        let tip = self.zcash.chain_height().await?;
+        if open_fee::require_scanned(self.zcash.scanned_height().await?, tip).is_err() {
+            return Ok(FeePaying::Syncing);
+        }
+        let max_total = record.open_fee_max_total_zat.ok_or_else(|| {
+            PrivateUsdError::new(
+                ErrorCode::DepositUnpayable,
+                "the conversion has no approved total for its open fee",
+            )
+        })?;
+        engine::check_cancelled(self.op)?;
+        let (proposal, network_fee) = self
+            .zcash
+            .propose_open_fee(record.index, &fee.address, fee.zat, max_total)
+            .await?;
+        let proposal = ProposedDeposit {
+            zcash: self.zcash,
+            proposal: Some(proposal),
+        };
+        engine::check_cancelled(self.op)?;
+        if open_fee::time_left(&record.quote, self.clock.now())
+            < self.pins.open_fee_min_quote_life_seconds
+        {
+            return Ok(FeePaying::TooLate);
+        }
+        let mut started = record.clone();
+        if !started.open_fee_attempted {
+            started.open_fee_attempted = true;
+            update(store, self.account, &started)?;
+        }
+        self.create_open_fee(store, &started, proposal, network_fee)
+            .await
+            .map(FeePaying::Paid)
+    }
+
+    /// Posts the accept of a quote whose open fee is mined, unless the maker
+    /// asked to wait; never once the quote has expired. While the maker has
+    /// not seen the fee (`402 feeRequired`), or the accept may have gone
+    /// through (a `5xx` or no answer), it is posted again as the maker asks.
+    /// A refusal that says nothing opened ends the swap; one that may follow
+    /// an open (`accept_refusal`'s `None`) is posted again on the next step,
+    /// until the quote's end. After it, the chain shows whether the swap
+    /// opened and with what deadlines (`not_on_chain`).
+    async fn accept_with_fee(
+        &self,
+        store: &mut SwapStore,
+        record: ForwardRecord,
+    ) -> Result<ForwardStep> {
+        let now = self.clock.now();
+        let mut pace = engine::fee_pace(self.account, record.index);
+        if now >= record.quote.expires_at {
+            // No accept goes after the quote: whether the swap opened, and
+            // with what deadlines, is the chain's to show. The maker said it
+            // had not seen the fee, and the chain shows no swap: nothing
+            // opened.
+            if pace.fee_unseen && self.chain.swap(&record.swap_id.0).await?.is_none() {
+                return self.end_unopened(store, &record, NothingSentCause::FeeNotHonoured);
+            }
+            return self.not_on_chain(store, &record, false).await;
+        }
+        if pace.accept_after.is_some_and(|after| now < after) {
+            return Ok(waiting(ForwardWait::FeeAccepting));
+        }
+        let acceptance = self.acceptance(record.index, &record.quote)?;
+        let posted = self.post_acceptance(&record, &acceptance).await;
+        let again = match &posted {
+            Err(SwapHttpError::Refused(refusal))
+                if refusal.code == Some(SwapErrorCode::FeeRequired) =>
+            {
+                Some((refusal.retry_after_secs, FEE_WAIT_SECONDS, true))
+            }
+            Err(SwapHttpError::Refused(refusal)) if refusal.status >= 500 => Some((
+                refusal.retry_after_secs,
+                UNANSWERED_ACCEPT_WAIT_SECONDS,
+                false,
+            )),
+            Err(SwapHttpError::Unreachable { .. } | SwapHttpError::Unreadable { .. }) => {
+                Some((None, UNANSWERED_ACCEPT_WAIT_SECONDS, false))
+            }
+            _ => None,
+        };
+        if let Some((asked, default, unseen)) = again {
+            let now = self.clock.now();
+            let left = open_fee::time_left(&record.quote, now);
+            let wait = open_fee::accept_wait(asked, default, pace.accept_waits, left);
+            pace.accept_after = Some(now.saturating_add(wait));
+            pace.accept_waits = pace.accept_waits.saturating_add(1);
+            pace.fee_unseen = unseen;
+            engine::put_fee_pace(self.account, record.index, pace);
+            return Ok(waiting(ForwardWait::FeeAccepting));
+        }
+        // Any other answer is no word that nothing opened.
+        let index = record.index;
+        pace.fee_unseen = false;
+        engine::put_fee_pace(self.account, index, pace);
+        match self.accept_answered(store, record, posted)? {
+            AcceptOutcome::Accepted => {
+                engine::remove_fee_pace(self.account, index);
+                Ok(waiting(ForwardWait::Opening))
+            }
+            AcceptOutcome::NothingSent(cause) => {
+                engine::remove_fee_pace(self.account, index);
+                Ok(ForwardStep::Finished(ForwardOutcome::NothingSent { cause }))
+            }
+        }
+    }
+
+    /// Ends a swap that opened nothing, and forgets its fee's pacing.
+    fn end_unopened(
+        &self,
+        store: &mut SwapStore,
+        record: &ForwardRecord,
+        cause: NothingSentCause,
+    ) -> Result<ForwardStep> {
+        engine::remove_fee_pace(self.account, record.index);
+        self.finish(
+            store,
+            record,
+            ForwardOutcome::NothingSent { cause },
+            None,
+            None,
+        )
+    }
+
     // ---- advance ----
 
     /// One look at the chain for swap `index`, then at most one key-using
@@ -651,13 +1110,23 @@ where
                 problem: None,
             },
             Ok(ForwardStep::Waiting { wait, .. }) => AdvanceReport {
+                next_poll: match wait {
+                    // As long as the maker asked, or the accept's pace.
+                    ForwardWait::FeeAccepting => {
+                        let now = self.clock.now();
+                        let after = engine::fee_pace(self.account, index)
+                            .accept_after
+                            .unwrap_or(now + FEE_WAIT_SECONDS);
+                        Duration::from_secs(after.saturating_sub(now).max(1))
+                    }
+                    _ => swap::nap(
+                        wake(wait),
+                        self.chain.newest_head().as_ref(),
+                        self.clock.now(),
+                    ),
+                },
                 record,
                 wait: Some(wait),
-                next_poll: swap::nap(
-                    wake(wait),
-                    self.chain.newest_head().as_ref(),
-                    self.clock.now(),
-                ),
                 problem: None,
             },
             Err(problem) => AdvanceReport {
@@ -677,10 +1146,8 @@ where
             return Ok(ForwardStep::Finished(outcome.clone()));
         }
         engine::check_cancelled(self.op)?;
-        if record.deposit.is_some() {
-            self.collect_return(&record).await;
-        }
         match self.terms(&record)? {
+            None if record.quote.open_fee.is_some() => self.open_with_fee(store, &record).await,
             None => self.not_on_chain(store, &record, false).await,
             Some(terms) => self.step(store, &record, &terms).await,
         }
@@ -729,15 +1196,29 @@ where
         record: &ForwardRecord,
         answered: bool,
     ) -> Result<ForwardStep> {
-        let gave_up = self.clock.now() > record.quote.expires_at + OPEN_GRACE_SECONDS;
-        let cause = if !gave_up || record.deposit_progress() != DepositProgress::NotStarted {
+        let now = self.clock.now();
+        let gave_up = now > record.quote.expires_at + OPEN_GRACE_SECONDS;
+        // Unanswered past its quote, no answer is coming: the chain shows
+        // whether the swap opened all the same.
+        let unanswered = !answered && now >= record.quote.expires_at;
+        let cause = if !(gave_up || unanswered)
+            || record.deposit_progress() != DepositProgress::NotStarted
+        {
             None
         } else if self.chain.swap(&record.swap_id.0).await?.is_none() {
-            Some(NothingSentCause::NeverOpened)
-        } else if answered {
+            // A fee paid for a swap that never opened is the maker's.
+            match (gave_up, record.open_fee_payment.is_some()) {
+                (false, _) => None,
+                (true, true) => Some(NothingSentCause::FeeNotHonoured),
+                (true, false) => Some(NothingSentCause::NeverOpened),
+            }
+        } else if answered || self.keep_opened_deadlines(store, record).await? {
+            // Kept: the next look follows the swap to its deposit.
             None
-        } else {
+        } else if now > record.quote.expires_at + OPEN_GRACE_SECONDS + OPENED_EVENT_GRACE_SECONDS {
             Some(NothingSentCause::MakerUnavailable)
+        } else {
+            None
         };
         match cause {
             Some(cause) => self.finish(
@@ -749,6 +1230,37 @@ where
             ),
             None => Ok(waiting(ForwardWait::Opening)),
         }
+    }
+
+    /// Keeps on `record` the `t0` and `t1` its swap opened with, from the
+    /// swap's confirmed `Opened`: an accept whose answer was lost, its quote
+    /// gone. Nothing is posted; the chain alone is the evidence, and the
+    /// confirmed read holds them, with every other term, to the swap's terms
+    /// hash before anything is paid into it (a mismatch pays nothing). The
+    /// ticket the answer carried is gone: the relayer's posts go without it.
+    /// `false` while no confirmed block shows the event.
+    async fn keep_opened_deadlines(
+        &self,
+        store: &mut SwapStore,
+        record: &ForwardRecord,
+    ) -> Result<bool> {
+        let Some((t0, t1)) = self
+            .chain
+            .confirmed_opened_deadlines(&record.swap_id.0, record.accepted_at)
+            .await?
+        else {
+            return Ok(false);
+        };
+        log::info!(
+            "private usd: forward swap {}: opened unanswered, deadlines read from the chain",
+            record.index
+        );
+        let mut opened = record.clone();
+        opened.t0 = Some(t0);
+        opened.t1 = Some(t1);
+        update(store, self.account, &opened)?;
+        engine::remove_fee_pace(self.account, record.index);
+        Ok(true)
     }
 
     /// `chain_now` is the time of the newest block the swap was read against.
@@ -796,6 +1308,7 @@ where
                 None,
             ),
             Deposit::Syncing => Ok(waiting(ForwardWait::ZcashSyncing)),
+            Deposit::FundsPending => Ok(waiting(ForwardWait::FundsPending)),
             // From t0 the claim needs no `ready`: a maker gone quiet holds
             // the deposit no longer.
             Deposit::Kept => self.claim(store, record, terms).await,
@@ -852,18 +1365,31 @@ where
                         "the conversion has no approved deposit total",
                     )
                 })?;
+                let proposed = match self
+                    .zcash
+                    .propose_deposit(
+                        current.index,
+                        &address,
+                        current.quote.deposit_zat,
+                        max_total,
+                    )
+                    .await
+                {
+                    Ok(proposed) => proposed,
+                    // An open fee paid from the wallet's only note leaves the
+                    // deposit its change to wait for, not a failure.
+                    Err(error)
+                        if error.code == ErrorCode::DepositUnpayable
+                            && current.open_fee_payment.is_some()
+                            && self.zcash.funds().await?.pending > 0 =>
+                    {
+                        return Ok(Deposit::FundsPending);
+                    }
+                    Err(error) => return Err(error),
+                };
                 let proposal = ProposedDeposit {
                     zcash: self.zcash,
-                    proposal: Some(
-                        self.zcash
-                            .propose_deposit(
-                                current.index,
-                                &address,
-                                current.quote.deposit_zat,
-                                max_total,
-                            )
-                            .await?,
-                    ),
+                    proposal: Some(proposed),
                 };
                 // Proposing can wait seconds on the wallet write lock; a lock or
                 // background that arrived meanwhile stops here, before any key is
@@ -1504,29 +2030,6 @@ where
         )
     }
 
-    /// Reads the maker's status for a swap whose accept's token is still to
-    /// come back, once the deposit is out, and holds the token it hands
-    /// back. A read that fails waits for the next step, never an error.
-    async fn collect_return(&self, record: &ForwardRecord) {
-        let now = self.clock.now();
-        if !self.tokens.awaits_return(&record.swap_id, now) {
-            return;
-        }
-        let Ok(status) = self.maker.swap_status(&record.swap_id).await else {
-            return;
-        };
-        let Some(token_return) = status.token_return else {
-            return;
-        };
-        if let Err(error) = self.tokens.collect(&record.swap_id, &token_return.0, now) {
-            log::warn!(
-                "private usd: forward swap {}: holding the token back failed ({:?})",
-                record.index,
-                error.code
-            );
-        }
-    }
-
     /// A relayer's answer is not the payout receipt: the swap ends paid only
     /// on the confirmed `PaidOut` event, with the amount it paid.
     async fn finish_paid(
@@ -1534,8 +2037,6 @@ where
         store: &mut SwapStore,
         record: &ForwardRecord,
     ) -> Result<ForwardStep> {
-        // The maker hands the token back by now at the latest.
-        self.collect_return(record).await;
         let Some(paid) = self
             .chain
             .confirmed_payout(&record.swap_id.0, record.accepted_at)
@@ -1581,6 +2082,7 @@ where
             receives,
             self.clock.now(),
         )?;
+        engine::remove_fee_pace(self.account, record.index);
         Ok(ForwardStep::Finished(outcome))
     }
 
@@ -1632,8 +2134,15 @@ pub(crate) async fn abandon<C: ChainReader, K: Clock>(
             "the swap is under way on chain: it goes on",
         );
     }
-    // Unanswered, the maker never took it (a turn-away at the token gate
-    // included); answered, it never opened.
+    // A fee started may be mined: the swap goes on, so that its accept
+    // follows the fee and its end says what the fee bought.
+    if record.open_fee_progress() != OpenFeeProgress::NotStarted {
+        return fail(
+            ErrorCode::TooLate,
+            "the open fee is paid or on its way: the swap goes on",
+        );
+    }
+    // Unanswered, the maker never took it; answered, it never opened.
     let cause = if record.t0.is_none() {
         NothingSentCause::MakerUnavailable
     } else {
@@ -1648,6 +2157,7 @@ pub(crate) async fn abandon<C: ChainReader, K: Clock>(
         None,
         clock.now(),
     )?;
+    engine::remove_fee_pace(account, index);
     load(store, account, index)
 }
 
@@ -1699,13 +2209,19 @@ fn holding(wait: ForwardWait, terms: &Terms) -> ForwardStep {
 /// A maker's refusal of an accept that came before it opened anything, and
 /// what ended; `None` for one that may follow an open.
 fn accept_refusal(refusal: &Refusal) -> Option<NothingSentCause> {
+    // Unauthorized: the maker acted on nothing, whatever the code (a maker
+    // asking for a Privacy Pass token, which this build never pays).
+    if refusal.status == 401 {
+        return Some(NothingSentCause::MakerRefused);
+    }
     match refusal.code {
+        // A fee the quote never asked is a refusal: nothing opened.
         Some(
             SwapErrorCode::Rejected
             | SwapErrorCode::InvalidRequest
             | SwapErrorCode::NotFound
             | SwapErrorCode::MethodNotAllowed
-            | SwapErrorCode::TokenRequired,
+            | SwapErrorCode::FeeRequired,
         ) => Some(NothingSentCause::MakerRefused),
         Some(SwapErrorCode::UnknownQuote) => Some(NothingSentCause::QuoteExpired),
         Some(SwapErrorCode::Unavailable | SwapErrorCode::WatchtowerUnavailable) => {
@@ -1763,10 +2279,29 @@ impl SwapCall<'_> {
         op: Option<&OpHandle>,
         step: impl AsyncFnOnce(&WalletForward<'_>, &mut SwapStore) -> Result<R>,
     ) -> Result<R> {
-        let transport = swap::transport(op);
+        self.forward_over(swap::transport(op), op, step).await
+    }
+
+    /// [`Self::forward`] for an accept: `op` stops only its open fee, at the
+    /// checks around the fee's proposal and creation, while its requests run
+    /// on a transport no cancel stops. An accept's post always completes, as
+    /// before accepts had an op: one cut short may have opened the swap.
+    pub(crate) async fn forward_accepting<R>(
+        &self,
+        op: Option<&OpHandle>,
+        step: impl AsyncFnOnce(&WalletForward<'_>, &mut SwapStore) -> Result<R>,
+    ) -> Result<R> {
+        self.forward_over(swap::transport(None), op, step).await
+    }
+
+    async fn forward_over<R>(
+        &self,
+        transport: RoutedHttp,
+        op: Option<&OpHandle>,
+        step: impl AsyncFnOnce(&WalletForward<'_>, &mut SwapStore) -> Result<R>,
+    ) -> Result<R> {
         let chain = EvmRpc::new(&transport, self.pins(), self.eth_rpc_url)?.sharing_session();
         let zcash = self.zcash(op);
-        let tokens = self.tokens();
         let forward = Forward::new(
             self.account,
             self.keys,
@@ -1775,7 +2310,6 @@ impl SwapCall<'_> {
             &zcash,
             &SystemClock,
             &engine::MAKER_CHECKS,
-            &tokens,
             op,
         );
         let mut store = SwapStore::open(self.store_dir)?;

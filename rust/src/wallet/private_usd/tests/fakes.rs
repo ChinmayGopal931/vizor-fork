@@ -10,8 +10,6 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use base64::Engine as _;
 use http::Method;
 use rand_0_10::{rand_core::UnwrapErr, rngs::SysRng};
 use serde_json::{json, Value};
@@ -27,17 +25,18 @@ use super::super::evm_rpc::{
     ChainReader, ConfirmedSwap, Head, PaidOut, ReverseChainState, SeenHead, SwapRead, SwapStage,
     SwapState, TransactionStatus,
 };
-use super::super::forward::{Forward, ForwardStep, ForwardView, ForwardWait, ForwardZcash, Quoted};
+use super::super::forward::{
+    Forward, ForwardStep, ForwardView, ForwardWait, ForwardZcash, Funds, Quoted,
+};
 use super::super::joint::SwapTxStatus;
 use super::super::keys::SwapKeyContext;
 use super::super::models::{
-    Direction, ForwardRecord, Hex, JointAccountId, ReverseReceiveEstimate,
-    ReverseReceiveTransaction, ReverseRecord, StoredRecord, ZcashTransaction, ZcashTxId,
+    Direction, ForwardRecord, JointAccountId, ReverseReceiveEstimate, ReverseReceiveTransaction,
+    ReverseRecord, StoredRecord, ZcashTransaction, ZcashTxId,
 };
 use super::super::reverse::{self, ProvedFunding, Reverse, ReverseQuoted, ReverseZcash};
 use super::super::store::{self, SwapStore};
 use super::super::terms::{reverse_swap_id, swap_id};
-use super::super::tokens::{test_support::FakeIssuer, Finished, TokenStore};
 use super::super::transport::{HttpTransport, Service};
 use super::super::{fail, ErrorCode, PrivateUsdNetwork, Result};
 use crate::wallet::routed_http::{RoutedError, RoutedRequest, RoutedResponse};
@@ -205,32 +204,12 @@ pub(super) struct State {
     pub amount: u128,
     pub quote_expires_at: u64,
     pub quote_requests: Vec<Value>,
+    /// What every accept, forward or reverse, is answered with when not 200,
+    /// with this code.
     pub accept_status: u16,
     pub accept_code: Option<&'static str>,
-    /// The maker takes Privacy Pass tokens: an unpaid accept is answered
-    /// `401` with today's challenge, a paid one checked against the issuer's
-    /// keys, and `/v1/info` shows the return key.
-    pub tokens_required: bool,
-    /// The last paid accept's request for its token back.
-    pub token_request: Option<String>,
-    /// The maker hands the token back: a swap's status carries its
-    /// `tokenReturn`.
-    pub hands_back: bool,
-    /// The maker refuses every token (spent, it says), with tokens on.
-    pub refuses_tokens: bool,
-    /// Every accept's body, paid or not, in order.
+    /// Every accept's body, in order.
     pub accepts: Vec<Value>,
-    /// The issuer and the maker's return key, generated.
-    pub issuer: Rc<FakeIssuer>,
-    pub issuer_tokens_per_day: u32,
-    /// What `POST /v1/tokens` answers: 200 signs `issuer_signs` of the
-    /// batch (all of it when `None`); 403 refuses the attestation; 429 has
-    /// none left.
-    pub issuer_answer: u16,
-    pub issuer_signs: Option<usize>,
-    /// Every `POST /v1/tokens` body, in order.
-    pub issuer_posts: Vec<Value>,
-    issuer_challenges: u8,
     /// Holds the accept's answer until notified.
     pub hold_accept: Option<Arc<Notify>>,
     /// A reverse quote's funding, ready and refund deadlines.
@@ -240,6 +219,20 @@ pub(super) struct State {
     pub accepted_late_window: Option<u64>,
     /// What `/v1/info` adds: the contract's windows and kind.
     pub info_windows: Option<Value>,
+    /// The open fee every forward quote asks, zatoshis and address; `None`
+    /// asks none.
+    pub open_fee: Option<(u64, String)>,
+    /// Accepts the maker turns down `402 feeRequired` before it has seen
+    /// the fee, each with this `Retry-After` where one is set.
+    pub fee_unseen_accepts: u32,
+    pub fee_retry_after: Option<u64>,
+    /// The maker opens the swap on an accept, and its answer is lost.
+    pub accept_answer_lost: bool,
+    /// Whether a confirmed `Opened` shows the swap's open; `false`: no
+    /// confirmed block has it yet.
+    pub opened_event_visible: bool,
+    /// How many times the `Opened` event was looked for.
+    pub opened_event_reads: u32,
 
     // The relayer.
     pub relayer: [u8; 20],
@@ -292,13 +285,37 @@ pub(super) struct State {
 
     // The wallet's Zcash side.
     pub synced: bool,
-    /// Every broadcast fails.
+    /// How many blocks the wallet's scan trails the tip.
+    pub scan_lag: u64,
+    /// Every broadcast fails: the node refuses it.
     pub broadcast_fails: bool,
+    /// Every broadcast fails before any node answers.
+    pub broadcast_unreachable: bool,
+    /// How many broadcasts were tried, sent or not.
+    pub broadcast_attempts: u32,
     pub deposit_fee: Option<u64>,
+    /// What a deposit built now costs in network fee, whatever was
+    /// estimated: more once the open fee took a note it counted on.
+    pub deposit_cost: u64,
     pub unpayable: bool,
     pub deposits: Vec<(String, u64)>,
     /// The deposit the wallet created last, as its history shows it.
     pub created: Option<ZcashTransaction>,
+    /// The open fees the wallet paid, and the last one it created.
+    pub fee_payments: Vec<(String, u64)>,
+    pub created_fee: Option<ZcashTransaction>,
+    /// Where a crash cuts the open fee's payment short.
+    pub fee_crash: Option<Crash>,
+    /// The deadline each open fee payment was created to expire by.
+    pub fee_deadlines: Vec<u64>,
+    /// Seconds creating an open fee waits on the wallet's lock before it
+    /// judges its deadline, and then takes to sign: the clocks move on.
+    pub fee_lock_wait: u64,
+    pub fee_sign_seconds: u64,
+    /// Creating an open fee fails, nothing created.
+    pub fee_create_fails: bool,
+    /// What the account's funds are, spendable and on their way.
+    pub funds: Funds,
     pub statuses: HashMap<ZcashTxId, SwapTxStatus>,
     pub submitted: Vec<ZcashTxId>,
     pub discarded: u32,
@@ -375,22 +392,18 @@ impl State {
             quote_requests: Vec::new(),
             accept_status: 200,
             accept_code: None,
-            tokens_required: false,
-            token_request: None,
-            hands_back: false,
-            refuses_tokens: false,
             accepts: Vec::new(),
-            issuer: Rc::new(FakeIssuer::new(pins.issuer_url, pins.issuer_name)),
-            issuer_tokens_per_day: 3,
-            issuer_answer: 200,
-            issuer_signs: None,
-            issuer_posts: Vec::new(),
-            issuer_challenges: 0,
             hold_accept: None,
             reverse_deadlines: (FUNDING, READY, REFUND),
             reverse_accepts: 0,
             accepted_late_window: Some(late_window()),
             info_windows: None,
+            open_fee: None,
+            fee_unseen_accepts: 0,
+            fee_retry_after: None,
+            accept_answer_lost: false,
+            opened_event_visible: true,
+            opened_event_reads: 0,
             relayer: pins.relayer,
             relayer_fee: RELAYER_FEE,
             fee_expires_at: None,
@@ -417,11 +430,26 @@ impl State {
             posted_fees: Vec::new(),
             relayer_claims: false,
             synced: true,
+            scan_lag: 0,
             broadcast_fails: false,
+            broadcast_unreachable: false,
+            broadcast_attempts: 0,
             deposit_fee: Some(DEPOSIT_FEE_ZAT),
+            deposit_cost: DEPOSIT_FEE_ZAT,
             unpayable: false,
             deposits: Vec::new(),
             created: None,
+            fee_payments: Vec::new(),
+            created_fee: None,
+            fee_crash: None,
+            fee_deadlines: Vec::new(),
+            fee_lock_wait: 0,
+            fee_sign_seconds: 0,
+            fee_create_fails: false,
+            funds: Funds {
+                spendable: 100_000_000,
+                pending: 0,
+            },
             statuses: HashMap::new(),
             submitted: Vec::new(),
             discarded: 0,
@@ -725,6 +753,24 @@ impl ChainReader for FakeChain {
         Ok(self.0.get().refunded_at)
     }
 
+    /// The deadlines the maker opened the swap with, as its `Opened` names
+    /// them, once a confirmed block has it.
+    async fn confirmed_opened_deadlines(
+        &self,
+        id: &[u8; 32],
+        _since: u64,
+    ) -> Result<Option<(u64, u64)>> {
+        self.0.set().opened_event_reads += 1;
+        let state = self.0.get();
+        if !state.opened || !state.opened_event_visible || state.swap_id.as_ref() != Some(id) {
+            return Ok(None);
+        }
+        Ok(state
+            .opened_terms
+            .as_ref()
+            .map(|terms| (terms.t0, terms.t1)))
+    }
+
     async fn transaction_status(
         &self,
         _transaction: &[u8; 32],
@@ -745,6 +791,16 @@ fn answer(status: u16, body: Value) -> std::result::Result<RoutedResponse, Route
         status,
         headers: vec![("content-type".into(), "application/json".into())],
         body: serde_json::to_vec(&body).unwrap(),
+    })
+}
+
+/// The maker turning an accept down, while `accept_status` is not 200.
+fn refused_accept(state: &State) -> Option<std::result::Result<RoutedResponse, RoutedError>> {
+    (state.accept_status != 200).then(|| {
+        answer(
+            state.accept_status,
+            json!({ "code": state.accept_code, "error": "turned down" }),
+        )
     })
 }
 
@@ -770,10 +826,8 @@ impl HttpTransport for FakeServices {
             (Service::Maker, path.to_owned())
         } else if let Some(path) = request.url.strip_prefix(pins.relayer_url) {
             (Service::Relayer, path.to_owned())
-        } else if let Some(path) = request.url.strip_prefix(pins.issuer_url) {
-            (Service::Issuer, path.to_owned())
         } else {
-            panic!("only the pinned maker, relayer and issuer are asked");
+            panic!("only the pinned maker and relayer are asked");
         };
         let body: Value = request
             .body
@@ -811,147 +865,20 @@ impl HttpTransport for FakeServices {
             });
         }
         match service {
-            Service::Maker => self.maker(&request.method, &path, &body, &request.headers),
+            Service::Maker => self.maker(&request.method, &path, &body),
             Service::Relayer => self.relayer(&request.method, &path, &body),
-            Service::Issuer => self.issuer(&request.method, &path, &body),
         }
     }
 }
 
 impl FakeServices {
-    /// The token gate every accept passes (zecSwap's middleware, before the
-    /// quote is taken): with tokens on, an accept without a good token is
-    /// answered `401` with today's challenge, and one without the request
-    /// for its token back `400`; with tokens off, one with the request is
-    /// `400`. `None` lets the accept through.
-    fn token_gate(
-        &self,
-        body: &Value,
-        headers: &[(String, String)],
-    ) -> Option<std::result::Result<RoutedResponse, RoutedError>> {
-        let mut state = self.0.set();
-        let today = zecswap_tokens::day(state.clock);
-        let request = body["tokenRequest"].as_str().map(str::to_owned);
-        if !state.tokens_required {
-            return request.map(|_| {
-                answer(
-                    400,
-                    json!({ "code": "rejected", "error": "this maker hands back no tokens" }),
-                )
-            });
-        }
-        let authorization = headers
-            .iter()
-            .find(|(name, _)| name.eq_ignore_ascii_case("authorization"))
-            .map(|(_, value)| value.as_str());
-        let paid = authorization.is_some_and(|token| state.issuer.accepts(token, today));
-        if !paid || state.refuses_tokens {
-            return Some(Ok(RoutedResponse {
-                status: 401,
-                headers: vec![
-                    ("content-type".into(), "application/json".into()),
-                    (
-                        "www-authenticate".into(),
-                        state.issuer.www_authenticate(today),
-                    ),
-                ],
-                body: serde_json::to_vec(
-                    &json!({ "code": "tokenRequired", "error": "spend a token" }),
-                )
-                .unwrap(),
-            }));
-        }
-        let Some(request) = request else {
-            return Some(answer(
-                400,
-                json!({ "code": "rejected", "error": "an accept asks for its token back" }),
-            ));
-        };
-        state.token_request = Some(request);
-        None
-    }
-
-    /// A swap's status: its token handed back once the maker does.
-    fn swap_status(&self, path: &str) -> std::result::Result<RoutedResponse, RoutedError> {
-        let state = self.0.get();
-        let id = path.rsplit('/').next().unwrap_or_default();
-        let token_return = state
-            .token_request
-            .as_deref()
-            .filter(|_| state.hands_back)
-            .map(|request| state.issuer.token_return(request));
-        answer(200, json!({ "swapId": id, "tokenReturn": token_return }))
-    }
-
-    /// The pinned issuer's API.
-    fn issuer(
-        &self,
-        method: &Method,
-        path: &str,
-        body: &Value,
-    ) -> std::result::Result<RoutedResponse, RoutedError> {
-        let mut state = self.0.set();
-        match (method, path) {
-            (&Method::GET, "/v1/token-key") => answer(
-                200,
-                json!({
-                    "issuer": state.issuer.name,
-                    "tokenKey": state.issuer.key.token_key().to_base64(),
-                    "tokensPerDay": state.issuer_tokens_per_day,
-                }),
-            ),
-            (&Method::GET, "/v1/challenge") => {
-                state.issuer_challenges += 1;
-                let challenge = [state.issuer_challenges; 32];
-                answer(
-                    200,
-                    json!({ "challenge": URL_SAFE_NO_PAD.encode(challenge) }),
-                )
-            }
-            (&Method::POST, "/v1/tokens") => {
-                state.issuer_posts.push(body.clone());
-                match state.issuer_answer {
-                    200 => {
-                        let blinded: Vec<String> = body["blinded"]
-                            .as_array()
-                            .unwrap()
-                            .iter()
-                            .map(|request| request.as_str().unwrap().to_owned())
-                            .collect();
-                        let count = state.issuer_signs.unwrap_or(blinded.len());
-                        answer(
-                            200,
-                            json!({ "blindSignatures": state.issuer.sign(&blinded, count) }),
-                        )
-                    }
-                    403 => answer(
-                        403,
-                        json!({ "code": "rejected", "error": "bootloader unlocked" }),
-                    ),
-                    429 => answer(
-                        429,
-                        json!({ "code": "rejected", "error": "no tokens left today" }),
-                    ),
-                    status => answer(status, json!({ "code": "internal", "error": "?" })),
-                }
-            }
-            _ => answer(404, json!({ "code": "notFound", "error": "no such path" })),
-        }
-    }
-
     fn maker(
         &self,
         method: &Method,
         path: &str,
         body: &Value,
-        headers: &[(String, String)],
     ) -> std::result::Result<RoutedResponse, RoutedError> {
         let pins = pins();
-        if path.ends_with("/accept") {
-            if let Some(refused) = self.token_gate(body, headers) {
-                return refused;
-            }
-        }
         match (method, path) {
             (&Method::GET, "/v1/info") => {
                 let mut info = json!({
@@ -963,10 +890,6 @@ impl FakeServices {
                     "zcashNetwork": "testnet",
                     "reverseEnabled": true,
                 });
-                if self.0.get().tokens_required {
-                    info["tokenReturnKey"] =
-                        json!(self.0.get().issuer.return_key.token_key().to_base64());
-                }
                 if let Some(Value::Object(windows)) = &self.0.get().info_windows {
                     for (name, value) in windows {
                         info[name] = value.clone();
@@ -983,21 +906,22 @@ impl FakeServices {
                 let proof = context.prove_maker(&maker_secret(), UnwrapErr(SysRng));
                 let mut state = self.0.set();
                 state.quote_requests.push(body.clone());
-                answer(
-                    200,
-                    json!({
-                        "quoteId": hex0x(&QUOTE_ID),
-                        "maker": hex0x(&pins.maker),
-                        "makerShare": hex0x(&maker_share().to_affine_bytes()),
-                        "makerProof": hex0x(&proof.to_bytes()),
-                        "chainId": pins.chain_id,
-                        "contract": hex0x(&contract()),
-                        "token": hex0x(&pins.token),
-                        "amount": state.amount.to_string(),
-                        "depositZat": DEPOSIT_ZAT,
-                        "expiresAt": state.quote_expires_at,
-                    }),
-                )
+                let mut quote = json!({
+                    "quoteId": hex0x(&QUOTE_ID),
+                    "maker": hex0x(&pins.maker),
+                    "makerShare": hex0x(&maker_share().to_affine_bytes()),
+                    "makerProof": hex0x(&proof.to_bytes()),
+                    "chainId": pins.chain_id,
+                    "contract": hex0x(&contract()),
+                    "token": hex0x(&pins.token),
+                    "amount": state.amount.to_string(),
+                    "depositZat": DEPOSIT_ZAT,
+                    "expiresAt": state.quote_expires_at,
+                });
+                if let Some((zat, address)) = &state.open_fee {
+                    quote["openFee"] = json!({ "zat": zat, "address": address });
+                }
+                answer(200, quote)
             }
             (&Method::POST, "/v1/reverse/quote") => {
                 let context = SwapContext {
@@ -1036,6 +960,9 @@ impl FakeServices {
                 // The maker opens nothing yet: the user funds the escrow.
                 let mut state = self.0.set();
                 state.reverse_accepts += 1;
+                if let Some(refused) = refused_accept(&state) {
+                    return refused;
+                }
                 let request = state.quote_requests.last().unwrap().clone();
                 let id = reverse_swap_id(&bytes(&request["user"]), &maker_share());
                 let (_, ready, refund) = state.reverse_deadlines;
@@ -1050,24 +977,26 @@ impl FakeServices {
                 }
                 answer(200, accepted)
             }
-            (&Method::GET, path)
-                if path.starts_with("/v1/swaps/") || path.starts_with("/v1/reverse/swaps/") =>
-            {
-                self.swap_status(path)
-            }
             (&Method::POST, path) if path.ends_with("/accept") => {
                 let mut state = self.0.set();
-                if state.accept_status != 200 {
-                    let headers = vec![("content-type".into(), "application/json".into())];
+                if state.fee_unseen_accepts > 0 {
+                    state.fee_unseen_accepts -= 1;
+                    let mut headers = vec![("content-type".into(), "application/json".into())];
+                    if let Some(seconds) = state.fee_retry_after {
+                        headers.push(("retry-after".into(), seconds.to_string()));
+                    }
                     return Ok(RoutedResponse {
-                        status: state.accept_status,
+                        status: 402,
                         headers,
                         body: serde_json::to_vec(&json!({
-                            "code": state.accept_code,
-                            "error": "turned down",
+                            "code": "feeRequired",
+                            "error": "the open fee is not in a block yet",
                         }))
                         .unwrap(),
                     });
+                }
+                if let Some(refused) = refused_accept(&state) {
+                    return refused;
                 }
                 // The maker opens the swap with the quote it gave and our
                 // share, paying our auth key into our note.
@@ -1097,6 +1026,12 @@ impl FakeServices {
                 );
                 state.swap_id = Some(id);
                 state.opened = true;
+                if state.accept_answer_lost {
+                    return Err(RoutedError {
+                        route_blocked: false,
+                        message: "no answer".into(),
+                    });
+                }
                 let mut accepted = json!({
                     "swapId": hex0x(&id),
                     "t0": t0,
@@ -1241,8 +1176,12 @@ impl FakeServices {
 
 pub(super) struct FakeZcash(pub World);
 
-/// A proposed deposit: where to, and how much.
-pub(super) struct FakeProposal(String, u64);
+/// A proposed deposit or open fee: where to, how much, and which.
+pub(super) struct FakeProposal {
+    address: String,
+    zatoshi: u64,
+    open_fee: bool,
+}
 
 impl ForwardZcash for FakeZcash {
     type Proposal = FakeProposal;
@@ -1255,8 +1194,22 @@ impl ForwardZcash for FakeZcash {
         Ok(self.0.get().synced)
     }
 
+    /// `scan_lag` blocks behind the tip `chain_height` reads.
+    async fn scanned_height(&self) -> Result<Option<u64>> {
+        Ok(Some(ZCASH_HEIGHT - self.0.get().scan_lag))
+    }
+
     async fn deposit_fee(&self, _address: &str, _zatoshi: u64) -> Result<Option<u64>> {
         Ok(self.0.get().deposit_fee)
+    }
+
+    /// Testnet's before NU7, at `ZCASH_HEIGHT`.
+    async fn marginal_fee(&self) -> Result<u64> {
+        Ok(crate::wallet::fees::LEGACY_MARGINAL_FEE)
+    }
+
+    async fn funds(&self) -> Result<Funds> {
+        Ok(self.0.get().funds)
     }
 
     async fn propose_deposit(
@@ -1267,18 +1220,55 @@ impl ForwardZcash for FakeZcash {
         max_total: u64,
     ) -> Result<FakeProposal> {
         let state = self.0.get();
-        if state.unpayable || zatoshi + DEPOSIT_FEE_ZAT > max_total {
+        if state.unpayable || zatoshi + state.deposit_cost > max_total {
             return fail(ErrorCode::DepositUnpayable, "short");
         }
         if state.crash == Some(Crash::AfterPropose) {
             store::crash_before_next_commit();
         }
-        Ok(FakeProposal(address.to_owned(), zatoshi))
+        Ok(FakeProposal {
+            address: address.to_owned(),
+            zatoshi,
+            open_fee: false,
+        })
+    }
+
+    async fn propose_open_fee(
+        &self,
+        _index: u32,
+        address: &str,
+        zatoshi: u64,
+        max_total: u64,
+    ) -> Result<(FakeProposal, u64)> {
+        let state = self.0.get();
+        if state.unpayable || zatoshi + DEPOSIT_FEE_ZAT > max_total {
+            return fail(ErrorCode::DepositUnpayable, "short");
+        }
+        if state.fee_crash == Some(Crash::AfterPropose) {
+            store::crash_before_next_commit();
+        }
+        let proposal = FakeProposal {
+            address: address.to_owned(),
+            zatoshi,
+            open_fee: true,
+        };
+        Ok((proposal, DEPOSIT_FEE_ZAT))
     }
 
     async fn create_deposit(&self, proposal: FakeProposal) -> Result<ZcashTransaction> {
         let mut state = self.0.set();
-        state.deposits.push((proposal.0, proposal.1));
+        if proposal.open_fee {
+            state
+                .fee_payments
+                .push((proposal.address, proposal.zatoshi));
+            let created = transaction(&format!("openfee{}", state.fee_payments.len()));
+            state.created_fee = Some(created.clone());
+            if state.fee_crash == Some(Crash::AfterCreate) {
+                store::crash_before_next_commit();
+            }
+            return Ok(created);
+        }
+        state.deposits.push((proposal.address, proposal.zatoshi));
         let created = transaction(&format!("deposit{}", state.deposits.len()));
         state.created = Some(created.clone());
         if state.crash == Some(Crash::AfterCreate) {
@@ -1287,14 +1277,49 @@ impl ForwardZcash for FakeZcash {
         Ok(created)
     }
 
+    /// As the wallet's: refused, nothing stored, with less than a minute to
+    /// its deadline once the lock is taken.
+    async fn create_open_fee(
+        &self,
+        proposal: FakeProposal,
+        deadline: u64,
+    ) -> Result<ZcashTransaction> {
+        assert!(proposal.open_fee, "a deposit is created as a deposit");
+        {
+            let mut state = self.0.set();
+            let wait = state.fee_lock_wait;
+            state.pass(wait);
+            state.fee_deadlines.push(deadline);
+            if deadline.saturating_sub(state.clock) < deployment::OPEN_FEE_MARGIN_SECONDS {
+                return fail(ErrorCode::QuoteExpired, "the deadline is too near");
+            }
+            if state.fee_create_fails {
+                return fail(ErrorCode::ZcashWallet, "the wallet could not sign");
+            }
+        }
+        let created = self.create_deposit(proposal).await;
+        let mut state = self.0.set();
+        let signing = state.fee_sign_seconds;
+        state.pass(signing);
+        created
+    }
+
     fn discard_deposit(&self, _proposal: FakeProposal) {
         self.0.set().discarded += 1;
     }
 
-    async fn find_deposit(&self, _address: &str) -> Result<Option<ZcashTransaction>> {
+    async fn find_deposit(&self, address: &str) -> Result<Option<ZcashTransaction>> {
         let state = self.0.get();
-        Ok(state
-            .created
+        let paying_fee = state
+            .open_fee
+            .as_ref()
+            .is_some_and(|(_, fee_address)| fee_address == address);
+        let created = if paying_fee {
+            &state.created_fee
+        } else {
+            &state.created
+        };
+        Ok(created
             .clone()
             .filter(|created| state.statuses.get(&created.tx_id) != Some(&SwapTxStatus::Expired)))
     }
@@ -1304,6 +1329,10 @@ impl ForwardZcash for FakeZcash {
     }
 
     async fn broadcast(&self, transaction: &ZcashTransaction) -> Result<()> {
+        self.0.set().broadcast_attempts += 1;
+        if self.0.get().broadcast_unreachable {
+            return fail(ErrorCode::ZcashWallet, "no route to lightwalletd");
+        }
         if self.0.get().broadcast_fails {
             return fail(ErrorCode::ZcashRejected, "lightwalletd turned it down");
         }
@@ -1480,8 +1509,6 @@ pub(super) struct Harness {
     zcash: FakeZcash,
     clock: FakeClock,
     makers: MakerChecks,
-    /// The device's tokens, one store for the wallet's accounts.
-    pub(super) tokens: TokenStore,
 }
 
 impl Harness {
@@ -1496,10 +1523,6 @@ impl Harness {
 
     fn with(dir: Rc<tempfile::TempDir>, seed: &[u8]) -> Self {
         let world = World::new();
-        let tokens = TokenStore::open(
-            &dir.path().join("private_usd_tokens_testnet.json"),
-            world.get().issuer.pins(),
-        );
         Self {
             dir,
             account: uuid::Uuid::new_v4().to_string(),
@@ -1509,46 +1532,12 @@ impl Harness {
             zcash: FakeZcash(world.clone()),
             clock: FakeClock(world.clone()),
             makers: MakerChecks::default(),
-            tokens,
             world,
         }
     }
 
     pub(super) fn forward(&self) -> FakeForward<'_> {
         self.forward_with(None)
-    }
-
-    /// Runs an issuance over the fake issuer, with a stand-in for the
-    /// keystore's signature (the fake checks no attestation): the tokens the
-    /// issuer signs are held after it.
-    pub(super) async fn issued(&self) -> Finished {
-        let now = self.world.get().clock;
-        self.tokens.set_maker_asks(true).unwrap();
-        let issuance = self
-            .tokens
-            .begin(&self.services, now)
-            .await
-            .unwrap()
-            .expect("an issuance is needed");
-        self.tokens
-            .finish(
-                &self.services,
-                issuance.session_id,
-                vec!["leaf".into()],
-                "signature".into(),
-                now,
-            )
-            .await
-            .unwrap()
-    }
-
-    /// The path of the swap's status at the maker, whose reads count in
-    /// `paths`.
-    pub(super) fn status_path(&self, direction: Direction, swap_id: &Hex<32>) -> String {
-        match direction {
-            Direction::Forward => format!("/v1/swaps/{}", swap_id.to_hex()),
-            Direction::Reverse => format!("/v1/reverse/swaps/{}", swap_id.to_hex()),
-        }
     }
 
     pub(super) fn forward_with<'a>(&'a self, op: Option<&'a OpHandle>) -> FakeForward<'a> {
@@ -1560,7 +1549,6 @@ impl Harness {
             &self.zcash,
             &self.clock,
             &self.makers,
-            &self.tokens,
             op,
         )
     }
@@ -1572,10 +1560,6 @@ impl Harness {
             &self.chain,
             &self.services,
         )
-    }
-
-    pub(super) fn chain(&self) -> &FakeChain {
-        &self.chain
     }
 
     pub(super) fn store(&self) -> SwapStore {
@@ -1691,7 +1675,6 @@ impl Harness {
             &self.zcash,
             &self.clock,
             &self.makers,
-            &self.tokens,
             None,
         )
     }

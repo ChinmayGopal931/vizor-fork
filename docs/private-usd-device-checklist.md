@@ -150,9 +150,8 @@ the end.
    `fvm flutter build apk --release --dart-define=VIZOR_FORM_FACTOR=mobile --dart-define=VIZOR_PRIVATE_USD_ENABLED=true --dart-define-from-file=<rpc json>`.
    The JSON holds both keyed URLs (E6).
    - Install it on a phone with no personal wallet.
-   - Issuer acceptance is per signing digest (E3), which matters once a maker
-     requires tokens. Makers don't today (D20); re-check before release
-     (U11).
+   - Tokens: none. Veylor has no token client since 2026-11-21 (progress
+     D-161), and a maker that answers an accept `401` refused it.
 2. **Runs.** Do the manual runs marked **mainnet**, with small amounts,
    and M-15 with the beta limit.
 3. **The keyed RPC on mainnet.** A release build is not debuggable, so

@@ -13,6 +13,8 @@
 //!   a lock is never submitted.
 //! - A call registered with [`OpHandle::begin`] can be cancelled by its id and
 //!   reports what it is doing until it returns.
+//! - An open fee's pacing ([`FeePace`]) lives until the account is deleted:
+//!   lost with the process, it costs one early resend and one early accept.
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::Path;
@@ -84,6 +86,7 @@ pub(crate) fn delete_account(
     let _deposits = super::deposits::lock_account(account)?;
     remove_account_offers(account);
     remove_account_fundings(account);
+    remove_account_fee_paces(account);
     let Some(mut store) = SwapStore::open_existing(store_dir)? else {
         return Ok(());
     };
@@ -114,6 +117,9 @@ pub(crate) struct Offer {
     /// The deposit's network fee from this wallet now; `None` when one
     /// transaction cannot pay it, which makes the offer unpayable.
     pub deposit_fee_zatoshi: Option<u64>,
+    /// Where the quote asks an open fee: its payment's network fee from this
+    /// wallet now, `None` when one transaction cannot pay it.
+    pub open_fee_network_zatoshi: Option<u64>,
 }
 
 impl Offer {
@@ -121,6 +127,14 @@ impl Offer {
     pub(crate) fn max_total_zatoshi(&self) -> Option<u64> {
         self.deposit_fee_zatoshi
             .and_then(|fee| self.quote.deposit_zat.checked_add(fee))
+    }
+
+    /// What the open fee's payment may cost in all, the fee and its network
+    /// fee; `None` without a fee, or when one transaction cannot pay it.
+    pub(crate) fn max_open_fee_total_zatoshi(&self) -> Option<u64> {
+        let fee = self.quote.open_fee.as_ref()?;
+        self.open_fee_network_zatoshi
+            .and_then(|network| fee.zat.checked_add(network))
     }
 
     fn expired(&self, now: u64) -> bool {
@@ -177,6 +191,46 @@ pub(crate) fn remove_account_offers(account: &str) {
     lock(&OFFERS).retain(|(held, _), _| held != account);
 }
 
+// ---- open fees ----
+
+/// What a forward swap's open fee paces on, per account and swap index, in
+/// memory only: a process that never sent the kept payment sends it at once,
+/// and posts the accept without waiting.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct FeePace {
+    /// When this process last sent the payment, or chose to send nothing.
+    pub sent_at: Option<u64>,
+    /// The accept is posted again no sooner than this.
+    pub accept_after: Option<u64>,
+    /// How many waits the accept has had: from the second on they are paced.
+    pub accept_waits: u32,
+    /// The maker's last answer was `feeRequired`: it has opened nothing.
+    pub fee_unseen: bool,
+}
+
+static FEE_PACES: LazyLock<Mutex<HashMap<(String, u32), FeePace>>> =
+    LazyLock::new(Default::default);
+
+pub(crate) fn fee_pace(account: &str, index: u32) -> FeePace {
+    lock(&FEE_PACES)
+        .get(&(account.to_owned(), index))
+        .copied()
+        .unwrap_or_default()
+}
+
+pub(crate) fn put_fee_pace(account: &str, index: u32, pace: FeePace) {
+    lock(&FEE_PACES).insert((account.to_owned(), index), pace);
+}
+
+/// Forgets swap `index`'s pacing once its accept was answered or it ended.
+pub(crate) fn remove_fee_pace(account: &str, index: u32) {
+    lock(&FEE_PACES).remove(&(account.to_owned(), index));
+}
+
+fn remove_account_fee_paces(account: &str) {
+    lock(&FEE_PACES).retain(|(held, _), _| held != account);
+}
+
 /// Which makers' `/v1/info` already matched the pins this session, for which
 /// direction (a reverse conversion also needs `reverseEnabled`). Cleared with
 /// the offers.
@@ -210,7 +264,6 @@ pub(crate) fn clear_sessions() {
     lock(&FUNDINGS).clear();
     MAKER_CHECKS.clear();
     super::evm_rpc::clear_session_checks();
-    super::tokens::clear_sessions();
 }
 
 // ---- reverse fundings ----
@@ -435,10 +488,6 @@ pub(crate) fn problem(code: ErrorCode) -> ErrorCode {
     match code {
         RelayerUnreachable | RelayerRefused | RelayerFee | EthereumUnreachable | RailgunClosed
         | ZcashWallet | DepositUnpayable | ZcashRejected | Mismatch | RouteBlocked => code,
-        // The token gate's: the engine runs the issuance, or says why not.
-        TokensNeeded | TokensRefused | TokensUnreachable | TokensDeviceRefused | NoTokensToday => {
-            code
-        }
         ChainLagging | ChainUnreadable => EthereumUnreachable,
         // A service serving another deployment reads as the relayer being
         // unreachable.

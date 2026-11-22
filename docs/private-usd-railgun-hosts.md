@@ -15,7 +15,7 @@ throughout. It was written on 2026-11-20 from the Android and Mac code at
 Each item says what to do, why, where Android does it, and how the Mac does
 it. Items marked **(WebKit)** apply to a host built on WebKit (the Mac, iOS,
 WebKitGTK on Linux); **(Chromium)** to one built on Chromium (Android's
-WebView, CEF, WebView2). Read AGENTS.md's "Private USD" section first: its
+WebView, CEF, WebView2). Read `docs/private-usd.md` first: its
 invariants hold on every host, because the engine (Rust) and the flows (Dart)
 are shared.
 
@@ -135,7 +135,7 @@ Prefixes below: `kt/` is the Android host's directory, `rw/` is
   suspends the page soon after the window stops being visible (covered,
   minimised, another Space: the owner's log shows "View was recently
   visible", then the suspension), as iOS suspends it in the background.
-  That is the foreground rule (AGENTS.md, "Foreground and unlocked only").
+  That is the foreground rule (docs/private-usd.md, "Foreground and unlocked only").
   A page that can't be seen while the app's window is shown would stop its
   sync for no reason.
 - **H11. Never close the page for memory.** Android's host never does, and
@@ -222,7 +222,7 @@ Prefixes below: `kt/` is the Android host's directory, `rw/` is
 
 On mainnet a sync far behind reads Railgun's history from Anon's archive
 (`digest.anon.inc/v4/1`) before rail-squid: commitments and the transaction
-list, a few times faster (AGENTS.md, "Anon's archive"). The archive sends no
+list, a few times faster (docs/private-usd.md, "Anon's archive"). The archive sends no
 CORS headers, so the page can't read it itself, and every host fetches it for
 the page (section 5).
 
@@ -399,7 +399,7 @@ Shared Dart and the shared page do all of this; a host must only let it run.
   (`rw/src/rpc-probe.js`); map it to `rpc_failed`, and Dart offers another
   RPC.
 - **H37. Failure codes (desktop).** On the Mac, Linux and Windows, Dart keeps a short
-  coded record of what failed (`private_usd_diagnostics.dart`, AGENTS.md
+  coded record of what failed (`private_usd_diagnostics.dart`, docs/private-usd.md,
   "Failure codes"): for a failed call, the host's code and a reason matched
   from its message, in
   `<support>/diagnostics/private-usd-*.jsonl`, never the message itself. The

@@ -53,6 +53,8 @@ ApiForwardRecord forwardRecord({
   refundCause: refundCause,
   nothingSentCause: nothingSentCause,
   endedAt: endedAt,
+  openFeeMined: false,
+  openFeePending: false,
 );
 
 /// What one advance answers: a result, or an error it throws.
@@ -165,6 +167,7 @@ class FakePrivateUsdBackend implements PrivateUsdSwapBackend {
   Future<ApiAcceptResult> forwardAccept(
     String accountUuid,
     PrivateUsdSecretReader secret, {
+    required int opId,
     required int index,
     required BigInt maxTotalZat,
     required bool relayerClaims,
@@ -330,52 +333,6 @@ class FakePrivateUsdBackend implements PrivateUsdSwapBackend {
     PrivateUsdSecretReader secret, {
     required int index,
   }) => throw UnimplementedError();
-
-  /// What `tokensIssuanceBegin` answers (null: nothing needed), how each
-  /// `tokensIssuanceFinish` ends in turn (the last kind repeats), and what
-  /// was asked.
-  ApiIssuanceBegin? issuance;
-  Object? issuanceError;
-  List<ApiIssuanceKind> finishKinds = const [ApiIssuanceKind.issued];
-  int begins = 0;
-  final finishes =
-      <({BigInt sessionId, List<String> chain, String signature})>[];
-  ApiTokenStatus tokensStatusValue = const ApiTokenStatus(
-    held: 0,
-    exhaustedToday: false,
-    awaitingReturns: 0,
-    deviceRefused: false,
-    makerAsks: false,
-  );
-
-  @override
-  Future<ApiIssuanceBegin?> tokensIssuanceBegin() async {
-    begins++;
-    final error = issuanceError;
-    if (error != null) throw error;
-    return issuance;
-  }
-
-  @override
-  Future<ApiIssuanceFinish> tokensIssuanceFinish({
-    required BigInt sessionId,
-    required List<String> chain,
-    required String signature,
-  }) async {
-    finishes.add((sessionId: sessionId, chain: chain, signature: signature));
-    final kind =
-        finishKinds[(finishes.length - 1).clamp(0, finishKinds.length - 1)];
-    return ApiIssuanceFinish(
-      kind: kind,
-      next: kind == ApiIssuanceKind.signAgain
-          ? Uint8List.fromList([9, 9, 9])
-          : null,
-      status: tokensStatusValue,
-    );
-  }
-
-  @override
-  Future<ApiTokenStatus> tokensStatus() async => tokensStatusValue;
 
   @override
   void cancel(int opId) => cancelled.add(opId);

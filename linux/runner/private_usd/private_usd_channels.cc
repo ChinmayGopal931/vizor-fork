@@ -12,7 +12,6 @@ namespace {
 struct Channels {
   GtkApplication* application = nullptr;
   GtkWindow* window = nullptr;
-  FlMethodChannel* attestation = nullptr;
   FlMethodChannel* screen_awake = nullptr;
   FlMethodChannel* haptics = nullptr;
   // The keep-awake hold: GTK's inhibitor where the session manager takes one, else the freedesktop screensaver's.
@@ -30,20 +29,6 @@ void Respond(FlMethodCall* call, FlMethodResponse* response) {
   g_autoptr(GError) error = nullptr;
   fl_method_call_respond(call, response, &error);
   g_object_unref(response);
-}
-
-// MARK: Attestation
-
-// `com.zcash.wallet/private_usd_attestation` on Linux, as on iOS and the Mac: zecSwap's issuer checks Android key
-// attestation alone, so every `sign` is `unavailable`, and Dart then says conversions need an Android device while a
-// market maker asks for tokens. The same codes as Android's, so Dart treats every host alike.
-void OnAttestationCall(FlMethodChannel*, FlMethodCall* call, gpointer) {
-  if (std::strcmp(fl_method_call_get_name(call), "sign") == 0) {
-    Respond(call, FL_METHOD_RESPONSE(fl_method_error_response_new(
-                      "unavailable", "the token issuer has no Linux mode yet", nullptr)));
-  } else {
-    Respond(call, FL_METHOD_RESPONSE(fl_method_not_implemented_response_new()));
-  }
 }
 
 // MARK: Keep-awake
@@ -156,7 +141,6 @@ void register_private_usd_channels(FlView* view, GtkWindow* window, GtkApplicati
   g_channels->application = application;
   g_channels->window = window;
   FlBinaryMessenger* messenger = fl_engine_get_binary_messenger(fl_view_get_engine(view));
-  g_channels->attestation = NewChannel(messenger, "com.zcash.wallet/private_usd_attestation", OnAttestationCall);
   g_channels->screen_awake = NewChannel(messenger, "com.zcash.wallet/screen_awake", OnScreenAwakeCall);
   g_channels->haptics = NewChannel(messenger, "com.zcash.wallet/haptics", OnHapticsCall);
   g_signal_connect(window, "notify::is-active", G_CALLBACK(OnActiveChanged), nullptr);

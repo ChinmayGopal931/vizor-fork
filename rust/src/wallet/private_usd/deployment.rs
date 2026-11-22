@@ -31,6 +31,37 @@ pub(crate) const RELAYER_CLAIM_WAIT_BLOCKS: u64 = 5;
 pub(crate) const MAX_T0_TO_T1_SECONDS: u64 = 2 * 60 * 60;
 /// An accept is not sent this close to the quote's expiry.
 pub(crate) const ACCEPT_MARGIN_SECONDS: u64 = 15;
+/// A kept open fee is sent again only with this much of the quote's life
+/// left (zecSwap's `OPEN_FEE_MARGIN`): it counts once mined, and sent any
+/// later it is likely lost. Paying one needs the deployment's longer
+/// `open_fee_min_quote_life_seconds`.
+pub(crate) const OPEN_FEE_MARGIN_SECONDS: u64 = 60;
+/// An open fee no block has yet is sent again this often.
+pub(crate) const OPEN_FEE_RESEND_SECONDS: u64 = 30;
+/// The review stops offering a fee quote this long before the fee may no
+/// longer be paid (`open_fee_min_quote_life_seconds` before its end): the
+/// time from a tap on Bridge to the payment's checks. Rust's
+/// `open_fee_pay_by` includes it, so Dart adds no margin of its own.
+pub(crate) const OPEN_FEE_OFFER_MARGIN_SECONDS: u64 = 20;
+/// The least a fee quote is offered for when it comes: one that would be
+/// offered for less is refused at the quote.
+pub(crate) const OPEN_FEE_LEAST_REVIEW_SECONDS: u64 = 30;
+/// How far the main wallet's scan may trail the Zcash tip for a quote that
+/// asks an open fee to be paid: a wallet further behind would pay the fee
+/// and then wait to deposit, perhaps past the deposit window. Dart's
+/// `kPrivateUsdOpenFeeScanLagBlocks` is the same.
+pub(crate) const OPEN_FEE_MAX_SCAN_LAG_BLOCKS: u64 = 3;
+/// How long an accept waits before it is posted again while the maker has
+/// not seen the open fee, where the maker names no wait; the least it waits
+/// where it does; the least from the second wait on (a gateway may let each
+/// caller only a few accepts a minute through); and the most any wait is.
+pub(crate) const FEE_WAIT_SECONDS: u64 = 5;
+pub(crate) const FEE_WAIT_MIN_SECONDS: u64 = 1;
+pub(crate) const FEE_PACE_SECONDS: u64 = 12;
+pub(crate) const FEE_WAIT_MAX_SECONDS: u64 = 30;
+/// How long an accept of a quote whose fee was paid waits before it is posted
+/// again after a `5xx` or no answer, where the maker names no wait.
+pub(crate) const UNANSWERED_ACCEPT_WAIT_SECONDS: u64 = 12;
 /// Railgun's shield fee, in basis points.
 pub(crate) const RAILGUN_FEE_BPS: u128 = 25;
 /// Basis points in one.
@@ -162,12 +193,6 @@ pub(crate) struct Deployment {
     pub network: PrivateUsdNetwork,
     pub maker_url: &'static str,
     pub relayer_url: &'static str,
-    pub issuer_url: &'static str,
-    pub issuer_name: &'static str,
-    /// RFC 9578 token key, base64url SPKI (RSA-PSS SHA-384).
-    pub issuer_token_key: &'static str,
-    /// The key the maker hands tokens back under, base64url SPKI.
-    pub maker_token_return_key: &'static str,
     pub chain_id: u64,
     /// The windows contract swaps settle on; `None` where bridging is off,
     /// and quotes and swaps are refused.
@@ -196,6 +221,18 @@ pub(crate) struct Deployment {
     pub escrow_confirmations: u32,
     /// The soonest `t0` a forward deposit may be paid for.
     pub min_seconds_to_t0: u64,
+    /// The most a forward quote's open fee may ask, in zatoshis: a quote that
+    /// asks more is refused before anything is paid. The fee is the one
+    /// amount in a swap that rests on trust in the maker.
+    pub max_open_fee_zat: u64,
+    /// The least of its life a quote that asks an open fee must have left
+    /// when the user bridges, and when a payment the engine resumes starts:
+    /// time for a Zcash block to mine the fee and the maker to see it. A
+    /// quote with less is never paid for; Dart asks a fresh one at the tap.
+    pub open_fee_min_quote_life_seconds: u64,
+    /// The most a quote that asks an open fee may live: one further off is
+    /// refused at the quote, with nothing paid.
+    pub open_fee_max_quote_life_seconds: u64,
     /// The screening time shown to the user.
     pub screening_seconds: u32,
     pub explorer_tx_prefix: &'static str,
@@ -273,10 +310,6 @@ const MAINNET: Deployment = Deployment {
     network: PrivateUsdNetwork::Mainnet,
     maker_url: "https://zecswap-mainnet.pepeman931.workers.dev/maker",
     relayer_url: "https://zecswap-mainnet.pepeman931.workers.dev/relayer",
-    issuer_url: "https://zecswap-mainnet.pepeman931.workers.dev/issuer",
-    issuer_name: "zecswap-mainnet-issuer",
-    issuer_token_key: "MIIBUjA9BgkqhkiG9w0BAQowMKANMAsGCWCGSAFlAwQCAqEaMBgGCSqGSIb3DQEBCDALBglghkgBZQMEAgKiAwIBMAOCAQ8AMIIBCgKCAQEAuA8Rq3Fo644QG48Kmxsyg1UFAKd-kfsS9t7BgPVwJqXHIEmlH4gS1UaxDBdu7awf0n9lv7yYozNTE5PysBh01LBhGbcIMWyTSNXkF2l1Mi0AOVVhVJZr-KTyr0u6ZFI2EGRVxT1BF2B4QgzQgJ64xqj-tzX_ctpwYQiE1Gf74zG4Yd0mdEbDjTYhgzoaR0lV5uHHSnVN2fmnlskAkZl6mfrJKfcfivp-UQ8qgBEs-7ke67lMhMyC3BxoDG7qoY0B4eIQRQ_-fu3eYT1RifuO5LgvMYkzRe58X63emOvYls19En0Vbkeq2Y73kMRA2AOYMp5gD3DyF4t5LM535p4-GQIDAQAB",
-    maker_token_return_key: "MIIBUjA9BgkqhkiG9w0BAQowMKANMAsGCWCGSAFlAwQCAqEaMBgGCSqGSIb3DQEBCDALBglghkgBZQMEAgKiAwIBMAOCAQ8AMIIBCgKCAQEArte6ewR0iOfbhxrByZ1vj_MMkKiQLQ-2R3OdCyHeKr_G4FrsCHvLhJ0uuu5r-papDogiMb_btM5-nPaOWzC1olxbmEUypJWgz-yCXD3K4wp_jgeqlP7EnlJE3IT5iTwv_S1hK5yV4Fka5mRoyhvZlhvDW3eCWoMix15Fp-TD3AGm7GttqzW4QyLXV_mQcnqlWPwuCacmTYch93eMZ7CaTHHRMmsfqR7_kZdskZh_JM55_lw_puDvvdRtu4vYItvo5wMI5mkwmSEwi6UahZDx_OI8IAF2JpeqRIKwbhT6FVGwahDeu6PRTww71C0i13EOwC3GQ85pxDRIAzF01W14wQIDAQAB",
     chain_id: 1,
     // Deployed at block 26250774, in place of the lock contract.
     swaps: Some(SwapContract {
@@ -298,6 +331,13 @@ const MAINNET: Deployment = Deployment {
     zcash_confirmations: 2,
     escrow_confirmations: 3,
     min_seconds_to_t0: 15 * 60,
+    // The reference CLI's `--max-open-fee`; mainnet asks no fee yet, and its
+    // cap is to be decided once its gas-priced fee is known.
+    max_open_fee_zat: 500_000,
+    // Its quotes live 2 minutes today: they must live longer before a fee is
+    // asked there, or every fee quote is refused.
+    open_fee_min_quote_life_seconds: 180,
+    open_fee_max_quote_life_seconds: 30 * 60,
     screening_seconds: 60 * 60,
     explorer_tx_prefix: "https://etherscan.io/tx/",
     railscan_tx_prefix: "https://railscan.io/ethereum/tx/",
@@ -339,10 +379,6 @@ const TESTNET: Deployment = Deployment {
     network: PrivateUsdNetwork::Testnet,
     maker_url: "https://zecswap-testnet.pepeman931.workers.dev/maker",
     relayer_url: "https://zecswap-testnet.pepeman931.workers.dev/relayer",
-    issuer_url: "https://zecswap-testnet.pepeman931.workers.dev/issuer",
-    issuer_name: "zecswap-testnet-issuer",
-    issuer_token_key: "MIIBUjA9BgkqhkiG9w0BAQowMKANMAsGCWCGSAFlAwQCAqEaMBgGCSqGSIb3DQEBCDALBglghkgBZQMEAgKiAwIBMAOCAQ8AMIIBCgKCAQEAqAp6ClskrSdfUjiFvS2H9eTxKKNxrtVPM-n0n8WCgCj508sXiyQj21W9Dpjki-JYLbYS7xkHaTCuplU7-Kg6EFK_xwFB-BmQZcW9qk1GTYcZAqJ5YmfttMFHMDsdroUq5v6RnQxLRINIh5UIiFgn_516Wp2CcizaU-lwuwP4f8hp-0cLvynQ119pUTIfwgaYhrRaxngHFu0JnQF6l4AK4rhtIt6g7AG_bSSV06cYowKuOVEncE45CaUDOUJbP18MfRSP42HPnWZ0-h6n3_uBYvxHYsKp7KQ5_Hr-QpOafUoXhFANv4mfpk3MUQxo2m7vZZAMaFa9ELsIIiaLkACGhQIDAQAB",
-    maker_token_return_key: "MIIBUjA9BgkqhkiG9w0BAQowMKANMAsGCWCGSAFlAwQCAqEaMBgGCSqGSIb3DQEBCDALBglghkgBZQMEAgKiAwIBMAOCAQ8AMIIBCgKCAQEA5boFzxSM2UDd-NfwWUnT_lVo23Td6wOH5twYjLo2wLDEWmGKSNBgdZy3t3JC2JkzD8j9rVRdehpll_i3GRKmUq0wr6xkHHuHxswr3TehMUqUrztg-nxDS4U2f0V0yYno3I5YPo2SByOz_-jHNWM6Mlx-TZsWzALQTb3NmRXdynqecz3-8hqd_OPhUJtH7M3pK9ikkUbSzV1ofXkyM6FnaNAGkHZ1kAMEF2pGe69tOJJqGq6wpTuZMtzaaxu9t1C4xoR7R7pbdkjPM_Wxd15LoXa1N26V-PToIeD06VmwX51VjrO_2VHWFat4Rtu7eLPeiEX-5kKsyvCY7EhpkNK1DQIDAQAB",
     chain_id: 11_155_111,
     // Deployed at block 11958709, in place of the lock contract.
     swaps: Some(SwapContract {
@@ -370,6 +406,12 @@ const TESTNET: Deployment = Deployment {
     zcash_confirmations: 2,
     escrow_confirmations: 2,
     min_seconds_to_t0: 9 * 60,
+    // Sepolia's fee is the maker's minimum, 20,000 zatoshis.
+    max_open_fee_zat: 500_000,
+    // Its quotes live 5 minutes. 180 s is 2.4 blocks at 75 s, so a block in
+    // time is 91% likely, and 7.2 at NU7's 25 s, more than 99.9%.
+    open_fee_min_quote_life_seconds: 180,
+    open_fee_max_quote_life_seconds: 30 * 60,
     screening_seconds: 60,
     explorer_tx_prefix: "https://sepolia.etherscan.io/tx/",
     railscan_tx_prefix: "https://railscan.io/sepolia/tx/",

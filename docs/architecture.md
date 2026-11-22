@@ -1,0 +1,894 @@
+# Architecture
+
+Moved from AGENTS.md on 2026-11-22. AGENTS.md lists where every former section went.
+
+Flutter + Rust FFI via `flutter_rust_bridge` v2. All Zcash cryptography and sync run in Rust (`librustzcash` crates). Dart handles UI, state management (Riverpod), and secure storage only. Supports iOS, Android, and macOS.
+
+## Multi-Account Model
+
+Single DB (`zcash_wallet.db`) holds multiple accounts from different seeds. Single sync loop decrypts notes for all accounts simultaneously via `scan_cached_blocks` (uses all UFVKs). UI shows one "active account" at a time.
+
+**Account creation strategy** (due to `zcash_client_sqlite` constraints):
+- **First account**: `create_account()` → `AccountSource::Derived`. Uses `init_wallet_db(Some(seed))` so the seed fingerprint is pinned to the DB and future seed-requiring migrations can verify relevance.
+- **Additional accounts (even if derived from a known software mnemonic)**: `import_account_ufvk(AccountPurpose::Spending { derivation })` → `AccountSource::Imported`. We have to go through this path because `create_account` enforces a single-seed fingerprint per DB, so the second software account with a different mnemonic would be rejected. Derivation metadata (`Zip32Derivation { seed_fp, account_index }`) is attached to the `Imported` record so the account's origin is at least known, but librustzcash never stores the seed itself for imported accounts.
+- **DB init after the first account**: remains `init_wallet_db(None)`. Calling `init_wallet_db(Some(other_seed))` after the first account would fail the seed relevance check if `other_seed` doesn't match the pinned `Derived` account.
+
+**Multi-account migration limitation.** librustzcash `init_wallet_db` docs explicitly state:
+
+> *"Note that currently only one seed can be provided; as such, wallets containing accounts derived from several different seeds are unsupported, and will result in an error."*
+>
+> *"We do not check whether the seed is relevant to any imported account, because that would require brute-forcing the ZIP 32 account index space. Consequentially, seed-requiring migrations cannot be applied to imported accounts."*
+
+What this means for our DB shape:
+- **Software bootstrap account** (`Derived`, known seed): future seed-requiring migrations run correctly for this account when the wallet was created through the software create/import path.
+- **Imported accounts** (`Imported`, different seed fingerprint): the DB holds derivation metadata but not the seed, and librustzcash's migration machinery cannot distinguish "software account with a second seed we happen to know" from "external account imported from another wallet entirely." Both look like `AccountSource::Imported` with a non-matching fingerprint. The hardware (Keystone) case is a special instance of this general pattern, not a separate problem.
+- What happens to 2nd+ accounts during a seed-requiring migration depends entirely on how the individual migration is written. Schema-only migrations (the common case) apply unchanged. UFVK-based re-derivation migrations also work. Migrations that strictly need the per-account seed for an `Imported` record either skip the step, run a best-effort fallback, or — in the worst case — refuse to complete.
+- The correct mental model: **our wallet behaves as a multi-seed wallet inside librustzcash's officially-unsupported envelope**. Everything works today because current migrations tolerate `Imported` accounts. A future migration that doesn't is a real risk, and there is no clean in-library escape hatch because `create_account` cannot be called on a DB that already holds unrelated `Imported` accounts.
+
+**Hardware-first wallet policy** (Keystone). Keystone accounts are allowed to be the first account. `importKeystoneAccount` in `lib/src/providers/account_provider.dart` routes a fresh install through password setup and then imports the hardware UFVK, and `import_hardware_account` in `rust/src/wallet/keys.rs` does not require an existing `Derived` account. This improves Keystone-only onboarding but accepts the known librustzcash tradeoff:
+- A Keystone-first wallet can be `Imported`-only from DB creation time. Additional software accounts are also imported through UFVK metadata, so they do not automatically turn the wallet into a `Derived`-account DB.
+- Current schema and UFVK-tolerant migrations should continue to work. A future seed-requiring migration that refuses `Imported`-only wallets may require a product recovery path, such as warning the user and re-importing/rescanning from the Keystone account birthday.
+- Calling `create_account()` later is not a clean rescue mechanism for an `Imported`-only DB because that path itself depends on seed-aware initialization and seed relevance.
+
+**Account deletion and reset invariants.** Per-account deletion is allowed for
+any listed account while another account remains, including the initial
+`Derived` seed-anchor account. Deleting that account can leave the wallet DB
+containing only `Imported` accounts, which is the same migration tradeoff
+accepted for Keystone-first onboarding: current schema and UFVK-tolerant
+migrations should work, but a future seed-requiring migration may need a product
+recovery path. Deleting the last remaining account is not a per-account delete;
+the Accounts UI treats it as a full wallet reset, clearing the wallet DB, secure
+storage, active account state, and routing back to onboarding. Dart
+`AccountNotifier.removeAccount` and Rust `delete_account` still validate the
+target account exists before removing account-scoped wallet rows.
+Voting background work that can write account state or secure storage must
+register with the destructive-operation drain before its first asynchronous
+step, and account deletion/reset must await that work before clearing data.
+Ledger outbox operations and their caller-side result persistence must register
+with `ledgerOperationLifecycleProvider` before their first asynchronous step.
+Account deletion/reset block new Ledger work and drain accepted operations before
+invalidating the secret session or deleting wallet data. Keep the lease through
+swap/pay metadata persistence and outbox acknowledgement; do not cancel a
+broadcast after submission merely to unblock deletion. Device approval remains
+outside this durable-operation lease. Ledger account import uses the same
+`runMutation` boundary as software and Keystone imports. That boundary
+(`runWithSyncPausedForAccountMutation` in
+`lib/src/providers/wallet_mutation_guard.dart`) serializes account mutations,
+a reset, and the Private queries toggle on every platform; only its keyring
+interception is Linux-specific.
+Each account's private transparent recovery companions live in the
+`{dbPath}.tpir` directory beside the wallet DB. Rust `delete_account` removes
+that account's companions after releasing the wallet write lock (a leftover is
+removed at the next sync start); a full reset deletes the whole directory with
+the DB and any `*.tpir` directory left by an earlier wallet. On iOS the
+directory is excluded from iCloud and device backups, since it records which
+transparent addresses had activity.
+
+**Account identification**: `AccountUuid` (UUID string like `"550e8400-e29b-41d4-a716-446655440000"`). Passed as `String` between Dart and Rust via `Uuid::parse_str()` / `Uuid::to_string()`.
+
+**Mnemonic storage**: Per-account in Flutter secure storage (`zcash_account_mnemonic_{uuid}`). Account list stored as JSON in `zcash_accounts` key. Active account in `zcash_active_account` key.
+
+## Wallet Password Policy
+
+- The local wallet setup/unlock password is **ASCII-only**. Accept only printable
+  English letters, numbers, and symbols (`0x21`-`0x7E`).
+- Do **not** implement keyboard-layout or IME normalization for passwords
+  (for example, treating Korean 2-beolsik input as QWERTY). Passwords are
+  compared as exact strings under this ASCII-only policy.
+- Reuse the shared Dart helper in
+  `lib/src/core/security/password_policy.dart` for all password validation.
+- The charset validation message must stay exactly:
+  `Use only English letters, numbers, and symbols.`
+- **Mobile passcode**: the mobile form factor sets and unlocks the wallet
+  with a 6-digit passcode instead of a typed password. The digit string
+  is stored verbatim as the wallet password through the same
+  `appSecurityProvider` prepare/commit path — there is no separate
+  credential model. `kWalletPasswordMinLength` is form-factor dependent
+  (6 on mobile, 8 on desktop) because the security provider enforces it
+  on commit; the mobile passcode screens additionally require exactly
+  6 digits (`kMobilePasscodeLength`).
+- The passcode keypad's `?` help action resets the wallet and must appear only
+  on the app-start `/unlock` screen. Never show it in any other passcode keypad
+  context.
+
+## Account Creation and Home Setup
+
+Ordinary software creation and Gift Card creation defer secret-passphrase backup
+and Zcash education to Home. First ordinary accounts generate their mnemonic only
+after password/passcode confirmation; additional accounts create from Welcome with
+the unlocked credential. Imports retain account customisation. Ordinary creation
+uses `createAccountForDeferredSetup`, journaling the unseen seed in encrypted
+storage before first or additional account mutations. Recovery must preserve the
+seed, persona and account-specific `setupPending` / `giftEducationPending` flags.
+The existing Home cards share backup snooze/completion and education completion
+with Gift creation; education completion never marks a seed backed up.
+
+A separate mobile reminder that asks new users to back up later is still being
+built (Tony Yoon’s version). Integrate it at `TODO(backup-reminder)` in
+`mobile_home_screen.dart`, beside the NU7 announcement host, and record its
+rules here when it lands.
+
+## Mobile Screen Privacy
+
+Mobile screen privacy applies only while secret material is visible. Keep
+`SensitivePrivacyOverlay` on seed creation/import/review, settings seed, and
+viewing-key screens. It covers exposed secrets when the app loses foreground
+interaction and uses `NativeSensitiveContentBridge` for selective native capture
+exclusion (Android `FLAG_SECURE`, iOS `SecureScreenshotShield`). Ordinary screens
+and access gates with no exposed secret must remain uncovered in the app
+switcher; do not add app-wide native lifecycle covers.
+
+Keep `RouteCoverageAware` on import screens so capture exclusion survives route
+transitions and releases only after full coverage. Keep biometric prompt
+suppression around sensitive access gates, and exclude shielded content from
+screen-reader semantics without unmounting it. Desktop continues to use
+`SensitivePrivacyOverlay`.
+
+The mobile keep-awake lock owns system Back before payment cards and routes.
+Back may return from passcode entry to the lock status screen, but never acts
+on the covered app or interrupts authentication. Its idle deadline counts
+pointer, keyboard and deliberate platform semantics actions; automatic focus
+notifications do not extend it. Remove global input listeners on disposal.
+
+## Dart Provider Structure
+
+```
+AccountProvider (account_provider.dart)
+  ├── Manages account list, active account, per-account mnemonics
+  ├── createAccount() — first: create_wallet, additional: generateMnemonic + addAccount
+  ├── importAccount() — first: import_wallet, additional: addAccount
+  ├── importKeystoneAccount() — hardware UFVK import; may be first account
+  │                              (Keystone-first accepts Imported-only DB risk)
+  ├── switchAccount() — updates active, refreshes address
+  ├── renameAccount() — AccountInfo.copyWith (preserves isHardware)
+  ├── clearSensitiveStateForLock() — preserves account list/active UUID, clears in-memory address
+  ├── restoreAfterUnlock() — rehydrates active account UA from Rust after unlock
+  ├── getActiveMnemonic() — reads from secure storage only while unlocked (null for hardware/locked)
+  └── isActiveAccountHardware — routes send flow to PCZT pipeline when true
+
+WalletProvider (wallet_provider.dart)
+  ├── Watches AccountProvider
+  ├── Exposes hasWallet, unifiedAddress, activeAccountUuid
+  └── Propagates errors (does NOT mask as empty state)
+
+SyncProvider (sync_provider.dart)
+  ├── Listens to AccountProvider (ref.listen, not watch) — auto-starts sync on account creation
+  ├── startSync() is fire-and-forget with _syncGen generation counter
+  ├── startSync() no-ops while wallet is locked (`appSecurityProvider.requiresUnlock`)
+  ├── clearSensitiveStateForLock() — clears in-memory sync state, cancels Rust work, stops polling
+  ├── clearCachedWalletDbPath() — must be called after wallet reset/deleteAll()
+  │   so the next sync resolves the newly generated DB name instead of using the
+  │   deleted wallet's cached path
+  ├── startSyncAnyway() — unlock recovery path for cancelled-but-still-unwinding Rust sync
+  ├── Polls getLatestBlockHeight every 10s after sync completes
+  ├── Checks at once when the mempool observer reports a new block
+  ├── Re-syncs automatically when new blocks detected or previous sync incomplete
+  ├── Duplicate sync guard: _isSyncing (Dart) + isSyncRunning() (Rust)
+  ├── A start requested while its own stream still holds the Rust guard (its
+  │   post-sync follow-ups included) is queued and runs when the stream ends;
+  │   repeats coalesce, and a queued start is dropped if the app went background
+  ├── `_sensitiveStateEpoch` discards late balance/progress updates after lock/sign-out
+  ├── Passes activeAccountUuid to getBalance, getTransactionHistory
+  ├── Sync itself is account-agnostic (covers all accounts)
+  ├── Polling pauses on app background (onHide), resumes on foreground (onResume)
+  ├── refreshAfterSend() called after account switch for immediate update
+  ├── refreshAfterUnlock() restores the stored sync status, then the selected account's
+  │   persisted display balance; it reads no wallet summary or history
+  └── refreshHomeInBackground() refreshes live balance/history after sync starts; each publishes independently
+
+SyncDisplayPercentageProvider (sync_display_progress_provider.dart)
+  ├── Owns the 20 ms UI-only interpolation timer between Rust progress events
+  ├── Watches only authoritative progress targets from SyncProvider
+  ├── Exposes raw interpolated progress only to smooth progress indicators
+  └── Exposes whole percentages to labels so unrelated UI does not rebuild per tick
+```
+
+## App Bootstrap
+
+`main()` does a one-shot bootstrap before `runApp()` and injects it via
+`appBootstrapProvider`. This snapshot is the startup source of truth for the
+first frame and avoids the old `/welcome -> /home` jump plus the "empty home
+until sync callback arrives" flash.
+
+- `loadAppBootstrap()` reads:
+  - secure storage (`zcash_accounts`, `zcash_active_account`, `zcash_wallet_network`)
+  - Rust wallet DB metadata via `list_accounts` (one projection; no viewing-key
+    decoding or address reads)
+  - the selected account's receive address and persisted display balance, only
+    when unlocked; no live balance summary or transaction history before `runApp`
+- If the wallet is locked, bootstrap does **not** hydrate active address or
+  initial balance/history; it routes straight to `/unlock` and lets the unlock
+  flow repopulate that state.
+- Router uses `bootstrap.initialLocation` instead of always starting at `/`.
+- `AccountProvider` starts from `bootstrap.initialAccountState`.
+- `WalletProvider` falls back to bootstrap values while `accountProvider` is
+  still loading.
+- `SyncProvider` starts from `bootstrap.initialSyncSnapshot` (balances, recent
+  txs, scanned/tip heights) and then kicks off the normal live sync flow.
+- Bootstrap is best-effort: route/account bootstrap can still succeed even if
+  initial address/cache hydration fails, in which case sync state falls back
+  to empty and the live sync repopulates it.
+
+## Sync
+
+The sync engine (`rust/src/wallet/sync_engine/`) and the Dart sync provider
+(`lib/src/providers/sync_provider.dart`) are described in `docs/sync.md`.
+Read it before changing either, and update it when their behaviour changes.
+
+## Rust Module Structure
+
+```
+rust/src/
+├── lib.rs              # pub mod api, ffi, wallet, frb_generated
+├── api/
+│   ├── mod.rs          # pub mod simple, sync, wallet, keystone
+│   ├── simple.rs       # init_app() with setup_default_user_utils() + log level filter
+│   ├── wallet.rs       # FRB: create_wallet, import_wallet, add_account, list_accounts,
+│   │                    # delete_account,
+│   │                    # generate_mnemonic, get_unified_address(account_uuid),
+│   │                    # get_transparent_address(account_uuid), get_latest_block_height,
+│   │                    # import_hardware_account (Keystone UFVK-only)
+│   ├── sync.rs         # FRB: start_full_sync(StreamSink, mode), cancel_full_sync(),
+│   │                    # set_sync_mode(), get_sync_mode(), is_sync_running(),
+│   │                    # is_sync_cancel_requested(),
+│   │                    # get_balance(account_uuid), get_transaction_history(account_uuid),
+│   │                    # propose_send(account_uuid), estimate_fee(account_uuid),
+│   │                    # execute_proposal, get_next_available_address(account_uuid),
+│   │                    # create_pczt_from_proposal, add_proofs_to_pczt,
+│   │                    # prepare_pczt_for_keystone_batch,
+│   │                    # store_and_broadcast_pczts_with_keystone_signatures_for_proposal,
+│   │                    # discard_proposal (hardware-wallet PCZT pipeline),
+│   │                    # DESIRED_SYNC_MODE, SYNC_RUNNING, SYNC_CANCEL globals
+│   └── keystone.rs     # FRB: encode_pczt_to_ur, decode_ur_to_pczt, encode_pczt_ur_parts,
+│                        # encode_zcash_sign_batch_ur_parts,
+│                        # decode_zcash_batch_sign_response,
+│                        # decode_ur_part, reset_ur_session (#[frb(sync)]),
+│                        # decode_accounts_from_cbor, decode_pczt_from_cbor,
+│                        # decode_accounts_ur. Keystone UX is QR-only.
+│                        # Re-exports KeystoneAccountInfo, UrDecodeResult from
+│                        # crate::wallet::keystone via `pub use`.
+├── ffi.rs              # Thin, read-only C adapter for iOS Ironwood migration
+│                        # inspection and observable preparation-txid listing.
+├── migration_preparation.rs
+│                       # Platform-neutral mobile preparation core. iOS C FFI
+│                       # uses only its read-only inspect, proof-readiness, and
+│                       # observable txid reads. Its operation lifecycle,
+│                       # preparation-only sync, advance, and cancellation have
+│                       # had no native caller since the Android adapter was
+│                       # removed (459a8565b).
+│                       # Located outside api/ to avoid FRB codegen picking it up.
+├── wallet/
+│   ├── mod.rs          # pub mod keys, sync, sync_engine, keystone
+│   ├── keys.rs         # Key derivation, mnemonic, account creation (Derived + Imported),
+│   │                    # list_accounts, ensure_db_initialized, parse_account_uuid,
+│   │                    # delete_account with account existence check and row cleanup,
+│   │                    # init_db_and_create_account (software first-account bootstrap),
+│   │                    # import_hardware_account (Keystone UFVK import;
+│   │                    # Keystone-first is allowed)
+│   ├── sync/           # Per-account wallet operations (balance, send, history, etc.)
+│   │                    # All per-account functions take account_uuid parameter
+│   │                    # NoOp Sapling provers for Orchard-only software TXs
+│   │                    # TX broadcast via gRPC SendTransaction
+│   │                    # PROPOSAL_STORE: in-memory HashMap<u64, StoredProposal>
+│   │                    #   populated by propose_send, consume-on-entry from
+│   │                    #   execute_proposal / create_pczt_from_proposal,
+│   │                    #   explicit discard_proposal for cancel paths.
+│   │                    # Hardware PCZT pipeline:
+│   │                    #   create_pczt_from_proposal → add_proofs_to_pczt +
+│   │                    #   prepare_pczt_for_keystone_batch → compact signatures →
+│   │                    #   store_and_broadcast_pczts_with_compact_signatures_for_proposal
+│   │                    #   (see "Hardware Wallet (Keystone) Send Flow" above for
+│   │                    #   the broadcast-before-store and Sapling-params invariants)
+│   ├── sync_engine.rs  # run_sync_inner() — retry wrapper (3 retries, 2/4/8s backoff)
+│   │                    # run_sync_impl() — single sync attempt
+│   │                    # MemoryBlockSource (BlockSource trait impl)
+│   │                    # Single DB connection reused across entire sync
+│   │                    # Checks cancel + mode mismatch after each download/scan/batch
+│   │                    # Progress: work-unit fraction of a persisted sync job
+│   │                    # has_new_tx from ScanSummary note counts
+│   └── keystone.rs     # Keystone hardware wallet integration:
+│                        # - UR (Uniform Resources) encode/decode for animated QR:
+│                        #   batch-sign encode/decode, decode_ur_part, reset_ur_session
+│                        #   (ur::Decoder directly, not KeystoneURDecoder, to avoid
+│                        #   URType registry issues with `zcash-accounts`)
+│                        # - Single-part UR helpers retained for compatibility
+│                        # - QR-only product flow; USB transport is intentionally absent
+│                        # - Global UR_SESSION: Mutex<Option<UrSession>>, auto-reset
+│                        #   on type change / completion, caller resets via
+│                        #   reset_ur_session() on scan-screen entry
+└── frb_generated.rs    # Auto-generated by flutter_rust_bridge
+```
+
+## Foreground Sync and Platform-Specific Migration Preparation
+
+Normal wallet sync has one path: Dart calls `start_full_sync()` through
+`flutter_rust_bridge` and consumes `Stream<ApiSyncProgressEvent>`.
+`DESIRED_SYNC_MODE`, `SYNC_CANCEL`, and `SYNC_RUNNING` belong to that foreground
+path.
+
+Only iOS has native background migration work. Android has none: commit
+`459a8565b` removed its preparation and outbox WorkManager workers, their
+Kotlin bridge, and `rust/src/android_jni.rs`. The private (denomination
+preparation) mobile migration is iOS-only, and on Android its routes
+redirect to the fast migration (`supportsPrivateMobileIronwoodMigration`).
+The iOS contract:
+
+```
+Swift BackgroundMigrationPreparationManager
+    → submit user-visible BGContinuedProcessingTask
+    → read-only C FFI inspect / observable preparation txids
+    → native lightwalletd GetLatestBlock + GetTransaction queries
+    → update system task progress until every executed preparation tx has
+      3 confirmations
+    → record the foreground continuation and post a "step confirmed" alert
+    → complete the continued-processing task successfully for that wave
+    → leave sync / migration advance to foreground
+```
+
+- iOS submits `BGContinuedProcessingTaskRequest` only while denomination
+  preparation is active. Its normal polling loop only queries the lightwalletd
+  tip and each materialized preparation tx. It never runs a wallet sync or
+  advances migration state.
+- The iOS C-FFI inspection path opens SQLite with `SQLITE_OPEN_READ_ONLY` and
+  queries only the run phase and stage counts it needs. It must not call
+  `migration_status`, stage helpers that run `ensure_schema`, or any schema
+  upgrade path. Missing or incompatible preparation tables are a foreground
+  recovery signal, never a reason to repair the DB from the system task.
+- The iOS task treats `NotFound` and mempool as zero confirmations, derives
+  mined confirmation depth from the queried chain tip, and waits until every
+  observable tx in the current wave reaches 3 confirmations. It then records
+  the foreground continuation, posts a distinct "step confirmed" notification,
+  and completes the continued-processing task successfully. One task tracks one
+  wave; it never idles waiting for the user. Expiration of a mid-wave tracking
+  pass is reported as pause-and-re-arm, never as failure. Foreground reentry
+  owns the wallet sync, denomination advance, and submission of a fresh
+  read-only task for the next wave.
+- Android has no background worker and no native preparation or outbox path.
+  Its migration runs in the foreground only.
+- `rust/src/migration_preparation.rs` still owns a preparation operation's
+  cancel token and desired mode, which foreground `cancelFullSync()` does not
+  cancel; such an operation would share `SYNC_RUNNING` with the sync engine so
+  two wallet scans cannot run concurrently. Nothing starts one today: the iOS
+  task is read-only.
+- The iOS already-signed migration outbox transport remains background-capable.
+  It may query the chain tip and broadcast exact signed bytes, but it never
+  scans the wallet.
+- Account DB mutations quiesce and drain native migration work before changing
+  the wallet DB.
+- The removed general iOS background-sync identifier
+  `com.keplr.vizor.sync` is cancelled once at launch as a tombstone for requests
+  submitted by older builds; no handler is registered for it.
+
+## Network Upgrades
+
+Read [docs/network-upgrades.md](docs/network-upgrades.md) before changing send
+expiry or block-time and wait-time estimates. It covers what the wallet refuses
+around an upgrade, where those rules live
+(`rust/src/wallet/network_upgrade.rs`), and NU7's block spacing.
+
+## Tor and the network route
+
+Tor covers the app's foreground traffic only. The desired route lives in Rust
+process memory, applied by the Dart layer at startup and by the settings
+toggle; every foreground lightwalletd and HTTP path goes through the
+policy-aware openers and fails closed while Tor is starting or broken. Upstream
+exempts a sync's large block download; Veylor does not (below).
+
+- **Veylor keeps large block downloads on Tor.** Upstream lets a sync with
+  Tor and Private queries on download its main-scan batches over a direct
+  connection once the estimate reaches `DIRECT_BLOCK_DOWNLOAD_MIN_BYTES`.
+  Veylor turns that route off (`DIRECT_BLOCK_DOWNLOADS` in
+  `rust/src/wallet/sync_engine/mod.rs`): the direct session shows the server
+  the device's IP address and resume height, and timing ties it to the Tor
+  session. Keep it off. Upstream's rules, should the route come back:
+  - Only the batches `batch_uses_direct_connection` allows use it. Every
+    request that carries an address, txid or transaction stays on Tor.
+  - Never dial an onion server directly (`block_download_can_go_direct`).
+  - The session opens its Tor route first and fails closed with it; a direct
+    failure sends the batch over Tor.
+  - HTTP/2 pings only on a multi-threaded runtime (`keep_alive_fits_runtime`).
+  - Settings copy says Vizor uses Tor to protect the IP address; it does not
+    promise that every request goes through Tor.
+
+  How it opens, falls back and reconnects, and what the server learns from it:
+  "Direct block connection" in `docs/sync.md`.
+- **Voting SDK network clients are constructed only in**
+  `rust/src/wallet/voting/network_clients.rs`. Chain, helper, PIR, and
+  vote-tree are separate transport roles; injecting a chain transport does
+  not configure the tree. Both tree pre-sync and the round executor must use
+  the same shared routed transport. When upgrading the SDK, audit new
+  network-capable entry points and extend the routing table and service tests
+  in `rust/src/wallet/voting/README.md`. The Rust suite includes a supplemental
+  constructor guard; it does not replace checking actual network behavior.
+- **A Tor connection that could not open is a `SocketException` in Dart.**
+  The Rust Tor HTTP bridge retries an exit's DNS failure or Arti's
+  `RemoteNetworkTimeout` once on a fresh circuit (`tor_stream_open_recovery`),
+  then marks any stream-opening failure so `RustTorHttpBridge` rethrows it as
+  the direct route would. Voting retry, vote-server failover, and config-mirror
+  classification depend on that type; a raw Tor error string skips them all.
+- **iOS background migration transport is pinned direct**
+  (`open_background_direct_lwd_channel`), bypassing the route policy as a
+  product decision. A background pass never brings Tor up or borrows the
+  foreground's client, so routing that lane through the policy would only
+  convert it into failures on a Tor wallet. The mobile settings card
+  discloses this. Nothing in the foreground may use the pinned opener.
+- **The saved route may be stricter than the enforced route, never laxer.**
+  The saved preference is all a fresh launch has to go on, so a toggle
+  persists in whichever order keeps this true at every intermediate point:
+  enabling writes before the runtime switch (a failed write aborts a toggle
+  that has not happened yet), disabling writes after it (a failed write
+  leaves the stricter Tor value behind). `networkPrivacyPersistedRouteIsSafe`
+  is the executable statement of this rule.
+
+Key files:
+- `rust/src/migration_preparation.rs` — shared mobile preparation core
+- `rust/src/ffi.rs` — iOS read-only inspection and query adapter
+- `ios/Runner/zcash_sync.h` — matching C header
+- `ios/Runner/BackgroundMigrationPreparationManager.swift` — continued-task
+  confirmation tracker and foreground-handoff owner
+- `lib/src/providers/wallet_mutation_guard.dart` — mutation ordering fence
+- `lib/src/features/migration/services/ironwood_migration_service.dart` —
+  foreground preparation recovery
+
+## Home portfolio chart
+
+Home draws the chart's line as the balance sign's light trail on both form
+factors, and a tap (a click on desktop) on the sign opens the full chart at
+`/portfolio-chart` (`lib/src/features/portfolio_chart/`:
+`MobilePortfolioChartScreen`, and `DesktopPortfolioChartScreen` on desktop).
+Its wallet side is read from the local
+wallet DB alone: `getAccountBalanceDeltas`, each mined transaction's
+`account_balance_delta` once (Activity rows will not do: a transaction can show
+as two rows with its whole delta each, and a ZIP 320 funding step as none),
+folded per block into a balance step function once a sync has completed
+(nothing while locked, and a mask in privacy mode). Its market side is public ZEC/USD
+daily price history from the zapp pricing engine, `GET /v1/prices` on
+`VIZOR_PRICING_ENGINE_BASE_URL` (default
+`https://zapp-pricing-engine.majorworker.workers.dev`), through
+`NetworkHttpClient`, so it follows the Tor route and fails closed. The Home
+price is separate and stays on CoinGecko (`VIZOR_COINGECKO_PRICE_BASE_URL`);
+the chart no longer reads that define.
+
+- **Opt-in.** "Show on home" is on by default; "Use market prices" is off, so a
+  fresh install makes no chart request and the chart is the ZEC balance. A
+  saved choice is kept as written, and an unreadable "Use market prices" reads
+  as off. The mobile settings card has no explanatory text under its
+  switches (the owner removed it on 2026-10-17), and desktop Settings'
+  Portfolio chart block has none either.
+- **What a request carries.** The coin (`asset=ZEC`), the currency
+  (`fiat=USD`), `resolution=1d`, two UTC dates (`from`, `to`) and `limit=1000`,
+  in that order (the order is part of the server's cache key), and nothing
+  else. The dates are whole UTC days ending at the last completed UTC day
+  (yesterday, or the day before in the first ten minutes of a UTC day) over a
+  fixed window per chip: 7, 30, 90 or 365 days, or for All from the server's own
+  first day (`availableFrom`, learned from the 1w answer, as zapp does, so All
+  costs one more fixed request; at most the newest 4,000 days), so every device
+  sends the same request on a given day. Never put an address, key, seed,
+  balance, account, wallet identifier, wallet-derived date or wallet-derived
+  timing in it; balances and prices are joined on the device.
+  `pricingEnginePricesUri` is the only place the request is built, and
+  `test/features/portfolio_chart/portfolio_chart_history_test.dart` pins its
+  keys and values.
+- **When it may leave the device.** `portfolioPriceRequestsAllowedProvider` is
+  the one gate in front of the price source: "Use market prices" is on, the
+  chart is shown on Home, market prices are shown at all
+  (`zecMarketDataAvailableProvider`, the Home price's own gate, which follows
+  the active account through Private USD) and there is a usable server, the
+  wallet is unlocked, privacy mode is off, and the app is in the foreground
+  (`appInForegroundProvider`). While any of these does not hold nothing is
+  requested; only an already cached series is drawn. On desktop the
+  foreground is a window on screen, focused or not (`inactive` counts); a
+  window that is minimised, hidden or on another Space is `hidden`, and from
+  then the gate stays shut until the app is active again (`resumed`), however
+  many syncs complete meanwhile. Locking ("Sign out") shuts it too. An
+  empty, non-https or invalid `VIZOR_PRICING_ENGINE_BASE_URL` has the same
+  effect for good: no price switch in Settings and no request.
+- **The answer is untrusted data.** `parsePricingEnginePage` and
+  `assemblePriceSeries` accept a series only when it is the documented
+  document for the same asset, currency, resolution and dates; its
+  availability is whole UTC days; every price is finite, positive and
+  consistent; and its timestamps are UTC midnights, ascending, one day apart,
+  inside the window and the availability. A page that is not `complete`
+  follows its `nextCursor` (its UTC date becomes the next `from`, as in zapp)
+  for at most four pages, and a series that would need more, or whose cursor
+  repeats or goes back, is refused rather than drawn short. https only, 30 s
+  per request and 90 s in all, 512 KiB per page.
+- **Fallback and cache.** Any failure falls back to the ZEC balance with
+  "Prices unavailable" on the card and a five minute cool-down. Prices are
+  cached in memory only, per range and window (a window moves at UTC
+  midnight); a window the server had not finished is asked again after 30
+  minutes; a series more than a day behind is marked "Older prices".
+- **Valuation.** The balance side is exact (block times) and the prices are
+  daily, so `buildPortfolioChart` draws every price of the window and places a
+  balance change between two prices at its own time, valued on the straight
+  line between them. Do not sample the balance at the price timestamps alone:
+  that draws a receipt as a day-long slope and gives a wallet funded since the
+  last price no chart. A daily price is dated by its UTC day when scrubbed.
+
+## iOS Preparation Confirmation Tracking
+
+`BGContinuedProcessingTask`
+(`com.keplr.vizor.ironwood-preparation`) polls lightwalletd every 60 seconds
+while an executed denomination preparation waits for confirmations.
+
+- `BackgroundMigrationPreparationManager.swift` owns the task, reads observable
+  txids through C FFI, updates the system task `Progress`, and advances its
+  progress heartbeat every 15 seconds.
+- `NativeLightwalletdClient.swift` uses only `GetLatestBlock` and
+  `GetTransaction`; it checks both txid byte orientations.
+- `NotFound`, mempool height `0`, and fork height `UInt64.max` contribute zero
+  confirmations. A normal mined height contributes
+  `tip - minedHeight + 1`, capped at 3.
+- A preparation transaction the tracker saw broadcast while the next block
+  was still before a network upgrade, and that the server reports `NotFound`
+  on two consecutive passes once it is past, was dropped at activation (nodes
+  clear old-branch transactions, ZIP 200). The wave goes to the foreground
+  without failing the task, since only the foreground can stop the run.
+  Transactions first seen later may target the new branch and are not judged.
+  The check reads `zcash_next_upgrade_activation_height` and process memory,
+  not the wallet DB.
+- Reaching 3 confirmations finishes only the current observation wave. The
+  manager stores a foreground-continuation token, posts an “Open Veylor”
+  notification under its own `confirmedWaveReady` kind so healthy copy never
+  reuses failure copy, and immediately completes that system task successfully
+  without opening the wallet DB for sync or advance. It does not wait for the
+  user; a completed wave leaves nothing for a read-only task to observe.
+- Foreground reentry acknowledges the token before syncing and advancing the
+  durable run. If another transaction wave is materialized, it submits a fresh
+  read-only continued-processing task.
+- A foreground handoff records continuations only for runs that genuinely need
+  the foreground — never for a run the read-only task could still finish. A
+  multi-account task otherwise parks an account that is merely mid-wave, and
+  that account stops being re-armed until the user makes it active. The
+  "is a preparation bound to this request" boolean stays broader than the
+  recorded set on purpose: it gates cancellation of the pending request, so
+  deriving it from the recorded set would cancel healthy mid-wave runs.
+- OS expiration is completed without a failure presentation and re-arms
+  background tracking, because it interrupts one execution opportunity rather
+  than proving the migration failed. Expiry posts no notification of its own:
+  scopes whose waves already confirmed keep their earlier step-confirmed
+  alert, and the interrupted wave resumes when the re-armed task runs.
+- While private queries are on, the task does not track
+  confirmations. A background pass cannot advance the wallet's scanned
+  state, so it can never accept a Status PIR anchor, and it must not fall back
+  to a public `GetTransaction`. `migrationPreparationContinuedTaskDisposition`
+  maps a continued-processing target to `.foregroundOnly`, so the task is not
+  submitted (`blocked_private_recovery`) and a launched task hands off to the
+  foreground. Dart sends the effective setting through the
+  `setPrivateRecovery` channel method at startup and on every toggle. Native
+  treats a value it never received as private. Dart likewise resolves an
+  unreadable saved preference to private for that launch without writing it
+  back, and a blocked bootstrap applies no setting at all.
+
+## Send Flow
+
+2-step: `propose_send(account_uuid)` → confirmation dialog (shows fee) → `execute_proposal()` → broadcast via `SendTransaction` gRPC.
+
+- Integer-only ZEC-to-zatoshi parsing (no floating-point)
+- Real fee estimation via `estimate_fee(account_uuid)` on each keystroke
+- No-op Sapling provers for Orchard-only TXs (avoids 50MB param download)
+- Post-send: `refreshAfterSend()` for immediate pending TX display
+- Friendly error messages via `_friendlyError()` pattern matching
+
+## Ledger Device-App Limits
+
+Before changing a Ledger send, Gift Card, shielding, swap, or voting flow, read
+`docs/ledger/limitations.md`. **32 actions per pool does not mean 32 recipients:**
+the device can review only **4 external shielded outputs across both pools**;
+internal change is excluded. Numeric limits live in `rust/src/wallet/ledger/limits.rs`.
+Keep account-key verification before PCZT transmission. Apps before 3.10.0
+reject the NU7 branch and an Orchard spend into Ironwood; `LedgerAppSupport`
+carries what the connected app can sign, and the serializer refuses the rest.
+
+## Signing Cancellation
+
+Keep desktop and mobile consistent when cancelling signing, not merely closing the QR scanner:
+
+- Send / Gift Card: preserve inputs, return to Review, and refresh balance and fees before retry.
+- Swap / Pay: return to the composer without preserving inputs; obtain a new quote on the next Review.
+- Vote: preserve saved partial signatures and resume unsigned bundles.
+- For transaction proposals, finish input-lock release and balance refresh before allowing retry.
+
+Send proposal reservations are process-scoped until a signed outbox checkpoint
+or the first broadcast attempt. Wallet-owned PCZTs carry the reservation owner;
+strip that metadata from device signer views. Ledger checkpoint insertion and
+reservation transfer must commit in the same SQLite transaction. Keystone marks
+retention before the first network submission, including TEX's first round.
+A hardware TEX request's ZIP 320 ephemeral address follows the same boundary:
+releasing the request before that boundary returns the address, so cancelled
+approvals cannot exhaust the ephemeral gap limit; after it the address stays
+reserved.
+Normal app exit closes the proposal gate and requests sync cancellation.
+Desktop exits hide the window before awaiting reservation cleanup, except on
+Linux. Linux keeps the window visible during the same bounded cleanup, then
+calls `exit(0)` instead of GTK hide/destroy teardown to avoid the compositor
+shutdown crash. Rust allows 250ms to
+acquire the wallet write lock and drain accepted DB creators, then releases only
+unsubmitted reservations without waiting on SQLite contention. Once the budget
+expires, it starts no further cleanup; unfinished work is left for startup
+recovery. It does not interrupt an active DB operation. Dart bounds its cleanup
+wait at 300ms. On macOS, the exit-only `desktop_exit` channel orders the window
+out synchronously and suppresses last-window auto-quit while Dart is preparing
+its exit reply; ordinary window visibility still uses `window_manager`.
+Backgrounding or hiding a window by itself does not end the session, except
+that mobile returning after 15 minutes in the background locks it through the
+sign-out sequence (`BackgroundAutoLockHost`).
+Before the first balance read after restart, the DB migration gate recovers
+abandoned process-scoped reservations without network access. Legacy retained,
+signed, and ambiguous-broadcast reservations keep their expiry-based recovery.
+Never clear all account locks: migration owners and durable outbox work are
+outside cancellation cleanup.
+
+Android Ledger device work must use `LedgerMobileHandler.launchOperation`,
+including app queries and app-opening approval, not only signing APDUs. Register
+ownership before dispatch, settle each MethodChannel result once, and retain the
+SDK-wide exclusion until the job actually completes after cancellation. Discovery
+and disconnect cleanup also participate in exclusion across Activity recreation.
+Dart preparation uses `ledgerDeviceRequestsProvider`: capture before the first
+await and check before starting the next stage or publishing a result. Do not
+apply this cancellable device policy to already-submitted durable broadcasts.
+
+## Hardware Wallet (Keystone) Send Flow
+
+Normal hardware sends use Keystone's signatures-only batch protocol, even for
+one transaction. The device cannot generate ZK proofs (proving keys are too
+big for the device), and the phone cannot sign (the spending key lives on the
+device), so Veylor retains the proof PCZT and applies only the compact
+Orchard/Ironwood signatures returned by Keystone.
+
+```
+1. createPcztFromProposal                         → base PCZT (phone)
+   (IO-finalized, no proofs, no signatures)
+      │
+      ├── 2a. addProofsToPczt(base, params?)      → pcztWithProofs
+      │       (Orchard or Ironwood proof; Sapling output proofs if the
+      │        proposal has needsSaplingParams=true)
+      │
+      └── 2b. preparePcztForKeystoneBatch(base)   → compact redacted PCZT
+              → zcash-sign-batch QR
+              → device signs Orchard/Ironwood spend_auth_sig
+              → zcash-batch-sig-result QR         → signatures only
+                                                         ↓
+3. storeAndBroadcastPcztsWithKeystoneSignaturesForProposal(
+     pcztWithProofs, signatureBlobs,
+     spend_params?, output_params?,
+   )                                                → txid
+```
+
+Roles in the split:
+
+| Step | PCZT role | Runs on | Needs what |
+|------|-----------|---------|------------|
+| 1 | Creator + IoFinalizer | phone | wallet DB |
+| 2a | Prover | phone | proving params (Orchard or Ironwood; Sapling ~50MB if the target recipient is Sapling) |
+| 2b | Batch redactor | phone | wallet-owned base PCZT |
+| sign | Signer | device | spend authorization derivation (device holds USK) |
+| 3 | Signer application + TransactionExtractor | phone | wallet-owned proof PCZT, compact signatures, verifying keys, and wallet DB |
+
+The v1 `BatchSignResponse` can represent only Orchard and Ironwood spend
+authorization signatures. It cannot represent transparent-input or Sapling
+spend signatures. Therefore hardware TEX sends and hardware transparent
+shielding still use the full-PCZT signer response until the Keystone batch
+protocol gains transparent signatures. Normal sends and ZEC swap deposits must
+not fall back to the full-PCZT response.
+
+One batch round can return at most 96 spend signatures, and one PCZT cannot be
+split across rounds. `prepare_pczt_for_keystone_batch` therefore rejects a
+transaction requiring more than 96 signatures before the request QR is shown.
+Callers surface an actionable smaller-amount message and must not fall back to
+the full-PCZT response.
+
+**Critical invariants** (each of these was a real bug at some point in
+development; breaking them is a correctness or data-loss regression):
+
+1. **The hardware completion path must broadcast before it persists.**
+   The function order is: `TransactionExtractor::extract()` (in-memory, no
+   DB) → `send_transaction` gRPC → *only then* `extract_and_store_transaction_from_pczt`.
+   Storing first would mark notes spent by a transaction no server holds.
+   Once the server has the whole transaction, a nonzero `SendResponse` is no
+   proof it was dropped: Zebra and Zakura re-queue rejected transactions for
+   later blocks. A rejected transaction is stored like an unknown result, so
+   its inputs stay spent until its expiry height; for a TEX payment round,
+   sync keeps resubmitting it after the funding round. A transaction without
+   an expiry height still fails outright, and
+   so does a rejected TEX first round: it pays only the wallet's ephemeral
+   address, and keeping it would drop the signed payment round.
+
+2. **Local storage failure after a successful broadcast must not surface
+   as a send failure.** The primary store path is
+   `extract_and_store_transaction_from_pczt` (preserves rich PCZT
+   recipient/memo metadata). On failure, fall back to
+   `decrypt_and_store_transaction` — the same path sync uses when it
+   discovers one of our sent txs on-chain. Correctness is preserved
+   (spent notes get marked spent via nullifier matching) at the cost of
+   some PCZT-only display metadata. Only if both paths fail do we
+   return an error, and the error message must tell the user the tx is
+   on the network and not to retry.
+
+3. **Sapling params must be passed to BOTH `add_proofs_to_pczt` AND
+   the hardware completion path whenever the PCZT contains a Sapling
+   bundle.** `add_proofs_to_pczt` needs `LocalTxProver` to build Sapling
+   output proofs; the completion path needs `LocalTxProver
+   ::verifying_keys()` (a) to validate the extracted transaction and
+   (b) to let `extract_and_store_transaction_from_pczt` store it. Both
+   functions share the `Option<&str>` / `Option<&str>` signature. If
+   the caller supplied paths to `add_proofs_to_pczt` but passed `None`
+   here, extraction bails with `SaplingRequired` and the user sees a
+   cryptic error after already downloading 50MB of params and
+   approving on the device. `send_screen.dart` threads the same
+   `proposal.needsSaplingParams ? spendPath : null` into both FFI
+   calls — keep it that way.
+
+4. **`PROPOSAL_STORE` is consume-on-entry for both execute paths, plus
+   explicit discard on cancel.**
+   - `create_pczt_from_proposal` and `execute_proposal` both call
+     `.remove()` at the top (dropping the store lock before any DB
+     work). A second call with the same `proposal_id` returns
+     `"Proposal not found (expired or already consumed)"`.
+   - Dart `_send()` runs the whole flow inside a `try/finally`
+     with a `proposalConsumed` flag that flips to true immediately
+     after the consume call. The `finally` block calls
+     `discardProposal(proposalId)` when the flag is still false —
+     this covers confirmation-dialog cancel, Sapling-params-dialog
+     cancel, exceptions during Sapling download, and any error
+     before the consume call. `discardProposal` is idempotent.
+   - If you add a new entry point that reads a stored proposal,
+     follow the same "consume on entry, idempotent discard on any
+     non-consuming exit" pattern. Silently reading without
+     consuming (`.get()`) reintroduces the memory-leak /
+     replayable-ID bugs that a prior revision of this branch had.
+
+The Dart flow in `lib/src/features/send/screens/send_screen.dart`
+implements this pipeline end-to-end; the Rust side lives in
+`rust/src/wallet/sync/pczt.rs::{create_pczt_from_proposal,
+add_proofs_to_pczt, prepare_pczt_for_keystone_batch,
+store_and_broadcast_pczts_with_compact_signatures_for_proposal,
+discard_proposal}` with FRB wrappers in `rust/src/api/sync.rs`.
+
+**Transparent inputs under Private queries.** Every hardware broadcast path
+(Ledger outbox, Keystone compact and full batches, legacy PCZT) re-checks its
+transparent inputs just before `SendTransaction`
+(`rust/src/wallet/sync/hardware_authority.rs`). Under a private policy the
+check targets the wallet's own tip + 1, so a block that lands while the device
+signs does not refuse the signature. Until private recovery covers the
+wallet's latest scanned block the refusal is `CatchingUp`; the broadcast waits
+up to 30 s (`CATCH_UP_WAIT`) for it, and a busy wallet DB is waited out the
+same way. If it still cannot dispatch, the refusal is retryable and the caller
+keeps the signed transaction rather than releasing it. Under Private queries,
+Ledger accounts recover privately from their stored birthday like other
+accounts (`docs/ledger/transparent-recovery.md`). A birthday later than the
+account's first activity can omit earlier transparent history; existing public
+records that private recovery cannot explain block activation, and turning
+the setting off restores public discovery from height 0.
+
+## Wallet Creation
+
+`create_wallet()` fetches chain tip from lightwalletd as birthday height before creating the account. This prevents new wallets from doing a full chain scan. Birthday fetch failure blocks wallet creation (network required).
+
+On mainnet, the wallet API (`rust/src/api/wallet.rs`, `restored_birthday`)
+stores every restored birthday rounded down to one past a grid point
+(`tree_states::restore_birthday`), so lightwalletd learns only the bucket. The
+grid is every 10,000 blocks before NU7 and every 30,000 from it, about 8.7 days
+in both eras, and the bucket containing the activation starts at the last grid
+point before it. It is a height grid, not a calendar, so every app version
+draws the same buckets.
+When the grid point is a compiled checkpoint (`rust/src/wallet/tree_states.rs`)
+the first scan batch reads its state locally instead of sending
+`GetTreeState`; a restore newer than the table fetches the grid point's state.
+Restores are the discovery import
+(`import_software_wallet_with_account_discovery`), wallet-link import
+(`import_software_account_at_index`), and hardware import
+(`import_hardware_account`). Newly created accounts (`create_wallet`,
+`add_account`, and `import_wallet` from onboarding's reveal-then-confirm
+flow), payment-link claims (`import_wallet`), and Gift Card observers keep the
+exact height; testnet and regtest are unchanged. Code that queries lightwalletd from a restored birthday must use the
+rounded value, never the exact requested height. The weekly
+`update-mainnet-chain-tables.yml` workflow appends checkpoints.
+
+## Rust API Design Constraint
+
+FRB codegen works best with simple types. Keep the `rust/src/api/` surface limited to primitives, `String`, and flat structs. Do all complex Zcash type manipulation inside `rust/src/wallet/` and return simple results through `rust/src/api/`.
+
+All per-account API functions take `account_uuid: String`. Sync-level operations (`start_full_sync`, etc.) operate on all accounts and do NOT take account_uuid.
+
+## Key Security Model
+
+`zcash_client_sqlite` intentionally does NOT store spending keys in the DB — only viewing keys (UFVK).
+
+**Software accounts**: the mnemonic/seed lives in Flutter's `flutter_secure_storage` (iOS Keychain / Android Keystore) per-account (`zcash_account_mnemonic_{uuid}`) and is passed to Rust only when needed for transaction signing. Seed is scoped in a block and dropped before network I/O (broadcast).
+
+**Hardware (Keystone) accounts**: no seed ever reaches the phone. On import the phone receives only the UFVK via QR/UR; the USK stays on the device. There is no corresponding `zcash_account_mnemonic_{uuid}` entry, and `getActiveMnemonic()` returns null for hardware accounts. Transaction signing happens inside the device via the PCZT handoff (see "Hardware Wallet (Keystone) Send Flow"), so the phone never holds spending key material for these accounts at any point.
+
+## WalletDb Initialization
+
+`WalletDb::for_path()` requires 4 params: `(path, Network, SystemClock, OsRng)`. `init_wallet_db()` must be called before `create_account()` — it runs schema migrations.
+
+Seed-relevance rule:
+- **Software bootstrap account**: `init_db_and_create_account` calls `init_wallet_db(Some(seed))` then `create_account` → `AccountSource::Derived`. This pins the seed fingerprint so future seed-requiring migrations can verify relevance.
+- **Subsequent opens**: `ensure_db_initialized` calls `init_wallet_db(None)`. Calling `init_wallet_db(Some(other_seed))` after the first account would fail the relevance check when any `Imported` account exists.
+- **Hardware-first bootstrap is allowed**: `import_hardware_account` initializes without a local seed and imports the Keystone UFVK. This can produce an `Imported`-only DB, so seed-requiring migration recovery must be handled at the product layer if such a migration appears.
+
+## Desktop Window Bootstrap
+
+Desktop window appearance is managed by the external [`desktop_window_bootstrap`](https://github.com/chainapsis/desktop_window_bootstrap) package plus `window_manager`, with a strict responsibility split:
+
+- `desktop_window_bootstrap` owns window appearance and titlebar overlap handling.
+  - On macOS this means the transparent titlebar / full-size content-view shell is applied natively before the window is shown, via `macos/Runner/MainFlutterWindow.swift`.
+  - The app calls `DesktopWindowBootstrap.initialize()` in `lib/main.dart` after `initializeDesktopWindow()` has created the OS window but before `showDesktopWindow()` reveals it.
+  - `DesktopWindowTitlebarSafeArea` in `lib/app.dart` pads Flutter content below the macOS traffic-light/titlebar area. Keep it wrapped around the app root.
+- `window_manager` owns sizing/lifecycle only.
+  - `lib/src/core/layout/app_layout.dart` should remain responsible for initial size, minimum size, aspect ratio, `show()`, `focus()`, and layout-mode reconciliation from window events.
+  - Do not reintroduce `TitleBarStyle` ownership or other appearance writes through `window_manager`; that overlaps with `desktop_window_bootstrap`.
+
+Current startup order for desktop platforms:
+
+```text
+WidgetsFlutterBinding.ensureInitialized()
+→ RustLib.init()
+→ initializeDesktopWindow()      // window_manager creates the OS window
+→ DesktopWindowBootstrap.initialize()
+→ showDesktopWindow()
+→ runApp()
+```
+
+## Figma comparison tooling
+
+For deterministic code-to-Figma screenshots, use the widget-test capture as
+the normal iteration path. It renders the same `FigmaCompareApp` and registered
+scenario without building Rust, CocoaPods, Xcode, or a macOS app:
+
+```bash
+scripts/figma-compare.sh widget --scenario pay-recipient --theme dark
+```
+
+Use the native entry point only for final macOS window-shell and restoration
+verification:
+
+```bash
+scripts/figma-compare.sh native --scenario pay-recipient --theme dark
+```
+
+Registered states live in
+`lib/figma_compare/figma_compare_scenarios.dart` and must use deterministic
+dev-only mocks. Outputs go below the app sandbox's `vizor-figma-compare`
+temporary directory: `content.widget.png` is the fast app-content reference;
+`content.png` and `content.window.png` are the real-engine and native-window
+final evidence. The native entry point reuses production macOS window
+initialization without starting Rust, storage, sync, wallet, or network state,
+automatically restores a minimized window before capture, and returns it and
+the previously foreground app to their original states afterward. Full
+workflow, mobile capture, and cleanup rules are in `FIGMA-AI-FIX.md`.
+
+Important desktop design rule:
+
+- The shell is opaque and true black, with no acrylic: the native window
+  (`DesktopWindowVisualStyle.opaque`) and Flutter's root (`macosUtility.window`)
+  are the neon look's black, and the Mac window opens in the dark appearance
+  so nothing light shows before the first frame.
+- Screens leave `Scaffold.backgroundColor: Colors.transparent` over that black
+  and paint solid fills only where the UI should actually be solid.
+
+## Hardware Wallet QR Codes
+
+Hardware-wallet PCZT QR codes prioritize scan reliability over Figma parity.
+Use black-on-white square modules with an explicit quiet zone. Do not apply
+decorative QR treatments to codes that Keystone devices need to scan.
+
+The receive-address QR of a Keystone account is one of those codes: the device
+scans it to verify rotating addresses. `ReceiveQrSurface(scanOptimized: true)`
+draws it black-on-white with square modules in every theme and keeps the pool
+badge. Its quiet zone is the white card's padding rather than modules inside
+the bitmap; a Keystone device scans it at the current geometry. Software and
+Ledger accounts keep the decorative dot style.
+
+## Crate Versions
+
+Constrained in `rust/Cargo.toml` and resolved in `rust/Cargo.lock`. Key crates: `zcash_client_backend` 0.22.0, `zcash_client_sqlite` 0.20.2, `orchard` 0.13.1, `sapling-crypto` 0.7.0. These must stay compatible — check librustzcash releases before bumping.
+
+The zakura wallet crates come from their crates.io releases. Veylor patches only the vendored backend and, until its branch is pushed, zecswap-core (see "Pinned zecSwap and a local stand-in" under Private USD). A release that adds a wallet migration makes the database unreadable to builds with an older release.
+
+`tonic` 0.14 with `tls-ring` + `tls-webpki-roots` features for gRPC TLS. `rustls` 0.23+ requires explicit crypto provider — `tls-ring` provides this.
+
+`log` 0.4 for Rust logging — forwarded to Flutter console via FRB. Level set to `Info` in `init_app()`.
+
+Additional crates for multi-account: `uuid` 1.1, `zip32` 0.2, `jubjub` 0.10, `bls12_381` 0.8, `rand_core` 0.6.

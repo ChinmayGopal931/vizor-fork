@@ -31,7 +31,6 @@
 		RAILGUNMAC01000000000008 /* RailgunError.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNMAC00000000000008 /* RailgunError.swift */; };
 		RAILGUNMAC01000000000014 /* RailgunArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNMAC00000000000014 /* RailgunArchive.swift */; };
 		RAILGUNMAC01000000000009 /* railgun in Resources */ = {isa = PBXBuildFile; fileRef = RAILGUNMAC00000000000009 /* railgun */; };
-		RAILGUNMAC01000000000010 /* PrivateUsdAttestationHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNMAC00000000000010 /* PrivateUsdAttestationHandler.swift */; };
 		RAILGUNMAC01000000000011 /* ScreenAwakeChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNMAC00000000000011 /* ScreenAwakeChannel.swift */; };
 		RAILGUNMAC01000000000012 /* MacSessionLifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNMAC00000000000012 /* MacSessionLifecycle.swift */; };
 		RAILGUNMAC01000000000013 /* SettlementAttentionChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNMAC00000000000013 /* SettlementAttentionChannel.swift */; };
@@ -94,7 +93,6 @@
 		RAILGUNMAC00000000000008 /* RailgunError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RailgunError.swift; sourceTree = "<group>"; };
 		RAILGUNMAC00000000000014 /* RailgunArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RailgunArchive.swift; sourceTree = "<group>"; };
 		RAILGUNMAC00000000000009 /* railgun */ = {isa = PBXFileReference; lastKnownFileType = folder; name = railgun; path = ../../../ios/Runner/Railgun/railgun; sourceTree = "<group>"; };
-		RAILGUNMAC00000000000010 /* PrivateUsdAttestationHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateUsdAttestationHandler.swift; sourceTree = "<group>"; };
 		RAILGUNMAC00000000000011 /* ScreenAwakeChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenAwakeChannel.swift; sourceTree = "<group>"; };
 		RAILGUNMAC00000000000012 /* MacSessionLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacSessionLifecycle.swift; sourceTree = "<group>"; };
 		RAILGUNMAC00000000000013 /* SettlementAttentionChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettlementAttentionChannel.swift; sourceTree = "<group>"; };
@@ -258,7 +256,6 @@
 				LEDGERMAC000000000000001 /* LedgerMobileHandler.swift */,
 				NATIVESTR000000000000001 /* NativeStrings.swift */,
 				RAILGUNMAC00000000000000 /* Railgun */,
-				RAILGUNMAC00000000000010 /* PrivateUsdAttestationHandler.swift */,
 				RAILGUNMAC00000000000011 /* ScreenAwakeChannel.swift */,
 				RAILGUNMAC00000000000012 /* MacSessionLifecycle.swift */,
 				RAILGUNMAC00000000000013 /* SettlementAttentionChannel.swift */,
@@ -538,7 +535,6 @@
 				RAILGUNMAC01000000000007 /* RailgunEndpoints.swift in Sources */,
 				RAILGUNMAC01000000000008 /* RailgunError.swift in Sources */,
 				RAILGUNMAC01000000000014 /* RailgunArchive.swift in Sources */,
-				RAILGUNMAC01000000000010 /* PrivateUsdAttestationHandler.swift in Sources */,
 				RAILGUNMAC01000000000011 /* ScreenAwakeChannel.swift in Sources */,
 				RAILGUNMAC01000000000012 /* MacSessionLifecycle.swift in Sources */,
 				RAILGUNMAC01000000000013 /* SettlementAttentionChannel.swift in Sources */,

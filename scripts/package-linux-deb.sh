@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Packages a Veylor Linux bundle as a .deb for Ubuntu and Debian (AGENTS.md,
+# Packages a Veylor Linux bundle as a .deb for Ubuntu and Debian (docs/releases.md,
 # "Desktop identity"): the bundle under /opt/<package>, a /usr/bin link, the
 # desktop entry and icons, and the AppArmor profile Shielded USD's page process
 # needs on Ubuntu 23.10 and later, where WebKit's bubblewrap sandbox may create

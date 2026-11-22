@@ -1210,7 +1210,6 @@ class MainFlutterWindow: NSWindow {
   private var ledgerBleMethodChannel: FlutterMethodChannel?
   private var ledgerBleDiscoveryChannel: FlutterEventChannel?
   private var railgunHostHandler: RailgunHostHandler?
-  private var attestationHandler: PrivateUsdAttestationHandler?
   private var sessionLifecycle: MacSessionLifecycle?
 
   deinit {
@@ -1325,9 +1324,8 @@ class MainFlutterWindow: NSWindow {
     ledgerBleDiscoveryChannel = discoveryChannel
   }
 
-  /// Private USD's hidden Railgun page, in this window behind the Flutter view, and its attestation channel, which
-  /// answers `unavailable` as iOS's does. The page itself is a process singleton; the handler only binds the engine
-  /// to it, before Dart's bootstrap asks whether it is supported.
+  /// Private USD's hidden Railgun page, in this window behind the Flutter view. The page itself is a process
+  /// singleton; the handler only binds the engine to it, before Dart's bootstrap asks whether it is supported.
   private func registerPrivateUsdChannels(messenger: FlutterBinaryMessenger) {
     RailgunPageHost.shared.window = self
     let railgunHostHandler = RailgunHostHandler()
@@ -1336,11 +1334,6 @@ class MainFlutterWindow: NSWindow {
       .setMethodCallHandler { call, result in railgunHostHandler.handle(call, result: result) }
     FlutterEventChannel(name: RailgunHostHandler.eventChannelName, binaryMessenger: messenger)
       .setStreamHandler(railgunHostHandler)
-
-    let attestationHandler = PrivateUsdAttestationHandler()
-    self.attestationHandler = attestationHandler
-    FlutterMethodChannel(name: PrivateUsdAttestationHandler.channelName, binaryMessenger: messenger)
-      .setMethodCallHandler { call, result in attestationHandler.handle(call, result: result) }
   }
 
   override public func order(_ place: NSWindow.OrderingMode, relativeTo otherWin: Int) {

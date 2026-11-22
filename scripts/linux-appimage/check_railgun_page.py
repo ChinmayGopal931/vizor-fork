@@ -2,7 +2,7 @@
 """Check Shielded USD's Railgun page process in a Linux bundle and its AppImage.
 
 The page process loads the system's WebKitGTK at run time and runs on the
-system's libraries alone (linux/runner/CMakeLists.txt; AGENTS.md, "Private
+system's libraries alone (linux/runner/CMakeLists.txt; docs/private-usd.md, "Private
 USD"): nothing in the bundle or the AppImage may link WebKit, libsoup or
 JavaScriptCore or carry a copy of them, and the page process has no RPATH. The
 page's own files must be in the bundle's data/railgun.

@@ -13,6 +13,9 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" tools:node="remove" />
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+    <!-- The activity is portrait, which Google Play reads as a required portrait screen.
+         Optional, so devices without one (tablets, Chromebooks, XR) can install it. -->
+    <uses-feature android:name="android.hardware.screen.portrait" android:required="false" />
     <application
         android:label="Veylor"
         android:name="${applicationName}"

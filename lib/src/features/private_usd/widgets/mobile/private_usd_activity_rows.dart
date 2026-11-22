@@ -42,8 +42,9 @@ const _logo = PrivateUsdLogo(size: AppAssetSize.size);
 
 /// A forward conversion's activity row, or null when it moved no money
 /// (nothing sent). Under way, it shows its stage and opens its progress;
-/// paid, the ZEC paid; refunded, that the ZEC came back, with no amount.
-/// Ended, it unfolds into its [details].
+/// paid, the ZEC paid; refunded, that the ZEC came back, with no amount;
+/// ended unstarted after its market maker fee was mined, that fee, which
+/// isn't refunded. Ended, it unfolds into its [details].
 ActivityRowData? buildPrivateUsdActivityRow({
   required BuildContext context,
   required ApiForwardRecord record,
@@ -104,11 +105,10 @@ ActivityRowData? buildPrivateUsdActivityRow({
         onTap: onOpenConversion,
       );
     case ApiForwardOutcome.paid:
-      final zec = privacyModeEnabled
-          ? fixedPrivacyMask()
-          : ZecAmount.fromZatoshi(
-              record.maxTotalZat ?? record.depositZat,
-            ).activity.toString();
+      final zec = privateUsdForwardPaidText(
+        record,
+        privacyModeEnabled: privacyModeEnabled,
+      );
       return ActivityRowData(
         stableId: base.stableId,
         title: context.l10n.privateUsdActivityConverted,
@@ -141,7 +141,36 @@ ActivityRowData? buildPrivateUsdActivityRow({
         onTap: unfold.onTap,
       );
     case ApiForwardOutcome.nothingSent:
-      return null;
+      // The fee is the one thing it moved: its row stands in for the fee's
+      // own transaction, which the feeds leave out.
+      final fee = record.openFeeZat;
+      if (fee == null || !record.openFeeMined) return null;
+      final paid = fee + (record.openFeeNetworkZat ?? BigInt.zero);
+      final zec = privacyModeEnabled
+          ? fixedPrivacyMask()
+          : ZecAmount.fromZatoshi(paid).activity.toString();
+      final out = PrivateUsdCopy.activityOut(zec);
+      // Its payment's own network fee unknown, the amount is approximate:
+      // "≈ −0.25 ZEC", the sign kept with the number.
+      final approximate =
+          record.openFeeNetworkZat == null && !privacyModeEnabled;
+      return ActivityRowData(
+        stableId: base.stableId,
+        title: context.l10n.privateUsdActivityFeeLost,
+        leadingIconName: _glyph,
+        leading: _logo,
+        leadingBackgroundColor: base.leadingBackgroundColor,
+        leadingIconColor: base.leadingIconColor,
+        subtitle: context.l10n.privateUsdActivityFeeLostDetail,
+        amountText: activityAmountTextForFormFactor(
+          approximate ? PrivateUsdCopy.approximately(out) : out,
+        ),
+        amountColor: outgoingAmountColor(colors),
+        statusText: '',
+        timestampText: timestamp,
+        details: unfold.details,
+        onTap: unfold.onTap,
+      );
   }
 }
 

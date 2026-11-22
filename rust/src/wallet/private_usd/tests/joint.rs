@@ -409,6 +409,143 @@ fn a_swap_deposit_is_one_transaction_within_its_approved_total() {
     assert_eq!(proposal_locks(&wallet.path), 0);
 }
 
+/// An open fee created but not yet kept, as an interruption between the
+/// two leaves it, is withheld from the wallet's resubmission in its quote's
+/// last minute all the same: the account's sent transaction to the fee's
+/// address. Earlier in the quote, it goes on.
+#[tokio::test]
+async fn a_fee_created_but_never_kept_is_withheld_near_its_quotes_end() {
+    use super::super::models::{Direction, StoredRecord};
+    use super::super::open_fee::withheld_fee_txids;
+    use super::super::store::SwapStore;
+
+    let _route = lock_route_policy();
+    let mut chain = Chain::new();
+    let wallet = main_wallet(&chain);
+    chain.fund(&wallet.path, main_address());
+    let to = joint_account(0).unified_address(NETWORK.network_type());
+    let lwd = CapturingLwd::start_with(vec![], u64::from(chain.tip()), |_| {}).await;
+    let fee = sync::propose_swap_deposit(
+        &wallet.path,
+        NETWORK,
+        &wallet.account,
+        "open-fee",
+        &to,
+        20_000,
+        100_000,
+    )
+    .unwrap();
+    let created = sync::create_stored_proposal_transactions(
+        &wallet.path,
+        &lwd.url,
+        fee.proposal_id,
+        "open-fee",
+        SecretVec::new(SEED.to_vec()),
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+    let txid = created[0].txid.as_ref().to_vec();
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let store_dir = std::path::Path::new(&wallet.path)
+        .parent()
+        .unwrap()
+        .join("private_usd_zcash_wallet.db_main");
+    let started = |expires_at: u64| {
+        let hex = |bytes: usize, value: u8| format!("0x{}", format!("{value:02x}").repeat(bytes));
+        let json = format!(
+            r#"{{"index":0,"quote":{{"quoteId":"{}","maker":"0x4370eeaa6becf1daef21deeb0379eb7f6caef7ef","makerShare":"{}","makerProof":"{}","chainId":1,"contract":"0xeb3a00bcb6c9ff626fe57a5dbbdcf01730e7898f","token":"0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48","amount":"1000000","depositZat":202021,"expiresAt":{expires_at},"openFee":{{"zat":20000,"address":"{to}"}}}},"swapId":"{}","zcashHeight":{},"acceptedAt":{now},"receives":"977550","relayerFee":"20000","openFeeMaxTotalZat":30000,"openFeeAttempted":true}}"#,
+            hex(32, 0x22),
+            hex(64, 0x0a),
+            hex(64, 0x06),
+            hex(32, 0x01),
+            chain.tip(),
+        );
+        StoredRecord::decode(Direction::Forward, &json).unwrap()
+    };
+    let mut store = SwapStore::open(&store_dir).unwrap();
+    store.save(&wallet.account, &started(now + 600)).unwrap();
+    assert!(
+        !withheld_fee_txids(&wallet.path).contains(&txid),
+        "its quote still has time"
+    );
+    store.update(&wallet.account, &started(now + 30)).unwrap();
+    assert!(withheld_fee_txids(&wallet.path).contains(&txid));
+}
+
+/// A payment due by a deadline, as an open fee is by its quote's end: in
+/// time, it carries the deadline's expiry, below an ordinary payment's;
+/// created with less than its least time to go, nothing is stored or sent,
+/// and its inputs are free for the next.
+#[tokio::test]
+async fn a_payment_due_by_a_deadline_expires_with_it_and_is_never_created_late() {
+    let _route = lock_route_policy();
+    let mut chain = Chain::new();
+    let wallet = main_wallet(&chain);
+    chain.fund(&wallet.path, main_address());
+    let to = joint_account(0).unified_address(NETWORK.network_type());
+    let lwd = CapturingLwd::start_with(vec![], u64::from(chain.tip()), |_| {}).await;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let propose = || {
+        sync::propose_swap_deposit(
+            &wallet.path,
+            NETWORK,
+            &wallet.account,
+            "open-fee",
+            &to,
+            20_000,
+            100_000,
+        )
+        .unwrap()
+    };
+    let create = async |proposal_id: u64, left: u64| {
+        sync::create_stored_proposal_transactions_expiring_by(
+            &wallet.path,
+            &lwd.url,
+            proposal_id,
+            "open-fee",
+            SecretVec::new(SEED.to_vec()),
+            sync::PaymentDeadline {
+                at: now + left,
+                least_left: 60,
+            },
+        )
+        .await
+    };
+
+    let late = create(propose().proposal_id, 30).await.unwrap_err();
+    assert!(late.starts_with(sync::DEADLINE_TOO_NEAR), "{late}");
+    assert_eq!(proposal_locks(&wallet.path), 0, "its inputs are free");
+    assert!(
+        joint::find_deposit(&wallet.path, NETWORK, &wallet.account, &to)
+            .unwrap()
+            .is_none(),
+        "nothing is stored"
+    );
+
+    let created = create(propose().proposal_id, 590).await.unwrap();
+    let [created] = created.as_slice() else {
+        panic!("one transaction");
+    };
+    let target = BlockHeight::from_u32(chain.tip() + 1);
+    let due =
+        sync::deadline_expiry_height(&NETWORK, target, 590, sync::DEADLINE_EXPIRY_SLACK_BLOCKS);
+    assert_eq!(created.expiry_height, u32::from(due));
+    assert!(
+        created.expiry_height < chain.tip() + 1 + 40,
+        "below an ordinary expiry"
+    );
+    assert_eq!(lwd.count("/SendTransaction"), 0, "nothing is sent");
+}
+
 /// The create half stores the deposit without sending it; `find_deposit`
 /// finds it; `swap_tx_status` follows it until it is mined or provably
 /// expired.

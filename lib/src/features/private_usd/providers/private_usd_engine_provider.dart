@@ -6,10 +6,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/private_usd_feature_config.dart';
 import '../../../core/layout/app_form_factor.dart';
+import '../../../core/storage/wallet_paths.dart';
 import '../../../providers/account_provider.dart';
 import '../../../providers/app_security_provider.dart';
 import '../../../providers/private_usd_lifecycle_provider.dart';
 import '../../../providers/rpc_endpoint_failover_provider.dart';
+import '../../../providers/sync_provider.dart';
 import '../models/private_usd_record_key.dart';
 import '../services/private_usd_deposit_backend.dart';
 import '../services/private_usd_engine.dart';
@@ -19,7 +21,6 @@ import '../services/private_usd_spend_guard.dart';
 import '../services/private_usd_swap_backend.dart';
 import 'private_usd_available_provider.dart';
 import 'private_usd_custom_rpc_provider.dart';
-import 'private_usd_tokens_provider.dart';
 import 'private_usd_unfinished_provider.dart';
 import 'railgun_engine_provider.dart';
 
@@ -107,9 +108,10 @@ final privateUsdEngineProvider = Provider<PrivateUsdEngine>((ref) {
   // runs no key-using step until it is resumed.
   var foreground = state == null || state == AppLifecycleState.resumed;
   final depositsEnabled = ref.read(privateUsdDepositsEnabledProvider);
+  // The Privacy Pass token store an earlier build kept is no longer read.
+  unawaited(_deleteLegacyTokenStores());
   final engine = PrivateUsdEngine(
     backend: ref.watch(privateUsdSwapBackendProvider),
-    tokens: ref.watch(privateUsdTokensServiceProvider),
     // Any account's seed while unlocked; null while locked.
     readMnemonic: (accountUuid) => ref
         .read(accountProvider.notifier)
@@ -153,6 +155,16 @@ final privateUsdEngineProvider = Provider<PrivateUsdEngine>((ref) {
   engine.conversions.addListener(publish);
   engine.reverseConversions.addListener(publish);
   engine.deposits.addListener(publishDeposits);
+  // An ended bridge's fee payment that may still be mined is read again as
+  // the wallet scans.
+  ref.listen(syncProvider.select((s) => s.value?.scannedHeight ?? 0), (
+    previous,
+    next,
+  ) {
+    if (previous != null && next > previous) {
+      unawaited(engine.walletScanned());
+    }
+  });
   // The deposits follow the active account.
   ref.listen(accountProvider.select((s) => s.value?.activeAccountUuid), (
     previous,
@@ -217,6 +229,15 @@ final privateUsdEngineProvider = Provider<PrivateUsdEngine>((ref) {
   scheduleMicrotask(() => engine.start(resuming: true));
   return engine;
 });
+
+/// Deletes the device-wide Privacy Pass token stores builds before
+/// 2026-11-21 kept, best effort and silently: the next start tries again,
+/// and a full reset deletes them too.
+Future<void> _deleteLegacyTokenStores() async {
+  try {
+    await deleteLegacyPrivateUsdTokenStores();
+  } catch (_) {}
+}
 
 /// The key of [accountUuid]'s conversion under way, if the engine knows one.
 final privateUsdUnderWayProvider =

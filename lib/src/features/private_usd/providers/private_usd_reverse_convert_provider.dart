@@ -337,47 +337,10 @@ class PrivateUsdReverseConvertNotifier
     }
     // Gone ahead: the conversion is under way from here, whatever follows.
     try {
-      var result = await engine.reverseAccept(account, index: index);
-      if (result.kind == rust.ApiAcceptKind.tokensNeeded) {
-        // The maker wants a Privacy Pass token and none is held: nothing
-        // paid. Get today's once, then accept again; with none to be had,
-        // call it off. The tokens need this flow.
-        if (!ref.mounted) {
-          if (kDesktopFormFactor) _flowGone();
-          return null;
-        }
-        final failure = await issueTokens();
-        if (!ref.mounted) {
-          if (kDesktopFormFactor) _flowGone();
-          return null;
-        }
-        if (failure == null) {
-          result = await engine.reverseAccept(account, index: index);
-          if (!ref.mounted) {
-            if (kDesktopFormFactor) _flowGone();
-            return null;
-          }
-        }
-        if (failure != null || result.kind == rust.ApiAcceptKind.tokensNeeded) {
-          if (kDesktopFormFactor) {
-            PrivateUsdDiagnostics.instance.outcome(
-              PrivateUsdDiagnosticOp.reverseAccept,
-              PrivateUsdDiagnosticOutcome.tokensUnavailable,
-            );
-          }
-          unawaited(_cancelQuietly(engine, account, index));
-          startFailed(
-            failure ?? ((l10n) => l10n.privateUsdConvertErrorTokensUnavailable),
-          );
-          return null;
-        }
-      }
+      final result = await engine.reverseAccept(account, index: index);
       switch (result.kind) {
         case rust.ApiAcceptKind.accepted:
           break;
-        case rust.ApiAcceptKind.tokensNeeded:
-          // Handled above.
-          return null;
         case rust.ApiAcceptKind.nothingSent:
           if (kDesktopFormFactor) {
             PrivateUsdDiagnostics.instance.outcome(
@@ -453,24 +416,6 @@ class PrivateUsdReverseConvertNotifier
       );
     } catch (_) {
       return false;
-    }
-  }
-
-  Future<void> _cancelQuietly(
-    PrivateUsdEngine engine,
-    String account,
-    int index,
-  ) async {
-    try {
-      await engine.reverseCancel(account, index: index);
-    } catch (error) {
-      privateUsdLog('cancel failed (${error.runtimeType})');
-      if (kDesktopFormFactor) {
-        PrivateUsdDiagnostics.instance.failure(
-          PrivateUsdDiagnosticOp.reverseCancel,
-          error,
-        );
-      }
     }
   }
 

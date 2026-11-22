@@ -3,7 +3,7 @@ param(
   [string]$Version = "",
   [ValidateSet("mainnet", "testnet")]
   [string]$Network = "mainnet",
-  # Veylor's identity (AGENTS.md, "Desktop identity"): com.veylor.desktop or
+  # Veylor's identity (docs/releases.md, "Desktop identity"): com.veylor.desktop or
   # com.veylor.desktop.testnet. Empty keeps upstream's identity.
   [string]$ApplicationId = $env:VIZOR_APPLICATION_ID,
   [string]$PackId = "",

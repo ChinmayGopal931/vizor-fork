@@ -29,7 +29,7 @@ PROVISIONING_PROFILE_SPECIFIER =
 
 // Fastlane writes this ignored file for macOS release flavors, and
 // scripts/macos-identity.sh writes it to select Veylor's identity
-// (AGENTS.md, "Desktop identity"). It is included here, instead of passed as
+// (docs/releases.md, "Desktop identity"). It is included here, instead of passed as
 // global xcodebuild settings, so Pods targets keep their own PRODUCT_NAME,
 // bundle paths and signing. It comes last, so its values win.
 #include? "FlavorOverrides.xcconfig"

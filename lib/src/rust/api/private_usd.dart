@@ -6,8 +6,10 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `api_advance`, `api_cause`, `api_code`, `api_cost_request`, `api_deposit_pass`, `api_deposit_record`, `api_deposit_terms`, `api_funding_request`, `api_quote`, `api_record`, `api_reverse_advance`, `api_reverse_phase`, `api_reverse_record`, `api_send_record`, `api_token_status`, `api_transact`, `block_on`, `catch`, `deposit_confirmations`, `drive`, `internal_hex`, `late_claim_at`, `no_such_conversion`, `open_context`, `parse_amount`, `parse_network_and_migrate`, `seconds`, `swap_network`, `token_store`, `warm_proving_keys`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
+// These functions are ignored because they are not marked as `pub`: `api_advance`, `api_cause`, `api_code`, `api_cost_request`, `api_deposit_pass`, `api_deposit_record`, `api_deposit_terms`, `api_funding_request`, `api_quote`, `api_record`, `api_reverse_advance`, `api_reverse_phase`, `api_reverse_record`, `api_send_record`, `api_transact`, `block_on`, `catch`, `deposit_confirmations`, `drive_with`, `drive`, `internal_hex`, `late_claim_at`, `no_such_conversion`, `open_context`, `open_fee_status`, `parse_amount`, `parse_network_and_migrate`, `seconds`, `swap_network`, `wallet_facts`, `warm_proving_keys`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `WalletFacts`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
+// These functions are ignored (category: IgnoreBecauseOwnerTyShouldIgnore): `default`
 
 /// The deployment for the wallet network `"main"` or `"test"`; `None` on
 /// regtest or an unknown network, where Private USD is hidden.
@@ -107,49 +109,6 @@ ApiActivity? privateUsdActivity({required int opId}) =>
 void privateUsdClearSessions() =>
     RustLib.instance.api.crateApiPrivateUsdPrivateUsdClearSessions();
 
-/// Starts an issuance of today's tokens, for the keystore to attest: `None`
-/// when nothing is needed. The maker's `/v1/info` decides first: without
-/// the pinned return key it takes no tokens, and nothing is asked of the
-/// issuer; with it, the tokens makers handed back for swaps still awaiting
-/// one are collected, then a batch is fetched ahead for today's challenge
-/// unless one is held or today is spent. Over the route policy, a fresh
-/// transport per call.
-Future<ApiIssuanceBegin?> privateUsdTokensIssuanceBegin({
-  required String tokensPath,
-  required String network,
-}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdTokensIssuanceBegin(
-  tokensPath: tokensPath,
-  network: network,
-);
-
-/// Finishes the issuance `session_id` with the keystore's attestation: the
-/// key's certificate chain (leaf first, DER, base64url) and its signature
-/// over the message, and holds what the issuer signs. `SignAgain` once on
-/// the first refusal; `TokensDeviceRefused` on the second; `Exhausted`, or
-/// a short batch, marks today spent.
-Future<ApiIssuanceFinish> privateUsdTokensIssuanceFinish({
-  required String tokensPath,
-  required String network,
-  required BigInt sessionId,
-  required List<String> chain,
-  required String signature,
-}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdTokensIssuanceFinish(
-  tokensPath: tokensPath,
-  network: network,
-  sessionId: sessionId,
-  chain: chain,
-  signature: signature,
-);
-
-/// What the device holds of the makers' tokens. Nothing is asked of anyone.
-Future<ApiTokenStatus> privateUsdTokensStatus({
-  required String tokensPath,
-  required String network,
-}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdTokensStatus(
-  tokensPath: tokensPath,
-  network: network,
-);
-
 /// The account's conversions under way, in either direction: a forward one
 /// not ended, a reverse one past its quote. The account deletion and reset
 /// warnings show it. 0 when the wallet never made one.
@@ -213,6 +172,16 @@ Future<ApiForwardQuote> privateUsdForwardQuote({
 /// setting, kept on the record), the claim goes to the relayer once the
 /// deposit is out and the maker's ready is confirmed, for it to send when
 /// the claim's window opens.
+///
+/// A quote that asks an open fee is not posted here: the fee is paid
+/// (`QuoteExpired` with less of the quote left than the deployment's least
+/// fee quote life, and `DepositUnpayable` unless the wallet also covers the
+/// deposit, both with nothing saved), and the call returns `Accepted`; the
+/// advances post the accept once the wallet shows the fee mined. The fee is
+/// a key step: it runs under `op_id`, which a lock or the background
+/// cancels (`private_usd_cancel`) before the payment is saved or created.
+/// Nothing else answers the cancel: an accept's post, with or without a fee,
+/// always completes, since one cut short may have opened the swap.
 Future<ApiAcceptResult> privateUsdForwardAccept({
   required String dbPath,
   required String network,
@@ -221,7 +190,7 @@ Future<ApiAcceptResult> privateUsdForwardAccept({
   required List<int> mnemonicBytes,
   required String lightwalletdUrl,
   required String ethRpcUrl,
-  required String tokensPath,
+  required int opId,
   required int index,
   required BigInt maxTotalZat,
   required bool relayerClaims,
@@ -233,7 +202,7 @@ Future<ApiAcceptResult> privateUsdForwardAccept({
   mnemonicBytes: mnemonicBytes,
   lightwalletdUrl: lightwalletdUrl,
   ethRpcUrl: ethRpcUrl,
-  tokensPath: tokensPath,
+  opId: opId,
   index: index,
   maxTotalZat: maxTotalZat,
   relayerClaims: relayerClaims,
@@ -253,7 +222,6 @@ Future<ApiForwardAdvance> privateUsdForwardAdvance({
   required List<int> mnemonicBytes,
   required String lightwalletdUrl,
   required String ethRpcUrl,
-  required String tokensPath,
   required int opId,
   required int index,
 }) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdForwardAdvance(
@@ -264,15 +232,13 @@ Future<ApiForwardAdvance> privateUsdForwardAdvance({
   mnemonicBytes: mnemonicBytes,
   lightwalletdUrl: lightwalletdUrl,
   ethRpcUrl: ethRpcUrl,
-  tokensPath: tokensPath,
   opId: opId,
   index: index,
 );
 
 /// Drops swap `index` before it reached the chain: an unanswered accept ends
-/// `MakerUnavailable` (a turn-away at the token gate included), an answered
-/// one `NeverOpened`. `TooLate` once a deposit started or the chain shows
-/// the swap. No key is needed.
+/// `MakerUnavailable`, an answered one `NeverOpened`. `TooLate` once a
+/// deposit started or the chain shows the swap. No key is needed.
 Future<ApiForwardRecord> privateUsdForwardAbandon({
   required String network,
   required String accountUuid,
@@ -423,10 +389,9 @@ Future<ApiReverseRecord> privateUsdReverseGoAhead({
 );
 
 /// The maker's acceptance of swap `index`, posted once, and its joint account
-/// imported (idempotent: call it again after an error). `TokensNeeded`: the
-/// maker wants a token, which this build cannot get; nothing opened, so
-/// cancel the conversion. `NothingSent`: the maker's last word
-/// ended it (`CANCELLED`), with the cause when known.
+/// imported (idempotent: call it again after an error). `NothingSent`: the
+/// maker's last word ended it (`CANCELLED`), with the cause when known (a
+/// maker answering `401` refused it).
 Future<ApiAcceptResult> privateUsdReverseAccept({
   required String dbPath,
   required String network,
@@ -435,7 +400,6 @@ Future<ApiAcceptResult> privateUsdReverseAccept({
   required List<int> mnemonicBytes,
   required String lightwalletdUrl,
   required String ethRpcUrl,
-  required String tokensPath,
   required int index,
 }) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdReverseAccept(
   dbPath: dbPath,
@@ -445,7 +409,6 @@ Future<ApiAcceptResult> privateUsdReverseAccept({
   mnemonicBytes: mnemonicBytes,
   lightwalletdUrl: lightwalletdUrl,
   ethRpcUrl: ethRpcUrl,
-  tokensPath: tokensPath,
   index: index,
 );
 
@@ -524,7 +487,6 @@ Future<ApiReverseAdvance> privateUsdReverseAdvance({
   required List<int> mnemonicBytes,
   required String lightwalletdUrl,
   required String ethRpcUrl,
-  required String tokensPath,
   required int opId,
   required int index,
 }) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdReverseAdvance(
@@ -535,7 +497,6 @@ Future<ApiReverseAdvance> privateUsdReverseAdvance({
   mnemonicBytes: mnemonicBytes,
   lightwalletdUrl: lightwalletdUrl,
   ethRpcUrl: ethRpcUrl,
-  tokensPath: tokensPath,
   opId: opId,
   index: index,
 );
@@ -825,10 +786,6 @@ Future<ApiDepositRecord> privateUsdDepositRescue({
 enum ApiAcceptKind {
   /// The maker opened the swap, or is opening it: show its progress.
   accepted,
-
-  /// The maker wants a Privacy Pass token, which this build cannot get.
-  /// Nothing opened; abandon the conversion.
-  tokensNeeded,
 
   /// Over before anything was sent; `cause` says why.
   nothingSent,
@@ -1449,6 +1406,21 @@ class ApiForwardQuote {
   final BigInt? maxTotalZat;
   final PlatformInt64? feeExpiresAt;
 
+  /// What the maker asks before it opens the swap, in zatoshis, paid apart
+  /// from the deposit and never refunded; `None` where it asks none.
+  final BigInt? openFeeZat;
+
+  /// The open fee's payment's network fee from this wallet now; `None`
+  /// without a fee, or when one transaction cannot pay it (the quote is
+  /// then unpayable).
+  final BigInt? openFeeNetworkZat;
+
+  /// Unix seconds: from here on the quote leaves less than the least life
+  /// its open fee needs, and accept refuses it (`QuoteExpired`, nothing
+  /// paid). The review stops offering it a margin before, for a new quote.
+  /// `None` without a fee.
+  final PlatformInt64? openFeePayBy;
+
   const ApiForwardQuote({
     required this.index,
     required this.expiresAt,
@@ -1460,6 +1432,9 @@ class ApiForwardQuote {
     this.depositFeeZat,
     this.maxTotalZat,
     this.feeExpiresAt,
+    this.openFeeZat,
+    this.openFeeNetworkZat,
+    this.openFeePayBy,
   });
 
   @override
@@ -1473,7 +1448,10 @@ class ApiForwardQuote {
       depositZat.hashCode ^
       depositFeeZat.hashCode ^
       maxTotalZat.hashCode ^
-      feeExpiresAt.hashCode;
+      feeExpiresAt.hashCode ^
+      openFeeZat.hashCode ^
+      openFeeNetworkZat.hashCode ^
+      openFeePayBy.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -1489,7 +1467,10 @@ class ApiForwardQuote {
           depositZat == other.depositZat &&
           depositFeeZat == other.depositFeeZat &&
           maxTotalZat == other.maxTotalZat &&
-          feeExpiresAt == other.feeExpiresAt;
+          feeExpiresAt == other.feeExpiresAt &&
+          openFeeZat == other.openFeeZat &&
+          openFeeNetworkZat == other.openFeeNetworkZat &&
+          openFeePayBy == other.openFeePayBy;
 }
 
 /// A flat view of a forward record; the record itself stays in Rust.
@@ -1503,6 +1484,11 @@ class ApiForwardRecord {
   final PlatformInt64 quoteExpiresAt;
   final BigInt depositZat;
   final BigInt? maxTotalZat;
+
+  /// The kept deposit's network fee as the wallet recorded it; `None`
+  /// before there is one, or where the wallet does not show it. What the
+  /// deposit cost, where `max_total_zat` is only the most it could.
+  final BigInt? depositNetworkZat;
   final String amount;
   final String receives;
   final String relayerFee;
@@ -1539,6 +1525,26 @@ class ApiForwardRecord {
   final ApiNothingSentCause? nothingSentCause;
   final PlatformInt64? endedAt;
 
+  /// The maker's open fee the quote asked, in zatoshis; `None` where it
+  /// asked none.
+  final BigInt? openFeeZat;
+
+  /// The open fee's payment's own network fee, where the wallet knows it.
+  final BigInt? openFeeNetworkZat;
+
+  /// The open fee's payment, internal byte order hex, as wallet history
+  /// rows carry it: the bridge's row stands in for it.
+  final String? openFeeTxid;
+
+  /// The main wallet shows the open fee's payment in a block: paid, and
+  /// the maker's whatever becomes of the swap.
+  final bool openFeeMined;
+
+  /// The open fee's payment is unmined and may still be mined: an ended
+  /// bridge's record is read again as the wallet scans, until the payment
+  /// is mined or expires.
+  final bool openFeePending;
+
   const ApiForwardRecord({
     required this.index,
     required this.swapId,
@@ -1547,6 +1553,7 @@ class ApiForwardRecord {
     required this.quoteExpiresAt,
     required this.depositZat,
     this.maxTotalZat,
+    this.depositNetworkZat,
     required this.amount,
     required this.receives,
     required this.relayerFee,
@@ -1563,6 +1570,11 @@ class ApiForwardRecord {
     this.refundCause,
     this.nothingSentCause,
     this.endedAt,
+    this.openFeeZat,
+    this.openFeeNetworkZat,
+    this.openFeeTxid,
+    required this.openFeeMined,
+    required this.openFeePending,
   });
 
   @override
@@ -1574,6 +1586,7 @@ class ApiForwardRecord {
       quoteExpiresAt.hashCode ^
       depositZat.hashCode ^
       maxTotalZat.hashCode ^
+      depositNetworkZat.hashCode ^
       amount.hashCode ^
       receives.hashCode ^
       relayerFee.hashCode ^
@@ -1589,7 +1602,12 @@ class ApiForwardRecord {
       outcome.hashCode ^
       refundCause.hashCode ^
       nothingSentCause.hashCode ^
-      endedAt.hashCode;
+      endedAt.hashCode ^
+      openFeeZat.hashCode ^
+      openFeeNetworkZat.hashCode ^
+      openFeeTxid.hashCode ^
+      openFeeMined.hashCode ^
+      openFeePending.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -1603,6 +1621,7 @@ class ApiForwardRecord {
           quoteExpiresAt == other.quoteExpiresAt &&
           depositZat == other.depositZat &&
           maxTotalZat == other.maxTotalZat &&
+          depositNetworkZat == other.depositNetworkZat &&
           amount == other.amount &&
           receives == other.receives &&
           relayerFee == other.relayerFee &&
@@ -1618,7 +1637,12 @@ class ApiForwardRecord {
           outcome == other.outcome &&
           refundCause == other.refundCause &&
           nothingSentCause == other.nothingSentCause &&
-          endedAt == other.endedAt;
+          endedAt == other.endedAt &&
+          openFeeZat == other.openFeeZat &&
+          openFeeNetworkZat == other.openFeeNetworkZat &&
+          openFeeTxid == other.openFeeTxid &&
+          openFeeMined == other.openFeeMined &&
+          openFeePending == other.openFeePending;
 }
 
 /// A paid conversion whose payout Railgun's screening sent back to its
@@ -1674,6 +1698,18 @@ enum ApiForwardWait {
   /// refund. If the maker never refunds, the claim goes out from
   /// `late_claim_at`.
   unwinding,
+
+  /// The open fee is paid and waits for a block; it is sent again every
+  /// half minute meanwhile.
+  feeConfirming,
+
+  /// The open fee is mined; the maker has not seen it yet, and the accept
+  /// is posted again as it asks until the quote expires.
+  feeAccepting,
+
+  /// The deposit waits for ZEC on its way to spendable, such as the open
+  /// fee's change.
+  fundsPending,
 }
 
 /// The page's `prepareReverse` params, ready to JSON-encode: `{amount,
@@ -1729,75 +1765,6 @@ class ApiFundingRequest {
           alreadyFunded == other.alreadyFunded;
 }
 
-/// An issuance's first phase: what the keystore signs (plan X11).
-class ApiIssuanceBegin {
-  final BigInt sessionId;
-
-  /// The issuer's name: the attestation key's alias and challenge derive
-  /// from it.
-  final String issuerName;
-
-  /// `"zecswap-issuer-v1" ‖ challenge ‖ SHA-256(blinded₁ ‖ … ‖ blindedₙ)`.
-  final Uint8List message;
-
-  const ApiIssuanceBegin({
-    required this.sessionId,
-    required this.issuerName,
-    required this.message,
-  });
-
-  @override
-  int get hashCode =>
-      sessionId.hashCode ^ issuerName.hashCode ^ message.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is ApiIssuanceBegin &&
-          runtimeType == other.runtimeType &&
-          sessionId == other.sessionId &&
-          issuerName == other.issuerName &&
-          message == other.message;
-}
-
-class ApiIssuanceFinish {
-  final ApiIssuanceKind kind;
-
-  /// With `SignAgain`: the message to sign once more.
-  final Uint8List? next;
-  final ApiTokenStatus status;
-
-  const ApiIssuanceFinish({
-    required this.kind,
-    this.next,
-    required this.status,
-  });
-
-  @override
-  int get hashCode => kind.hashCode ^ next.hashCode ^ status.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is ApiIssuanceFinish &&
-          runtimeType == other.runtimeType &&
-          kind == other.kind &&
-          next == other.next &&
-          status == other.status;
-}
-
-enum ApiIssuanceKind {
-  /// Tokens are held.
-  issued,
-
-  /// The issuer had none left for this device today.
-  exhausted,
-
-  /// The issuer refused the attestation once: sign `next` and finish
-  /// again with the same session, once.
-  signAgain,
-}
-
 enum ApiNothingSentCause {
   quoteExpired,
   makerRefused,
@@ -1806,6 +1773,10 @@ enum ApiNothingSentCause {
   mismatch,
   depositWindowMissed,
   makerCancelled,
+
+  /// The quote expired before the maker saw its open fee, or the maker
+  /// never opened the swap it was paid for: a fee mined is the maker's.
+  feeNotHonoured,
 }
 
 /// A Private USD failure. Its Dart `toString()` is the message.
@@ -1841,22 +1812,6 @@ enum ApiPrivateUsdErrorCode {
   depositUnpayable,
   zcashRejected,
   mismatch,
-  tokensRefused,
-  tokensNeeded,
-
-  /// The token issuer gave no usable answer.
-  tokensUnreachable,
-
-  /// The token issuer refused this device's attestation.
-  tokensDeviceRefused,
-
-  /// This device's tokens for today are spent.
-  noTokensToday,
-
-  /// The phone's keystore failed to make or use the attestation key.
-  /// Raised by Dart from the attestation channel, never by Rust; the code
-  /// lives here so one switch names every token message.
-  keystore,
   chainLagging,
   quoteExpired,
   makerUnavailable,
@@ -1878,6 +1833,15 @@ enum ApiPrivateUsdErrorCode {
   /// pins: a contract that is not the pinned windows contract, or terms
   /// that are not the pin's. Never followed.
   wrongDeployment,
+
+  /// The maker asks an open fee above the cap, or payable outside Orchard
+  /// or on another network: the quote is dropped with nothing paid.
+  openFeeRefused,
+
+  /// The wallet is still catching up with the Zcash chain: a quote that
+  /// asks an open fee is not bridged, nothing saved or paid, and the same
+  /// quote may be bridged once it has.
+  walletSyncing,
 }
 
 /// A proved send or withdrawal, as Dart hands it to Rust to keep before it is
@@ -2386,52 +2350,6 @@ enum ApiSendState {
   /// payment.
   unconfirmed,
   confirmed,
-}
-
-/// What the device holds of the makers' Privacy Pass tokens (reference
-/// §5.9).
-class ApiTokenStatus {
-  /// Tokens held for today's challenge.
-  final int held;
-
-  /// The issuer had no more for this device today.
-  final bool exhaustedToday;
-
-  /// Swaps whose token is still to come back.
-  final int awaitingReturns;
-
-  /// The issuer refused this device's attestation when last asked.
-  final bool deviceRefused;
-
-  /// The maker takes tokens: its info showed the pinned return key.
-  final bool makerAsks;
-
-  const ApiTokenStatus({
-    required this.held,
-    required this.exhaustedToday,
-    required this.awaitingReturns,
-    required this.deviceRefused,
-    required this.makerAsks,
-  });
-
-  @override
-  int get hashCode =>
-      held.hashCode ^
-      exhaustedToday.hashCode ^
-      awaitingReturns.hashCode ^
-      deviceRefused.hashCode ^
-      makerAsks.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is ApiTokenStatus &&
-          runtimeType == other.runtimeType &&
-          held == other.held &&
-          exhaustedToday == other.exhaustedToday &&
-          awaitingReturns == other.awaitingReturns &&
-          deviceRefused == other.deviceRefused &&
-          makerAsks == other.makerAsks;
 }
 
 enum ApiTransactKind {

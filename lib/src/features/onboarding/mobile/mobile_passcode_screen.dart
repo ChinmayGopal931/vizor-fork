@@ -30,7 +30,7 @@ import '../../../core/widgets/app_button.dart';
 
 /// Length of the mobile wallet passcode. The digit string is stored as
 /// the wallet password verbatim (see the wallet password policy note in
-/// AGENTS.md), so unlocking re-enters the same six digits.
+/// docs/architecture.md), so unlocking re-enters the same six digits.
 const kMobilePasscodeLength = 6;
 
 enum _PasscodePhase { create, confirm, submitting }

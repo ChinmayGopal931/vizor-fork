@@ -5,6 +5,8 @@
 //! the relayer, and since schema 5 it may rescue a payout Railgun sent back,
 //! so paid records are kept. Since schema 6 indices are counted per seed and
 //! ZIP-32 index, not per account, and the counters survive the account.
+//! Since schema 7 a forward record may pay its quote's open fee, and since
+//! schema 8 a reverse record keeps no Privacy Pass token fields.
 //!
 //! A plain SQLite file in app-private storage, opened per call (WAL,
 //! `synchronous = FULL`, a busy timeout), migrated by `PRAGMA user_version`.
@@ -26,9 +28,11 @@ const FILE_NAME: &str = "swaps.db";
 /// 1: swaps, the send log and the joint accounts. 2: deposits. 3: records of
 /// the windows contract. 4: claims handed to the relayer. 5: rescues of
 /// returned payouts, and paid forward records kept for them. 6: the index
-/// counters per seed and ZIP-32 index. A build refuses a store newer than
-/// itself, never resetting it.
-const SCHEMA_VERSION: i32 = 6;
+/// counters per seed and ZIP-32 index. 7: forward records that pay their
+/// quote's open fee. 8: reverse records without the token issuer their
+/// deployment pinned. A build refuses a store newer than itself, never
+/// resetting it.
+const SCHEMA_VERSION: i32 = 8;
 const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 /// Finished records kept per direction. Reverse `REFUNDED` and forward
 /// `PAID` ones are kept beyond it: a rescue may still be possible.
@@ -238,12 +242,19 @@ impl SwapStore {
             }
             // 1 → 2: the deposits tables join. 2 → 3, 3 → 4 and 4 → 5
             // change no table. 5 → 6: the index counters per seed join; the
-            // per-account ones stay until each is folded in.
-            1..=5 => {
+            // per-account ones stay until each is folded in. 6 → 7 changes
+            // no table: records gain the open fee, which a build that knows
+            // 6 would not read. 7 → 8 changes no table: reverse records lose
+            // their Privacy Pass token fields, which this build no longer
+            // reads.
+            1..=7 => {
                 if version == 1 {
                     tx.execute_batch(SCHEMA_V2).map_err(sql)?;
                 }
-                tx.execute_batch(SCHEMA_V6).map_err(sql)?;
+                if version <= 5 {
+                    tx.execute_batch(SCHEMA_V6).map_err(sql)?;
+                }
+                drop_token_fields(&tx)?;
                 tx.pragma_update(None, "user_version", SCHEMA_VERSION)
                     .map_err(sql)?;
             }
@@ -854,6 +865,81 @@ impl SwapStore {
     }
 }
 
+/// A forward record's open fee and its payment, as [`open_fee_payments`]
+/// reads it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct OpenFeeRow {
+    pub account_uuid: String,
+    /// The kept payment, display order, as the record keeps it; `None`
+    /// before it is kept.
+    pub tx_id: Option<String>,
+    /// The payment was started (`openFeeAttempted`): created, perhaps, but
+    /// not yet kept, as an interruption between the two leaves it.
+    pub attempted: bool,
+    /// Where the fee is paid, which a started payment is found again by.
+    pub address: String,
+    /// The bridge has ended.
+    pub ended: bool,
+    /// Its quote's `expiresAt`.
+    pub expires_at: u64,
+}
+
+/// Every forward record's open fee in `dir`'s `swaps.db`, its payment kept or
+/// only started, of every account, read only: no migration, no write, and a
+/// record that does not read is skipped rather than failing the rest. The
+/// wallet's resubmission reads it (`open_fee::withheld_fee_txids`), outside
+/// any conversion step. `None` without a store.
+pub(crate) fn open_fee_payments(dir: &Path) -> Result<Option<Vec<OpenFeeRow>>> {
+    let path = dir.join(FILE_NAME);
+    if !path.exists() {
+        return Ok(None);
+    }
+    let conn = Connection::open_with_flags(
+        &path,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .map_err(sql)?;
+    conn.busy_timeout(BUSY_TIMEOUT).map_err(sql)?;
+    let mut statement = conn
+        .prepare(
+            "SELECT account_uuid, record_json FROM swaps
+             WHERE direction = 'forward' AND record_json LIKE '%\"openFee\"%'",
+        )
+        .map_err(sql)?;
+    let rows = statement
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
+        .map_err(sql)?;
+    let mut payments = Vec::new();
+    for row in rows {
+        let (account_uuid, json) = row.map_err(sql)?;
+        let Ok(record) = serde_json::from_str::<serde_json::Value>(&json) else {
+            continue;
+        };
+        let (Some(address), Some(expires_at)) = (
+            record["quote"]["openFee"]["address"].as_str(),
+            record["quote"]["expiresAt"].as_u64(),
+        ) else {
+            continue;
+        };
+        let tx_id = record["openFeePayment"]["txId"].as_str().map(str::to_owned);
+        let attempted = record["openFeeAttempted"].as_bool().unwrap_or(false);
+        if tx_id.is_none() && !attempted {
+            continue;
+        }
+        payments.push(OpenFeeRow {
+            account_uuid,
+            tx_id,
+            attempted,
+            address: address.to_owned(),
+            ended: !record["outcome"].is_null(),
+            expires_at,
+        });
+    }
+    Ok(Some(payments))
+}
+
 /// A kept record, strictly: unreadable, or not the row's own swap, is an
 /// error.
 fn decode(direction: Direction, index: i64, json: &str) -> Result<StoredRecord> {
@@ -862,6 +948,59 @@ fn decode(direction: Direction, index: i64, json: &str) -> Result<StoredRecord> 
         return Err(unreadable("a record is filed under another index"));
     }
     Ok(record)
+}
+
+/// Schema 8: reverse records lose their Privacy Pass token fields, which
+/// went with the token client (2026-11-21). Their deployment pinned the
+/// token issuer (`deployment.tokenIssuer`), and an acceptance could carry
+/// the request for its token back (`acceptance.tokenRequest`, never kept in
+/// practice). Nothing else in a record changes, and it is written as this
+/// build writes it, so a later write of it unchanged is skipped and its time,
+/// which orders Activity, stays. A record that does not read as JSON is left
+/// as it is: reading it stays an error, never a reset.
+fn drop_token_fields(tx: &Connection) -> Result<()> {
+    let rows: Vec<(String, i64, String)> = tx
+        .prepare(
+            "SELECT account_uuid, swap_index, record_json FROM swaps
+             WHERE direction = 'reverse'",
+        )
+        .map_err(sql)?
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+        .map_err(sql)?
+        .collect::<rusqlite::Result<_>>()
+        .map_err(sql)?;
+    for (account, index, json) in rows {
+        let Ok(mut record) = serde_json::from_str::<serde_json::Value>(&json) else {
+            continue;
+        };
+        let mut dropped = false;
+        for (field, token_field) in [
+            ("deployment", "tokenIssuer"),
+            ("acceptance", "tokenRequest"),
+        ] {
+            if let Some(object) = record
+                .get_mut(field)
+                .and_then(serde_json::Value::as_object_mut)
+            {
+                dropped |= object.remove(token_field).is_some();
+            }
+        }
+        if dropped {
+            // One that does not decode for another reason keeps the rest of
+            // its text.
+            let stripped = record.to_string();
+            let json = StoredRecord::decode(Direction::Reverse, &stripped)
+                .and_then(|stored| stored.to_json())
+                .unwrap_or(stripped);
+            tx.execute(
+                "UPDATE swaps SET record_json = ?1
+                 WHERE account_uuid = ?2 AND direction = 'reverse' AND swap_index = ?3",
+                params![json, account, index],
+            )
+            .map_err(sql)?;
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -883,15 +1022,16 @@ mod tests {
     const CONTRACT: &str = "0xbd9a37f47a988aefc4d80395727f41feb698e225";
     const TOKEN: &str = "0x5764d0044bef5aa839e0ddafe2073421101b9ed8";
     const TESTNET: &str = r#"{"makerUrl":"https://zecswap-testnet.pepeman931.workers.dev/maker","relayerUrl":"https://zecswap-testnet.pepeman931.workers.dev/relayer","rpcUrl":"https://ethereum-sepolia-rpc.publicnode.com","chainId":11155111,"contract":"0xbd9a37f47a988aefc4d80395727f41feb698e225","token":"0x5764d0044bef5aa839e0ddafe2073421101b9ed8","railgun":"0xecfcf3b4ec647c4ca6d49108b311b7a7c9543fea","maker":"0x2bac02b5032e9092493814c705f156b49e288922","relayer":"0xd9633572041886fa7584a2e12f36c8c7f1126412"}"#;
-    const MAINNET: &str = r#"{"makerUrl":"https://zecswap-mainnet.pepeman931.workers.dev/maker","relayerUrl":"https://zecswap-mainnet.pepeman931.workers.dev/relayer","rpcUrl":"https://ethereum-rpc.publicnode.com","chainId":1,"contract":"0x4708d7d36992b7e33ad97a1ab0a31c3ac6c4fe6d","token":"0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48","railgun":"0xfa7093cdd9ee6932b4eb2c9e1cde7ce00b1fa4b9","maker":"0x4370eeaa6becf1daef21deeb0379eb7f6caef7ef","relayer":"0xcbcb5f57c79c88a0e4bb450289de2088958a017f","zcashNetwork":"mainnet","zcashConfirmations":2,"tokenIssuer":{"url":"https://zecswap-mainnet.pepeman931.workers.dev/issuer","name":"zecswap-mainnet-issuer","tokenKey":"token","returnKey":"return"}}"#;
+    const MAINNET: &str = r#"{"makerUrl":"https://zecswap-mainnet.pepeman931.workers.dev/maker","relayerUrl":"https://zecswap-mainnet.pepeman931.workers.dev/relayer","rpcUrl":"https://ethereum-rpc.publicnode.com","chainId":1,"contract":"0x4708d7d36992b7e33ad97a1ab0a31c3ac6c4fe6d","token":"0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48","railgun":"0xfa7093cdd9ee6932b4eb2c9e1cde7ce00b1fa4b9","maker":"0x4370eeaa6becf1daef21deeb0379eb7f6caef7ef","relayer":"0xcbcb5f57c79c88a0e4bb450289de2088958a017f","zcashNetwork":"mainnet","zcashConfirmations":2}"#;
 
     fn ticket() -> String {
         format!("{}.{}", hex(32, 0x5c), "3f".repeat(32))
     }
 
     /// Forward record fixtures: accepted, depositing, deposited, paid,
-    /// refunded, ended unsent, with a ticket, and with its claim held by the
-    /// relayer.
+    /// refunded, ended unsent, with a ticket, with its claim held by the
+    /// relayer, rescued, paying its quote's open fee, and ended with that fee
+    /// unseen.
     fn forward_states() -> Vec<String> {
         let head = format!(
             r#"{{"index":7,"quote":{{"quoteId":"{}","maker":"{MAKER}","makerShare":"{}","makerProof":"{}","chainId":11155111,"contract":"{CONTRACT}","token":"{TOKEN}","amount":"1000000","depositZat":202021,"expiresAt":1790000300}},"swapId":"{}","zcashHeight":4200000,"acceptedAt":1790000000,"receives":"977550","relayerFee":"20000""#,
@@ -949,7 +1089,25 @@ mod tests {
                 hex(65, 0x17),
                 ticket()
             ),
+            format!(
+                r#"{},"openFeeMaxTotalZat":30000,"openFeeAttempted":true,"openFeePayment":{{"txId":"{}","raw":"0600","expiryHeight":4200040,"networkFeeZat":10000}}}}"#,
+                with_open_fee(&head),
+                "ef".repeat(32)
+            ),
+            format!(
+                r#"{},"outcome":{{"type":"nothing_sent","cause":"FEE_NOT_HONOURED"}},"finishedAt":1790000300,"openFeeMaxTotalZat":30000,"openFeeAttempted":true}}"#,
+                with_open_fee(&head)
+            ),
         ]
+    }
+
+    /// `head` with its quote asking an open fee.
+    fn with_open_fee(head: &str) -> String {
+        head.replacen(
+            r#""expiresAt":1790000300}"#,
+            r#""expiresAt":1790000300,"openFee":{"zat":20000,"address":"utest1fee"}}"#,
+            1,
+        )
     }
 
     /// Reverse record fixtures: previewed, accepted, sending (with a ticket),
@@ -1158,14 +1316,94 @@ mod tests {
         assert_eq!(store.take_index(SPACE, ACCOUNT).unwrap(), next + 1);
     }
 
-    /// A store schema 1, 3, 4 or 5 wrote opens at schema 6: the deposits
-    /// tables and the seed's index counters join schema 1's, and every
-    /// record, the active pointer and the send log stay as they were. The
-    /// account's counter is folded into its seed's on the next index taken.
+    /// A store schema 1, 3, 4, 5, 6 or 7 wrote opens at schema 8: the
+    /// deposits tables and the seed's index counters join schema 1's, and
+    /// every record, the active pointer and the send log stay as they were.
+    /// The account's counter is folded into its seed's on the next index
+    /// taken.
     #[test]
     fn an_older_store_migrates_keeping_its_records() {
-        for version in [1, 3, 4, 5] {
+        for version in [1, 3, 4, 5, 6, 7] {
             older_store_migrates_keeping_its_records(version);
+        }
+    }
+
+    /// A reverse record schema 6 or 7 kept, with the token issuer its
+    /// deployment pinned (and an acceptance's request for its token back),
+    /// opens at schema 8 without them and otherwise unchanged; a forward
+    /// record and the active pointers stay as they were, and nothing
+    /// migrates twice.
+    #[test]
+    fn reverse_records_lose_their_token_fields_at_schema_8() {
+        for version in [6, 7] {
+            reverse_records_lose_their_token_fields(version);
+        }
+    }
+
+    fn reverse_records_lose_their_token_fields(version: i32) {
+        let current = reverse_states().remove(2);
+        let mut legacy: serde_json::Value = serde_json::from_str(&current).unwrap();
+        legacy["deployment"]["tokenIssuer"] = serde_json::json!({
+            "url": "https://zecswap-testnet.pepeman931.workers.dev/issuer",
+            "name": "zecswap-testnet-issuer",
+            "tokenKey": "token",
+            "returnKey": "return",
+        });
+        legacy["acceptance"]["tokenRequest"] = serde_json::json!("request");
+        let legacy = legacy.to_string();
+        assert!(StoredRecord::decode(Direction::Reverse, &legacy).is_err());
+
+        let dir = tempfile::tempdir().unwrap();
+        let conn = Connection::open(dir.path().join(FILE_NAME)).unwrap();
+        conn.execute_batch(SCHEMA).unwrap();
+        conn.execute_batch(SCHEMA_V2).unwrap();
+        conn.execute_batch(SCHEMA_V6).unwrap();
+        conn.pragma_update(None, "user_version", version).unwrap();
+        let forward_json = forward_json();
+        for (direction, index, phase, json) in [
+            ("reverse", 4, "SENDING_USDC", legacy.as_str()),
+            ("forward", 7, "OPENING", forward_json.as_str()),
+        ] {
+            conn.execute(
+                "INSERT INTO swaps(account_uuid, direction, swap_index, deployment, swap_id,
+                                   phase, finished, record_json, updated_at)
+                 VALUES (?1, ?2, ?3, 'testnet', ?4, ?5, 0, ?6, 1790000000)",
+                params![ACCOUNT, direction, index, hex(32, 0x5c), phase, json],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO active(account_uuid, direction, swap_index) VALUES (?1, ?2, ?3)",
+                params![ACCOUNT, direction, index],
+            )
+            .unwrap();
+        }
+        drop(conn);
+
+        for _ in 0..2 {
+            let store = SwapStore::open(dir.path()).unwrap();
+            let version: i32 = store
+                .conn
+                .query_row("PRAGMA user_version", [], |row| row.get(0))
+                .unwrap();
+            assert_eq!(version, SCHEMA_VERSION);
+            let kept: String = store
+                .conn
+                .query_row(
+                    "SELECT record_json FROM swaps WHERE direction = 'reverse'",
+                    [],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(kept, current, "kept as this build writes it");
+            assert_eq!(
+                store.active(ACCOUNT, Direction::Reverse).unwrap(),
+                Some(StoredRecord::decode(Direction::Reverse, &current).unwrap())
+            );
+            assert_eq!(
+                store.active(ACCOUNT, Direction::Forward).unwrap(),
+                Some(StoredRecord::Forward(Box::new(forward(&forward_json))))
+            );
+            assert_eq!(store.unfinished_count(ACCOUNT).unwrap(), 2);
         }
     }
 
@@ -1175,6 +1413,9 @@ mod tests {
         conn.execute_batch(SCHEMA).unwrap();
         if version >= 2 {
             conn.execute_batch(SCHEMA_V2).unwrap();
+        }
+        if version >= 6 {
+            conn.execute_batch(SCHEMA_V6).unwrap();
         }
         conn.pragma_update(None, "user_version", version).unwrap();
         let json = forward_json();
@@ -1209,7 +1450,7 @@ mod tests {
             .query_row("PRAGMA user_version", [], |row| row.get(0))
             .unwrap();
         assert_eq!(version, SCHEMA_VERSION);
-        assert_eq!(SCHEMA_VERSION, 6);
+        assert_eq!(SCHEMA_VERSION, 8);
         assert_eq!(
             store.active(ACCOUNT, Direction::Forward).unwrap(),
             Some(StoredRecord::Forward(Box::new(forward(&json))))

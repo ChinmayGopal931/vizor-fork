@@ -12,7 +12,6 @@ import '../../../core/config/app_version_config.dart';
 import '../../../core/config/network_config.dart';
 import '../../../rust/api/private_usd.dart' as rust;
 import '../models/railgun_models.dart' show RailgunProtocolException;
-import 'private_usd_attestation.dart';
 import 'private_usd_engine.dart'
     show
         PrivateUsdEngineInterruptedException,
@@ -96,10 +95,6 @@ enum PrivateUsdDiagnosticOp {
   fundProving,
   fundSubmitting,
 
-  /// Privacy Pass tokens, for a maker that asks for them.
-  issueTokens,
-  prefetchTokens,
-
   // The conversions' loop (`PrivateUsdEngine`).
   advance,
   reverseAdvance,
@@ -159,9 +154,6 @@ enum PrivateUsdDiagnosticOutcome {
   /// The maker turned the accept away and nothing was sent; `rust` names
   /// Rust's cause.
   nothingSent,
-
-  /// No Privacy Pass token could be had.
-  tokensUnavailable,
 
   /// No quote fits the amount.
   noQuoteFits,
@@ -453,17 +445,6 @@ class PrivateUsdDiagnosticRecord {
                   : PrivateUsdDiagnosticOutcome.failed),
           rustCode: code,
         );
-      case PrivateUsdAttestationException(:final code):
-        return code == PrivateUsdAttestationErrorCode.keystore
-            ? PrivateUsdDiagnosticRecord(
-                op,
-                outcome ?? PrivateUsdDiagnosticOutcome.failed,
-                rustCode: rust.ApiPrivateUsdErrorCode.keystore,
-              )
-            : PrivateUsdDiagnosticRecord(
-                op,
-                outcome ?? PrivateUsdDiagnosticOutcome.tokensUnavailable,
-              );
       default:
         return PrivateUsdDiagnosticRecord(op, outcome ?? _outcomeOf(error));
     }
