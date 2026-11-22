@@ -2075,6 +2075,14 @@ pub(crate) async fn abandon<C: ChainReader, K: Clock>(
             "the swap is under way on chain: it goes on",
         );
     }
+    // A fee started may be mined: the swap goes on, so that its accept
+    // follows the fee and its end says what the fee bought.
+    if record.open_fee_progress() != OpenFeeProgress::NotStarted {
+        return fail(
+            ErrorCode::TooLate,
+            "the open fee is paid or on its way: the swap goes on",
+        );
+    }
     // Unanswered, the maker never took it; answered, it never opened.
     let cause = if record.t0.is_none() {
         NothingSentCause::MakerUnavailable

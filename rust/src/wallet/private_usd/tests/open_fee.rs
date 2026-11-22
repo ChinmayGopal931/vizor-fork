@@ -7,7 +7,7 @@
 
 use super::super::engine;
 use super::super::evm_rpc::SwapStage;
-use super::super::forward::{AcceptOutcome, ForwardStep, ForwardWait, Funds};
+use super::super::forward::{self, AcceptOutcome, ForwardStep, ForwardWait, Funds};
 use super::super::models::{ForwardOutcome, NothingSentCause, OpenFeeProgress};
 use super::super::{ErrorCode, Result};
 use super::fakes::*;
@@ -471,5 +471,39 @@ async fn a_swap_whose_accept_answer_was_lost_goes_on_from_the_chains_opened() {
     assert!(h.record().t0.is_some());
     assert_eq!(h.advance().await.unwrap(), h.confirming());
     assert_eq!(h.world.get().deposits.len(), 1);
+}
+
+/// Finding 4: "Call it off" refuses a bridge whose fee was started, kept or
+/// sent: the swap goes on, its accept following the fee.
+#[tokio::test]
+async fn a_bridge_whose_fee_started_is_never_abandoned() {
+    let h = asking(FEE, fee_address());
+    h.world.set().broadcast_fails = true;
+    let quoted = h.quote().await.unwrap();
+    accept(&h, quoted.index).await.unwrap_err();
+    assert!(matches!(
+        h.record().open_fee_progress(),
+        OpenFeeProgress::Kept(_)
+    ));
+    let chain = FakeChain(h.world.clone());
+    let clock = FakeClock(h.world.clone());
+    let refused = forward::abandon(&mut h.store(), &chain, &clock, &h.account, 0)
+        .await
+        .unwrap_err();
+    assert_eq!(refused.code, ErrorCode::TooLate);
+    assert_eq!(h.record().outcome, None);
+
+    // Started, not yet kept: refused the same way.
+    let h = asking(FEE, fee_address());
+    h.world.set().fee_crash = Some(Crash::AfterCreate);
+    let quoted = h.quote().await.unwrap();
+    accept(&h, quoted.index).await.unwrap_err();
+    assert_eq!(h.record().open_fee_progress(), OpenFeeProgress::Started);
+    let chain = FakeChain(h.world.clone());
+    let clock = FakeClock(h.world.clone());
+    let refused = forward::abandon(&mut h.store(), &chain, &clock, &h.account, 0)
+        .await
+        .unwrap_err();
+    assert_eq!(refused.code, ErrorCode::TooLate);
 }
 
