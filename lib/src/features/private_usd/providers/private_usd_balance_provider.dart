@@ -122,10 +122,10 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
     _lifecycle = AppLifecycleListener(
       onHide: _pausePolling,
       onPause: _pausePolling,
-      onResume: () {
-        _foreground = true;
-        _ensurePolling();
-      },
+      onResume: _resumePolling,
+      // On desktop a window shown again is the foreground, focused or not:
+      // polling resumes without waiting for focus.
+      onShow: kDesktopFormFactor ? _resumePolling : null,
     );
     ref.onDispose(() {
       _lifecycle?.dispose();
@@ -510,6 +510,11 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
   Duration? _age() {
     final updatedAt = state.updatedAt;
     return updatedAt == null ? null : _now().difference(updatedAt);
+  }
+
+  void _resumePolling() {
+    _foreground = true;
+    _ensurePolling();
   }
 
   void _pausePolling() {

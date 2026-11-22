@@ -242,6 +242,13 @@ window, focused or not:
   app that becomes active clears it whatever was missed.
 - An unfocused window (another app in front, the window still showing) is
   `inactive`, and Private USD runs on, as the phones run on while inactive.
+- A window shown again is the foreground at once, focused or not: on `onShow`
+  (`hidden` to `inactive`) the engine resumes, and so do the balance's
+  polling, `appInForegroundProvider` and the kill switch's deferred fetch.
+  Until 2026-11-22 they waited for the window to take focus (`resumed`), so a
+  window brought back behind another app left a bridge paused. An app that
+  starts with its window unfocused runs too. The phones still resume on
+  `onResume` alone (each gated on `kDesktopFormFactor`).
 - WebKit suspends the page while its window is not visible, as iOS suspends it
   in the background: a sync waits, and resumes when the window shows again.
 - The kill switch's retries wait for the foreground on desktop too

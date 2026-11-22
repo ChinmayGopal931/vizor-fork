@@ -169,11 +169,12 @@ Code:
   one (D14).
 - Hardware accounts, accounts without ZIP-32 metadata, and regtest hide the
   feature.
-- **On the Mac** the foreground is a shown window, focused or not. A
-  minimised or hidden window, a hidden app or a window fully covered by others
-  is `AppLifecycleState.hidden` (the engine's occlusion), and so are a locked
-  screen, displays asleep, a Mac going to sleep and another user's session in
-  front (`MacSessionLifecycle` says so on `flutter/lifecycle`, and once nothing
+- **On the Mac** the foreground is a shown window, focused or not: a window
+  shown again resumes Private USD at once (`onShow`), without waiting for
+  focus. A minimised or hidden window, a hidden app or a window fully covered
+  by others is `AppLifecycleState.hidden` (the engine's occlusion), and so are
+  a locked screen, displays asleep, a Mac going to sleep and another user's
+  session in front (`MacSessionLifecycle` says so on `flutter/lifecycle`, and once nothing
   keeps the Mac away sends the state the engine would report). WebKit
   suspends the page while its window is not visible, as iOS does in the
   background. The keep-awake flag is an IOKit `PreventUserIdleDisplaySleep`

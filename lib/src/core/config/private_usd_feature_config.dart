@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../main.dart' show log;
 import '../../providers/network_privacy_provider.dart';
+import '../layout/app_form_factor.dart' show kDesktopFormFactor;
 import '../layout/app_process_work_policy.dart';
 import '../network/network_http_client.dart';
 
@@ -305,12 +306,9 @@ class PrivateUsdKillSwitchNotifier extends Notifier<bool> {
         _cancelRetry();
         _retryDeferredToForeground = true;
       },
-      onResume: () {
-        _isInForeground = true;
-        if (!_retryDeferredToForeground) return;
-        _retryDeferredToForeground = false;
-        if (!_disposed && !_fetchInFlight) unawaited(_fetch());
-      },
+      onResume: _toForeground,
+      // On desktop a window shown again is the foreground, focused or not.
+      onShow: kDesktopFormFactor ? _toForeground : null,
     );
     ref.onDispose(() {
       _disposed = true;
@@ -339,6 +337,13 @@ class PrivateUsdKillSwitchNotifier extends Notifier<bool> {
       scheduleMicrotask(() => unawaited(_start()));
     }
     return resolvePrivateUsdAvailability(lastKnown: _lastKnown);
+  }
+
+  void _toForeground() {
+    _isInForeground = true;
+    if (!_retryDeferredToForeground) return;
+    _retryDeferredToForeground = false;
+    if (!_disposed && !_fetchInFlight) unawaited(_fetch());
   }
 
   Future<void> _start() async {

@@ -104,9 +104,13 @@ final privateUsdEngineEnabledProvider = Provider<bool>((ref) {
 final privateUsdEngineProvider = Provider<PrivateUsdEngine>((ref) {
   final lifecycle = ref.watch(privateUsdLifecycleProvider);
   final state = WidgetsBinding.instance.lifecycleState;
-  // Stricter than `appInForegroundProvider`: an app that starts inactive
-  // runs no key-using step until it is resumed.
-  var foreground = state == null || state == AppLifecycleState.resumed;
+  // On the phones stricter than `appInForegroundProvider`: an app that
+  // starts inactive runs no key-using step until it is resumed. On desktop
+  // the foreground is a shown window, focused or not.
+  var foreground =
+      state == null ||
+      state == AppLifecycleState.resumed ||
+      (kDesktopFormFactor && state == AppLifecycleState.inactive);
   final depositsEnabled = ref.read(privateUsdDepositsEnabledProvider);
   // The Privacy Pass token store an earlier build kept is no longer read.
   unawaited(_deleteLegacyTokenStores());
@@ -216,6 +220,15 @@ final privateUsdEngineProvider = Provider<PrivateUsdEngine>((ref) {
       foreground = true;
       engine.start(resuming: true);
     },
+    // On desktop a window shown again is the foreground, focused or not
+    // (docs/private-usd.md, "On the Mac"): the engine resumes without
+    // waiting for focus. The phones resume on `onResume` alone.
+    onShow: kDesktopFormFactor
+        ? () {
+            foreground = true;
+            engine.start(resuming: true);
+          }
+        : null,
   );
   ref.onDispose(() {
     listener.dispose();
