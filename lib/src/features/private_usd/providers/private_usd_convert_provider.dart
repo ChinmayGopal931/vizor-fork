@@ -31,14 +31,10 @@ abstract final class PrivateUsdConvertTiming {
   /// Typing pauses this long before its amount is quoted.
   static const typingDebounce = Duration(milliseconds: 700);
 
-  /// A quote stops being offered this long before it expires: the driver
-  /// won't accept one about to run out.
+  /// A quote stops being offered this long before it expires (one that asks
+  /// an open fee, before Rust stops paying its fee): the driver won't accept
+  /// one about to run out.
   static const expiryMargin = Duration(seconds: 20);
-
-  /// A quote that asks an open fee stops being offered this long before it
-  /// expires: Rust pays the fee only with a minute of the quote left, the
-  /// time it has to be mined.
-  static const openFeeExpiryMargin = Duration(seconds: 80);
 
   static const tick = Duration(seconds: 1);
 }
@@ -773,19 +769,25 @@ class PrivateUsdConvertNotifier
   }) {
     if (!takesQuote(forReview: forReview)) return;
     final onReview = state.step != PrivateUsdConvertStep.amount;
-    final arrivedExpired = !clock().isBefore(
-      privateUsdZecQuoteOfferedUntil(quote),
-    );
+    final now = clock();
+    final arrivedExpired = !now.isBefore(privateUsdZecQuoteOfferedUntil(quote));
     if (arrivedExpired) {
+      // A fee quote too short for its fee to be paid in time ran out; any
+      // other says the clock is off.
+      final clockAhead = !now.isBefore(
+        quote.expiresAt.subtract(PrivateUsdConvertTiming.expiryMargin),
+      );
       // On the review the expired quote stays, so "Refresh quote" does too.
       state = state.copyWith(
         quoting: false,
         clearQuote: !onReview,
-        quoteError: (l10n) => kDesktopFormFactor
-            ? (privateUsdLinuxWording
-                  ? l10n.privateUsdConvertQuoteClockAheadLinux
-                  : l10n.privateUsdConvertQuoteClockAheadDesktop)
-            : l10n.privateUsdConvertQuoteClockAhead,
+        quoteError: !clockAhead
+            ? (l10n) => l10n.privateUsdConvertQuoteRanOut
+            : (l10n) => kDesktopFormFactor
+                  ? (privateUsdLinuxWording
+                        ? l10n.privateUsdConvertQuoteClockAheadLinux
+                        : l10n.privateUsdConvertQuoteClockAheadDesktop)
+                  : l10n.privateUsdConvertQuoteClockAhead,
       );
       return;
     }
@@ -821,13 +823,12 @@ class PrivateUsdConvertNotifier
   }
 }
 
-/// When [quote] stops being offered: before Rust would refuse its accept, a
-/// minute and more ahead where it asks an open fee.
+/// When [quote] stops being offered: before Rust would refuse its accept,
+/// which for one that asks an open fee is from its pay-by, the least life
+/// its fee needs to be mined in time before the quote's end.
 DateTime privateUsdZecQuoteOfferedUntil(PrivateUsdZecQuote quote) =>
-    quote.expiresAt.subtract(
-      quote.asksOpenFee
-          ? PrivateUsdConvertTiming.openFeeExpiryMargin
-          : PrivateUsdConvertTiming.expiryMargin,
+    (quote.openFeePayBy ?? quote.expiresAt).subtract(
+      PrivateUsdConvertTiming.expiryMargin,
     );
 
 /// [accountUuid]'s conversion under way in either direction, read from the

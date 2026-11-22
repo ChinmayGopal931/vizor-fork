@@ -43,6 +43,13 @@ class PrivateUsdZecQuote {
 
   DateTime get expiresAt =>
       DateTime.fromMillisecondsSinceEpoch(quote.expiresAt * 1000);
+
+  /// Where it asks an open fee, when Rust stops paying it: the least life
+  /// the fee needs to be mined in time before [expiresAt].
+  DateTime? get openFeePayBy => switch (quote.openFeePayBy) {
+    final payBy? => DateTime.fromMillisecondsSinceEpoch(payBy * 1000),
+    null => null,
+  };
 }
 
 /// No quote fits the entered ZEC: too little for any dollar after the fee,
