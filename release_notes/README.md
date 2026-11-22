@@ -33,6 +33,13 @@ Veylor's Android direct APK releases have
 `veylor-android/vX.Y.Z`. Besides the changes, it carries the steps that check a
 download (AGENTS.md, "Android direct APK (verifiable)").
 
+Veylor's Linux and Windows releases have
+`release_notes/veylor-linux-vX.Y.Z.md` and
+`release_notes/veylor-windows-vX.Y.Z.md`, the bodies of the releases
+`veylor-linux/vX.Y.Z` and `veylor-windows/vX.Y.Z`, which their workflows
+publish (docs/releases.md). Besides the changes, each says which file to
+download and how to check it.
+
 ## Platform Scope
 
 Unless a release request explicitly says otherwise, draft release notes for the
