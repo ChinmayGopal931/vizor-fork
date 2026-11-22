@@ -172,15 +172,17 @@ fn send_expiry_height_for_target<P: Parameters>(
     network_upgrade::cap_expiry_at_branch_end(network, target_height, expiry)
 }
 
-/// Blocks a deadline-bound payment may still be mined in past its deadline,
-/// at the target spacing: block times vary, and its expiry is no more than an
-/// estimate of when the deadline falls.
+/// Blocks a deadline-bound payment may still be mined in past the last block
+/// its deadline expects, at the target spacing: block times vary, and its
+/// expiry is no more than an estimate of when the deadline falls.
 pub(crate) const DEADLINE_EXPIRY_SLACK_BLOCKS: u32 = 2;
 
 /// The expiry of a payment targeting `target` that must not be mined long
-/// after a deadline `seconds_left` away: the blocks until then at the
-/// network's spacing at `target` (75 s before NU7, 25 s from it), plus
-/// `slack_blocks`. Never closer than nodes accept, nor past an ordinary
+/// after a deadline `seconds_left` away: the last block expected by then at
+/// the network's spacing at `target` (75 s before NU7, 25 s from it; the
+/// `blocks` from the target, the target itself the first), plus
+/// `slack_blocks`, which are then the blocks it may still be mined in past
+/// the deadline. Never closer than nodes accept, nor past an ordinary
 /// payment's expiry for `target`, which ends with the target's branch.
 pub(crate) fn deadline_expiry_height<P: Parameters>(
     network: &P,
@@ -195,9 +197,11 @@ pub(crate) fn deadline_expiry_height<P: Parameters>(
     let blocks = seconds_left
         .saturating_mul(per_reference)
         .div_ceil(u64::from(crate::wallet::block_times::PRE_NU7_BLOCK_SECONDS));
-    let wanted = u32::from(target)
+    // The target is the first of those blocks: the deadline's is the last.
+    let deadline_block = u32::from(target)
         .saturating_add(u32::try_from(blocks).unwrap_or(u32::MAX))
-        .saturating_add(slack_blocks);
+        .saturating_sub(1);
+    let wanted = deadline_block.saturating_add(slack_blocks);
     // Nodes refuse one expiring within this many blocks of the next.
     let floor = u32::from(target).saturating_add(network_upgrade::TX_EXPIRING_SOON_BLOCKS);
     let ordinary = u32::from(send_expiry_height_for_target(network, target));
@@ -8380,21 +8384,28 @@ mod deadline_expiry_tests {
     }
 
     /// An open fee's payment expires soon after its quote: 180 s is 3 blocks
-    /// at 75 s and 8 at NU7's 25 s, plus the slack. A deadline already past
-    /// still gets the least expiry nodes accept, and none goes past an
-    /// ordinary payment's, which an upgrade ends at its branch.
+    /// at 75 s (the target, then 2) and 8 at NU7's 25 s, and the payment may
+    /// be mined in exactly the slack's 2 blocks after the last of them. A
+    /// deadline already past still gets the least expiry nodes accept, and
+    /// none goes past an ordinary payment's, which an upgrade ends at its
+    /// branch.
     #[test]
     fn a_payment_due_by_a_deadline_expires_soon_after_it() {
         let target = BlockHeight::from_u32(400_000);
         let before_nu7 = network(500_000);
         let from_nu7 = network(300_000);
+        // The deadline's block is the target's 3rd (target + 2): two more.
         assert_eq!(
             deadline_expiry_height(&before_nu7, target, 180, 2),
-            target + 5
+            target + 4
         );
         assert_eq!(
             deadline_expiry_height(&from_nu7, target, 180, 2),
-            target + 10
+            target + 9
+        );
+        assert_eq!(
+            deadline_expiry_height(&before_nu7, target, 75, 2),
+            target + 3
         );
         assert_eq!(
             deadline_expiry_height(&before_nu7, target, 0, 0),
