@@ -5,7 +5,6 @@ import '../../../rust/api/private_usd.dart'
         ApiPrivateUsdErrorCode,
         ApiRefundCause;
 import '../private_usd_copy.dart';
-import '../services/private_usd_attestation.dart';
 import '../services/private_usd_spend_guard.dart' show PrivateUsdSpendStatus;
 import '../../../core/l10n/l10n.dart';
 
@@ -56,15 +55,6 @@ String? privateUsdErrorMessage(
   ApiPrivateUsdErrorCode.zcashWallet => l10n.privateUsdConvertErrorWallet,
   ApiPrivateUsdErrorCode.depositUnpayable =>
     l10n.privateUsdConvertErrorUnpayable,
-  ApiPrivateUsdErrorCode.tokensRefused =>
-    l10n.privateUsdConvertErrorTokensUnavailable,
-  ApiPrivateUsdErrorCode.tokensNeeded =>
-    l10n.privateUsdConvertResultMakerUnavailable,
-  ApiPrivateUsdErrorCode.tokensUnreachable => l10n.privateUsdTokensUnreachable,
-  ApiPrivateUsdErrorCode.tokensDeviceRefused =>
-    l10n.privateUsdTokensDeviceRefused,
-  ApiPrivateUsdErrorCode.noTokensToday => l10n.privateUsdTokensNoneToday,
-  ApiPrivateUsdErrorCode.keystore => l10n.privateUsdTokensKeystore,
   ApiPrivateUsdErrorCode.quoteExpired => l10n.privateUsdConvertQuoteRanOut,
   ApiPrivateUsdErrorCode.makerUnavailable => l10n.privateUsdConvertErrorMaker,
   ApiPrivateUsdErrorCode.makerBusy => l10n.privateUsdConvertErrorMakerBusy,
@@ -116,25 +106,7 @@ String privateUsdProblemMessage(
   ApiPrivateUsdErrorCode.mismatch => l10n.privateUsdConvertProblemMismatch,
   ApiPrivateUsdErrorCode.storeUnreadable => l10n.privateUsdConvertErrorStore,
   ApiPrivateUsdErrorCode.routeBlocked => l10n.privateUsdConvertProblemRoute,
-  // The token gate's, while a resumed accept waits for the issuance.
-  ApiPrivateUsdErrorCode.tokensNeeded => l10n.privateUsdConvertProblemTokens,
-  ApiPrivateUsdErrorCode.tokensRefused ||
-  ApiPrivateUsdErrorCode.tokensUnreachable => l10n.privateUsdTokensUnreachable,
-  ApiPrivateUsdErrorCode.tokensDeviceRefused =>
-    l10n.privateUsdTokensDeviceRefused,
-  ApiPrivateUsdErrorCode.noTokensToday => l10n.privateUsdTokensNoneToday,
-  ApiPrivateUsdErrorCode.keystore => l10n.privateUsdTokensKeystore,
   _ => l10n.privateUsdConvertProblemUnexpected,
-};
-
-/// What to say when the phone could not attest an issuance.
-String privateUsdAttestationMessage(
-  AppLocalizations l10n,
-  PrivateUsdAttestationErrorCode code,
-) => switch (code) {
-  PrivateUsdAttestationErrorCode.unavailable =>
-    l10n.privateUsdTokensUnavailable,
-  PrivateUsdAttestationErrorCode.keystore => l10n.privateUsdTokensKeystore,
 };
 
 /// Why a forward conversion ended with nothing sent.

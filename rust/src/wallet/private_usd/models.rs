@@ -285,9 +285,6 @@ pub(crate) struct SwapAcceptance {
     pub user_share: Bytes64,
     pub user_proof: Bytes64,
     pub viewing_keys: Redacted<Bytes64>,
-    /// On an accept a token pays for: the blinded request for it back.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub token_request: Option<Redacted<String>>,
 }
 
 /// A `ready` the swap's own key signed, for a relayer to send.
@@ -368,24 +365,11 @@ pub(crate) struct MakerInfo {
     pub token: Address,
     pub zcash_network: SwapZcashNetwork,
     pub reverse_enabled: bool,
-    /// The key accepts' tokens come back under, base64url SPKI.
-    pub token_return_key: Option<String>,
     /// The contract's `MIN_WINDOW`, `LATE_WINDOW` and kind, where the maker
     /// names them.
     pub min_window: Option<u64>,
     pub late_window: Option<u64>,
     pub contract_kind: Option<String>,
-}
-
-/// `GET /v1/swaps/{id}` and `/v1/reverse/swaps/{id}`: what the maker keeps
-/// of a swap besides the chain. Everything else about it is read on chain.
-#[derive(Clone, Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct SwapStatus {
-    /// The accept's token handed back, once the user paid in: the blind
-    /// signature (base64url) of its `tokenRequest`, which only the blinding
-    /// secret turns into a token.
-    pub token_return: Option<Redacted<String>>,
 }
 
 /// The swap a maker opened for an accepted quote, with the deadlines it

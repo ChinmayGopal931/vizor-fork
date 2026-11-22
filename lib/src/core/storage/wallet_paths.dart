@@ -208,10 +208,10 @@ Future<Directory> _privateUsdDirectory(
 /// Private USD's `swaps.db` and `joint.db` directory for one wallet and
 /// network: `<support>/private_usd_<walletDbName>_<network>`.
 ///
-/// The swap records hold relayer tickets and token blinding secrets, so on iOS
-/// the directory stays out of iCloud and device backups, marked before
-/// anything is written in it. The mark goes with the directory, so it is set
-/// whenever the directory is made, and once per process for one made earlier.
+/// The swap records hold relayer tickets, so on iOS the directory stays out
+/// of iCloud and device backups, marked before anything is written in it.
+/// The mark goes with the directory, so it is set whenever the directory is
+/// made, and once per process for one made earlier.
 /// A failed mark is tried again on the next call: a weaker backup posture must
 /// not stop a conversion that is under way.
 Future<String> getPrivateUsdDirPath(
@@ -273,17 +273,6 @@ Future<void> deletePrivateUsdDirectories() async {
   if (firstError != null) {
     Error.throwWithStackTrace(firstError, firstStackTrace!);
   }
-}
-
-/// The device-wide Privacy Pass token store for [network]:
-/// `<support>/private_usd_tokens_<network>.json`, one per network, never per
-/// account. Rust creates it on the first write and keeps a `.tmp` beside it
-/// while writing. A full reset deletes it ([deletePrivateUsdTokenStores]);
-/// the Keystore attestation key is never deleted.
-Future<String> getPrivateUsdTokenStorePath(String network) async {
-  _checkPrivateUsdNetwork(network);
-  final support = await getWalletSupportDirectory();
-  return '${support.path}${Platform.pathSeparator}$_privateUsdTokenStorePrefix$network.json';
 }
 
 /// Removes the device-wide token stores and their temporary files, for a

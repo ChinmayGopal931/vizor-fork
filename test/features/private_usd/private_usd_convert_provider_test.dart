@@ -12,8 +12,6 @@ import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_conv
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_engine_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_relayer_claims_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_reverse_convert_provider.dart';
-import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_tokens_provider.dart';
-import 'package:zcash_wallet/src/features/private_usd/services/private_usd_attestation.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_balance_repository.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_engine.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_reverse_funding.dart';
@@ -47,7 +45,6 @@ void main() {
   var upgradeWindow = NetworkUpgradeWindowState.none;
   late _UnavailableReversePage reversePage;
   late MemoryRelayerClaimsStore relayerClaims;
-  late _FakeAttester attester;
 
   PrivateUsdConvertNotifier notifier() =>
       container.read(privateUsdConvertProvider.notifier);
@@ -70,7 +67,6 @@ void main() {
     reversePage = _UnavailableReversePage();
     relayerClaims = MemoryRelayerClaimsStore();
     DateTime now() => tester.binding.clock.now();
-    attester = _FakeAttester();
     backend = FakePrivateUsdBackend(records: {account: []})
       ..onQuote = (units) {
         asked.add(units);
@@ -101,7 +97,6 @@ void main() {
         privateUsdCurrentDeploymentProvider.overrideWithValue(null),
         privateUsdReversePageProvider.overrideWithValue(reversePage),
         privateUsdRelayerClaimsStoreProvider.overrideWithValue(relayerClaims),
-        privateUsdAttestationProvider.overrideWithValue(attester),
         privateUsdSwapBackendProvider.overrideWithValue(backend),
         privateUsdBalanceProvider(
           account,
@@ -449,128 +444,6 @@ void main() {
     expect(backend.acceptedRelayerClaims, isEmpty);
   });
 
-  // ---- Privacy Pass tokens (M4) ----
-
-  /// A maker turning the accept away at the token gate: the first accept
-  /// answers `tokensNeeded`, the next `accepted`.
-  void askedForAToken() {
-    var accepts = 0;
-    backend.onAccept = (index) => ApiAcceptResult(
-      kind: accepts++ == 0
-          ? ApiAcceptKind.tokensNeeded
-          : ApiAcceptKind.accepted,
-      index: index,
-    );
-    backend.issuance = ApiIssuanceBegin(
-      sessionId: BigInt.from(7),
-      issuerName: 'zecswap-testnet-issuer',
-      message: Uint8List.fromList([1, 2, 3]),
-    );
-  }
-
-  convertTest('a maker asking for a token gets today\'s, then the same '
-      'index is accepted', (tester) async {
-    await start(tester, holdings: spendable(oneZec));
-    await type(tester, '0.5');
-    expect(notifier().openReview(), isTrue);
-    // Opening the flow fetched ahead: nothing was needed then.
-    expect(backend.begins, 1);
-    askedForAToken();
-
-    final path = await notifier().confirm();
-    expect(path, isNotNull);
-    expect(backend.begins, 2);
-    expect(attester.signed, ['zecswap-testnet-issuer: 1,2,3']);
-    expect(backend.finishes.single.sessionId, BigInt.from(7));
-    expect(backend.finishes.single.chain, ['leaf', 'root']);
-    expect(backend.finishes.single.signature, 'signed');
-    expect(backend.acceptedRelayerClaims, [
-      true,
-      true,
-    ], reason: 'accepted twice');
-    expect(state().startError?.call(testL10n), isNull);
-  });
-
-  convertTest('a refusal is signed again once, over the next message', (
-    tester,
-  ) async {
-    await start(tester, holdings: spendable(oneZec));
-    await type(tester, '0.5');
-    expect(notifier().openReview(), isTrue);
-    askedForAToken();
-    backend.finishKinds = const [
-      ApiIssuanceKind.signAgain,
-      ApiIssuanceKind.issued,
-    ];
-
-    expect(await notifier().confirm(), isNotNull);
-    expect(attester.signed, [
-      'zecswap-testnet-issuer: 1,2,3',
-      'zecswap-testnet-issuer: 9,9,9',
-    ]);
-    expect(backend.finishes.length, 2);
-  });
-
-  for (final (failure, message) in [
-    (
-      const PrivateUsdAttestationException(
-        PrivateUsdAttestationErrorCode.keystore,
-      ),
-      testL10n.privateUsdTokensKeystore,
-    ),
-    (
-      const PrivateUsdAttestationException(
-        PrivateUsdAttestationErrorCode.unavailable,
-      ),
-      testL10n.privateUsdTokensUnavailable,
-    ),
-    (
-      const ApiPrivateUsdError(
-        code: ApiPrivateUsdErrorCode.tokensDeviceRefused,
-        message: 'refused',
-      ),
-      testL10n.privateUsdTokensDeviceRefused,
-    ),
-  ]) {
-    convertTest('an issuance that fails ends the conversion with nothing '
-        'sent: $message', (tester) async {
-      await start(tester, holdings: spendable(oneZec));
-      await type(tester, '0.5');
-      expect(notifier().openReview(), isTrue);
-      askedForAToken();
-      if (failure is PrivateUsdAttestationException) {
-        attester.failure = failure;
-      } else {
-        backend.issuanceError = failure;
-      }
-
-      expect(await notifier().confirm(), isNull);
-      expect(state().startError?.call(testL10n), message);
-      expect(backend.acceptedRelayerClaims, [true], reason: 'accepted once');
-    });
-  }
-
-  convertTest('a maker still asking after the issuance ends the conversion', (
-    tester,
-  ) async {
-    await start(tester, holdings: spendable(oneZec));
-    await type(tester, '0.5');
-    expect(notifier().openReview(), isTrue);
-    askedForAToken();
-    backend.onAccept = (index) =>
-        ApiAcceptResult(kind: ApiAcceptKind.tokensNeeded, index: index);
-
-    expect(await notifier().confirm(), isNull);
-    expect(
-      state().startError?.call(testL10n),
-      testL10n.privateUsdConvertErrorTokensUnavailable,
-    );
-    expect(backend.acceptedRelayerClaims, [
-      true,
-      true,
-    ], reason: 'once more, no loop');
-  });
-
   convertTest(
     'a quote stops being offered 20 s before it expires, and on the amount '
     'step it is replaced at its size',
@@ -728,28 +601,6 @@ class _GatedBackend extends FakePrivateUsdBackend {
       index: index,
       maxTotalZat: maxTotalZat,
       relayerClaims: relayerClaims,
-    );
-  }
-}
-
-/// The phone's attestation: signs every message with a fixed chain, or
-/// fails as told.
-class _FakeAttester implements PrivateUsdAttester {
-  /// Each message signed, as `issuer: bytes`.
-  final signed = <String>[];
-  PrivateUsdAttestationException? failure;
-
-  @override
-  Future<PrivateUsdAttestationSignature> sign({
-    required String issuerName,
-    required Uint8List message,
-  }) async {
-    final failure = this.failure;
-    if (failure != null) throw failure;
-    signed.add('$issuerName: ${message.join(',')}');
-    return const PrivateUsdAttestationSignature(
-      chain: ['leaf', 'root'],
-      signature: 'signed',
     );
   }
 }

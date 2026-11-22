@@ -70,7 +70,6 @@ use super::swap::{
     self, find, load, payout_after_fees, pinned_relayer_terms, quote_error, require_payout_fee,
     require_pays_out, save, serves, update, ClaimWindow, PostError, SwapCall, Wake, WindowView,
 };
-use super::tokens::{self, AcceptError, Payment, TokenStore};
 use super::transport::{HttpTransport, Refusal, SwapErrorCode, SwapHttpError};
 use super::{fail, indices, open_fee, terms, ErrorCode, PrivateUsdError, Result};
 use crate::wallet::routed_http::RoutedHttp;
@@ -159,9 +158,6 @@ fn wake(wait: ForwardWait) -> Wake {
 pub(crate) enum AcceptOutcome {
     /// The maker opened the swap, or is opening it: the engine follows it.
     Accepted,
-    /// The maker wants a Privacy Pass token, which this build cannot pay.
-    /// Nothing opened; the record waits, unanswered, to be abandoned.
-    TokensNeeded,
     /// Over before anything was sent.
     NothingSent(NothingSentCause),
 }
@@ -393,9 +389,6 @@ where
     zcash: &'a Z,
     clock: &'a K,
     makers: &'a MakerChecks,
-    /// The device's Privacy Pass tokens, which pay for accepts the maker
-    /// asks a token for, and come back once the deposit is out.
-    tokens: &'a TokenStore,
     op: Option<&'a OpHandle>,
 }
 
@@ -414,7 +407,6 @@ where
         zcash: &'a Z,
         clock: &'a K,
         makers: &'a MakerChecks,
-        tokens: &'a TokenStore,
         op: Option<&'a OpHandle>,
     ) -> Self {
         let pins = deployment::deployment(keys.network());
@@ -429,7 +421,6 @@ where
             zcash,
             clock,
             makers,
-            tokens,
             op,
         }
     }
@@ -444,14 +435,7 @@ where
         let session = engine::session();
         self.pins.swap_contract()?;
         swap::require_none_under_way(store, self.account)?;
-        swap::check_maker(
-            &self.maker,
-            self.pins,
-            self.makers,
-            false,
-            self.tokens.pins(),
-        )
-        .await?;
+        swap::check_maker(&self.maker, self.pins, self.makers, false).await?;
         let contracts = [(self.chain, self.pins.maker)];
         // The relayer's terms don't wait on the index: both are asked at once.
         let (index, relayer) = tokio::join!(
@@ -627,9 +611,6 @@ where
                     Ok(AcceptOutcome::NothingSent(cause))
                 }
                 Ok(_) => Ok(AcceptOutcome::Accepted),
-                Err(error) if error.code == ErrorCode::TokensNeeded => {
-                    Ok(AcceptOutcome::TokensNeeded)
-                }
                 Err(error) => Err(error),
             };
         }
@@ -640,9 +621,7 @@ where
         self.post_accept(store, record, &acceptance).await
     }
 
-    /// Posts the acceptance, paying with a token where the maker asks for
-    /// one (`tokens::accept_paying`). The acceptance is built per post: only
-    /// a paid one carries the request for its token back.
+    /// Posts the acceptance and takes the maker's answer.
     async fn post_accept(
         &self,
         store: &mut SwapStore,
@@ -653,33 +632,13 @@ where
         self.accept_answered(store, record, posted)
     }
 
-    /// Posts `acceptance` for `record`'s quote, paying with a token where the
-    /// maker asks for one: the maker's answer.
+    /// Posts `acceptance` for `record`'s quote: the maker's answer.
     async fn post_acceptance(
         &self,
         record: &ForwardRecord,
         acceptance: &SwapAcceptance,
-    ) -> std::result::Result<SwapAccepted, AcceptError> {
-        tokens::accept_paying(
-            self.tokens,
-            self.clock.now(),
-            record.swap_id,
-            Direction::Forward,
-            async |payment: Option<&Payment>| {
-                let paid = SwapAcceptance {
-                    token_request: payment.map(|payment| payment.token_request.clone()),
-                    ..acceptance.clone()
-                };
-                self.maker
-                    .accept(
-                        &record.quote.quote_id,
-                        &paid,
-                        payment.map(|payment| payment.authorization.0.as_str()),
-                    )
-                    .await
-            },
-        )
-        .await
+    ) -> std::result::Result<SwapAccepted, SwapHttpError> {
+        self.maker.accept(&record.quote.quote_id, acceptance).await
     }
 
     /// What the maker's answer to `record`'s accept makes of it: the swap's
@@ -688,16 +647,11 @@ where
         &self,
         store: &mut SwapStore,
         record: ForwardRecord,
-        posted: std::result::Result<SwapAccepted, AcceptError>,
+        posted: std::result::Result<SwapAccepted, SwapHttpError>,
     ) -> Result<AcceptOutcome> {
         let accepted = match posted {
             Ok(accepted) => accepted,
-            // Turned away at the token gate, with no token to pay. A refusal
-            // sends nothing, so nothing opened; the challenge is kept for the
-            // issuance.
-            Err(AcceptError::TokensNeeded { .. }) => return Ok(AcceptOutcome::TokensNeeded),
-            Err(AcceptError::Tokens(error)) => return Err(error),
-            Err(AcceptError::Http(SwapHttpError::Refused(refusal))) => {
+            Err(SwapHttpError::Refused(refusal)) => {
                 match accept_refusal(&refusal) {
                     Some(cause) => {
                         self.finish(
@@ -715,7 +669,7 @@ where
                 }
             }
             // No answer, or one that does not read: maybe opened.
-            Err(AcceptError::Http(error)) => return Err(error.into()),
+            Err(error) => return Err(error.into()),
         };
         let mut opened = record;
         opened.t0 = Some(accepted.t0);
@@ -960,21 +914,19 @@ where
         let acceptance = self.acceptance(record.index, &record.quote)?;
         let posted = self.post_acceptance(&record, &acceptance).await;
         let again = match &posted {
-            Err(AcceptError::Http(SwapHttpError::Refused(refusal)))
+            Err(SwapHttpError::Refused(refusal))
                 if refusal.code == Some(SwapErrorCode::FeeRequired) =>
             {
                 Some((refusal.retry_after_secs, FEE_WAIT_SECONDS, true))
             }
-            Err(AcceptError::Http(SwapHttpError::Refused(refusal))) if refusal.status >= 500 => {
-                Some((
-                    refusal.retry_after_secs,
-                    UNANSWERED_ACCEPT_WAIT_SECONDS,
-                    false,
-                ))
+            Err(SwapHttpError::Refused(refusal)) if refusal.status >= 500 => Some((
+                refusal.retry_after_secs,
+                UNANSWERED_ACCEPT_WAIT_SECONDS,
+                false,
+            )),
+            Err(SwapHttpError::Unreachable { .. } | SwapHttpError::Unreadable { .. }) => {
+                Some((None, UNANSWERED_ACCEPT_WAIT_SECONDS, false))
             }
-            Err(AcceptError::Http(
-                SwapHttpError::Unreachable { .. } | SwapHttpError::Unreadable { .. },
-            )) => Some((None, UNANSWERED_ACCEPT_WAIT_SECONDS, false)),
             _ => None,
         };
         if let Some((asked, default, unseen)) = again {
@@ -1000,11 +952,6 @@ where
                 engine::remove_fee_pace(self.account, index);
                 Ok(ForwardStep::Finished(ForwardOutcome::NothingSent { cause }))
             }
-            // The engine fetches today's tokens; the next step pays with one.
-            AcceptOutcome::TokensNeeded => fail(
-                ErrorCode::TokensNeeded,
-                "the maker asks a token for the accept",
-            ),
         }
     }
 
@@ -1083,9 +1030,6 @@ where
             return Ok(ForwardStep::Finished(outcome.clone()));
         }
         engine::check_cancelled(self.op)?;
-        if record.deposit.is_some() {
-            self.collect_return(&record).await;
-        }
         match self.terms(&record)? {
             None if record.quote.open_fee.is_some() => self.open_with_fee(store, &record).await,
             None => self.not_on_chain(store, &record, false).await,
@@ -1930,29 +1874,6 @@ where
         )
     }
 
-    /// Reads the maker's status for a swap whose accept's token is still to
-    /// come back, once the deposit is out, and holds the token it hands
-    /// back. A read that fails waits for the next step, never an error.
-    async fn collect_return(&self, record: &ForwardRecord) {
-        let now = self.clock.now();
-        if !self.tokens.awaits_return(&record.swap_id, now) {
-            return;
-        }
-        let Ok(status) = self.maker.swap_status(&record.swap_id).await else {
-            return;
-        };
-        let Some(token_return) = status.token_return else {
-            return;
-        };
-        if let Err(error) = self.tokens.collect(&record.swap_id, &token_return.0, now) {
-            log::warn!(
-                "private usd: forward swap {}: holding the token back failed ({:?})",
-                record.index,
-                error.code
-            );
-        }
-    }
-
     /// A relayer's answer is not the payout receipt: the swap ends paid only
     /// on the confirmed `PaidOut` event, with the amount it paid.
     async fn finish_paid(
@@ -1960,8 +1881,6 @@ where
         store: &mut SwapStore,
         record: &ForwardRecord,
     ) -> Result<ForwardStep> {
-        // The maker hands the token back by now at the latest.
-        self.collect_return(record).await;
         let Some(paid) = self
             .chain
             .confirmed_payout(&record.swap_id.0, record.accepted_at)
@@ -2058,8 +1977,7 @@ pub(crate) async fn abandon<C: ChainReader, K: Clock>(
             "the swap is under way on chain: it goes on",
         );
     }
-    // Unanswered, the maker never took it (a turn-away at the token gate
-    // included); answered, it never opened.
+    // Unanswered, the maker never took it; answered, it never opened.
     let cause = if record.t0.is_none() {
         NothingSentCause::MakerUnavailable
     } else {
@@ -2126,6 +2044,11 @@ fn holding(wait: ForwardWait, terms: &Terms) -> ForwardStep {
 /// A maker's refusal of an accept that came before it opened anything, and
 /// what ended; `None` for one that may follow an open.
 fn accept_refusal(refusal: &Refusal) -> Option<NothingSentCause> {
+    // Unauthorized: the maker acted on nothing, whatever the code (a maker
+    // asking for a Privacy Pass token, which this build never pays).
+    if refusal.status == 401 {
+        return Some(NothingSentCause::MakerRefused);
+    }
     match refusal.code {
         // A fee the quote never asked is a refusal: nothing opened.
         Some(
@@ -2133,7 +2056,6 @@ fn accept_refusal(refusal: &Refusal) -> Option<NothingSentCause> {
             | SwapErrorCode::InvalidRequest
             | SwapErrorCode::NotFound
             | SwapErrorCode::MethodNotAllowed
-            | SwapErrorCode::TokenRequired
             | SwapErrorCode::FeeRequired,
         ) => Some(NothingSentCause::MakerRefused),
         Some(SwapErrorCode::UnknownQuote) => Some(NothingSentCause::QuoteExpired),
@@ -2195,7 +2117,6 @@ impl SwapCall<'_> {
         let transport = swap::transport(op);
         let chain = EvmRpc::new(&transport, self.pins(), self.eth_rpc_url)?.sharing_session();
         let zcash = self.zcash(op);
-        let tokens = self.tokens();
         let forward = Forward::new(
             self.account,
             self.keys,
@@ -2204,7 +2125,6 @@ impl SwapCall<'_> {
             &zcash,
             &SystemClock,
             &engine::MAKER_CHECKS,
-            &tokens,
             op,
         );
         let mut store = SwapStore::open(self.store_dir)?;

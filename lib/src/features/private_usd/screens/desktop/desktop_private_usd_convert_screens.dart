@@ -31,11 +31,8 @@ import '../../providers/private_usd_engine_provider.dart';
 import '../../providers/private_usd_least_fee_provider.dart';
 import '../../providers/private_usd_relayer_claims_provider.dart';
 import '../../providers/private_usd_reverse_convert_provider.dart';
-import '../../providers/private_usd_tokens_provider.dart';
 import '../../widgets/desktop/desktop_private_usd_bridge_widgets.dart';
 import '../../widgets/desktop/desktop_private_usd_widgets.dart';
-import '../../widgets/mobile/private_usd_convert_views.dart'
-    show privateUsdReviewNote;
 import '../../widgets/mobile/private_usd_convert_widgets.dart';
 import '../../widgets/mobile/private_usd_flow_widgets.dart'
     show kPrivateUsdRailgunFeePercent;
@@ -483,9 +480,6 @@ class DesktopPrivateUsdConvertReviewScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final privacyModeEnabled = ref.watch(privacyModeProvider);
-    final torOffDisclosure = ref.watch(
-      privateUsdTokensTorOffDisclosureProvider,
-    );
     final l10n = context.l10n;
     if (direction == PrivateUsdDirection.reverse) {
       final state = ref.watch(privateUsdReverseConvertProvider);
@@ -534,12 +528,8 @@ class DesktopPrivateUsdConvertReviewScreen extends ConsumerWidget {
               ),
         note: draft == null
             ? null
-            : privateUsdReviewNote(
-                l10n,
-                l10n.privateUsdReverseKeepOpen(
-                  formatDayMonthTime(privateUsdReadyBy(draft), l10n.localeName),
-                ),
-                torOffDisclosure: torOffDisclosure,
+            : l10n.privateUsdReverseKeepOpen(
+                formatDayMonthTime(privateUsdReadyBy(draft), l10n.localeName),
               ),
         message: state.message(l10n),
         onConfirm: () => unawaited(_confirm(context, notifier.confirm)),
@@ -588,13 +578,9 @@ class DesktopPrivateUsdConvertReviewScreen extends ConsumerWidget {
               quote: quote,
               privacyModeEnabled: privacyModeEnabled,
             ),
-      note: privateUsdReviewNote(
-        l10n,
-        relayerClaims
-            ? l10n.privateUsdConvertRelayerReviewNote
-            : l10n.privateUsdConvertBackgroundNote,
-        torOffDisclosure: torOffDisclosure,
-      ),
+      note: relayerClaims
+          ? l10n.privateUsdConvertRelayerReviewNote
+          : l10n.privateUsdConvertBackgroundNote,
       message: state.message(l10n),
       onConfirm: () => unawaited(_confirm(context, notifier.confirm)),
       onRefreshQuote: notifier.refreshQuote,

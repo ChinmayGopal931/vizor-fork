@@ -208,7 +208,6 @@ impl SwapKeyContext {
             user_share: Hex(keys.share.public().to_affine_bytes()),
             user_proof: Hex(proof.to_bytes()),
             viewing_keys: Redacted(Hex(keys.viewing.to_bytes())),
-            token_request: None,
         })
     }
 

@@ -179,12 +179,6 @@ pub(crate) struct Deployment {
     pub network: PrivateUsdNetwork,
     pub maker_url: &'static str,
     pub relayer_url: &'static str,
-    pub issuer_url: &'static str,
-    pub issuer_name: &'static str,
-    /// RFC 9578 token key, base64url SPKI (RSA-PSS SHA-384).
-    pub issuer_token_key: &'static str,
-    /// The key the maker hands tokens back under, base64url SPKI.
-    pub maker_token_return_key: &'static str,
     pub chain_id: u64,
     /// The windows contract swaps settle on; `None` where bridging is off,
     /// and quotes and swaps are refused.
@@ -294,10 +288,6 @@ const MAINNET: Deployment = Deployment {
     network: PrivateUsdNetwork::Mainnet,
     maker_url: "https://zecswap-mainnet.pepeman931.workers.dev/maker",
     relayer_url: "https://zecswap-mainnet.pepeman931.workers.dev/relayer",
-    issuer_url: "https://zecswap-mainnet.pepeman931.workers.dev/issuer",
-    issuer_name: "zecswap-mainnet-issuer",
-    issuer_token_key: "MIIBUjA9BgkqhkiG9w0BAQowMKANMAsGCWCGSAFlAwQCAqEaMBgGCSqGSIb3DQEBCDALBglghkgBZQMEAgKiAwIBMAOCAQ8AMIIBCgKCAQEAuA8Rq3Fo644QG48Kmxsyg1UFAKd-kfsS9t7BgPVwJqXHIEmlH4gS1UaxDBdu7awf0n9lv7yYozNTE5PysBh01LBhGbcIMWyTSNXkF2l1Mi0AOVVhVJZr-KTyr0u6ZFI2EGRVxT1BF2B4QgzQgJ64xqj-tzX_ctpwYQiE1Gf74zG4Yd0mdEbDjTYhgzoaR0lV5uHHSnVN2fmnlskAkZl6mfrJKfcfivp-UQ8qgBEs-7ke67lMhMyC3BxoDG7qoY0B4eIQRQ_-fu3eYT1RifuO5LgvMYkzRe58X63emOvYls19En0Vbkeq2Y73kMRA2AOYMp5gD3DyF4t5LM535p4-GQIDAQAB",
-    maker_token_return_key: "MIIBUjA9BgkqhkiG9w0BAQowMKANMAsGCWCGSAFlAwQCAqEaMBgGCSqGSIb3DQEBCDALBglghkgBZQMEAgKiAwIBMAOCAQ8AMIIBCgKCAQEArte6ewR0iOfbhxrByZ1vj_MMkKiQLQ-2R3OdCyHeKr_G4FrsCHvLhJ0uuu5r-papDogiMb_btM5-nPaOWzC1olxbmEUypJWgz-yCXD3K4wp_jgeqlP7EnlJE3IT5iTwv_S1hK5yV4Fka5mRoyhvZlhvDW3eCWoMix15Fp-TD3AGm7GttqzW4QyLXV_mQcnqlWPwuCacmTYch93eMZ7CaTHHRMmsfqR7_kZdskZh_JM55_lw_puDvvdRtu4vYItvo5wMI5mkwmSEwi6UahZDx_OI8IAF2JpeqRIKwbhT6FVGwahDeu6PRTww71C0i13EOwC3GQ85pxDRIAzF01W14wQIDAQAB",
     chain_id: 1,
     // Deployed at block 26250774, in place of the lock contract.
     swaps: Some(SwapContract {
@@ -362,10 +352,6 @@ const TESTNET: Deployment = Deployment {
     network: PrivateUsdNetwork::Testnet,
     maker_url: "https://zecswap-testnet.pepeman931.workers.dev/maker",
     relayer_url: "https://zecswap-testnet.pepeman931.workers.dev/relayer",
-    issuer_url: "https://zecswap-testnet.pepeman931.workers.dev/issuer",
-    issuer_name: "zecswap-testnet-issuer",
-    issuer_token_key: "MIIBUjA9BgkqhkiG9w0BAQowMKANMAsGCWCGSAFlAwQCAqEaMBgGCSqGSIb3DQEBCDALBglghkgBZQMEAgKiAwIBMAOCAQ8AMIIBCgKCAQEAqAp6ClskrSdfUjiFvS2H9eTxKKNxrtVPM-n0n8WCgCj508sXiyQj21W9Dpjki-JYLbYS7xkHaTCuplU7-Kg6EFK_xwFB-BmQZcW9qk1GTYcZAqJ5YmfttMFHMDsdroUq5v6RnQxLRINIh5UIiFgn_516Wp2CcizaU-lwuwP4f8hp-0cLvynQ119pUTIfwgaYhrRaxngHFu0JnQF6l4AK4rhtIt6g7AG_bSSV06cYowKuOVEncE45CaUDOUJbP18MfRSP42HPnWZ0-h6n3_uBYvxHYsKp7KQ5_Hr-QpOafUoXhFANv4mfpk3MUQxo2m7vZZAMaFa9ELsIIiaLkACGhQIDAQAB",
-    maker_token_return_key: "MIIBUjA9BgkqhkiG9w0BAQowMKANMAsGCWCGSAFlAwQCAqEaMBgGCSqGSIb3DQEBCDALBglghkgBZQMEAgKiAwIBMAOCAQ8AMIIBCgKCAQEA5boFzxSM2UDd-NfwWUnT_lVo23Td6wOH5twYjLo2wLDEWmGKSNBgdZy3t3JC2JkzD8j9rVRdehpll_i3GRKmUq0wr6xkHHuHxswr3TehMUqUrztg-nxDS4U2f0V0yYno3I5YPo2SByOz_-jHNWM6Mlx-TZsWzALQTb3NmRXdynqecz3-8hqd_OPhUJtH7M3pK9ikkUbSzV1ofXkyM6FnaNAGkHZ1kAMEF2pGe69tOJJqGq6wpTuZMtzaaxu9t1C4xoR7R7pbdkjPM_Wxd15LoXa1N26V-PToIeD06VmwX51VjrO_2VHWFat4Rtu7eLPeiEX-5kKsyvCY7EhpkNK1DQIDAQAB",
     chain_id: 11_155_111,
     // Deployed at block 11958709, in place of the lock contract.
     swaps: Some(SwapContract {

@@ -6,8 +6,8 @@
 //! `crate::wallet::routed_http` only, so it follows the route policy and fails
 //! closed on Tor.
 //!
-//! Never log the mnemonic, the seed, a secret share, a relayer ticket, token
-//! state or a keyed RPC URL.
+//! Never log the mnemonic, the seed, a secret share, a relayer ticket or a
+//! keyed RPC URL.
 
 use std::fmt;
 use std::sync::{Mutex, MutexGuard, PoisonError};
@@ -37,7 +37,6 @@ pub(crate) mod sends;
 pub(crate) mod store;
 pub(crate) mod swap;
 pub(crate) mod terms;
-pub(crate) mod tokens;
 pub(crate) mod transport;
 
 #[cfg(test)]
@@ -114,8 +113,6 @@ pub(crate) enum ErrorCode {
     DepositUnpayable,
     ZcashRejected,
     Mismatch,
-    TokensRefused,
-    TokensNeeded,
     ChainLagging,
     QuoteExpired,
     MakerUnavailable,
@@ -137,13 +134,6 @@ pub(crate) enum ErrorCode {
     ChainUnreadable,
     /// Sixteen swap indices in a row are already in use on chain.
     IndicesInUse,
-    /// The token issuer gave no usable answer.
-    TokensUnreachable,
-    /// The issuer refused this device's attestation twice over.
-    TokensDeviceRefused,
-    /// The issuer has no tokens left for this device today, and none is
-    /// held.
-    NoTokensToday,
     /// More than a quote can name (`u32` token base units).
     AmountUnquotable,
     /// A quote's open fee is above the cap, or payable outside Orchard or on

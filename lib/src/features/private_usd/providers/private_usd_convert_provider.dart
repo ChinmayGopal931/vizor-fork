@@ -16,7 +16,6 @@ import '../models/private_usd_desktop_wording.dart';
 import '../models/private_usd_messages.dart';
 import '../models/private_usd_record_key.dart';
 import '../private_usd_copy.dart';
-import '../services/private_usd_attestation.dart';
 import '../services/private_usd_diagnostics.dart';
 import '../services/private_usd_engine.dart';
 import '../services/private_usd_pause.dart';
@@ -25,7 +24,6 @@ import 'private_usd_available_provider.dart';
 import 'private_usd_engine_provider.dart';
 import 'private_usd_least_fee_provider.dart';
 import 'private_usd_relayer_claims_provider.dart';
-import 'private_usd_tokens_provider.dart';
 import '../../../core/l10n/l10n.dart';
 
 /// The convert flows' timing.
@@ -234,51 +232,6 @@ abstract class PrivateUsdConvertFlowNotifier<
       _pending?.cancel();
       tick.cancel();
     });
-    // Today's tokens, fetched ahead of the accept while the maker asks for
-    // them (plan M4): never inside a quote's window.
-    unawaited(ref.read(privateUsdTokensServiceProvider).prefetch());
-  }
-
-  /// Gets today's Privacy Pass tokens for an accept the maker turned away
-  /// at the token gate: null once tokens are held, else what to tell the
-  /// user. Nothing opened at the gate, so the accept is safe to repeat.
-  @protected
-  Future<PrivateUsdText?> issueTokens() async {
-    try {
-      await ref.read(privateUsdTokensServiceProvider).issue();
-      return null;
-    } on rust.ApiPrivateUsdError catch (error) {
-      privateUsdLog('the issuance failed (${error.code.name})');
-      if (kDesktopFormFactor) {
-        PrivateUsdDiagnostics.instance.failure(
-          PrivateUsdDiagnosticOp.issueTokens,
-          error,
-        );
-      }
-      return (AppLocalizations l10n) =>
-          privateUsdErrorMessage(l10n, error.code) ??
-          l10n.privateUsdConvertErrorTokensUnavailable;
-    } on PrivateUsdAttestationException catch (error) {
-      privateUsdLog('the issuance failed (${error.code.name})');
-      if (kDesktopFormFactor) {
-        PrivateUsdDiagnostics.instance.failure(
-          PrivateUsdDiagnosticOp.issueTokens,
-          error,
-        );
-      }
-      return (AppLocalizations l10n) =>
-          privateUsdAttestationMessage(l10n, error.code);
-    } catch (error) {
-      privateUsdLog('the issuance failed (${error.runtimeType})');
-      if (kDesktopFormFactor) {
-        PrivateUsdDiagnostics.instance.failure(
-          PrivateUsdDiagnosticOp.issueTokens,
-          error,
-        );
-      }
-      return (AppLocalizations l10n) =>
-          l10n.privateUsdConvertErrorTokensUnavailable;
-    }
   }
 
   /// Asks again for the quote that ran out on the amount step, when it may.
@@ -677,53 +630,19 @@ class PrivateUsdConvertNotifier
     );
     try {
       final relayerClaims = await privateUsdRelayerClaimsOf(ref);
-      Future<rust.ApiAcceptResult> accept() => engine.accept(
+      final result = await engine.accept(
         account,
         index: quote.index,
         maxTotalZat: quote.maxTotalZat,
         relayerClaims: relayerClaims,
       );
-      var result = await accept();
       if (!ref.mounted) {
         if (kDesktopFormFactor) _flowGone();
         return null;
       }
-      if (result.kind == rust.ApiAcceptKind.tokensNeeded) {
-        // The maker wants a Privacy Pass token and none is held: nothing
-        // opened. Get today's once, then accept the same index again; with
-        // none to be had, end the record. Never in a loop.
-        final failure = await issueTokens();
-        if (!ref.mounted) {
-          if (kDesktopFormFactor) _flowGone();
-          return null;
-        }
-        if (failure == null) {
-          result = await accept();
-          if (!ref.mounted) {
-            if (kDesktopFormFactor) _flowGone();
-            return null;
-          }
-        }
-        if (failure != null || result.kind == rust.ApiAcceptKind.tokensNeeded) {
-          if (kDesktopFormFactor) {
-            PrivateUsdDiagnostics.instance.outcome(
-              PrivateUsdDiagnosticOp.accept,
-              PrivateUsdDiagnosticOutcome.tokensUnavailable,
-            );
-          }
-          unawaited(_abandonQuietly(engine, account, quote.index));
-          startFailed(
-            failure ?? ((l10n) => l10n.privateUsdConvertErrorTokensUnavailable),
-          );
-          return null;
-        }
-      }
       switch (result.kind) {
         case rust.ApiAcceptKind.accepted:
           return path;
-        case rust.ApiAcceptKind.tokensNeeded:
-          // Handled above.
-          return null;
         case rust.ApiAcceptKind.nothingSent:
           if (kDesktopFormFactor) {
             PrivateUsdDiagnostics.instance.outcome(
@@ -822,24 +741,6 @@ class PrivateUsdConvertNotifier
       );
     } catch (_) {
       return false;
-    }
-  }
-
-  Future<void> _abandonQuietly(
-    PrivateUsdEngine engine,
-    String account,
-    int index,
-  ) async {
-    try {
-      await engine.abandon(account, index: index);
-    } catch (error) {
-      privateUsdLog('abandon failed (${error.runtimeType})');
-      if (kDesktopFormFactor) {
-        PrivateUsdDiagnostics.instance.failure(
-          PrivateUsdDiagnosticOp.abandon,
-          error,
-        );
-      }
     }
   }
 

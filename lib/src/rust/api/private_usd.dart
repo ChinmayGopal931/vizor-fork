@@ -6,8 +6,8 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `api_advance`, `api_cause`, `api_code`, `api_cost_request`, `api_deposit_pass`, `api_deposit_record`, `api_deposit_terms`, `api_funding_request`, `api_quote`, `api_record`, `api_reverse_advance`, `api_reverse_phase`, `api_reverse_record`, `api_send_record`, `api_token_status`, `api_transact`, `block_on`, `catch`, `deposit_confirmations`, `drive`, `internal_hex`, `late_claim_at`, `no_such_conversion`, `open_context`, `open_fee_mined`, `parse_amount`, `parse_network_and_migrate`, `seconds`, `swap_network`, `token_store`, `warm_proving_keys`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
+// These functions are ignored because they are not marked as `pub`: `api_advance`, `api_cause`, `api_code`, `api_cost_request`, `api_deposit_pass`, `api_deposit_record`, `api_deposit_terms`, `api_funding_request`, `api_quote`, `api_record`, `api_reverse_advance`, `api_reverse_phase`, `api_reverse_record`, `api_send_record`, `api_transact`, `block_on`, `catch`, `deposit_confirmations`, `drive`, `internal_hex`, `late_claim_at`, `no_such_conversion`, `open_context`, `open_fee_mined`, `parse_amount`, `parse_network_and_migrate`, `seconds`, `swap_network`, `warm_proving_keys`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
 
 /// The deployment for the wallet network `"main"` or `"test"`; `None` on
 /// regtest or an unknown network, where Private USD is hidden.
@@ -107,49 +107,6 @@ ApiActivity? privateUsdActivity({required int opId}) =>
 void privateUsdClearSessions() =>
     RustLib.instance.api.crateApiPrivateUsdPrivateUsdClearSessions();
 
-/// Starts an issuance of today's tokens, for the keystore to attest: `None`
-/// when nothing is needed. The maker's `/v1/info` decides first: without
-/// the pinned return key it takes no tokens, and nothing is asked of the
-/// issuer; with it, the tokens makers handed back for swaps still awaiting
-/// one are collected, then a batch is fetched ahead for today's challenge
-/// unless one is held or today is spent. Over the route policy, a fresh
-/// transport per call.
-Future<ApiIssuanceBegin?> privateUsdTokensIssuanceBegin({
-  required String tokensPath,
-  required String network,
-}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdTokensIssuanceBegin(
-  tokensPath: tokensPath,
-  network: network,
-);
-
-/// Finishes the issuance `session_id` with the keystore's attestation: the
-/// key's certificate chain (leaf first, DER, base64url) and its signature
-/// over the message, and holds what the issuer signs. `SignAgain` once on
-/// the first refusal; `TokensDeviceRefused` on the second; `Exhausted`, or
-/// a short batch, marks today spent.
-Future<ApiIssuanceFinish> privateUsdTokensIssuanceFinish({
-  required String tokensPath,
-  required String network,
-  required BigInt sessionId,
-  required List<String> chain,
-  required String signature,
-}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdTokensIssuanceFinish(
-  tokensPath: tokensPath,
-  network: network,
-  sessionId: sessionId,
-  chain: chain,
-  signature: signature,
-);
-
-/// What the device holds of the makers' tokens. Nothing is asked of anyone.
-Future<ApiTokenStatus> privateUsdTokensStatus({
-  required String tokensPath,
-  required String network,
-}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdTokensStatus(
-  tokensPath: tokensPath,
-  network: network,
-);
-
 /// The account's conversions under way, in either direction: a forward one
 /// not ended, a reverse one past its quote. The account deletion and reset
 /// warnings show it. 0 when the wallet never made one.
@@ -227,7 +184,6 @@ Future<ApiAcceptResult> privateUsdForwardAccept({
   required List<int> mnemonicBytes,
   required String lightwalletdUrl,
   required String ethRpcUrl,
-  required String tokensPath,
   required int index,
   required BigInt maxTotalZat,
   required bool relayerClaims,
@@ -239,7 +195,6 @@ Future<ApiAcceptResult> privateUsdForwardAccept({
   mnemonicBytes: mnemonicBytes,
   lightwalletdUrl: lightwalletdUrl,
   ethRpcUrl: ethRpcUrl,
-  tokensPath: tokensPath,
   index: index,
   maxTotalZat: maxTotalZat,
   relayerClaims: relayerClaims,
@@ -259,7 +214,6 @@ Future<ApiForwardAdvance> privateUsdForwardAdvance({
   required List<int> mnemonicBytes,
   required String lightwalletdUrl,
   required String ethRpcUrl,
-  required String tokensPath,
   required int opId,
   required int index,
 }) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdForwardAdvance(
@@ -270,15 +224,13 @@ Future<ApiForwardAdvance> privateUsdForwardAdvance({
   mnemonicBytes: mnemonicBytes,
   lightwalletdUrl: lightwalletdUrl,
   ethRpcUrl: ethRpcUrl,
-  tokensPath: tokensPath,
   opId: opId,
   index: index,
 );
 
 /// Drops swap `index` before it reached the chain: an unanswered accept ends
-/// `MakerUnavailable` (a turn-away at the token gate included), an answered
-/// one `NeverOpened`. `TooLate` once a deposit started or the chain shows
-/// the swap. No key is needed.
+/// `MakerUnavailable`, an answered one `NeverOpened`. `TooLate` once a
+/// deposit started or the chain shows the swap. No key is needed.
 Future<ApiForwardRecord> privateUsdForwardAbandon({
   required String network,
   required String accountUuid,
@@ -429,10 +381,9 @@ Future<ApiReverseRecord> privateUsdReverseGoAhead({
 );
 
 /// The maker's acceptance of swap `index`, posted once, and its joint account
-/// imported (idempotent: call it again after an error). `TokensNeeded`: the
-/// maker wants a token, which this build cannot get; nothing opened, so
-/// cancel the conversion. `NothingSent`: the maker's last word
-/// ended it (`CANCELLED`), with the cause when known.
+/// imported (idempotent: call it again after an error). `NothingSent`: the
+/// maker's last word ended it (`CANCELLED`), with the cause when known (a
+/// maker answering `401` refused it).
 Future<ApiAcceptResult> privateUsdReverseAccept({
   required String dbPath,
   required String network,
@@ -441,7 +392,6 @@ Future<ApiAcceptResult> privateUsdReverseAccept({
   required List<int> mnemonicBytes,
   required String lightwalletdUrl,
   required String ethRpcUrl,
-  required String tokensPath,
   required int index,
 }) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdReverseAccept(
   dbPath: dbPath,
@@ -451,7 +401,6 @@ Future<ApiAcceptResult> privateUsdReverseAccept({
   mnemonicBytes: mnemonicBytes,
   lightwalletdUrl: lightwalletdUrl,
   ethRpcUrl: ethRpcUrl,
-  tokensPath: tokensPath,
   index: index,
 );
 
@@ -530,7 +479,6 @@ Future<ApiReverseAdvance> privateUsdReverseAdvance({
   required List<int> mnemonicBytes,
   required String lightwalletdUrl,
   required String ethRpcUrl,
-  required String tokensPath,
   required int opId,
   required int index,
 }) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdReverseAdvance(
@@ -541,7 +489,6 @@ Future<ApiReverseAdvance> privateUsdReverseAdvance({
   mnemonicBytes: mnemonicBytes,
   lightwalletdUrl: lightwalletdUrl,
   ethRpcUrl: ethRpcUrl,
-  tokensPath: tokensPath,
   opId: opId,
   index: index,
 );
@@ -831,10 +778,6 @@ Future<ApiDepositRecord> privateUsdDepositRescue({
 enum ApiAcceptKind {
   /// The maker opened the swap, or is opening it: show its progress.
   accepted,
-
-  /// The maker wants a Privacy Pass token, which this build cannot get.
-  /// Nothing opened; abandon the conversion.
-  tokensNeeded,
 
   /// Over before anything was sent; `cause` says why.
   nothingSent,
@@ -1789,75 +1732,6 @@ class ApiFundingRequest {
           alreadyFunded == other.alreadyFunded;
 }
 
-/// An issuance's first phase: what the keystore signs (plan X11).
-class ApiIssuanceBegin {
-  final BigInt sessionId;
-
-  /// The issuer's name: the attestation key's alias and challenge derive
-  /// from it.
-  final String issuerName;
-
-  /// `"zecswap-issuer-v1" ‖ challenge ‖ SHA-256(blinded₁ ‖ … ‖ blindedₙ)`.
-  final Uint8List message;
-
-  const ApiIssuanceBegin({
-    required this.sessionId,
-    required this.issuerName,
-    required this.message,
-  });
-
-  @override
-  int get hashCode =>
-      sessionId.hashCode ^ issuerName.hashCode ^ message.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is ApiIssuanceBegin &&
-          runtimeType == other.runtimeType &&
-          sessionId == other.sessionId &&
-          issuerName == other.issuerName &&
-          message == other.message;
-}
-
-class ApiIssuanceFinish {
-  final ApiIssuanceKind kind;
-
-  /// With `SignAgain`: the message to sign once more.
-  final Uint8List? next;
-  final ApiTokenStatus status;
-
-  const ApiIssuanceFinish({
-    required this.kind,
-    this.next,
-    required this.status,
-  });
-
-  @override
-  int get hashCode => kind.hashCode ^ next.hashCode ^ status.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is ApiIssuanceFinish &&
-          runtimeType == other.runtimeType &&
-          kind == other.kind &&
-          next == other.next &&
-          status == other.status;
-}
-
-enum ApiIssuanceKind {
-  /// Tokens are held.
-  issued,
-
-  /// The issuer had none left for this device today.
-  exhausted,
-
-  /// The issuer refused the attestation once: sign `next` and finish
-  /// again with the same session, once.
-  signAgain,
-}
-
 enum ApiNothingSentCause {
   quoteExpired,
   makerRefused,
@@ -1905,22 +1779,6 @@ enum ApiPrivateUsdErrorCode {
   depositUnpayable,
   zcashRejected,
   mismatch,
-  tokensRefused,
-  tokensNeeded,
-
-  /// The token issuer gave no usable answer.
-  tokensUnreachable,
-
-  /// The token issuer refused this device's attestation.
-  tokensDeviceRefused,
-
-  /// This device's tokens for today are spent.
-  noTokensToday,
-
-  /// The phone's keystore failed to make or use the attestation key.
-  /// Raised by Dart from the attestation channel, never by Rust; the code
-  /// lives here so one switch names every token message.
-  keystore,
   chainLagging,
   quoteExpired,
   makerUnavailable,
@@ -2454,52 +2312,6 @@ enum ApiSendState {
   /// payment.
   unconfirmed,
   confirmed,
-}
-
-/// What the device holds of the makers' Privacy Pass tokens (reference
-/// §5.9).
-class ApiTokenStatus {
-  /// Tokens held for today's challenge.
-  final int held;
-
-  /// The issuer had no more for this device today.
-  final bool exhaustedToday;
-
-  /// Swaps whose token is still to come back.
-  final int awaitingReturns;
-
-  /// The issuer refused this device's attestation when last asked.
-  final bool deviceRefused;
-
-  /// The maker takes tokens: its info showed the pinned return key.
-  final bool makerAsks;
-
-  const ApiTokenStatus({
-    required this.held,
-    required this.exhaustedToday,
-    required this.awaitingReturns,
-    required this.deviceRefused,
-    required this.makerAsks,
-  });
-
-  @override
-  int get hashCode =>
-      held.hashCode ^
-      exhaustedToday.hashCode ^
-      awaitingReturns.hashCode ^
-      deviceRefused.hashCode ^
-      makerAsks.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is ApiTokenStatus &&
-          runtimeType == other.runtimeType &&
-          held == other.held &&
-          exhaustedToday == other.exhaustedToday &&
-          awaitingReturns == other.awaitingReturns &&
-          deviceRefused == other.deviceRefused &&
-          makerAsks == other.makerAsks;
 }
 
 enum ApiTransactKind {
