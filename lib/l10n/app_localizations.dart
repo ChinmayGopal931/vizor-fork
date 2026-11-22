@@ -14612,6 +14612,12 @@ abstract class AppLocalizations {
   /// **'A few seconds'**
   String get privateUsdConvertEtaSeconds;
 
+  /// Under the amount and on the bridge review, ZEC to Shielded USD, while the market maker asks a fee and the wallet is still catching up with the Zcash chain: the fee is not paid, and Bridge is off, until it has.
+  ///
+  /// In en, this message translates to:
+  /// **'Bridging waits until your wallet finishes syncing.'**
+  String get privateUsdConvertFeeWaitsForSync;
+
   /// Row label in the bridge quote breakdown for the relayer's and Railgun's fees.
   ///
   /// In en, this message translates to:
@@ -14990,11 +14996,23 @@ abstract class AppLocalizations {
   /// **'The swap couldn\'t be completed in time, so it was called off and your ZEC came back, less a small network fee.'**
   String get privateUsdConvertResultRefundedLate;
 
+  /// Result body, and activity detail note, when a bridge whose market maker fee was paid could not be completed in time: it was called off, the ZEC returned minus a small network fee, and the fee is not refunded.
+  ///
+  /// In en, this message translates to:
+  /// **'The swap couldn\'t be completed in time, so it was called off and your ZEC came back, less a small network fee. The market maker keeps its fee.'**
+  String get privateUsdConvertResultRefundedLateFeeKept;
+
   /// Result body, and activity detail note, when the market maker cancelled the swap: the ZEC returned to the wallet minus a small network fee.
   ///
   /// In en, this message translates to:
   /// **'The market maker called the swap off, so your ZEC came back to your wallet, less a small network fee.'**
   String get privateUsdConvertResultRefundedMaker;
+
+  /// Result body, and activity detail note, when the market maker cancelled a bridge whose market maker fee was paid: the ZEC returned minus a small network fee, and the fee is not refunded.
+  ///
+  /// In en, this message translates to:
+  /// **'The market maker called the swap off, so your ZEC came back to your wallet, less a small network fee. The market maker keeps its fee.'**
+  String get privateUsdConvertResultRefundedMakerFeeKept;
 
   /// Result title on the bridge progress screen when the bridge was called off and the user's ZEC returned.
   ///
