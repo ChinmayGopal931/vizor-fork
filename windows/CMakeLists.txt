@@ -173,10 +173,35 @@ install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../ios/Runner/Railgun/railgun/"
 # its install hook failed. Every DLL of the runtime comes from the redist folder
 # of the Visual Studio whose compiler builds the app, for the architecture it
 # builds for, its newest version there (a runtime may be newer than the toolset
-# that linked against it, never older). CMake's InstallRequiredSystemLibraries
-# knows only the compilers of its own release; this reads the folders instead.
-# scripts/check-veylor-windows-package.py checks what every binary imports.
+# that linked against it, never older), and only the DLLs built for that
+# architecture: the arm64 folder also holds an x64 vcruntime140_1.dll, for
+# ARM64EC and x64 code, which an ARM64 process can't load. CMake's
+# InstallRequiredSystemLibraries knows only the compilers of its own release;
+# this reads the folders instead. scripts/check-veylor-windows-package.py checks
+# what every binary imports.
+
+# A PE file's machine, as file(READ ... HEX) spells its COFF header's: 8664 for
+# x64, aa64 for ARM64. Empty if the file is no PE file.
+function(veylor_pe_machine PE_FILE OUTPUT)
+  set(machine "")
+  file(READ "${PE_FILE}" pe_offset OFFSET 60 LIMIT 4 HEX)
+  if(pe_offset MATCHES "^(..)(..)(..)(..)$")
+    math(EXPR pe_offset
+      "0x${CMAKE_MATCH_4}${CMAKE_MATCH_3}${CMAKE_MATCH_2}${CMAKE_MATCH_1}")
+    file(READ "${PE_FILE}" pe_header OFFSET ${pe_offset} LIMIT 6 HEX)
+    if(pe_header MATCHES "^50450000(..)(..)$")
+      set(machine "${CMAKE_MATCH_2}${CMAKE_MATCH_1}")
+    endif()
+  endif()
+  set(${OUTPUT} "${machine}" PARENT_SCOPE)
+endfunction()
+
 set(VEYLOR_MSVC_RUNTIME_PROBLEM "")
+set(VEYLOR_MSVC_RUNTIME_DLLS "")
+set(VEYLOR_MSVC_RUNTIME_NAMES "")
+set(VEYLOR_MSVC_RUNTIME_LEFT_OUT "")
+set(VEYLOR_MSVC_MACHINE_x64 "8664")
+set(VEYLOR_MSVC_MACHINE_arm64 "aa64")
 string(TOLOWER "${MSVC_CXX_ARCHITECTURE_ID}" VEYLOR_MSVC_ARCH)
 if(NOT VEYLOR_MSVC_ARCH MATCHES "^(x64|arm64)$")
   set(VEYLOR_MSVC_RUNTIME_PROBLEM
@@ -204,11 +229,30 @@ else()
   if(VEYLOR_MSVC_CRT_DIR STREQUAL "")
     set(VEYLOR_MSVC_RUNTIME_PROBLEM
       "${VEYLOR_VC_DIR}/Redist/MSVC has no ${VEYLOR_MSVC_ARCH} runtime")
+  else()
+    file(GLOB crt_dlls "${VEYLOR_MSVC_CRT_DIR}/*.dll")
+    foreach(dll IN LISTS crt_dlls)
+      veylor_pe_machine("${dll}" machine)
+      get_filename_component(name "${dll}" NAME)
+      string(TOLOWER "${name}" name)
+      if(machine STREQUAL "${VEYLOR_MSVC_MACHINE_${VEYLOR_MSVC_ARCH}}")
+        list(APPEND VEYLOR_MSVC_RUNTIME_DLLS "${dll}")
+        list(APPEND VEYLOR_MSVC_RUNTIME_NAMES "${name}")
+      else()
+        list(APPEND VEYLOR_MSVC_RUNTIME_LEFT_OUT "${name}")
+      endif()
+    endforeach()
+    if(NOT "vcruntime140.dll" IN_LIST VEYLOR_MSVC_RUNTIME_NAMES OR
+       NOT "msvcp140.dll" IN_LIST VEYLOR_MSVC_RUNTIME_NAMES)
+      set(VEYLOR_MSVC_RUNTIME_PROBLEM
+        "${VEYLOR_MSVC_CRT_DIR} has no ${VEYLOR_MSVC_ARCH} vcruntime140.dll and msvcp140.dll")
+    endif()
   endif()
 endif()
 if(VEYLOR_MSVC_RUNTIME_PROBLEM STREQUAL "")
-  message(STATUS "The C++ runtime beside the app: ${VEYLOR_MSVC_CRT_DIR}")
-  file(GLOB VEYLOR_MSVC_RUNTIME_DLLS "${VEYLOR_MSVC_CRT_DIR}/*.dll")
+  message(STATUS "The C++ runtime beside the app, from ${VEYLOR_MSVC_CRT_DIR}: "
+    "${VEYLOR_MSVC_RUNTIME_NAMES}; left out, another architecture's: "
+    "${VEYLOR_MSVC_RUNTIME_LEFT_OUT}")
   install(FILES ${VEYLOR_MSVC_RUNTIME_DLLS} DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
     CONFIGURATIONS Profile;Release COMPONENT Runtime)
 else()

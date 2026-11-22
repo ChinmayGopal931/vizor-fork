@@ -356,9 +356,12 @@ Linux's rules hold, in `veylor-windows.yml`'s own `publish` job:
   once the Visual C++ Redistributable is installed. On a fresh Windows 11 ARM
   VM the installer said its install hook failed: the app couldn't start
   (2026-11-22). `windows/CMakeLists.txt` installs the runtime's DLLs beside the
-  executable (app-local, as Microsoft allows), every one in the redist folder
-  of the Visual Studio whose compiler builds the app, for the architecture it
-  builds, its newest version there; a Release build that finds none fails.
+  executable (app-local, as Microsoft allows), from the redist folder of the
+  Visual Studio whose compiler builds the app, for the architecture it builds,
+  its newest version there, and only those built for that architecture: the
+  arm64 folder also holds an x64 `vcruntime140_1.dll`, for ARM64EC and x64
+  code, which an ARM64 process can't load. A Release build that finds no
+  runtime fails.
   GitHub's runners have the redistributable, so the package check reads every
   program and library in the app and fails a build where one is another
   architecture's or imports a runtime DLL that the app's folder or the package
