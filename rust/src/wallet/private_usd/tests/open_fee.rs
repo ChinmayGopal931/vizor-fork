@@ -784,3 +784,23 @@ async fn the_engine_waits_for_the_wallet_before_paying_a_fee() {
     assert!(h.world.get().fee_payments.is_empty(), "nothing paid");
 }
 
+/// At the quote's end with the fee shown unmined (a reorg took its block
+/// back), the chain is read before the bridge is given up: a swap the maker
+/// opened meanwhile, its accept's answer lost, goes on to its deposit.
+#[tokio::test]
+async fn a_fee_shown_unmined_at_the_end_is_followed_if_the_swap_opened() {
+    let h = asking(FEE, fee_address());
+    h.world.set().accept_answer_lost = true;
+    let quoted = h.quote().await.unwrap();
+    accept(&h, quoted.index).await.unwrap();
+    mine(&h, "openfee1");
+    h.advance().await.unwrap();
+    assert!(h.world.get().opened, "the maker opened it");
+    // The fee's block is taken back.
+    h.world.set().statuses.remove(&tx_id("openfee1"));
+    h.world.set().pass(300);
+    assert_eq!(h.advance().await.unwrap(), waiting(ForwardWait::Opening));
+    assert!(h.record().t0.is_some(), "the deadlines from its Opened");
+    assert_eq!(h.advance().await.unwrap(), h.confirming());
+    assert_eq!(h.world.get().deposits.len(), 1);
+}

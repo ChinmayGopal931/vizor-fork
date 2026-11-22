@@ -886,6 +886,11 @@ where
         }
         let now = self.clock.now();
         if now >= current.quote.expires_at {
+            // A fee the wallet shows unmined may still have opened the swap,
+            // in a block a reorg took back: the chain says.
+            if self.chain.swap(&current.swap_id.0).await?.is_some() {
+                return self.not_on_chain(store, &current, false).await;
+            }
             // Never accepted. A payment that can still be mined is the
             // maker's if it is; one provably expired paid nothing.
             let cause = if status == SwapTxStatus::Expired {
