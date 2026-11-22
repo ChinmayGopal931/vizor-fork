@@ -40,6 +40,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use zcash_address::unified::{self, Container, Encoding};
 use zcash_protocol::consensus::NetworkType;
 
+use crate::wallet::network::WalletNetwork;
+
 use super::deployment::{
     FEE_PACE_SECONDS, FEE_WAIT_MAX_SECONDS, FEE_WAIT_MIN_SECONDS, OPEN_FEE_LEAST_REVIEW_SECONDS,
     OPEN_FEE_MARGIN_SECONDS, OPEN_FEE_MAX_SCAN_LAG_BLOCKS, OPEN_FEE_OFFER_MARGIN_SECONDS,
@@ -204,7 +206,8 @@ const STORE_NETWORKS: [&str; 2] = ["main", "test"];
 
 /// The open fee payments the wallet DB at `db_path` must not send again:
 /// those of bridges that ended, and of quotes with less than
-/// [`OPEN_FEE_MARGIN_SECONDS`] left, the time a fee needs to be mined first.
+/// [`OPEN_FEE_MARGIN_SECONDS`] left, the time a fee needs to be mined first,
+/// a payment created but not yet kept among them.
 /// Mined later, a fee pays for nothing. The wallet's resubmission leaves
 /// these out, read from the swap store beside the wallet DB
 /// (`<support>/private_usd_<db>_<net>`) on each pass, so a restart withholds
@@ -238,11 +241,33 @@ pub(crate) fn withheld_fee_txids(db_path: &str) -> HashSet<Vec<u8>> {
             if !row.ended && now.saturating_add(OPEN_FEE_MARGIN_SECONDS) < row.expires_at {
                 continue;
             }
-            let Some(tx_id) = super::models::ZcashTxId::parse(&row.tx_id) else {
-                continue;
-            };
-            if let Ok(txid) = super::joint::internal_txid(&tx_id) {
-                withheld.insert(txid.as_ref().to_vec());
+            match &row.tx_id {
+                Some(tx_id) => {
+                    let Some(tx_id) = super::models::ZcashTxId::parse(tx_id) else {
+                        continue;
+                    };
+                    if let Ok(txid) = super::joint::internal_txid(&tx_id) {
+                        withheld.insert(txid.as_ref().to_vec());
+                    }
+                }
+                // Started, perhaps created, not yet kept: the account's sent
+                // transaction to the fee's address. Only one conversion runs
+                // at a time per account, so on a bridge under way that is its
+                // own; one that ended without a payment kept had none found.
+                None if row.attempted && !row.ended => {
+                    let Some(network) = WalletNetwork::from_str(network) else {
+                        continue;
+                    };
+                    if let Ok(Some(sent)) = super::joint::find_sent(
+                        db_path,
+                        network,
+                        &row.account_uuid,
+                        Some(&row.address),
+                    ) {
+                        withheld.insert(sent.txid.as_ref().to_vec());
+                    }
+                }
+                None => {}
             }
         }
     }
