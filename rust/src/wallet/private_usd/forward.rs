@@ -1711,7 +1711,11 @@ where
             return Ok(record);
         };
         let nonce = self.chain.rescue_nonce(&record.swap_id.0).await?;
-        let now = swap::fresh_head(read.head.timestamp, self.clock.now())?;
+        let now = swap::fresh_head(
+            read.head.timestamp,
+            self.clock.now(),
+            self.chain.clock_ahead(),
+        )?;
         let deadline = now + SIGNATURE_TTL_SECONDS;
         let note = self.keys.note(index)?;
         let digest = self.pins.domain()?.rescue(
@@ -2006,7 +2010,7 @@ where
         let device_now = self.clock.now();
         let view = WindowView {
             stage: read.swap.as_ref().map(|swap| swap.stage),
-            head: swap::fresh_head(read.head.timestamp, device_now)?,
+            head: swap::fresh_head(read.head.timestamp, device_now, self.chain.clock_ahead())?,
             head_number: read.head.number,
             device_now,
             t0: terms.t0,

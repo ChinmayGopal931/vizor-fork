@@ -1842,6 +1842,10 @@ enum ApiPrivateUsdErrorCode {
   /// asks an open fee is not bridged, nothing saved or paid, and the same
   /// quote may be bridged once it has.
   walletSyncing,
+
+  /// This device's clock runs minutes ahead of the Ethereum node's: a step
+  /// that reveals a share waits until the clock is right.
+  clockOff,
 }
 
 /// A proved send or withdrawal, as Dart hands it to Rust to keep before it is

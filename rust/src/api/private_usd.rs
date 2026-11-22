@@ -77,6 +77,9 @@ pub enum ApiPrivateUsdErrorCode {
     /// asks an open fee is not bridged, nothing saved or paid, and the same
     /// quote may be bridged once it has.
     WalletSyncing,
+    /// This device's clock runs minutes ahead of the Ethereum node's: a step
+    /// that reveals a share waits until the clock is right.
+    ClockOff,
 }
 
 /// A Private USD failure. Its Dart `toString()` is the message.
@@ -133,6 +136,7 @@ fn api_code(code: ErrorCode) -> ApiPrivateUsdErrorCode {
         ErrorCode::AmountUnquotable => Api::AmountRefused,
         ErrorCode::OpenFeeRefused => Api::OpenFeeRefused,
         ErrorCode::WalletSyncing => Api::WalletSyncing,
+        ErrorCode::ClockOff => Api::ClockOff,
     }
 }
 

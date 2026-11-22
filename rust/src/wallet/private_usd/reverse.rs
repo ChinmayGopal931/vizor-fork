@@ -1027,7 +1027,8 @@ where
         let Some(fee) = self.view.rescue_fee(&record).await? else {
             return Ok(record);
         };
-        let now = swap::fresh_head(self.state(&record).await?.head.timestamp, self.clock.now())?;
+        let head = self.state(&record).await?.head.timestamp;
+        let now = swap::fresh_head(head, self.clock.now(), self.chain.clock_ahead())?;
         let deadline = now + SIGNATURE_TTL_SECONDS;
         let note = self.keys.note(index)?;
         let digest = self.pins.domain()?.rescue(
@@ -1585,7 +1586,7 @@ where
         let device_now = self.clock.now();
         Ok(WindowView {
             stage: read.swap.as_ref().map(|swap| swap.stage),
-            head: swap::fresh_head(read.head.timestamp, device_now)?,
+            head: swap::fresh_head(read.head.timestamp, device_now, self.chain.clock_ahead())?,
             head_number: read.head.number,
             device_now,
             t0: record.quote.ready_deadline,

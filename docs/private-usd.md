@@ -352,7 +352,12 @@ keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
 - Reveal `z` only in its window, decided on one consistent read (the swap at
   the newest block's hash, with that block's number and time) of a fresh
   head, and again immediately before the post. A window opens by the block's
-  time and closes by the later of it and the device clock. A forward claim
+  time and closes by the later of it and the device clock. A head three
+  minutes behind the device's clock is no fresh head (`ChainLagging`, shown as
+  Ethereum out of reach), unless the node's own answers, by their HTTP
+  `Date`, put the device's clock over two minutes ahead: then it is
+  `ClockOff`, and the copy asks for the phone's, Mac's or computer's clock to
+  be set (`privateUsdConvert{Error,Problem}Clock*`). A forward claim
   goes once the swap is ready (2 blocks deep before `t0`) or from `t0`, with
   more than 300 s left before `t1`, or for good from `t1 + LATE_WINDOW`; in
   between, the swap unwinds through the maker's refund. A reverse refund goes

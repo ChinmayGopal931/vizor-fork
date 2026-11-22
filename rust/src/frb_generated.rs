@@ -14753,6 +14753,7 @@ impl SseDecode for crate::api::private_usd::ApiPrivateUsdErrorCode {
             23 => crate::api::private_usd::ApiPrivateUsdErrorCode::WrongDeployment,
             24 => crate::api::private_usd::ApiPrivateUsdErrorCode::OpenFeeRefused,
             25 => crate::api::private_usd::ApiPrivateUsdErrorCode::WalletSyncing,
+            26 => crate::api::private_usd::ApiPrivateUsdErrorCode::ClockOff,
             _ => unreachable!("Invalid variant for ApiPrivateUsdErrorCode: {}", inner),
         };
     }
@@ -22205,6 +22206,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::private_usd::ApiPrivateUsdErr
             Self::WrongDeployment => 23.into_dart(),
             Self::OpenFeeRefused => 24.into_dart(),
             Self::WalletSyncing => 25.into_dart(),
+            Self::ClockOff => 26.into_dart(),
             _ => unreachable!(),
         }
     }
@@ -28200,6 +28202,7 @@ impl SseEncode for crate::api::private_usd::ApiPrivateUsdErrorCode {
                 crate::api::private_usd::ApiPrivateUsdErrorCode::WrongDeployment => 23,
                 crate::api::private_usd::ApiPrivateUsdErrorCode::OpenFeeRefused => 24,
                 crate::api::private_usd::ApiPrivateUsdErrorCode::WalletSyncing => 25,
+                crate::api::private_usd::ApiPrivateUsdErrorCode::ClockOff => 26,
                 _ => {
                     unimplemented!("");
                 }

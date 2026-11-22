@@ -8855,6 +8855,18 @@ class AppLocalizationsEn extends AppLocalizations {
       'This amount doesn\'t cover the relayer\'s fee. Try a larger amount.';
 
   @override
+  String get privateUsdConvertErrorClock =>
+      'Your phone\'s clock is off. Set it to the right time, then try again.';
+
+  @override
+  String get privateUsdConvertErrorClockDesktop =>
+      'Your Mac\'s clock is off. Set it to the right time, then try again.';
+
+  @override
+  String get privateUsdConvertErrorClockLinux =>
+      'Your computer\'s clock is off. Set it to the right time, then try again.';
+
+  @override
   String get privateUsdConvertErrorEthereum =>
       'Veylor can\'t reach Ethereum right now. Try again in a moment.';
 
@@ -8979,6 +8991,18 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get privateUsdConvertOpeningSlow =>
       'The market maker hasn\'t opened the swap yet. Nothing has been sent.';
+
+  @override
+  String get privateUsdConvertProblemClock =>
+      'Your phone\'s clock is off, so the bridge can\'t go on. Set it to the right time. Veylor keeps trying while it\'s open.';
+
+  @override
+  String get privateUsdConvertProblemClockDesktop =>
+      'Your Mac\'s clock is off, so the bridge can\'t go on. Set it to the right time. Veylor keeps trying while it\'s open.';
+
+  @override
+  String get privateUsdConvertProblemClockLinux =>
+      'Your computer\'s clock is off, so the bridge can\'t go on. Set it to the right time. Veylor keeps trying while it\'s open.';
 
   @override
   String get privateUsdConvertProblemEthereum =>
