@@ -164,3 +164,60 @@ install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
 # (docs/private-usd-windows.md).
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../ios/Runner/Railgun/railgun/"
   DESTINATION "${INSTALL_BUNDLE_DATA_DIR}/railgun" COMPONENT Runtime)
+
+# The Visual C++ runtime beside the executable (app-local deployment, which
+# Microsoft allows), so a release starts on a computer without the Visual C++
+# Redistributable: the app, the plugins and the wallet library import
+# vcruntime140.dll and msvcp140.dll (vcruntime140_1.dll too on x64), which only
+# the redistributable puts in Windows. Without them Velopack's installer says
+# its install hook failed. Every DLL of the runtime comes from the redist folder
+# of the Visual Studio whose compiler builds the app, for the architecture it
+# builds for, its newest version there (a runtime may be newer than the toolset
+# that linked against it, never older). CMake's InstallRequiredSystemLibraries
+# knows only the compilers of its own release; this reads the folders instead.
+# scripts/check-veylor-windows-package.py checks what every binary imports.
+set(VEYLOR_MSVC_RUNTIME_PROBLEM "")
+string(TOLOWER "${MSVC_CXX_ARCHITECTURE_ID}" VEYLOR_MSVC_ARCH)
+if(NOT VEYLOR_MSVC_ARCH MATCHES "^(x64|arm64)$")
+  set(VEYLOR_MSVC_RUNTIME_PROBLEM
+    "the compiler builds for '${MSVC_CXX_ARCHITECTURE_ID}', not x64 or ARM64")
+elseif(NOT CMAKE_CXX_COMPILER MATCHES "^(.*/VC)/Tools/MSVC/[^/]+/bin/")
+  set(VEYLOR_MSVC_RUNTIME_PROBLEM
+    "the compiler ${CMAKE_CXX_COMPILER} is not a Visual Studio's VC/Tools/MSVC")
+else()
+  set(VEYLOR_VC_DIR "${CMAKE_MATCH_1}")
+  # <VC>/Redist/MSVC/<version>/<arch>/Microsoft.VC14x.CRT
+  file(GLOB VEYLOR_MSVC_CRT_DIRS LIST_DIRECTORIES true
+    "${VEYLOR_VC_DIR}/Redist/MSVC/*/${VEYLOR_MSVC_ARCH}/Microsoft.VC*.CRT")
+  set(VEYLOR_MSVC_CRT_DIR "")
+  set(VEYLOR_MSVC_REDIST_VERSION "0")
+  foreach(crt_dir IN LISTS VEYLOR_MSVC_CRT_DIRS)
+    get_filename_component(redist_version "${crt_dir}/../.." ABSOLUTE)
+    get_filename_component(redist_version "${redist_version}" NAME)
+    if(redist_version MATCHES "^[0-9]+(\\.[0-9]+)+$" AND
+       redist_version VERSION_GREATER VEYLOR_MSVC_REDIST_VERSION AND
+       EXISTS "${crt_dir}/vcruntime140.dll" AND EXISTS "${crt_dir}/msvcp140.dll")
+      set(VEYLOR_MSVC_REDIST_VERSION "${redist_version}")
+      set(VEYLOR_MSVC_CRT_DIR "${crt_dir}")
+    endif()
+  endforeach()
+  if(VEYLOR_MSVC_CRT_DIR STREQUAL "")
+    set(VEYLOR_MSVC_RUNTIME_PROBLEM
+      "${VEYLOR_VC_DIR}/Redist/MSVC has no ${VEYLOR_MSVC_ARCH} runtime")
+  endif()
+endif()
+if(VEYLOR_MSVC_RUNTIME_PROBLEM STREQUAL "")
+  message(STATUS "The C++ runtime beside the app: ${VEYLOR_MSVC_CRT_DIR}")
+  file(GLOB VEYLOR_MSVC_RUNTIME_DLLS "${VEYLOR_MSVC_CRT_DIR}/*.dll")
+  install(FILES ${VEYLOR_MSVC_RUNTIME_DLLS} DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+    CONFIGURATIONS Profile;Release COMPONENT Runtime)
+else()
+  # A Debug build runs where Visual Studio is; a release build without the
+  # runtime would not start on a computer without the redistributable.
+  message(WARNING "No C++ runtime to ship: ${VEYLOR_MSVC_RUNTIME_PROBLEM}.")
+  install(CODE "
+    if(CMAKE_INSTALL_CONFIG_NAME MATCHES \"^(Profile|Release)$\")
+      message(FATAL_ERROR \"No C++ runtime to ship: ${VEYLOR_MSVC_RUNTIME_PROBLEM}.\")
+    endif()
+    " COMPONENT Runtime)
+endif()
