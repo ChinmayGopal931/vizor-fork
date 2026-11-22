@@ -197,7 +197,7 @@ case "${flavor}" in
     )
     ;;
   veylor)
-    # Exactly the Play bundle's defines (AGENTS.md, "Android direct APK
+    # Exactly the Play bundle's defines (docs/releases.md, "Android direct APK
     # (verifiable)"), so the APK behaves as Play's build does.
     build_args+=(
       --dart-define=VIZOR_PRIVATE_USD_ENABLED=true

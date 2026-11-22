@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Selects the identity the macOS app builds with (AGENTS.md, "Desktop
+# Selects the identity the macOS app builds with (docs/releases.md, "Desktop
 # identity"). It writes or removes macos/Runner/Configs/FlavorOverrides.xcconfig,
 # the ignored file AppInfo.xcconfig includes, so the choice lasts until it is
 # cleared. Without the file the build keeps upstream's Vizor identity.
@@ -93,7 +93,7 @@ fi
 # Veylor builds sign with Zapp LLC's team: its Apple Development certificate
 # and the app's Mac development profile, which lists the Macs it runs on, or,
 # for a release, its Developer ID certificate and the app's Developer ID
-# profile (AGENTS.md, "Desktop identity").
+# profile (docs/releases.md, "Desktop identity").
 VEYLOR_TEAM="63UVRFCV97"
 RELEASE_PROFILE_NAME=""
 case "$APPLICATION_ID" in

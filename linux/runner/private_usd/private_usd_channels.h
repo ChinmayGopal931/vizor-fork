@@ -4,7 +4,7 @@
 #include <flutter_linux/flutter_linux.h>
 #include <gtk/gtk.h>
 
-// Shielded USD's native side on Linux (AGENTS.md, "Private USD"), on the Mac's channel names: the Railgun page host
+// Shielded USD's native side on Linux (docs/private-usd.md), on the Mac's channel names: the Railgun page host
 // (`com.zcash.wallet/railgun`), the keep-awake flag (`com.zcash.wallet/screen_awake`), the settlement reminder
 // (`com.zcash.wallet/haptics`, `settlementDeadline`) and the session lifecycle (`flutter/lifecycle`). Registered before
 // Dart's bootstrap can ask anything of them.

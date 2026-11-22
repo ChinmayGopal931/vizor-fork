@@ -33,7 +33,7 @@ Environment:
   VIZOR_UPDATE_CHECK_ENABLED     true only for builds that should check updates.
   VIZOR_COINGECKO_PRICE_BASE_URL Home price API base URL.
   VIZOR_WALLET_LINK_BACKEND_URL  Wallet link relay API base URL.
-  VIZOR_PRIVATE_USD_ENABLED      true compiles Shielded USD in (AGENTS.md,
+  VIZOR_PRIVATE_USD_ENABLED      true compiles Shielded USD in (docs/private-usd.md,
                                  "Private USD"); it shows where the Railgun
                                  page process starts WebKit's sandbox
                                  (docs/private-usd-linux.md). Unset: not
@@ -43,7 +43,7 @@ Environment:
 Default flavors: mainnet,testnet
 
 The veylor flavors build Veylor's identity through VIZOR_APPLICATION_ID
-(AGENTS.md, "Desktop identity") and never check for updates.
+(docs/releases.md, "Desktop identity") and never check for updates.
 USAGE
 }
 

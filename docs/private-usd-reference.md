@@ -1127,7 +1127,7 @@ Each row is a step zapp performs, and the veylor seam that performs it. "New" me
 ### 8.2 FRB API conventions
 
 - **Registration.** Add `pub mod private_usd;` to `rust/src/api/mod.rs`. `flutter_rust_bridge.yaml` has `rust_input: crate::api,zcash_voting::wire` and `dart_output: lib/src/rust`, so the new file is picked up automatically and generates `lib/src/rust/api/private_usd.dart`. Regenerate with `scripts/generate-rust-bridge.sh` (FRB `=2.11.1`, `rust/Cargo.toml:13`; Dart `flutter_rust_bridge: 2.11.1`). Logic lives in `rust/src/wallet/private_usd/{mod,keys,railgun_keys,evm_rpc,maker_client,relayer_client,tokens,forward,reverse,joint,store}.rs`; `api/` stays thin.
-- **Signatures.** Only primitives, `String`, `Vec<u8>` and flat structs (AGENTS.md "Rust API Design Constraint").
+- **Signatures.** Only primitives, `String`, `Vec<u8>` and flat structs (docs/architecture.md "Rust API Design Constraint").
   - Per-account calls take `db_path: String, network: String, account_uuid: String`. Key-using calls take `mnemonic_bytes: Vec<u8>`, wrapped at once in `zeroize::Zeroizing` (`api/gift_card_tracking.rs:6-23`; `api/sync.rs:1656-1663`).
   - Calls that sync or broadcast also take `lightwalletd_url: String`, from `rpcEndpointFailoverProvider.current.normalizedLightwalletdUrl`.
   - Re-export wallet structs with `pub use` (`api/gift_card_tracking.rs:3`).
@@ -1410,7 +1410,7 @@ pub fn private_usd_send_settle_all(store_dir: String, network: String, eth_rpc_u
 - **The entry point** is the strip itself, which pushes the Private USD screen holding "Convert", "Send" and "Withdraw". The action row stays Send / Receive / Pay. The in-flight conversion banner (zapp's `ToUsd`/`ToZec`) is a `_MobileHomeEntryCard(emphasized: true)` placed after the action row.
 - **When to hide it:** whenever `privateUsdAvailableProvider` is false (below). Before first use the strip still shows "—" and starts no WebView (§9.4 S1). The banner stays while an unfinished swap exists, even when unavailable (D16).
 - **New providers.** All go under `lib/src/features/private_usd/providers/`: `privateUsdAvailableProvider`, `privateUsdBalanceProvider(accountUuid)` (the §6.6 state), and `privateUsdConversionBannerProvider(accountUuid)`.
-- **Tokens to use.** `colors.background.homeCard`, `colors.text.homeCard`, `colors.text.positiveStrong` / `colors.text.destructive`, `AppSpacing.*`, `AppRadii.large`, `_mobileHomeLabelMStyle`, and `AppIcon` with `AppIcons.*`. A Private USD icon must be added as a design asset (lossless WebP for raster, per AGENTS.md).
+- **Tokens to use.** `colors.background.homeCard`, `colors.text.homeCard`, `colors.text.positiveStrong` / `colors.text.destructive`, `AppSpacing.*`, `AppRadii.large`, `_mobileHomeLabelMStyle`, and `AppIcon` with `AppIcons.*`. A Private USD icon must be added as a design asset (lossless WebP for raster, per docs/neon-look.md).
 
 **Figma-compare and Widgetbook.**
 
@@ -1426,7 +1426,7 @@ pub fn private_usd_send_settle_all(store_dir: String, network: String, eth_rpc_u
 **Availability.** `privateUsdAvailableProvider` (`lib/src/features/private_usd/providers/private_usd_available_provider.dart`) is true when all of these hold:
 
 - `VIZOR_PRIVATE_USD_ENABLED` is set
-- `kAppFormFactor == AppFormFactor.mobile` (const, so desktop tree-shakes the rest) **and** `defaultTargetPlatform == TargetPlatform.android`. Only Android has the Kotlin host; a mobile-form-factor iOS build would otherwise hit `MissingPluginException`. This is an OS-behaviour check, which AGENTS.md allows; use `defaultTargetPlatform` so widget tests can override it.
+- `kAppFormFactor == AppFormFactor.mobile` (const, so desktop tree-shakes the rest) **and** `defaultTargetPlatform == TargetPlatform.android`. Only Android has the Kotlin host; a mobile-form-factor iOS build would otherwise hit `MissingPluginException`. This is an OS-behaviour check, which docs/form-factor.md allows; use `defaultTargetPlatform` so widget tests can override it.
 - `private_usd_deployment(network) != null` (mainnet or testnet; never regtest)
 - the kill switch is not `false` (§7.3)
 - the active account is a software account with a ZIP-32 index (`!isKeystoneAccount && !isLedgerAccount`, `account_provider.dart:2788-2792`, and `zip32AccountIndex != null`)
@@ -2178,7 +2178,7 @@ Flags:
 - `private_usd_home_separator` (`:17`): veylor lays out its own strip
 - `convert_quote_countdown` (`:90`): use veylor's `m:ss` formatter
 
-**Naming rule.** "Private USD" is the feature's name: capitalize it at the start of a sentence and as a screen title, and write "private USD" mid-sentence (zapp mixes both). "Railgun", "Ethereum", "Etherscan", "Railscan", "ZEC", "USDC" and "Zcash" keep their canonical case (AGENTS.md "UI Copy Conventions").
+**Naming rule.** "Private USD" is the feature's name: capitalize it at the start of a sentence and as a screen title, and write "private USD" mid-sentence (zapp mixes both). "Railgun", "Ethereum", "Etherscan", "Railscan", "ZEC", "USDC" and "Zcash" keep their canonical case (docs/copy.md).
 
 **Shared**
 
@@ -2523,7 +2523,7 @@ Flags:
 | N `reset_anyway` | Reset anyway | N |
 | N `accounts_pending_conversions` | {n} conversion(s) in progress | N (plural; beside the swap pending count) |
 
-**Where the copy lives.** veylor keeps UI strings inline in widgets (for example `mobile_swap_review_content.dart:116`); there is no ARB. Put them in `lib/src/features/private_usd/private_usd_copy.dart` as `const` strings and builder functions, so tests and Widgetbook assert on one source (AGENTS.md: "When editing existing copy, also update widgetbook fixtures and tests"). Map `ApiPrivateUsdErrorCode` (§8.2) to these strings in one `privateUsdErrorMessage(code)` function, mirroring `pu/PrivateUsdFailure.kt`.
+**Where the copy lives.** veylor keeps UI strings inline in widgets (for example `mobile_swap_review_content.dart:116`); there is no ARB. Put them in `lib/src/features/private_usd/private_usd_copy.dart` as `const` strings and builder functions, so tests and Widgetbook assert on one source (docs/copy.md: "When editing existing copy, also update widgetbook fixtures and tests"). Map `ApiPrivateUsdErrorCode` (§8.2) to these strings in one `privateUsdErrorMessage(code)` function, mirroring `pu/PrivateUsdFailure.kt`.
 
 ### 9.7 Widgetbook fixtures and capture scenarios
 

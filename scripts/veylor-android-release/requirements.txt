@@ -1,5 +1,5 @@
 # apksigcopier checks that a signed APK is the attested unsigned build plus
-# its signature, as F-Droid checks reproducible builds (AGENTS.md, "Android
+# its signature, as F-Droid checks reproducible builds (docs/releases.md, "Android
 # direct APK (verifiable)"). Pinned with hashes; scripts/sign-veylor-apk.sh
 # installs them into a throwaway virtualenv under build/ with
 # --require-hashes --only-binary=:all: --no-deps. click 8.1 keeps Python 3.8

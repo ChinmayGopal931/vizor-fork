@@ -2,7 +2,7 @@
 ///
 /// The desktop pane and the mobile screen render the same two tabs over the
 /// same created/received sections, so the tab enum and the section grouping
-/// live here rather than in either form factor's view file. `AGENTS.md` keeps
+/// live here rather than in either form factor's view file. `docs/form-factor.md` keeps
 /// app code on one selector per concept; a mobile-only copy of these types
 /// would let the two lanes drift apart silently.
 library;
