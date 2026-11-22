@@ -45,8 +45,7 @@ Everything runs in Veylor's process, on the UI thread, in `windows/runner/`:
   wallet library's fetch (below).
 - `railgun/railgun_dispatch.cpp`, `railgun_network.cpp`: the UI thread's timers
   and posted work, the bridge's loopback check, and the network watch.
-- `private_usd_channels.cpp`: Privacy Pass attestation (`unavailable`, as on
-  iOS, the Mac and Linux), the keep-awake flag and the settlement reminder.
+- `private_usd_channels.cpp`: the keep-awake flag and the settlement reminder.
 - `session_lifecycle.cpp`: the session away (below).
 
 Linux's portable files are compiled unchanged: the protocol and its method and

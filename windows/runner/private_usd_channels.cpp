@@ -31,18 +31,6 @@ PrivateUsdChannels::PrivateUsdChannels(flutter::BinaryMessenger* messenger, HWND
   railgun_ = std::make_unique<railgun_windows::RailgunHostChannels>(messenger, window, view);
   lifecycle_ = std::make_unique<SessionLifecycle>(messenger, window);
 
-  // `com.zcash.wallet/private_usd_attestation` on Windows, as on iOS, the Mac and Linux: zecSwap's issuer checks
-  // Android key attestation alone, so every `sign` is `unavailable`, and Dart then says conversions need an Android
-  // device while a market maker asks for tokens. The same codes as Android's, so Dart treats every host alike.
-  attestation_ = NewChannel(messenger, "com.zcash.wallet/private_usd_attestation");
-  attestation_->SetMethodCallHandler([](const auto& call, auto result) {
-    if (call.method_name() == "sign") {
-      result->Error("unavailable", "the token issuer has no Windows mode yet");
-    } else {
-      result->NotImplemented();
-    }
-  });
-
   // `com.zcash.wallet/screen_awake` on Windows (`setEnabled {enabled}`), the flag `SyncKeepAwakeNativeHost` owns:
   // while it is on, neither the display nor the computer sleeps on idle, as the phones keep their screen on and the
   // Mac holds an IOKit assertion. A locked or sleeping computer hides the app, and a hidden app pauses Private USD (plan
@@ -97,7 +85,7 @@ PrivateUsdChannels::PrivateUsdChannels(flutter::BinaryMessenger* messenger, HWND
 }
 
 PrivateUsdChannels::~PrivateUsdChannels() {
-  for (auto* channel : {&attestation_, &screen_awake_, &haptics_}) {
+  for (auto* channel : {&screen_awake_, &haptics_}) {
     if (*channel) (*channel)->SetMethodCallHandler(nullptr);
   }
   if (awake_) ::SetThreadExecutionState(ES_CONTINUOUS);
