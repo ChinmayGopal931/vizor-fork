@@ -288,6 +288,9 @@ pub(super) struct State {
     /// Every broadcast fails.
     pub broadcast_fails: bool,
     pub deposit_fee: Option<u64>,
+    /// What a deposit built now costs in network fee, whatever was
+    /// estimated: more once the open fee took a note it counted on.
+    pub deposit_cost: u64,
     pub unpayable: bool,
     pub deposits: Vec<(String, u64)>,
     /// The deposit the wallet created last, as its history shows it.
@@ -417,6 +420,7 @@ impl State {
             synced: true,
             broadcast_fails: false,
             deposit_fee: Some(DEPOSIT_FEE_ZAT),
+            deposit_cost: DEPOSIT_FEE_ZAT,
             unpayable: false,
             deposits: Vec::new(),
             created: None,
@@ -1176,6 +1180,11 @@ impl ForwardZcash for FakeZcash {
         Ok(self.0.get().deposit_fee)
     }
 
+    /// Testnet's before NU7, at `ZCASH_HEIGHT`.
+    async fn marginal_fee(&self) -> Result<u64> {
+        Ok(crate::wallet::fees::LEGACY_MARGINAL_FEE)
+    }
+
     async fn funds(&self) -> Result<Funds> {
         Ok(self.0.get().funds)
     }
@@ -1188,7 +1197,7 @@ impl ForwardZcash for FakeZcash {
         max_total: u64,
     ) -> Result<FakeProposal> {
         let state = self.0.get();
-        if state.unpayable || zatoshi + DEPOSIT_FEE_ZAT > max_total {
+        if state.unpayable || zatoshi + state.deposit_cost > max_total {
             return fail(ErrorCode::DepositUnpayable, "short");
         }
         if state.crash == Some(Crash::AfterPropose) {

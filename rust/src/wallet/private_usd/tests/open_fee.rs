@@ -507,3 +507,36 @@ async fn a_bridge_whose_fee_started_is_never_abandoned() {
     assert_eq!(refused.code, ErrorCode::TooLate);
 }
 
+/// Finding 6: a quote that asks a fee approves its deposit with one
+/// action's fee to spare, inside the most the review shows, so a deposit
+/// that takes an input more once the fee spent a note still fits; a quote
+/// without a fee approves its estimate alone.
+#[tokio::test]
+async fn a_deposit_after_the_fee_fits_its_approved_total_with_an_input_more() {
+    let slack = crate::wallet::fees::LEGACY_MARGINAL_FEE;
+    let h = asking(FEE, fee_address());
+    let quoted = h.quote().await.unwrap();
+    assert_eq!(
+        quoted.offer.deposit_fee_zatoshi,
+        Some(DEPOSIT_FEE_ZAT + slack)
+    );
+    let max_total = quoted.offer.max_total_zatoshi().unwrap();
+    assert_eq!(max_total, DEPOSIT_ZAT + DEPOSIT_FEE_ZAT + slack);
+    assert_eq!(
+        h.forward()
+            .accept(&mut h.store(), quoted.index, max_total, false)
+            .await
+            .unwrap(),
+        AcceptOutcome::Accepted
+    );
+    mine(&h, "openfee1");
+    assert_eq!(h.advance().await.unwrap(), waiting(ForwardWait::Opening));
+    h.world.set().deposit_cost = DEPOSIT_FEE_ZAT + slack;
+    assert_eq!(h.advance().await.unwrap(), h.confirming());
+    assert_eq!(h.world.get().deposits.len(), 1);
+
+    let h = Harness::new();
+    let quoted = h.quote().await.unwrap();
+    assert_eq!(quoted.offer.deposit_fee_zatoshi, Some(DEPOSIT_FEE_ZAT));
+}
+

@@ -1002,6 +1002,14 @@ impl ForwardZcash for WalletZcash<'_> {
         .map_err(wallet_error)
     }
 
+    async fn marginal_fee(&self) -> Result<u64> {
+        let target = sync::fee_policy_target(self.main_db, self.network).map_err(wallet_error)?;
+        Ok(crate::wallet::fees::marginal_fee(
+            &self.network,
+            BlockHeight::from_u32(target),
+        ))
+    }
+
     async fn funds(&self) -> Result<Funds> {
         let balance = sync::get_wallet_balance(self.main_db, self.network, self.account_uuid)
             .map_err(wallet_error)?;

@@ -207,6 +207,9 @@ pub(crate) trait ForwardZcash {
     /// The deposit's network fee from the wallet now, or `None` unless one
     /// transaction can pay it. Nothing is locked.
     async fn deposit_fee(&self, address: &str, zatoshi: u64) -> Result<Option<u64>>;
+    /// One logical action's fee at the wallet's next target height (ZIP 317:
+    /// 5,000 zatoshis before NU7, 1,000 from it).
+    async fn marginal_fee(&self) -> Result<u64>;
     /// The account's funds a payment may spend.
     async fn funds(&self) -> Result<Funds>;
     /// Proposes paying `zatoshi` to `address` in one transaction costing at
@@ -491,9 +494,17 @@ where
             .keys
             .joint(index, &terms::quote_maker_share(&quote)?)?
             .unified_address(self.zcash_network());
-        let deposit_fee_zatoshi = self.zcash.deposit_fee(&address, quote.deposit_zat).await?;
+        let mut deposit_fee_zatoshi = self.zcash.deposit_fee(&address, quote.deposit_zat).await?;
         let open_fee_network_zatoshi = match &quote.open_fee {
-            Some(fee) => self.zcash.deposit_fee(&fee.address, fee.zat).await?,
+            Some(fee) => {
+                // The fee's payment spends notes the deposit's estimate
+                // counted on, and the deposit may then take an input more:
+                // its approved total allows one action more, which the
+                // review shows inside the most it may cost.
+                let slack = self.zcash.marginal_fee().await?;
+                deposit_fee_zatoshi = deposit_fee_zatoshi.and_then(|fee| fee.checked_add(slack));
+                self.zcash.deposit_fee(&fee.address, fee.zat).await?
+            }
             None => None,
         };
         let offer = Offer {
