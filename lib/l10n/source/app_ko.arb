@@ -2459,7 +2459,7 @@
   "privateUsdConvertRelayerInfoKeepOpen": "Veylor는 열려 있고 잠금이 해제된 동안 ZEC를 보내고, 마켓 메이커가 확인하면 수령을 릴레이어에게 맡겨요. 환불과 보내기는 Veylor가 열려 있고 잠금이 해제된 동안에만 진행돼요.",
   "privateUsdConvertRelayerReviewNote": "마켓 메이커가 입금을 확인할 때까지 몇 분 동안 Veylor를 열어 두세요. 그다음 릴레이어가 달러를 수령하니 앱을 나가도 돼요.",
   "privateUsdConvertResultFeeKept": "브리지가 시작되지 않았어요. 마켓 메이커 수수료는 돌려받을 수 없고, 나머지 ZEC는 지갑에서 나가지 않았어요.",
-  "privateUsdConvertResultFeeNotHonoured": "마켓 메이커가 수수료를 확인하기 전에 견적이 만료됐어요. 수수료가 나중에 확인되면 환불되지 않아요.",
+  "privateUsdConvertResultFeeNotHonoured": "마켓 메이커가 수수료를 확인하기 전에 견적이 만료됐어요. 확인된 수수료는 환불되지 않고, 확인되지 않은 수수료는 지갑에 그대로 남아요.",
   "privateUsdConvertResultMakerCancelled": "ZEC를 보내기 전에 마켓 메이커가 스왑을 취소했어요. ZEC는 지갑에서 나가지 않았어요.",
   "privateUsdConvertResultMakerRefused": "마켓 메이커가 브리지를 거절했어요. ZEC는 지갑에서 나가지 않았어요.",
   "privateUsdConvertResultMakerUnavailable": "지금은 마켓 메이커가 브리지를 받지 않아요. ZEC는 지갑에서 나가지 않았어요.",

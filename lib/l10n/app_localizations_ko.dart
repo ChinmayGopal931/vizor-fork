@@ -8991,7 +8991,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get privateUsdConvertResultFeeNotHonoured =>
-      '마‍켓 메‍이‍커‍가 수‍수‍료‍를 확‍인‍하‍기 전‍에 견‍적‍이 만‍료‍됐‍어‍요. 수‍수‍료‍가 나‍중‍에 확‍인‍되‍면 환‍불‍되‍지 않‍아‍요.';
+      '마‍켓 메‍이‍커‍가 수‍수‍료‍를 확‍인‍하‍기 전‍에 견‍적‍이 만‍료‍됐‍어‍요. 확‍인‍된 수‍수‍료‍는 환‍불‍되‍지 않‍고, 확‍인‍되‍지 않‍은 수‍수‍료‍는 지‍갑‍에 그‍대‍로 남‍아‍요.';
 
   @override
   String get privateUsdConvertResultMakerCancelled =>

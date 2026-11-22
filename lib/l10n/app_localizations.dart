@@ -14924,10 +14924,10 @@ abstract class AppLocalizations {
   /// **'The bridge didn\'t start. The market maker keeps its fee; the rest of your ZEC never left your wallet.'**
   String get privateUsdConvertResultFeeKept;
 
-  /// Result on the bridge progress screen when a bridge ended because its quote expired before the market maker saw its fee confirmed. The fee may still confirm, and then isn't refunded.
+  /// Result on the bridge progress screen and in the bridge's details when a bridge ended because its quote expired before the market maker saw its fee confirmed. Worded to stay true whether the fee confirms later or never does (then it stays in the wallet).
   ///
   /// In en, this message translates to:
-  /// **'The quote ran out before the market maker saw its fee. If the fee still confirms, it isn\'t refunded.'**
+  /// **'The quote ran out before the market maker saw its fee. A fee that confirms isn\'t refunded; one that doesn\'t stays in your wallet.'**
   String get privateUsdConvertResultFeeNotHonoured;
 
   /// Result body when a bridge ended with nothing sent: the market maker cancelled the swap before Veylor sent the ZEC, so no ZEC left the wallet.

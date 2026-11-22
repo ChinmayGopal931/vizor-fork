@@ -9124,7 +9124,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get privateUsdConvertResultFeeNotHonoured =>
-      'The quote ran out before the market maker saw its fee. If the fee still confirms, it isn\'t refunded.';
+      'The quote ran out before the market maker saw its fee. A fee that confirms isn\'t refunded; one that doesn\'t stays in your wallet.';
 
   @override
   String get privateUsdConvertResultMakerCancelled =>

@@ -2459,7 +2459,7 @@
   "privateUsdConvertRelayerInfoKeepOpen": "Veylor 在打开且解锁时发送你的 ZEC，并在做市商确认后将领取交给中继者。退款和发送只在 Veylor 打开且解锁时进行。",
   "privateUsdConvertRelayerReviewNote": "请保持 Veylor 打开，直到做市商确认你的存入，约需几分钟。之后中继者会领取你的美元，你就可以离开了。",
   "privateUsdConvertResultFeeKept": "跨链未开始。做市商会保留其手续费；其余 ZEC 从未离开钱包。",
-  "privateUsdConvertResultFeeNotHonoured": "做市商确认手续费之前，报价已过期。如果手续费之后仍被确认，将不予退还。",
+  "privateUsdConvertResultFeeNotHonoured": "做市商确认手续费之前，报价已过期。已确认的手续费不予退还；未确认的手续费会留在钱包中。",
   "privateUsdConvertResultMakerCancelled": "在你的 ZEC 发送之前，做市商取消了兑换。你的 ZEC 从未离开钱包。",
   "privateUsdConvertResultMakerRefused": "做市商拒绝了此次跨链。你的 ZEC 从未离开钱包。",
   "privateUsdConvertResultMakerUnavailable": "做市商目前不接受跨链。你的 ZEC 从未离开钱包。",

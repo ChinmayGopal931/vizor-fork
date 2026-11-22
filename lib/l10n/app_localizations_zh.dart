@@ -8443,7 +8443,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get privateUsdConvertResultFeeNotHonoured =>
-      '做市商确认手续费之前，报价已过期。如果手续费之后仍被确认，将不予退还。';
+      '做市商确认手续费之前，报价已过期。已确认的手续费不予退还；未确认的手续费会留在钱包中。';
 
   @override
   String get privateUsdConvertResultMakerCancelled =>

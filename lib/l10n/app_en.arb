@@ -11660,9 +11660,9 @@
   "@privateUsdConvertResultFeeKept": {
     "description": "Result on the bridge progress screen, and the note in its details, when a bridge ended before it started but after the market maker's fee was paid and confirmed: that fee isn't refunded."
   },
-  "privateUsdConvertResultFeeNotHonoured": "The quote ran out before the market maker saw its fee. If the fee still confirms, it isn't refunded.",
+  "privateUsdConvertResultFeeNotHonoured": "The quote ran out before the market maker saw its fee. A fee that confirms isn't refunded; one that doesn't stays in your wallet.",
   "@privateUsdConvertResultFeeNotHonoured": {
-    "description": "Result on the bridge progress screen when a bridge ended because its quote expired before the market maker saw its fee confirmed. The fee may still confirm, and then isn't refunded."
+    "description": "Result on the bridge progress screen and in the bridge's details when a bridge ended because its quote expired before the market maker saw its fee confirmed. Worded to stay true whether the fee confirms later or never does (then it stays in the wallet)."
   },
   "privateUsdConvertResultMakerCancelled": "The market maker called the swap off before your ZEC was sent. Your ZEC never left your wallet.",
   "@privateUsdConvertResultMakerCancelled": {
