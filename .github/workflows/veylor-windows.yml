@@ -1,15 +1,19 @@
 name: Veylor Windows
 
 # Builds Veylor's Windows desktop app into Velopack packages per architecture
-# and network, and keeps them as workflow artifacts; it publishes nothing. The
-# identities are com.veylor.desktop (mainnet) and com.veylor.desktop.testnet
-# (testnet), the form factor desktop (the default), and Shielded USD is
-# compiled in: its Railgun page runs in WebView2, on the system's Evergreen
-# runtime (docs/private-usd-windows.md). The build runs upstream's packaging
+# and network, attests each file's build provenance and keeps them as workflow
+# artifacts. A run dispatched with public_release also publishes the mainnet
+# installers (the publish job, at the end). The identities are
+# com.veylor.desktop (mainnet) and com.veylor.desktop.testnet (testnet), the
+# form factor desktop (the default), and Shielded USD is compiled in: its
+# Railgun page runs in WebView2, on the system's Evergreen runtime
+# (docs/private-usd-windows.md). The build runs upstream's packaging
 # script, scripts/package-windows-velopack.ps1, with the arguments its lane
 # passes (`fastlane windows package`; docs/releases.md, "Desktop identity"): the
 # lane's Ruby has no Windows ARM64 platform in Gemfile.lock. The packages are
-# unsigned and have no update feed.
+# unsigned and have no update feed. The app carries the Visual C++ runtime
+# beside it (windows/CMakeLists.txt): the runners have the redistributable, so
+# only the package check would see it missing.
 #
 # A first job checks the Railgun page host against the hosts checklist
 # (docs/private-usd-railgun-hosts.md) on both architectures, with the host's
@@ -32,7 +36,9 @@ permissions:
   contents: read
 
 # A push cancels the CI run before it on the same branch, but never a public
-# release run, which has a group of its own (as veylor-linux.yml's).
+# release run, which has a group of its own and is never cancelled: a release
+# stopped between its jobs would leave a release half made (as
+# veylor-linux.yml's).
 concurrency:
   group: veylor-windows-${{ github.ref }}-${{ inputs.public_release && 'release' || 'ci' }}
   cancel-in-progress: ${{ !inputs.public_release }}
@@ -40,7 +46,7 @@ concurrency:
 env:
   # The version a CI build carries: <version>-internal.<run number>, or
   # <version> for a run dispatched with public_release.
-  VEYLOR_VERSION: 0.9.0
+  VEYLOR_VERSION: 0.9.3
   # Flutter comes from .fvmrc through fvm and is checked against
   # scripts/release-config/flutter-sdk.json. The tools below are pinned by
   # version here and by SHA-256 in the matrix; vpk is the Velopack CLI that
@@ -257,8 +263,10 @@ jobs:
               -OutputDir "dist\windows\velopack\$($flavor.Flavor)" `
               -UpdateRepositoryUrl "https://github.com/${{ github.repository }}"
             if ($LASTEXITCODE -ne 0) { throw "packaging $($flavor.AppId) failed" }
-            # Nothing of the app or its package shows Vizor's identity, and the
-            # app compiled with the settings it should.
+            # Nothing of the app or its package shows Vizor's identity, the app
+            # compiled with the settings it should, and every program and
+            # library in it is this architecture's, with the Visual C++
+            # runtime they import beside them and in the package.
             python -I scripts/check-veylor-windows-package.py `
               --pack-dir "build\windows\$env:ARCH\runner\Release" `
               --output-dir "dist\windows\velopack\$($flavor.Flavor)" `
@@ -465,3 +473,96 @@ jobs:
         with:
           path: ~/.cache/sccache
           key: ${{ steps.sccache.outputs.cache-primary-key }}
+
+  # A public release run publishes the mainnet installers itself, so the files
+  # on the release are the ones this run built and attested, never a copy that
+  # passed through a computer: the two Setup programs, under names that say
+  # what they are, and SHA256SUMS. No update feed yet. The release is never
+  # marked latest: the Mac's DMG link and update feed resolve through "latest"
+  # (docs/releases.md, "Veylor Windows release"). Its tag is the commit the
+  # files were built from. A release already there takes new files only from a
+  # run of that same commit (a publish that failed partway, run again): files
+  # built from another commit take a new version, never a published one's
+  # name. These are veylor-linux.yml's rules.
+  publish:
+    name: Publish the release
+    if: ${{ inputs.public_release }}
+    needs: [railgun-page, package, pins]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      attestations: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      # Into the runner's temporary directory, never a folder of the checkout:
+      # only the files named below are ever published.
+      - name: Download the mainnet x64 package
+        uses: actions/download-artifact@v8
+        with:
+          name: Veylor-windows-x64
+          path: ${{ runner.temp }}/downloaded/x64
+
+      - name: Download the mainnet ARM64 package
+        uses: actions/download-artifact@v8
+        with:
+          name: Veylor-windows-arm64
+          path: ${{ runner.temp }}/downloaded/arm64
+
+      - name: Check every file's attestation and write SHA256SUMS
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/release"
+          files=()
+          for arch in x64 arm64; do
+            from="$RUNNER_TEMP/downloaded/$arch"
+            # Velopack names the package after its version and the installer
+            # after its channel alone: the package beside it shows the
+            # installer is this version's build, not an internal one.
+            if [ ! -f "$from/com.veylor.desktop-$VEYLOR_VERSION-win-$arch-mainnet-full.nupkg" ]; then
+              echo "::error::The $arch package is not version $VEYLOR_VERSION's build."
+              exit 1
+            fi
+            file="Veylor-windows-$arch-Setup.exe"
+            cp "$from/com.veylor.desktop-win-$arch-mainnet-Setup.exe" "$RUNNER_TEMP/release/$file"
+            files+=("$file")
+          done
+          cd "$RUNNER_TEMP/release"
+          test "$(ls | wc -l)" -eq 2
+          # A rename keeps the digest, which the attestation names.
+          for file in "${files[@]}"; do
+            gh attestation verify "$file" --repo "$GITHUB_REPOSITORY" \
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/veylor-windows.yml" > /dev/null
+            echo "attested: $file"
+          done
+          sha256sum "${files[@]}" > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Publish veylor-windows/v${{ env.VEYLOR_VERSION }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag="veylor-windows/v$VEYLOR_VERSION"
+          notes="release_notes/veylor-windows-v$VEYLOR_VERSION.md"
+          release="$RUNNER_TEMP/release"
+          files=("$release/Veylor-windows-x64-Setup.exe" "$release/Veylor-windows-arm64-Setup.exe" "$release/SHA256SUMS")
+          if gh release view "$tag" > /dev/null 2>&1; then
+            tag_commit=$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .sha)
+            if [ "$tag_commit" != "$GITHUB_SHA" ]; then
+              echo "::error::$tag is published from $tag_commit; this run built $GITHUB_SHA. Raise VEYLOR_VERSION for a new release."
+              exit 1
+            fi
+            gh release upload "$tag" "${files[@]}" --clobber
+            gh release edit "$tag" --notes-file "$notes" --latest=false
+          else
+            gh release create "$tag" "${files[@]}" --target "$GITHUB_SHA" \
+              --title "Veylor $VEYLOR_VERSION (beta) for Windows" \
+              --notes-file "$notes" --latest=false
+          fi
