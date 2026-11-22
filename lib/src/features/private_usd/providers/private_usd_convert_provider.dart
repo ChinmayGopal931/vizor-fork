@@ -563,11 +563,16 @@ class PrivateUsdConvertNotifier
   // A quote not asked for while the wallet caught up, asked once it has.
   void Function()? _afterSync;
 
+  // An expired fee quote was replaced on the amount step: the next waits for
+  // the user, since each spends a swap index and shows a payout address.
+  bool _feeQuoteReplaced = false;
+
   @override
   PrivateUsdConvertState build() {
     setUpFlow();
     _asksFee = false;
     _afterSync = null;
+    _feeQuoteReplaced = false;
     _search = PrivateUsdZecQuoteSearch(
       (units) =>
           ref.read(privateUsdEngineProvider).quote(this.account!, units: units),
@@ -614,6 +619,7 @@ class PrivateUsdConvertNotifier
       clearQuoteError: true,
     );
     _afterSync = null;
+    _feeQuoteReplaced = false;
     final total = state.totalZat;
     if (total == null || state.isShort) return;
     if (!_mayQuote(() => onAmountChanged(state.amountText))) return;
@@ -630,6 +636,7 @@ class PrivateUsdConvertNotifier
     final spendable = state.holdings.spendable!;
     cancelQuote();
     _afterSync = null;
+    _feeQuoteReplaced = false;
     state = state.copyWith(
       amountText: formatZecAmount(spendable),
       clearQuote: true,
@@ -650,6 +657,7 @@ class PrivateUsdConvertNotifier
     final total = state.totalZat;
     if (total == null) return;
     final requested = state.quote?.requestedUnits;
+    _feeQuoteReplaced = false;
     state = state.copyWith(clearStartError: true);
     if (!_mayQuote(refreshQuote)) return;
     _requestQuote(
@@ -789,7 +797,16 @@ class PrivateUsdConvertNotifier
     final total = state.totalZat;
     if (total == null || state.isShort) return;
     final expired = state.quote!;
+    // A fee quote is replaced once; then the user asks again (an edit, Use
+    // it all), each quote spending a swap index.
+    if (expired.asksOpenFee && _feeQuoteReplaced) {
+      state = state.copyWith(
+        quoteError: (l10n) => l10n.privateUsdConvertQuoteRanOut,
+      );
+      return;
+    }
     if (!_mayQuote(replaceExpiredQuote)) return;
+    if (expired.asksOpenFee) _feeQuoteReplaced = true;
     _requestQuote(
       () => _search.quote(total, requestedUnits: expired.requestedUnits),
     );
@@ -894,13 +911,12 @@ class PrivateUsdConvertNotifier
   }
 }
 
-/// When [quote] stops being offered: before Rust would refuse its accept,
-/// which for one that asks an open fee is from its pay-by, the least life
-/// its fee needs to be mined in time before the quote's end.
+/// When [quote] stops being offered: before Rust would refuse its accept.
+/// One that asks an open fee is offered until Rust's pay-by alone, which
+/// holds its own margin, so the two never disagree.
 DateTime privateUsdZecQuoteOfferedUntil(PrivateUsdZecQuote quote) =>
-    (quote.openFeePayBy ?? quote.expiresAt).subtract(
-      PrivateUsdConvertTiming.expiryMargin,
-    );
+    quote.openFeePayBy ??
+    quote.expiresAt.subtract(PrivateUsdConvertTiming.expiryMargin);
 
 /// [accountUuid]'s conversion under way in either direction, read from the
 /// records (opening a convert screen, or after the app died mid-accept):

@@ -38,6 +38,14 @@ pub(crate) const ACCEPT_MARGIN_SECONDS: u64 = 15;
 pub(crate) const OPEN_FEE_MARGIN_SECONDS: u64 = 60;
 /// An open fee no block has yet is sent again this often.
 pub(crate) const OPEN_FEE_RESEND_SECONDS: u64 = 30;
+/// The review stops offering a fee quote this long before the fee may no
+/// longer be paid (`open_fee_min_quote_life_seconds` before its end): the
+/// time from a tap on Bridge to the payment's checks. Rust's
+/// `open_fee_pay_by` includes it, so Dart adds no margin of its own.
+pub(crate) const OPEN_FEE_OFFER_MARGIN_SECONDS: u64 = 20;
+/// The least a fee quote is offered for when it comes: one that would be
+/// offered for less is refused at the quote.
+pub(crate) const OPEN_FEE_LEAST_REVIEW_SECONDS: u64 = 30;
 /// How far the main wallet's scan may trail the Zcash tip for a quote that
 /// asks an open fee to be paid: a wallet further behind would pay the fee
 /// and then wait to deposit, perhaps past the deposit window. Dart's

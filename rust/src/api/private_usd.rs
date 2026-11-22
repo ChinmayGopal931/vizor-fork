@@ -28,7 +28,7 @@ use crate::wallet::private_usd::{
         Address, Amount, ClaimHold, Direction, ForwardOutcome, ForwardPhase, ForwardRecord,
         NothingSentCause, RefundCause, ReversePhase, ReverseRecord, ZcashTxId,
     },
-    railgun_head, railgun_keys,
+    open_fee, railgun_head, railgun_keys,
     relayer_client::{RailgunBroadcast, RelayerClient},
     reverse::{self, FundingPrice, FundingRequest, ProvedFunding, ReverseAccept, ReverseReport},
     sends::{self, ProvedSend, SendRecord, Sends},
@@ -2381,7 +2381,7 @@ fn api_quote(quoted: &Quoted) -> ApiForwardQuote {
         open_fee_network_zat: offer.open_fee_network_zatoshi,
         open_fee_pay_by: offer.quote.open_fee.as_ref().map(|_| {
             let min_life = deployment::deployment(offer.network).open_fee_min_quote_life_seconds;
-            seconds(offer.quote.expires_at.saturating_sub(min_life))
+            seconds(open_fee::pay_by(&offer.quote, min_life))
         }),
     }
 }

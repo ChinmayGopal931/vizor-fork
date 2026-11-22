@@ -373,7 +373,9 @@ async fn a_fee_quote_too_short_or_too_long_lived_pays_nothing() {
     let least = pins().open_fee_min_quote_life_seconds;
     let most = pins().open_fee_max_quote_life_seconds;
     assert_eq!((least, most), (180, 1_800));
-    for life in [least - 1, most + 1] {
+    // Offered until 20 s before the least life, for at least 30 s.
+    let shortest = least + 20 + 30;
+    for life in [shortest - 1, most + 1] {
         let h = asking(FEE, fee_address());
         h.world.set().quote_expires_at = NOW + life;
         let refused = h.quote().await.unwrap_err();
@@ -384,7 +386,7 @@ async fn a_fee_quote_too_short_or_too_long_lived_pays_nothing() {
         );
         assert!(h.world.get().fee_payments.is_empty());
     }
-    for life in [least, most] {
+    for life in [shortest, most] {
         let h = asking(FEE, fee_address());
         h.world.set().quote_expires_at = NOW + life;
         let quoted = h.quote().await.unwrap();

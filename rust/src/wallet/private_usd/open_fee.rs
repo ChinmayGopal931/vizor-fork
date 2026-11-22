@@ -8,11 +8,13 @@
 //!   network with an Orchard receiver and no other ([`orchard_only`]), so no
 //!   choice of pool can send it in the clear. A quote that fails is dropped;
 //!   its index is spent all the same.
-//! - **Quoted to live long enough, and no longer.** A fee quote must live
-//!   the deployment's `open_fee_min_quote_life_seconds` (180 s: a 75-second
-//!   block more than 90% likely in time) and at most its
-//!   `open_fee_max_quote_life_seconds` (30 minutes) when it comes
-//!   ([`check_quote_life`]).
+//! - **Quoted to live long enough, and no longer.** A fee quote is offered
+//!   until its [`pay_by`]: the deployment's `open_fee_min_quote_life_seconds`
+//!   (180 s: a 75-second block more than 90% likely in time) and
+//!   [`OPEN_FEE_OFFER_MARGIN_SECONDS`] before its end. It must come with at
+//!   least [`OPEN_FEE_LEAST_REVIEW_SECONDS`] of that offer left, so living
+//!   230 s or more, and live at most `open_fee_max_quote_life_seconds` (30
+//!   minutes) ([`check_quote_life`]).
 //! - **From a wallet at the tip.** Nothing is paid while the main wallet's
 //!   scan trails the Zcash tip by more than [`OPEN_FEE_MAX_SCAN_LAG_BLOCKS`]
 //!   ([`require_scanned`]): it would deposit late, if at all.
@@ -39,8 +41,8 @@ use zcash_address::unified::{self, Container, Encoding};
 use zcash_protocol::consensus::NetworkType;
 
 use super::deployment::{
-    FEE_PACE_SECONDS, FEE_WAIT_MAX_SECONDS, FEE_WAIT_MIN_SECONDS, OPEN_FEE_MARGIN_SECONDS,
-    OPEN_FEE_MAX_SCAN_LAG_BLOCKS,
+    FEE_PACE_SECONDS, FEE_WAIT_MAX_SECONDS, FEE_WAIT_MIN_SECONDS, OPEN_FEE_LEAST_REVIEW_SECONDS,
+    OPEN_FEE_MARGIN_SECONDS, OPEN_FEE_MAX_SCAN_LAG_BLOCKS, OPEN_FEE_OFFER_MARGIN_SECONDS,
 };
 use super::models::{OpenFee, SwapQuote};
 use super::{fail, ErrorCode, Result};
@@ -118,9 +120,21 @@ fn canonical(address: &str) -> bool {
         .is_ok_and(|(network, decoded)| decoded.encode(&network) == address)
 }
 
-/// That a quote asking an open fee, quoted at `now`, lives long enough for
-/// its fee to be paid and mined in time, `min_life` seconds, and not past
-/// `max_life`. `OpenFeeRefused` otherwise, with nothing paid.
+/// Until when the review offers a quote that asks an open fee (unix
+/// seconds): `min_life`, the least of its life the fee needs to be mined in
+/// time, and [`OPEN_FEE_OFFER_MARGIN_SECONDS`] for the tap, before its end.
+/// Dart offers it until then and adds no margin of its own.
+pub(crate) fn pay_by(quote: &SwapQuote, min_life: u64) -> u64 {
+    quote
+        .expires_at
+        .saturating_sub(min_life)
+        .saturating_sub(OPEN_FEE_OFFER_MARGIN_SECONDS)
+}
+
+/// That a quote asking an open fee, quoted at `now`, is offered for at least
+/// [`OPEN_FEE_LEAST_REVIEW_SECONDS`] before its [`pay_by`], so lives long
+/// enough for its fee to be paid and mined in time, and not past `max_life`.
+/// `OpenFeeRefused` otherwise, with nothing paid.
 pub(crate) fn check_quote_life(
     quote: &SwapQuote,
     now: u64,
@@ -128,10 +142,10 @@ pub(crate) fn check_quote_life(
     max_life: u64,
 ) -> Result<()> {
     let life = time_left(quote, now);
-    if life < min_life {
+    if pay_by(quote, min_life) < now.saturating_add(OPEN_FEE_LEAST_REVIEW_SECONDS) {
         return fail(
             ErrorCode::OpenFeeRefused,
-            format!("the fee quote lives {life}s, too short for its fee to be mined first"),
+            format!("the fee quote lives {life}s, too short to review and mine its fee first"),
         );
     }
     if quote.expires_at.saturating_sub(now) > max_life {
