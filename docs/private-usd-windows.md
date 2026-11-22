@@ -221,12 +221,16 @@ not start.
   used.
 - **CI** (`.github/workflows/veylor-windows.yml`) builds both identities for
   x64 (windows-latest) and ARM64 (windows-11-arm), unsigned and with no update
-  feed, stamped `0.9.0-internal.<run>` (or `0.9.0` on a dispatch with
-  `public_release`), and keeps the Velopack installer and package as artifacts
-  (`Veylor-windows-x64`, `Veylor-Testnet-windows-arm64`, …).
+  feed, stamped `<version>-internal.<run>` (or the version alone on a
+  dispatch with `public_release`, which also publishes the mainnet installers:
+  docs/releases.md, "Veylor Windows release"), and keeps the Velopack
+  installer and package as artifacts (`Veylor-windows-x64`,
+  `Veylor-Testnet-windows-arm64`, …).
   `scripts/check-veylor-windows-package.py` checks each: the defines it
   compiled with (no keyed RPC URL), the executable's name and version resource,
-  the page's bundle, and the installer's and package's names and manifest.
+  the page's bundle, every program's and library's architecture and the Visual
+  C++ runtime they import (beside the app and in the package), and the
+  installer's and package's names and manifest.
   The job then installs Veylor Testnet silently and checks what Windows shows
   of it: Apps & features names it Veylor Testnet and its publisher Zapp LLC, the
   Start menu's shortcut is Veylor Testnet (none names Vizor), and the app keeps
@@ -392,6 +396,15 @@ the app and the checklist's real sync, 7.3), the keep-awake hold, the
 settlement reminder, the session lifecycle (lock, sleep, display off, fast user
 switching), a covered or minimised window's throttling, a screen reader, and
 Windows 10.
+
+On a fresh Windows 11 ARM VM (UTM, 2026-11-22), the ARM64 testnet package's
+installer said "the application install hook failed": the app, its plugins and
+the wallet library import Microsoft's C++ runtime (`vcruntime140.dll`,
+`msvcp140.dll`), which GitHub's runners have and a fresh Windows lacks, and the
+package didn't carry it. Once the Visual C++ Redistributable was installed, the
+app ran. The packages now carry the runtime beside the app, and the package
+check fails one that lacks a DLL its binaries import (docs/releases.md,
+"Veylor Windows release").
 
 ## Trying it on a Windows 11 ARM computer (or VM)
 

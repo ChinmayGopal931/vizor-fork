@@ -207,10 +207,14 @@ own way, and a malformed or unknown id fails the build:
     `<version>-internal.<run>`, or the workflow's `VEYLOR_VERSION` on a
     dispatch with `public_release`. `scripts/check-veylor-windows-package.py`
     fails a build whose defines (no keyed RPC URL), executable, version
-    resource, page bundle, installer or package manifest differ or name Vizor.
+    resource, page bundle, installer or package manifest differ or name Vizor,
+    whose programs and libraries are another architecture's, or whose Visual
+    C++ runtime is missing ("Veylor Windows release" below).
   - **What it keeps:** each identity's Velopack installer
     (`com.veylor.desktop-win-<arch>-mainnet-Setup.exe`), full package, feed
-    and assets, as workflow artifacts for 30 days. Nothing is published.
+    and assets, as workflow artifacts for 30 days. A run dispatched with
+    `public_release` also publishes the mainnet installers ("Veylor Windows
+    release" below).
   - **Signing:** unsigned, with no update feed, so Windows's SmartScreen warns
     on the installer until a code-signing certificate signs it.
   - **Caches:** the Cargo registry and pub caches. There is no compiler cache:
@@ -242,8 +246,7 @@ fastlane builds leave Sparkle out, the Linux check is off, and Windows hides
 its updater in a build without a feed key. The lanes keep upstream's signing,
 Apple team, match and release targets, and the macOS lane refuses to sign a
 Veylor flavor. Veylor's macOS release has its own signing, notarization and
-update feed, and Linux's comes from CI (both below); Windows's packages come
-from CI too (above), and it has no Veylor release yet.
+update feed; Linux's and Windows's come from CI (all three below).
 
 ### Veylor macOS release
 
@@ -323,6 +326,49 @@ A run without `public_release` stays `-internal.<run>` and publishes nothing.
 - **Not yet:** the AppImages are unsigned (`LINUX_APPIMAGE_UNSIGNED`), the .debs
   come from no repository, and nothing updates itself.
 
+### Veylor Windows release
+
+`gh workflow run veylor-windows.yml --ref main -f public_release=true` builds
+`VEYLOR_VERSION` (set in the workflow) for x64 and ARM64 and publishes it. A
+run without `public_release` stays `-internal.<run>` and publishes nothing.
+Linux's rules hold, in `veylor-windows.yml`'s own `publish` job:
+
+- **What it publishes.** The two mainnet installers, renamed from Velopack's
+  `com.veylor.desktop-win-<arch>-mainnet-Setup.exe` to
+  `Veylor-windows-x64-Setup.exe` and `Veylor-windows-arm64-Setup.exe`, and
+  `SHA256SUMS`. Not the packages or their feed: nothing updates itself yet.
+  The testnet builds stay workflow artifacts.
+- **Attested.** The package job gives every file Velopack writes signed build
+  provenance. A rename keeps the digest, so the `publish` job verifies each
+  installer under its new name, signed by `veylor-windows.yml`
+  (`--signer-workflow`), and checks that the package beside it carries
+  `VEYLOR_VERSION`, so it is this version's build, not an internal one.
+- **Published by the run**, after both architectures' page checks and packages
+  and the pins have passed: the release `veylor-windows/vX.Y.Z`, tagged at the
+  commit it built, titled "Veylor X.Y.Z (beta) for Windows", with the notes
+  from `release_notes/veylor-windows-vX.Y.Z.md`. The downloads go to the
+  runner's temporary directory, never a folder of the checkout.
+- **A published version keeps its files**, **never cancelled** and **never
+  latest** (`--latest=false`), as Linux's.
+- **The C++ runtime ships with the app.** The app, its plugins and the wallet
+  library import Microsoft's C++ runtime (`vcruntime140.dll` and
+  `msvcp140.dll`, and `vcruntime140_1.dll` on x64), which Windows has only
+  once the Visual C++ Redistributable is installed. On a fresh Windows 11 ARM
+  VM the installer said its install hook failed: the app couldn't start
+  (2026-11-22). `windows/CMakeLists.txt` installs the runtime's DLLs beside the
+  executable (app-local, as Microsoft allows), every one in the redist folder
+  of the Visual Studio whose compiler builds the app, for the architecture it
+  builds, its newest version there; a Release build that finds none fails.
+  GitHub's runners have the redistributable, so the package check reads every
+  program and library in the app and fails a build where one is another
+  architecture's or imports a runtime DLL that the app's folder or the package
+  lacks.
+- **Anyone checks a download:**
+  `gh attestation verify <file> --repo ChinmayGopal931/vizor-fork
+  --signer-workflow ChinmayGopal931/vizor-fork/.github/workflows/veylor-windows.yml`.
+- **Not yet:** the installers are unsigned (SmartScreen warns until a
+  code-signing certificate signs them), and nothing updates itself.
+
 ## Release Notes
 
 When asked to prepare user-facing release notes or a changelog for a release,
@@ -330,4 +376,6 @@ read `release_notes/README.md` and create `release_notes/vX.Y.Z.md`.
 Unless the request explicitly says otherwise, draft desktop release notes for
 Windows, Linux, and macOS from desktop user-facing changes only. Exclude
 mobile-only changes. Veylor's macOS releases use
-`release_notes/veylor-macos-vX.Y.Z.md` ("Veylor macOS release").
+`release_notes/veylor-macos-vX.Y.Z.md` ("Veylor macOS release"), and its Linux
+and Windows releases `release_notes/veylor-linux-vX.Y.Z.md` and
+`release_notes/veylor-windows-vX.Y.Z.md`, which their workflows publish.

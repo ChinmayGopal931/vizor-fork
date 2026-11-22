@@ -60,7 +60,7 @@ log stream --predicate 'subsystem == "frb_user"' --level info
 | Shielded USD (Private USD): invariants, the open fee, Railgun's page and sync | `docs/private-usd.md`, then `docs/private-usd-android-plan.md` §3.5 |
 | A Railgun page host (Android, iOS, Mac, Linux, Windows) | `docs/private-usd-railgun-hosts.md` |
 | Shielded USD on Windows: the WebView2 host, its CI checks, what has run, trying a build | `docs/private-usd-windows.md` |
-| App identities, Google Play, the direct APK, the macOS and Linux releases | `docs/releases.md` |
+| App identities, Google Play, the direct APK, the macOS, Linux and Windows releases | `docs/releases.md` |
 | Release notes or a changelog | `release_notes/README.md` |
 | Tests, regtest, E2E, `clear-app.sh` | `docs/testing.md` |
 
