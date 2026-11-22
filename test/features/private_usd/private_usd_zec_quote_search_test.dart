@@ -80,6 +80,38 @@ void main() {
     expect(quote.totalZat <= BigInt.from(50000000), isTrue);
   });
 
+  // Rust's accept refuses unless the spendable ZEC covers the open fee, its
+  // payment's network fee and the deposit's approved total (`forward.rs`,
+  // `propose_open_fee`): the review's total is exactly that.
+  test('a fee quote\'s total is what the bridge needs the wallet to hold', () {
+    final quote = PrivateUsdZecQuote(
+      quote: ApiForwardQuote(
+        index: 0,
+        expiresAt: now + validity,
+        amount: '1000000',
+        relayerFee: '20000',
+        receives: '980000',
+        depositZat: BigInt.from(202021),
+        depositFeeZat: BigInt.from(15000),
+        maxTotalZat: BigInt.from(217021),
+        openFeeZat: BigInt.from(20000),
+        openFeeNetworkZat: BigInt.from(10000),
+        openFeePayBy: now + validity - 200,
+      ),
+      requestedUnits: 1000000,
+    );
+    expect(
+      quote.totalZat,
+      quote.openFeeZat + quote.quote.openFeeNetworkZat! + quote.maxTotalZat,
+    );
+    expect(quote.totalZat, BigInt.from(247021));
+    final noFee = PrivateUsdZecQuote(
+      quote: quoteFor(1000000),
+      requestedUnits: 1000000,
+    );
+    expect(noFee.totalZat, noFee.maxTotalZat);
+  });
+
   test("an offer whose fee the wallet can't work out can't be paid", () async {
     answer = (units) => quoteFor(units, fee: null);
 
