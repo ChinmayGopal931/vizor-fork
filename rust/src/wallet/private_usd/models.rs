@@ -815,16 +815,6 @@ impl ForwardRecord {
 
 // ---- reverse record ----
 
-/// Where a deployment's maker takes Privacy Pass tokens from.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct TokenIssuer {
-    pub url: String,
-    pub name: String,
-    pub token_key: String,
-    pub return_key: String,
-}
-
 const DEFAULT_ESCROW_CONFIRMATIONS: u64 = 3;
 const DEFAULT_ZCASH_CONFIRMATIONS: u32 = 3;
 
@@ -883,8 +873,6 @@ pub(crate) struct RecordDeployment {
         skip_serializing_if = "is_default_zcash_confirmations"
     )]
     pub zcash_confirmations: u32,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub token_issuer: Option<TokenIssuer>,
 }
 
 impl RecordDeployment {
@@ -905,12 +893,6 @@ impl RecordDeployment {
             escrow_confirmations: pins.escrow_confirmations.into(),
             zcash_network: network.into(),
             zcash_confirmations: pins.zcash_confirmations,
-            token_issuer: Some(TokenIssuer {
-                url: pins.issuer_url.into(),
-                name: pins.issuer_name.into(),
-                token_key: pins.issuer_token_key.into(),
-                return_key: pins.maker_token_return_key.into(),
-            }),
         })
     }
 }
