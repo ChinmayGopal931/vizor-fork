@@ -126,6 +126,7 @@ jobs:
               "VIZOR_PRIVATE_USD_ENABLED": "true",
               "ZCASH_DEFAULT_NETWORK": "main",
               "VIZOR_APPLICATION_ID": "com.veylor.app",
+              "VIZOR_WALLET_LINK_BACKEND_URL": "https://functions.vizor.cash",
               "VIZOR_DEGOOGLED": "true",
           }
           problems = []

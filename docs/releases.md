@@ -32,7 +32,13 @@ Play bundle is otherwise `flutter build appbundle --release` with
 plugins ship, or Play serves some devices a build without the core), signed
 with the upload keystore through the `ANDROID_KEYSTORE_*` variables, a build
 number above the last upload, and the keyed RPC JSON through
-`--dart-define-from-file`. Keystore aliases do not depend on the id, but
+`--dart-define-from-file`. It passes
+`--dart-define=VIZOR_WALLET_LINK_BACKEND_URL=https://functions.vizor.cash`,
+the relay Veylor's desktop builds create their wallet-link packages on, and
+so does the iOS TestFlight build: without it the app's default is
+`http://localhost:3000`, which reaches nothing on a phone, so scanning a
+desktop's wallet link fails. The Play and TestFlight builds up to 2026-11-22
+passed none. Keystore aliases do not depend on the id, but
 app-link verification (`assetlinks.json`) names the shipped id.
 
 ## Android direct APK (verifiable)
@@ -47,9 +53,11 @@ uninstalling.
   `scripts/build-android-reproducible.sh --flavor veylor --universal
   --build-name 1.0.3 --build-number 10 --signing unsigned --degoogled`. The
   flavor defines `VIZOR_FORM_FACTOR=mobile`, `VIZOR_PRIVATE_USD_ENABLED=true`,
-  `ZCASH_DEFAULT_NETWORK=main` and `VIZOR_APPLICATION_ID=com.veylor.app`, and
-  nothing else: the price and wallet-link URLs keep their defaults, and there
-  is no keyed RPC file (a build anyone can reproduce holds no secret). Neither
+  `ZCASH_DEFAULT_NETWORK=main`, `VIZOR_APPLICATION_ID=com.veylor.app` and
+  `VIZOR_WALLET_LINK_BACKEND_URL=https://functions.vizor.cash` (since
+  2026-11-22: the relay Veylor's desktops use, as above), and nothing else:
+  the price URL keeps its default, and there is no keyed RPC file (a build
+  anyone can reproduce holds no secret). Neither
   build defines `VIZOR_RELEASE_VERSION`, so both show v0.0.0 in Settings; pass
   `--release-version` here once the Play build does. Upstream's builds keep
   `--flavor vizor`, the default, unchanged (`scripts/test_fdroid_tools.py`

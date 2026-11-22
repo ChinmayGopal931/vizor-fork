@@ -412,6 +412,7 @@ class VeylorReproducibleBuildTest(unittest.TestCase):
                 "--dart-define=VIZOR_PRIVATE_USD_ENABLED=true",
                 "--dart-define=ZCASH_DEFAULT_NETWORK=main",
                 "--dart-define=VIZOR_APPLICATION_ID=com.veylor.app",
+                "--dart-define=VIZOR_WALLET_LINK_BACKEND_URL=https://functions.vizor.cash",
                 "--dart-define=VIZOR_DEGOOGLED=true",
             ],
         )
