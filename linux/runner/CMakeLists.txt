@@ -38,7 +38,7 @@ target_link_libraries(${BINARY_NAME} PRIVATE PkgConfig::GTK)
 
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}")
 
-# Shielded USD's Railgun page process (AGENTS.md, "Private USD"): the page runs
+# Shielded USD's Railgun page process (docs/private-usd.md, "Private USD"): the page runs
 # in it, on the system's WebKitGTK 4.1, which it loads at run time. It is built
 # against WebKitGTK's headers and never linked to WebKit, libsoup or
 # JavaScriptCore, so nothing in the bundle needs them; without the headers the

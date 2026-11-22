@@ -54,7 +54,7 @@ releases use t64 package names where applicable. On Fedora, check `gtk3`,
 The `veylor` and `veylor-testnet` flavors build Veylor's identity
 (`com.veylor.desktop` and `com.veylor.desktop.testnet`, executables `veylor`
 and `veylor-testnet`) through `VIZOR_APPLICATION_ID`; see "Desktop identity" in
-AGENTS.md. They are not default flavors, never check for updates and embed no
+docs/releases.md. They are not default flavors, never check for updates and embed no
 update information until Veylor has release keys of its own. Their assets are
 named `Veylor-linux-<arch>.AppImage` and `Veylor-Testnet-linux-<arch>.AppImage`.
 
@@ -111,7 +111,7 @@ CI on its fork (`.github/workflows/veylor-linux.yml`). A flavor or tag that
 embeds update information refuses it, since updates must be verifiable. Unset
 it, and provide the GPG variables above, to sign.
 
-`VIZOR_PRIVATE_USD_ENABLED=true` compiles Shielded USD in (AGENTS.md, "Private
+`VIZOR_PRIVATE_USD_ENABLED=true` compiles Shielded USD in (docs/private-usd.md, "Private
 USD"). Its Railgun page runs in the bundle's `veylor-railgun-page`, on the
 system's WebKitGTK 4.1 in WebKit's sandbox; where that can't start, Shielded USD
 stays hidden (docs/private-usd-linux.md). The build needs

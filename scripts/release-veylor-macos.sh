@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Veylor's macOS release (AGENTS.md, "Veylor macOS release"). It builds the
+# Veylor's macOS release (docs/releases.md, "Veylor macOS release"). It builds the
 # app with Veylor's identity, signs it with Zapp LLC's Developer ID,
 # notarizes and staples it, packages Veylor-macos.dmg, signs, notarizes and
 # staples that, and writes the signed Sparkle appcast, leaving the assets in

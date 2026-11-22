@@ -21,7 +21,7 @@ LINUX_RELEASE_FLAVOR_CONFIGS = {
     binary_name: "vizor-testnet",
     zcash_default_network: "test"
   },
-  # Veylor's identity (AGENTS.md, "Desktop identity"). No update feed until
+  # Veylor's identity (docs/releases.md, "Desktop identity"). No update feed until
   # Veylor has release keys of its own.
   "veylor" => {
     app_name: "Veylor",

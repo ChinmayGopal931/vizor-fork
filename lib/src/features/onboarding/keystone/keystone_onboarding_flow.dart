@@ -22,7 +22,7 @@ enum KeystoneOnboardingStep {
 
 extension KeystoneOnboardingStepX on KeystoneOnboardingStep {
   // Sidebar step labels keep their original Title Case — see the
-  // sentence-case exception in AGENTS.md (UI Copy Conventions).
+  // sentence-case exception in docs/copy.md.
   String label(AppLocalizations l10n) => switch (this) {
     KeystoneOnboardingStep.howToConnect => l10n.keystoneStepHowToConnect,
     KeystoneOnboardingStep.scanQrCode => l10n.commonScanQrCode,

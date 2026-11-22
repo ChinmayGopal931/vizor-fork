@@ -6,7 +6,7 @@ usage() {
 Usage: scripts/sign-veylor-apk.sh --unsigned PATH [options]
 
 Signs the attested unsigned APK of a Veylor Android direct release on this Mac
-with Veylor's APK-only key, and checks the result (AGENTS.md, "Android direct
+with Veylor's APK-only key, and checks the result (docs/releases.md, "Android direct
 APK (verifiable)"):
 
   1. The unsigned APK is com.veylor.app with all three ABIs, unsigned,

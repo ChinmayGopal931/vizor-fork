@@ -263,7 +263,7 @@ platform :ios do
           "fvm flutter build ipa",
           "--release",
           # Store builds must compile the mobile token set — release
-          # builds have no form-factor guard (see AGENTS.md).
+          # builds have no form-factor guard (see docs/form-factor.md).
           *dart_defines.map { |dart_define| "--dart-define=#{shell_escape(dart_define)}" },
           "--build-name", shell_escape(metadata.fetch(:version)),
           "--build-number", shell_escape(metadata.fetch(:build_number)),

@@ -7,7 +7,7 @@ rescue, on the phone's engine and providers ("The bridge" below).
 Linux has a host of its own (`docs/private-usd-linux.md`); Windows hides Shielded
 USD until it gets one.
 
-Read AGENTS.md's "Private USD" section and `docs/private-usd-android-plan.md`
+Read `docs/private-usd.md` and `docs/private-usd-android-plan.md`
 §3.5 first: every invariant there holds on the Mac, because the Rust engine and
 the Dart flows are the phones' own. The iOS host, which this one follows, is in
 `docs/private-usd-ios-reference.md` §6.
@@ -134,7 +134,7 @@ Android: mainnet only, behind Settings' "Sync history from Anon's archive"
 (`privateUsdArchiveSyncProvider`, on by default, the phone's setting and
 storage), which `privateUsdArchiveAvailableProvider` offers on the Mac wherever
 its host runs the page (macOS 14 and later). iOS still starts the page without
-it. The page and its rules are Android's, unchanged (AGENTS.md, "Anon's
+it. The page and its rules are Android's, unchanged (docs/private-usd.md, "Anon's
 archive"); only the host is new (`macos/Runner/Railgun/RailgunArchive.swift`).
 What every host must do for the archive, and for the page as a whole, item by
 item against Android's, is in `docs/private-usd-railgun-hosts.md`.

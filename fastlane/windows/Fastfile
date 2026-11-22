@@ -14,7 +14,7 @@ WINDOWS_RELEASE_FLAVOR_CONFIGS = {
     pack_title: "Vizor Testnet",
     network: "testnet"
   },
-  # Veylor's identity (AGENTS.md, "Desktop identity"). No update feed until
+  # Veylor's identity (docs/releases.md, "Desktop identity"). No update feed until
   # Veylor has release keys of its own.
   "veylor" => {
     pack_id: "com.veylor.desktop",

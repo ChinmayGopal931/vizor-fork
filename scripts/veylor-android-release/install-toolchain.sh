@@ -8,7 +8,7 @@ Usage: scripts/veylor-android-release/install-toolchain.sh \
 
 Installs the toolchain Veylor's verifiable APK is built with, at pinned
 versions, under DIR, and writes DIR/env.sh to source before
-scripts/build-android-reproducible.sh (AGENTS.md, "Android direct APK
+scripts/build-android-reproducible.sh (docs/releases.md, "Android direct APK
 (verifiable)"). The CI build and anyone rebuilding it use this script:
 
   - Temurin JDK 21.0.13+9 (SHA-256 pinned below)

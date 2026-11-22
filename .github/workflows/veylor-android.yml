@@ -1,6 +1,6 @@
 name: Veylor Android
 
-# Builds the unsigned input of a Veylor Android direct release (AGENTS.md,
+# Builds the unsigned input of a Veylor Android direct release (docs/releases.md,
 # "Android direct APK (verifiable)"): Veylor's Google Play build of
 # com.veylor.app (mobile, mainnet, Shielded USD on, the default price and
 # wallet-link URLs) plus VIZOR_DEGOOGLED=true, as one universal APK, through

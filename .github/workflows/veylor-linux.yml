@@ -9,7 +9,7 @@ name: Veylor Linux
 # veylor-railgun-page, on the system's WebKitGTK, in WebKit's sandbox
 # (docs/private-usd-linux.md). The build runs upstream's lane, `fastlane linux
 # release`, which runs scripts/build-linux-release.sh and
-# scripts/package-linux-appimage.sh (fastlane/linux/README.md; AGENTS.md,
+# scripts/package-linux-appimage.sh (fastlane/linux/README.md; docs/releases.md,
 # "Desktop identity"); scripts/package-linux-deb.sh packages the same bundle.
 # A second job runs the Rust tests that pin the Railgun page's host lists
 # across Android, iOS, the Mac and Linux.
@@ -522,7 +522,7 @@ jobs:
   # A public release run publishes the mainnet packages itself, so the files on
   # the release are the ones this run built and attested, never a copy that
   # passed through a computer. The release is never marked latest: the Mac's
-  # DMG link and update feed resolve through "latest" (AGENTS.md, "Veylor Linux
+  # DMG link and update feed resolve through "latest" (docs/releases.md, "Veylor Linux
   # release"). Its tag is the commit the files were built from. A release
   # already there takes new files only from a run of that same commit (a
   # publish that failed partway, run again): files built from another commit
