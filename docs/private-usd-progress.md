@@ -7,6 +7,35 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
 
 ## Where things stand (2026-10-17; read this first)
 
+- **The open fee's review fixes (2026-11-21, D-162).** A review found the
+  open fee safe on mainnet, which asks none, and nine gaps for testnet's,
+  all closed on `feat/open-fee`:
+  - **The fee lives with its quote.** Its payment expires a few blocks after
+    the quote (`deadline_expiry_height` in `send.rs`), and the wallet's sync
+    stops sending the fee of a bridge that ended or a quote that expired
+    (`open_fee::withheld_fee_txids`, read from `swaps.db`).
+  - **Quotes long enough for a block.** A fee quote must live 180 s to 30
+    minutes (`open_fee_min_quote_life_seconds`,
+    `open_fee_max_quote_life_seconds`), and is paid only with 180 s left;
+    the review offers it until 20 s before then and asks for a new one.
+    Mainnet's 2-minute quotes would be refused: its maker must lengthen them
+    before asking a fee.
+  - **A lost accept answer.** Once the quote is over, a swap the chain shows
+    takes its `t0` and `t1` from its confirmed `Opened` and goes on to its
+    deposit, fee or not, with nothing posted.
+  - **Smaller ones.** "Call it off" refuses a bridge whose fee started; the
+    deposit's approved total allows one action more after the fee; a
+    refunded bridge shows its fee as not refunded; the accept's fee step runs
+    under an op id (a lock or the background stops it before it is saved);
+    "You paid" uses the wallet's own network fees (`depositNetworkZat`, a
+    found-again payment's from the wallet), marked "≈" where a fee payment's
+    is unknown; the fee-not-honoured result is worded to stay true whether
+    the fee confirms later or not.
+  - **Tests.** `tests/open_fee.rs` gains six (the fee's deadline and no
+    resend after the end, quote life, the `Opened` recovery fee or not,
+    abandon, the deposit's slack, a cancelled accept); `open_fee.rs` the
+    resubmission exclusion; `send.rs` the deadline expiry.
+
 - **The Privacy Pass token client is gone (2026-11-21, D-161).** The owner
   decided that the open fee on ZEC → USD bridges (D-160) replaces it. It
   never ran: both hosted makers' `/v1/info` answer `tokenReturnKey: null`.
@@ -50,8 +79,9 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
     `openFeeMaxTotalZat`, `openFeeAttempted` and `openFeePayment`.
   - **Dart.** The review's ledger shows "Market maker fee · not refunded" and
     its total includes the fee; the quote stops being offered 80 s before
-    it expires; the progress names the fee's waits; Activity folds the fee's
-    transaction into its bridge row, and keeps a row for a fee lost.
+    it expires (200 s since D-162); the progress names the fee's waits;
+    Activity folds the fee's transaction into its bridge row, and keeps a
+    row for a fee lost.
   - **Tests.** `tests/open_fee.rs` (the five "done when" cases on the
     fakes), `open_fee.rs` units, the schema 6 → 7 migration and the strict
     fixtures. Not yet run against the hosted maker: the owner's Mac testnet
@@ -3014,6 +3044,37 @@ M8 status (2026-10-14): the non-device parts are done.
   - **Windows** (`feat/windows-desktop`, unmerged) still registers the
     attestation stub in `windows/runner/private_usd_channels.cpp` and names
     it in `docs/private-usd-windows.md`; both go when it merges.
+
+- **D-162 (2026-11-21): the open fee's review.** What changed, and why:
+  - **Expiry, not resends, bounds a late fee.** A fee mined after its quote
+    pays for nothing, and an ordinary payment can be mined 40 blocks (50
+    minutes) or, from NU7, 120 blocks on, re-sent by the sync all the while.
+    The payment's expiry is the target height plus the blocks left until
+    `expiresAt` at the target's spacing, plus 2 for block-time variance;
+    nodes refuse one within 3 blocks of the tip, so that is its floor, and
+    an ordinary payment's expiry (capped at an upgrade) its ceiling. The
+    sync's resubmission reads `swaps.db` beside the wallet DB on each pass,
+    best effort: a store that does not read withholds nothing, and the
+    expiry still ends the payment.
+  - **180 s of quote, and why.** At 75 s blocks a fee paid with 60 s left
+    misses its block more often than not (`e^(-60/75)` ≈ 45%); with 180 s,
+    about 9%; at NU7's 25 s spacing, under 0.1%. A 30-minute ceiling keeps a
+    maker from holding a fee quote open for long. Both are pins
+    (`Deployment`), so a network can differ. A fresh quote at the tap, taken
+    at once when no worse, was the review's preference; it is not built:
+    every quote spends a swap index, and the review's countdown and "New
+    quote" already keep a user from bridging on unseen terms.
+  - **`Opened` over giving up.** A swap the maker opened whose answer was
+    lost used to end `MAKER_UNAVAILABLE` (zapp's rule), its fee lost. The
+    deadlines are in the swap's `Opened` event and nowhere else (the
+    contract stores the terms' hash), and the confirmed read holds them to
+    that hash, so the chain alone is the evidence and nothing is posted after
+    the quote. This also changes a no-fee swap's lost answer: it now goes on
+    to its deposit when the window allows, where it used to end unpaid.
+  - **The deposit's slack is in "You pay".** The fee's payment can take a
+    note the deposit's estimate counted on; one more input is one more
+    logical action. The approved total carries that action's fee, and the
+    review shows it as part of the most the bridge costs.
 
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's

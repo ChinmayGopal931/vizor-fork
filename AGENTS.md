@@ -2359,30 +2359,49 @@ mainnet asks none yet, and a quote without it takes the old path unchanged.
 
 - Refused at the quote with nothing paid (the index is spent all the same):
   `zat` of 0 or above the deployment's `max_open_fee_zat` (500,000 on both
-  networks), or an address that is not a canonical unified address of our
-  network with one Orchard receiver and nothing else (`orchard_only`, which
-  the pinned zecswap-core lacks).
-- Paid only with a minute of the quote left (`OPEN_FEE_MARGIN_SECONDS`),
-  judged before it is proposed and again right before it is created: a stored
-  payment is one the wallet's own sync sends again, so creation is the point
-  of no return. The accept checks first that the spendable Orchard and
-  Ironwood ZEC cover the fee, the deposit and both network fees.
+  networks; mainnet's is a placeholder until its gas-priced fee is known), an
+  address that is not a canonical unified address of our network with one
+  Orchard receiver and nothing else (`orchard_only`, which the pinned
+  zecswap-core lacks), or a quote that lives less than the deployment's
+  `open_fee_min_quote_life_seconds` (180 s: time for a 75-second block to
+  mine the fee) or more than `open_fee_max_quote_life_seconds` (30 minutes).
+  Mainnet's quotes live 2 minutes today, so its maker must lengthen them
+  before it asks a fee.
+- Paid only with that least life left, judged before it is proposed and
+  again right before it is created: a stored payment is one the wallet's own
+  sync sends again, so creation is the point of no return. The review offers
+  a fee quote until 20 s before then (`openFeePayBy`) and then asks for a new
+  one, so nobody bridges on terms they have not seen. The accept checks first
+  that the spendable Orchard and Ironwood ZEC cover the fee, the deposit and
+  both network fees; the deposit's approved total allows one logical action
+  more (`marginal_fee`), since the fee can take a note the deposit counted on.
+  The accept runs under an op id, so a lock or the background stops the fee
+  before it is saved, as any key step.
 - One payment of exactly `zat`, no memo (send flow
   `private-usd-open-fee:{account}:{index}`): the record is saved with the
   payment started before it is created (`openFeeAttempted`), the payment kept
   before it is first sent (`openFeePayment`), found again in the wallet after
-  an interruption, and never built twice. It is sent again every 30 s while
-  no block has it and the quote leaves the minute.
+  an interruption, and never built twice. It expires a few blocks after the
+  quote (`deadline_expiry_height`), not 40 or 120 on; the wallet's sync stops
+  sending it once its bridge ended or its quote expired
+  (`withheld_fee_txids`), and Veylor sends it again every 30 s while no block
+  has it and a minute of the quote is left. "Call it off" refuses a bridge
+  whose fee started.
 - The accept goes from the engine loop, only once Veylor's wallet shows the
   fee mined. `402 feeRequired`, a `5xx` or no answer post the same accept
   again after `Retry-After` (else 5 s, or 12 s unanswered; at least 1 s the
   first time and 12 s after, at most 30 s), and never once `expiresAt` has
-  passed. Any other `4xx` ends the bridge, and the fee is lost; a quote that
-  expires with the fee unseen ends `FEE_NOT_HONOURED`.
+  passed. A refusal that says nothing opened ends the bridge, and the fee is
+  lost; one that may follow an open is posted again until `expiresAt`. A
+  quote that expires with the fee unseen ends `FEE_NOT_HONOURED`. An accept
+  whose answer was lost goes on from the chain: once the quote is over, the
+  swap's confirmed `Opened` event gives its `t0` and `t1`, which the
+  confirmed read holds to the terms hash before any deposit.
 - A bridge that paid the fee waits for its change (`FundsPending`) rather
   than fail its deposit. Its fee transaction folds into its row in Activity,
-  and a bridge that ended unstarted after its fee was mined keeps a row for
-  the fee lost. Schema 7 added these record fields.
+  a paid or refunded bridge's details show the fee as not refunded, and a
+  bridge that ended unstarted after its fee was mined keeps a row for the
+  fee lost. Schema 7 added these record fields.
 
 **Invariants (plan §3.5).** Each one guards funds or privacy. Keep them, and
 keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
