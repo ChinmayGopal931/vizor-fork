@@ -169,12 +169,14 @@ pub(crate) fn time_to_pay(quote: &SwapQuote, now: u64) -> bool {
 const STORE_NETWORKS: [&str; 2] = ["main", "test"];
 
 /// The open fee payments the wallet DB at `db_path` must not send again:
-/// those of bridges that ended, and of quotes that expired. Mined then, a fee
-/// pays for nothing. The wallet's resubmission leaves these out, read from
-/// the swap store beside the wallet DB (`<support>/private_usd_<db>_<net>`)
-/// on each pass, so a restart withholds them before the engine runs. Best
-/// effort: a store that does not read withholds nothing, and the payment's
-/// own expiry still ends it a few blocks after its quote.
+/// those of bridges that ended, and of quotes with less than
+/// [`OPEN_FEE_MARGIN_SECONDS`] left, the time a fee needs to be mined first.
+/// Mined later, a fee pays for nothing. The wallet's resubmission leaves
+/// these out, read from the swap store beside the wallet DB
+/// (`<support>/private_usd_<db>_<net>`) on each pass, so a restart withholds
+/// them before the engine runs. Best effort: a store that does not read
+/// withholds nothing, and the payment's own expiry still ends it a few
+/// blocks after its quote.
 pub(crate) fn withheld_fee_txids(db_path: &str) -> HashSet<Vec<u8>> {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -199,7 +201,7 @@ pub(crate) fn withheld_fee_txids(db_path: &str) -> HashSet<Vec<u8>> {
             }
         };
         for row in rows {
-            if !row.ended && now < row.expires_at {
+            if !row.ended && now.saturating_add(OPEN_FEE_MARGIN_SECONDS) < row.expires_at {
                 continue;
             }
             let Some(tx_id) = super::models::ZcashTxId::parse(&row.tx_id) else {
@@ -338,9 +340,10 @@ mod tests {
         )
     }
 
-    /// Finding 1: the wallet's resubmission withholds the open fee of a
-    /// bridge that ended and of a quote that expired, read from the swap
-    /// store beside the wallet DB; a fee still in its quote's life goes on.
+    /// The wallet's resubmission withholds the open fee of a bridge that
+    /// ended and of a quote that expired or has less than a minute left,
+    /// read from the swap store beside the wallet DB; a fee with its quote's
+    /// time ahead goes on.
     #[test]
     fn the_sync_never_sends_again_a_fee_whose_bridge_ended_or_quote_expired() {
         use super::super::models::{Direction, StoredRecord, ZcashTxId};
@@ -361,10 +364,16 @@ mod tests {
             .unwrap()
             .as_secs()
             + 3_600;
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
         for (index, paid, expires_at, ended) in [
             (7, "aa", 1_790_000_300, true),
             (8, "bb", later, false),
             (9, "cc", 1_790_000_300, false),
+            // In its quote's last minute: too late to be mined first.
+            (10, "dd", now + 30, false),
         ] {
             let record = StoredRecord::decode(
                 Direction::Forward,
@@ -381,7 +390,7 @@ mod tests {
         };
         assert_eq!(
             withheld_fee_txids(db_path),
-            HashSet::from([internal("aa"), internal("cc")])
+            HashSet::from([internal("aa"), internal("cc"), internal("dd")])
         );
     }
 

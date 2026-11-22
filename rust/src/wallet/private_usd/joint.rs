@@ -27,6 +27,7 @@ use zcash_primitives::transaction::{fees::zip317, TxId};
 use zcash_protocol::consensus::{BlockHeight, Parameters};
 use zecswap_core::{JointAccount, SpendKey, SweepIntent};
 
+use super::deployment::OPEN_FEE_MARGIN_SECONDS;
 use super::forward::{ForwardZcash, Funds};
 use super::keys::SwapKeyContext;
 use super::models::{
@@ -1093,10 +1094,21 @@ impl ForwardZcash for WalletZcash<'_> {
             proposal.proposal_id,
             &proposal.send_flow_id,
             self.keys.seed(),
-            deadline,
+            sync::PaymentDeadline {
+                at: deadline,
+                least_left: OPEN_FEE_MARGIN_SECONDS,
+            },
         )
         .await
-        .map_err(wallet_error)?;
+        .map_err(|error| {
+            // Too near the quote's end once the wallet's lock was taken:
+            // nothing was stored, and the inputs are free.
+            if error.starts_with(sync::DEADLINE_TOO_NEAR) {
+                PrivateUsdError::new(ErrorCode::QuoteExpired, error)
+            } else {
+                wallet_error(error)
+            }
+        })?;
         match created.as_slice() {
             [payment] => kept_transaction(payment),
             _ => fail(

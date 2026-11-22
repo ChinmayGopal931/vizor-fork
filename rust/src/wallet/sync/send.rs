@@ -334,38 +334,57 @@ pub(super) fn proposal_expiry<P: Parameters, DbT: InputSource, FeeRuleT, N>(
     })
 }
 
-/// `expiry` brought down to what a payment due by `deadline` (unix seconds)
-/// may carry, from the live target. A step whose expiry the backend applies
-/// itself, a canonical ZIP 318 crossing before NU7, refuses any other and
-/// keeps its own: the sync's resubmission still withholds a Private USD open
-/// fee once its quote is over (`open_fee::withheld_fee_txids`).
+/// A payment that counts only if it is mined before `at` (unix seconds), and
+/// is not created with less than `least_left` seconds of it to go: a Private
+/// USD open fee and its quote's `expiresAt`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct PaymentDeadline {
+    pub at: u64,
+    pub least_left: u64,
+}
+
+/// How a payment created too near its deadline is refused, nothing stored
+/// and its inputs released.
+pub(crate) const DEADLINE_TOO_NEAR: &str = "The payment's deadline is too near to create it";
+
+/// `expiry` brought down to what a payment due by `deadline` may carry, from
+/// the live target, at `now` (unix seconds); refused with
+/// [`DEADLINE_TOO_NEAR`] under `deadline.least_left` seconds before it. A step
+/// whose expiry the backend applies itself, a canonical ZIP 318 crossing
+/// before NU7, refuses any other and keeps its own: the sync's resubmission
+/// still withholds a Private USD open fee near its quote's end
+/// (`open_fee::withheld_fee_txids`).
 fn deadline_bound_expiry<P: Parameters>(
     network: &P,
     min_target_height: BlockHeight,
     live: LiveSendExpiry,
     expiry: ProposalExpiry,
-    deadline: u64,
+    deadline: PaymentDeadline,
+    now: u64,
 ) -> Result<ProposalExpiry, String> {
+    let seconds_left = deadline.at.saturating_sub(now);
+    if seconds_left < deadline.least_left {
+        return Err(format!("{DEADLINE_TOO_NEAR}: {seconds_left}s left"));
+    }
     let Some(requested) = expiry.requested else {
         log::warn!("a payment due by a deadline is a canonical crossing: it keeps its own expiry");
         return Ok(expiry);
     };
     let target = BlockHeight::from_u32(live.tip.saturating_add(1)).max(min_target_height);
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|elapsed| elapsed.as_secs())
-        .unwrap_or_default();
-    let height = deadline_expiry_height(
-        network,
-        target,
-        deadline.saturating_sub(now),
-        DEADLINE_EXPIRY_SLACK_BLOCKS,
-    )
-    .min(requested);
+    let height =
+        deadline_expiry_height(network, target, seconds_left, DEADLINE_EXPIRY_SLACK_BLOCKS)
+            .min(requested);
     Ok(ProposalExpiry {
         height,
         requested: Some(height),
     })
+}
+
+fn unix_now() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_secs())
+        .unwrap_or_default()
 }
 
 fn send_expiry_height_for_live_tip<P: Parameters>(
@@ -2267,17 +2286,18 @@ pub(crate) async fn create_stored_proposal_transactions(
 }
 
 /// [`create_stored_proposal_transactions`] for a payment that counts only if
-/// it is mined before `deadline` (unix seconds): its expiry is
-/// [`deadline_expiry_height`] from the live target, so neither a resend nor
-/// the sync's resubmission can have it mined long after. A Private USD open
-/// fee is one.
+/// it is mined before `deadline`: its expiry is [`deadline_expiry_height`]
+/// from the live target, so neither a resend nor the sync's resubmission can
+/// have it mined long after, and with less than `deadline.least_left` to go
+/// when the wallet's write lock is taken nothing is created
+/// ([`DEADLINE_TOO_NEAR`]). A Private USD open fee is one.
 pub(crate) async fn create_stored_proposal_transactions_expiring_by(
     db_path: &str,
     lightwalletd_url: &str,
     proposal_id: u64,
     send_flow_id: &str,
     seed: SecretVec<u8>,
-    deadline: u64,
+    deadline: PaymentDeadline,
 ) -> Result<Vec<CreatedTransaction>, String> {
     create_stored_proposal_transactions_by(
         db_path,
@@ -2301,7 +2321,7 @@ async fn create_stored_proposal_transactions_by(
     seed: SecretVec<u8>,
     spend_params_path: Option<&str>,
     output_params_path: Option<&str>,
-    deadline: Option<u64>,
+    deadline: Option<PaymentDeadline>,
 ) -> Result<Vec<CreatedTransaction>, String> {
     let stored = consume_stored_proposal(
         proposal_id,
@@ -2368,8 +2388,8 @@ pub(crate) fn broadcast_rejected(error: &str) -> bool {
 
 /// Signs and stores a consumed proposal's transactions, releasing its inputs
 /// on any failure before they are stored. Nothing is broadcast. With a
-/// `deadline` (unix seconds), the transactions expire by
-/// [`deadline_expiry_height`] rather than the ordinary delta.
+/// `deadline`, the transactions expire by [`deadline_expiry_height`] rather
+/// than the ordinary delta, and none is created too near it.
 async fn create_stored_transactions(
     db_path: &str,
     lightwalletd_url: &str,
@@ -2377,7 +2397,7 @@ async fn create_stored_transactions(
     seed: SecretVec<u8>,
     spend_params_path: Option<&str>,
     output_params_path: Option<&str>,
-    deadline: Option<u64>,
+    deadline: Option<PaymentDeadline>,
 ) -> Result<Vec<TxId>, String> {
     let network = stored.network;
     let proposal_id = stored.proposal_id;
@@ -2447,12 +2467,15 @@ async fn create_stored_transactions(
             let expiry = proposal_expiry(&network, &db, &stored.proposal, live_expiry)?;
             let expiry = match deadline {
                 None => expiry,
+                // Judged now, with the write lock held: the lock can wait
+                // long on a batch of the sync.
                 Some(deadline) => deadline_bound_expiry(
                     &network,
                     min_target_height,
                     live_expiry,
                     expiry,
                     deadline,
+                    unix_now(),
                 )?,
             };
             // Reassert ownership while holding the process-wide write lock.
@@ -8374,7 +8397,10 @@ mod deadline_expiry_tests {
     use zcash_client_backend::data_api::testing::TestBuilder;
     use zcash_protocol::{consensus::BlockHeight, local_consensus::LocalNetwork};
 
-    use super::{deadline_expiry_height, send_expiry_height_for_target};
+    use super::{
+        deadline_bound_expiry, deadline_expiry_height, send_expiry_height_for_target,
+        LiveSendExpiry, PaymentDeadline, ProposalExpiry, DEADLINE_TOO_NEAR,
+    };
 
     fn network(nu7: u32) -> LocalNetwork {
         LocalNetwork {
@@ -8420,6 +8446,48 @@ mod deadline_expiry_tests {
             deadline_expiry_height(&upgrade_soon, target, 300, 2),
             target + 3
         );
+    }
+
+    /// A payment due in under its least time is refused before anything is
+    /// created, whatever its expiry; one in time takes the deadline's, below
+    /// the ordinary one, and a canonical crossing the backend's own.
+    #[test]
+    fn a_payment_too_near_its_deadline_is_not_created() {
+        let network = network(500_000);
+        let live = LiveSendExpiry {
+            tip: 399_999,
+            expiry_height: BlockHeight::from_u32(400_040),
+        };
+        let ordinary = ProposalExpiry {
+            height: BlockHeight::from_u32(400_040),
+            requested: Some(BlockHeight::from_u32(400_040)),
+        };
+        let target = BlockHeight::from_u32(400_000);
+        let due = |left: u64| PaymentDeadline {
+            at: 1_790_000_000 + left,
+            least_left: 60,
+        };
+        let bound = |expiry: ProposalExpiry, left: u64| {
+            deadline_bound_expiry(&network, target, live, expiry, due(left), 1_790_000_000)
+        };
+        let late = bound(ordinary, 59).unwrap_err();
+        assert!(late.starts_with(DEADLINE_TOO_NEAR), "{late}");
+        let crossing = ProposalExpiry {
+            requested: None,
+            ..ordinary
+        };
+        assert!(bound(crossing, 59)
+            .unwrap_err()
+            .starts_with(DEADLINE_TOO_NEAR));
+
+        assert_eq!(
+            bound(ordinary, 180).unwrap(),
+            ProposalExpiry {
+                height: target + 4,
+                requested: Some(target + 4),
+            }
+        );
+        assert_eq!(bound(crossing, 180).unwrap(), crossing);
     }
 }
 

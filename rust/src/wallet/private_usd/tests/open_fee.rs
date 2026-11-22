@@ -617,6 +617,48 @@ async fn a_no_fee_accept_cancelled_during_its_post_still_records_the_answer() {
     assert_eq!(accepts(&h), 1);
 }
 
+/// A fee whose creation waited on the wallet's lock into its quote's last
+/// minute is refused there: nothing is stored or sent, and the bridge ends
+/// with nothing paid. One whose signing ran into that minute is kept but
+/// never sent, by Veylor or (`withheld_fee_txids`) the sync.
+#[tokio::test]
+async fn a_fee_created_too_late_is_neither_stored_nor_sent() {
+    let h = asking(FEE, fee_address());
+    let quoted = h.quote().await.unwrap();
+    h.world.set().fee_lock_wait = 300 - 59;
+    let late = accept(&h, quoted.index).await.unwrap_err();
+    assert_eq!(late.code, ErrorCode::QuoteExpired);
+    assert!(h.world.get().fee_payments.is_empty(), "nothing stored");
+    assert_eq!(h.world.get().broadcast_attempts, 0, "nothing sent");
+    assert_eq!(h.record().open_fee_progress(), OpenFeeProgress::Started);
+    h.world.set().fee_lock_wait = 0;
+    assert_eq!(
+        h.advance().await.unwrap(),
+        nothing_sent(NothingSentCause::QuoteExpired)
+    );
+    assert!(h.world.get().fee_payments.is_empty());
+    assert_eq!(h.world.get().broadcast_attempts, 0);
+
+    let h = asking(FEE, fee_address());
+    let quoted = h.quote().await.unwrap();
+    h.world.set().fee_sign_seconds = 300 - 59;
+    assert_eq!(
+        accept(&h, quoted.index).await.unwrap(),
+        AcceptOutcome::Accepted
+    );
+    assert_eq!(h.world.get().fee_payments.len(), 1, "kept");
+    assert!(matches!(
+        h.record().open_fee_progress(),
+        OpenFeeProgress::Kept(_)
+    ));
+    assert_eq!(h.world.get().broadcast_attempts, 0, "never sent");
+    assert_eq!(
+        h.advance().await.unwrap(),
+        waiting(ForwardWait::FeeConfirming)
+    );
+    assert_eq!(h.world.get().broadcast_attempts, 0);
+}
+
 /// A resend the node refuses (one near its expiry) is no failure of the
 /// step; one that finds no node is, as any send's. Either way the next send
 /// waits its half minute, not the next step.

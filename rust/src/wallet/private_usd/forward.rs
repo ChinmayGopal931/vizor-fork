@@ -817,7 +817,12 @@ where
         let mut current: ForwardRecord = load(store, self.account, record.index)?;
         current.open_fee_payment = Some(payment.clone());
         update(store, self.account, &current)?;
-        self.send_open_fee(&current, &payment).await?;
+        // Sent only while the quote leaves it the time to be mined: creating
+        // it can wait long on the wallet's lock. One kept unsent ends with
+        // its expiry, and the sync withholds it (`withheld_fee_txids`).
+        if open_fee::time_to_pay(&current.quote, self.clock.now()) {
+            self.send_open_fee(&current, &payment).await?;
+        }
         Ok(payment)
     }
 

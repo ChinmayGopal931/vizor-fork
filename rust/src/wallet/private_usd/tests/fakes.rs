@@ -306,6 +306,10 @@ pub(super) struct State {
     pub fee_crash: Option<Crash>,
     /// The deadline each open fee payment was created to expire by.
     pub fee_deadlines: Vec<u64>,
+    /// Seconds creating an open fee waits on the wallet's lock before it
+    /// judges its deadline, and then takes to sign: the clocks move on.
+    pub fee_lock_wait: u64,
+    pub fee_sign_seconds: u64,
     /// What the account's funds are, spendable and on their way.
     pub funds: Funds,
     pub statuses: HashMap<ZcashTxId, SwapTxStatus>,
@@ -434,6 +438,8 @@ impl State {
             created_fee: None,
             fee_crash: None,
             fee_deadlines: Vec::new(),
+            fee_lock_wait: 0,
+            fee_sign_seconds: 0,
             funds: Funds {
                 spendable: 100_000_000,
                 pending: 0,
@@ -1260,14 +1266,28 @@ impl ForwardZcash for FakeZcash {
         Ok(created)
     }
 
+    /// As the wallet's: refused, nothing stored, with less than a minute to
+    /// its deadline once the lock is taken.
     async fn create_open_fee(
         &self,
         proposal: FakeProposal,
         deadline: u64,
     ) -> Result<ZcashTransaction> {
         assert!(proposal.open_fee, "a deposit is created as a deposit");
-        self.0.set().fee_deadlines.push(deadline);
-        self.create_deposit(proposal).await
+        {
+            let mut state = self.0.set();
+            let wait = state.fee_lock_wait;
+            state.pass(wait);
+            state.fee_deadlines.push(deadline);
+            if deadline.saturating_sub(state.clock) < deployment::OPEN_FEE_MARGIN_SECONDS {
+                return fail(ErrorCode::QuoteExpired, "the deadline is too near");
+            }
+        }
+        let created = self.create_deposit(proposal).await;
+        let mut state = self.0.set();
+        let signing = state.fee_sign_seconds;
+        state.pass(signing);
+        created
     }
 
     fn discard_deposit(&self, _proposal: FakeProposal) {
