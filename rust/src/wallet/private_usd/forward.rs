@@ -636,6 +636,7 @@ where
             // it in the wallet rather than paying again.
             open_fee_attempted: open_fee.is_some(),
             open_fee_payment: None,
+            accept_posted: false,
         };
         save(store, self.account, &record)?;
         engine::remove_offer(self.account, index);
@@ -683,15 +684,33 @@ where
         self.post_accept(store, record, &acceptance).await
     }
 
-    /// Posts the acceptance and takes the maker's answer.
+    /// Posts the acceptance and takes the maker's answer. A post before it,
+    /// whose answer never came back (it would have answered or ended the
+    /// record), may have opened the swap.
     async fn post_accept(
         &self,
         store: &mut SwapStore,
         record: ForwardRecord,
         acceptance: &SwapAcceptance,
     ) -> Result<AcceptOutcome> {
+        let after_unknown = record.accept_posted;
+        let record = self.mark_accept_posted(store, record)?;
         let posted = self.post_acceptance(&record, acceptance).await;
-        self.accept_answered(store, record, posted)
+        self.accept_answered(store, record, posted, after_unknown)
+    }
+
+    /// `record` marked as posted, kept before its first accept goes: a
+    /// process that dies waiting for the answer leaves the mark.
+    fn mark_accept_posted(
+        &self,
+        store: &mut SwapStore,
+        mut record: ForwardRecord,
+    ) -> Result<ForwardRecord> {
+        if !record.accept_posted {
+            record.accept_posted = true;
+            update(store, self.account, &record)?;
+        }
+        Ok(record)
     }
 
     /// Posts `acceptance` for `record`'s quote: the maker's answer.
@@ -705,14 +724,28 @@ where
 
     /// What the maker's answer to `record`'s accept makes of it: the swap's
     /// deadlines and ticket kept, or its end where nothing can have opened.
+    /// After a post whose answer is unknown (`after_unknown`), a refusal that
+    /// may follow that post's open ([`may_follow_an_open`]) ends nothing: the
+    /// record stays, maybe opened, and the chain shows what opened once the
+    /// quote is over.
     fn accept_answered(
         &self,
         store: &mut SwapStore,
         record: ForwardRecord,
         posted: std::result::Result<SwapAccepted, SwapHttpError>,
+        after_unknown: bool,
     ) -> Result<AcceptOutcome> {
         let accepted = match posted {
             Ok(accepted) => accepted,
+            Err(SwapHttpError::Refused(refusal))
+                if after_unknown && may_follow_an_open(&refusal) =>
+            {
+                log::warn!(
+                    "private usd: forward swap {}: an accept refused after an unanswered one; the chain decides",
+                    record.index
+                );
+                return Err(SwapHttpError::Refused(refusal).into());
+            }
             Err(SwapHttpError::Refused(refusal)) => {
                 match accept_refusal(&refusal) {
                     Some(cause) => {
@@ -1005,8 +1038,11 @@ where
     /// asked to wait; never once the quote has expired. While the maker has
     /// not seen the fee (`402 feeRequired`), or the accept may have gone
     /// through (a `5xx` or no answer), it is posted again as the maker asks.
-    /// A refusal that says nothing opened ends the swap; one that may follow
-    /// an open (`accept_refusal`'s `None`) is posted again on the next step,
+    /// A refusal that says nothing opened ends the swap, unless a post before
+    /// it went unanswered (this process's, or any of an earlier one's): then
+    /// an unknown quote, a `400` or a `404` may follow that post's open, and
+    /// it is posted again as an unanswered one is. One that may follow an
+    /// open (`accept_refusal`'s `None`) is posted again on the next step,
     /// until the quote's end. After it, the chain shows whether the swap
     /// opened and with what deadlines (`not_on_chain`).
     async fn accept_with_fee(
@@ -1030,30 +1066,54 @@ where
             return Ok(waiting(ForwardWait::FeeAccepting));
         }
         let acceptance = self.acceptance(record.index, &record.quote)?;
+        // What became of the posts before this one: an earlier process's are
+        // unknown here.
+        if !pace.posted {
+            pace.posted = true;
+            pace.answer_unknown |= record.accept_posted;
+        }
+        let after_unknown = pace.answer_unknown;
+        let record = self.mark_accept_posted(store, record)?;
         let posted = self.post_acceptance(&record, &acceptance).await;
         let again = match &posted {
             Err(SwapHttpError::Refused(refusal))
                 if refusal.code == Some(SwapErrorCode::FeeRequired) =>
             {
-                Some((refusal.retry_after_secs, FEE_WAIT_SECONDS, true))
+                Some((refusal.retry_after_secs, FEE_WAIT_SECONDS, true, false))
             }
             Err(SwapHttpError::Refused(refusal)) if refusal.status >= 500 => Some((
                 refusal.retry_after_secs,
                 UNANSWERED_ACCEPT_WAIT_SECONDS,
                 false,
+                true,
             )),
             Err(SwapHttpError::Unreachable { .. } | SwapHttpError::Unreadable { .. }) => {
-                Some((None, UNANSWERED_ACCEPT_WAIT_SECONDS, false))
+                Some((None, UNANSWERED_ACCEPT_WAIT_SECONDS, false, true))
+            }
+            // After a post whose answer is unknown, a refusal that says nothing
+            // opened may follow that post's open: it is posted again as an
+            // unanswered one is, and once the quote is over the chain shows
+            // whether the swap opened (`not_on_chain`).
+            Err(SwapHttpError::Refused(refusal))
+                if after_unknown && may_follow_an_open(refusal) =>
+            {
+                Some((
+                    refusal.retry_after_secs,
+                    UNANSWERED_ACCEPT_WAIT_SECONDS,
+                    false,
+                    false,
+                ))
             }
             _ => None,
         };
-        if let Some((asked, default, unseen)) = again {
+        if let Some((asked, default, unseen, unanswered)) = again {
             let now = self.clock.now();
             let left = open_fee::time_left(&record.quote, now);
             let wait = open_fee::accept_wait(asked, default, pace.accept_waits, left);
             pace.accept_after = Some(now.saturating_add(wait));
             pace.accept_waits = pace.accept_waits.saturating_add(1);
             pace.fee_unseen = unseen;
+            pace.answer_unknown |= unanswered;
             engine::put_fee_pace(self.account, record.index, pace);
             return Ok(waiting(ForwardWait::FeeAccepting));
         }
@@ -1061,7 +1121,7 @@ where
         let index = record.index;
         pace.fee_unseen = false;
         engine::put_fee_pace(self.account, index, pace);
-        match self.accept_answered(store, record, posted)? {
+        match self.accept_answered(store, record, posted, after_unknown)? {
             AcceptOutcome::Accepted => {
                 engine::remove_fee_pace(self.account, index);
                 Ok(waiting(ForwardWait::Opening))
@@ -2210,6 +2270,14 @@ fn holding(wait: ForwardWait, terms: &Terms) -> ForwardStep {
 
 /// A maker's refusal of an accept that came before it opened anything, and
 /// what ended; `None` for one that may follow an open.
+/// Whether a refusal that says nothing opened may follow an earlier post's
+/// open, so after a post whose answer is unknown it ends nothing: the quote
+/// unknown, which a maker that took it answers, or a `400` or `404`, which it
+/// may answer a second accept of the same quote with.
+fn may_follow_an_open(refusal: &Refusal) -> bool {
+    refusal.code == Some(SwapErrorCode::UnknownQuote) || matches!(refusal.status, 400 | 404)
+}
+
 fn accept_refusal(refusal: &Refusal) -> Option<NothingSentCause> {
     // Unauthorized: the maker acted on nothing, whatever the code (a maker
     // asking for a Privacy Pass token, which this build never pays).

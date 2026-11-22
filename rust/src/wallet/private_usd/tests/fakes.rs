@@ -228,6 +228,9 @@ pub(super) struct State {
     pub fee_retry_after: Option<u64>,
     /// The maker opens the swap on an accept, and its answer is lost.
     pub accept_answer_lost: bool,
+    /// Once the swap is open, a later accept is turned down so, status and
+    /// code, as a maker that took the quote may answer.
+    pub refused_after_open: Option<(u16, Option<&'static str>)>,
     /// Whether a confirmed `Opened` shows the swap's open; `false`: no
     /// confirmed block has it yet.
     pub opened_event_visible: bool,
@@ -402,6 +405,7 @@ impl State {
             fee_unseen_accepts: 0,
             fee_retry_after: None,
             accept_answer_lost: false,
+            refused_after_open: None,
             opened_event_visible: true,
             opened_event_reads: 0,
             relayer: pins.relayer,
@@ -994,6 +998,9 @@ impl FakeServices {
                         }))
                         .unwrap(),
                     });
+                }
+                if let (true, Some((status, code))) = (state.opened, state.refused_after_open) {
+                    return answer(status, json!({ "code": code, "error": "turned down" }));
                 }
                 if let Some(refused) = refused_accept(&state) {
                     return refused;

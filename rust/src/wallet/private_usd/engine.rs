@@ -206,6 +206,12 @@ pub(crate) struct FeePace {
     pub accept_waits: u32,
     /// The maker's last answer was `feeRequired`: it has opened nothing.
     pub fee_unseen: bool,
+    /// This process has posted the accept.
+    pub posted: bool,
+    /// What became of an earlier post is unknown: its answer was lost or a
+    /// `5xx`, or an earlier process posted it. That post may have opened the
+    /// swap.
+    pub answer_unknown: bool,
 }
 
 static FEE_PACES: LazyLock<Mutex<HashMap<(String, u32), FeePace>>> =

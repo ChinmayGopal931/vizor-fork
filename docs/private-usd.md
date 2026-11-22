@@ -313,7 +313,12 @@ mainnet asks none yet, and a quote without it takes the old path unchanged.
   and `t1`, which the confirmed read holds to the terms hash before any
   deposit. An accept refused `QUOTE_EXPIRED` after its record was saved (a
   fee Rust could not create in time) shows that bridge, under way until the
-  engine ends it.
+  engine ends it. After a post whose answer is unknown (lost, a `5xx`, or
+  made before a restart: the record's `acceptPosted`, `swaps.db` 9), an
+  unknown quote, a `400` or a `404` is no word that nothing opened: the maker
+  may answer so the second accept of a quote the first opened. The accept is
+  posted again as an unanswered one is, and the chain decides at the quote's
+  end; a quote without a fee, accepted again, likewise (review, 2026-11-22).
 - A bridge that paid the fee waits for its change (`FundsPending`) rather
   than fail its deposit. Its fee transaction folds into its row in Activity,
   a paid or refunded bridge's details show the fee as not refunded (a
@@ -334,7 +339,8 @@ keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
   a re-import changes), and never reuse a swap index (a shared `z` hands
   that swap to its maker).
 - Save the record before accept, and treat an accept that timed out or
-  failed in transport as maybe opened.
+  failed in transport as maybe opened, and so a refusal of a later post that
+  may follow its open (an unknown quote, a `400`, a `404`).
 - Never pay a deposit twice. Save `Started` before building it and the bytes
   before the first broadcast. Rebuild only once the old one is proven
   expired.
