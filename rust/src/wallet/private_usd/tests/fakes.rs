@@ -226,6 +226,13 @@ pub(super) struct State {
     /// the fee, each with this `Retry-After` where one is set.
     pub fee_unseen_accepts: u32,
     pub fee_retry_after: Option<u64>,
+    /// The maker opens the swap on an accept, and its answer is lost.
+    pub accept_answer_lost: bool,
+    /// Whether a confirmed `Opened` shows the swap's open; `false`: no
+    /// confirmed block has it yet.
+    pub opened_event_visible: bool,
+    /// How many times the `Opened` event was looked for.
+    pub opened_event_reads: u32,
 
     // The relayer.
     pub relayer: [u8; 20],
@@ -379,6 +386,9 @@ impl State {
             open_fee: None,
             fee_unseen_accepts: 0,
             fee_retry_after: None,
+            accept_answer_lost: false,
+            opened_event_visible: true,
+            opened_event_reads: 0,
             relayer: pins.relayer,
             relayer_fee: RELAYER_FEE,
             fee_expires_at: None,
@@ -721,6 +731,24 @@ impl ChainReader for FakeChain {
         Ok(self.0.get().refunded_at)
     }
 
+    /// The deadlines the maker opened the swap with, as its `Opened` names
+    /// them, once a confirmed block has it.
+    async fn confirmed_opened_deadlines(
+        &self,
+        id: &[u8; 32],
+        _since: u64,
+    ) -> Result<Option<(u64, u64)>> {
+        self.0.set().opened_event_reads += 1;
+        let state = self.0.get();
+        if !state.opened || !state.opened_event_visible || state.swap_id.as_ref() != Some(id) {
+            return Ok(None);
+        }
+        Ok(state
+            .opened_terms
+            .as_ref()
+            .map(|terms| (terms.t0, terms.t1)))
+    }
+
     async fn transaction_status(
         &self,
         _transaction: &[u8; 32],
@@ -976,6 +1004,12 @@ impl FakeServices {
                 );
                 state.swap_id = Some(id);
                 state.opened = true;
+                if state.accept_answer_lost {
+                    return Err(RoutedError {
+                        route_blocked: false,
+                        message: "no answer".into(),
+                    });
+                }
                 let mut accepted = json!({
                     "swapId": hex0x(&id),
                     "t0": t0,

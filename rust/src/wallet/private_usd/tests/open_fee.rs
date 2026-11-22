@@ -405,3 +405,71 @@ async fn a_fee_quote_too_short_or_too_long_lived_pays_nothing() {
     );
 }
 
+/// Finding 3: an accept whose answer was lost, for a swap the maker opened,
+/// goes on to its deposit once the quote is over, with the deadlines its
+/// confirmed `Opened` names and nothing posted after the quote; a swap
+/// whose event no confirmed block shows is waited for, then given up. A
+/// quote without a fee is followed the same way.
+#[tokio::test]
+async fn a_swap_whose_accept_answer_was_lost_goes_on_from_the_chains_opened() {
+    let h = asking(FEE, fee_address());
+    h.world.set().accept_answer_lost = true;
+    let quoted = h.quote().await.unwrap();
+    accept(&h, quoted.index).await.unwrap();
+    mine(&h, "openfee1");
+    assert_eq!(
+        h.advance().await.unwrap(),
+        waiting(ForwardWait::FeeAccepting)
+    );
+    assert!(h.world.get().opened, "the maker opened it");
+    assert_eq!(h.record().t0, None, "but its answer never came");
+    let posted = accepts(&h);
+
+    h.world.set().pass(300);
+    assert_eq!(h.advance().await.unwrap(), waiting(ForwardWait::Opening));
+    assert_eq!(accepts(&h), posted, "nothing posted after the quote");
+    let (t0, t1) = (h.world.get().t0, h.world.get().t1());
+    assert_eq!((h.record().t0, h.record().t1), (Some(t0), Some(t1)));
+    assert_eq!(h.advance().await.unwrap(), h.confirming());
+    assert_eq!(h.world.get().deposits.len(), 1);
+    assert_eq!(accepts(&h), posted);
+
+    // No confirmed block shows its event yet: waited for, then given up.
+    let h = asking(FEE, fee_address());
+    {
+        let mut state = h.world.set();
+        state.accept_answer_lost = true;
+        state.opened_event_visible = false;
+    }
+    let quoted = h.quote().await.unwrap();
+    accept(&h, quoted.index).await.unwrap();
+    mine(&h, "openfee1");
+    h.advance().await.unwrap();
+    h.world.set().pass(300 + 300 + 300);
+    assert_eq!(h.advance().await.unwrap(), waiting(ForwardWait::Opening));
+    assert_eq!(h.record().t0, None);
+    h.world.set().pass(1);
+    assert_eq!(
+        h.advance().await.unwrap(),
+        nothing_sent(NothingSentCause::MakerUnavailable)
+    );
+    assert!(h.world.get().deposits.is_empty());
+
+    // Without a fee: the accept itself loses its answer.
+    let h = Harness::new();
+    h.world.set().accept_answer_lost = true;
+    let quoted = h.quote().await.unwrap();
+    assert!(accept(&h, quoted.index).await.is_err(), "maybe opened");
+    assert_eq!(h.advance().await.unwrap(), waiting(ForwardWait::Opening));
+    assert_eq!(
+        h.world.get().opened_event_reads,
+        0,
+        "not before the quote ends"
+    );
+    h.world.set().pass(300);
+    assert_eq!(h.advance().await.unwrap(), waiting(ForwardWait::Opening));
+    assert!(h.record().t0.is_some());
+    assert_eq!(h.advance().await.unwrap(), h.confirming());
+    assert_eq!(h.world.get().deposits.len(), 1);
+}
+

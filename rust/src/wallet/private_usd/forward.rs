@@ -32,11 +32,13 @@
 //! A quote may ask an open fee (`open_fee.rs`): the maker's gas for opening
 //! the swap, paid in ZEC before it opens and never refunded. It is checked
 //! against the cap and paid only to an Orchard-only address of our network,
-//! with a minute of the quote left. The record is saved, the payment marked
-//! started, created and kept, then sent, and sent again while no block has
-//! it; the accept goes only once Veylor's own wallet shows it mined, and is
-//! posted again through `402 feeRequired` until the quote expires, never
-//! after. A payment is never built twice.
+//! from a quote that lives long enough for a block to mine it, with that
+//! much of the quote left. The record is saved, the payment marked started,
+//! created to expire with the quote, kept, then sent, and sent again while
+//! no block has it; the accept goes only once Veylor's own wallet shows it
+//! mined, and is posted again through `402 feeRequired` until the quote
+//! expires, never after. A payment is never built twice, and an answer lost
+//! is made up from the swap's `Opened` on chain.
 //!
 //! The driver runs over seams: [`ChainReader`], [`HttpTransport`],
 //! [`ForwardZcash`] (the wallet's side, [`WalletZcash`]) and [`Clock`]. The
@@ -77,6 +79,10 @@ use crate::wallet::routed_http::RoutedHttp;
 /// A maker's open can queue behind others; past this after the quote's
 /// expiry it is not coming, or too late to deposit into.
 const OPEN_GRACE_SECONDS: u64 = 5 * 60;
+/// A swap the chain shows opened though its accept went unanswered, whose
+/// `Opened` no confirmed block shows yet: past the open grace, its event is
+/// looked for this much longer before the swap is given up.
+const OPENED_EVENT_GRACE_SECONDS: u64 = 5 * 60;
 /// `caught_up` polls a confirmed read this often, this many times.
 const CATCH_UP_POLLS: u32 = 30;
 const CATCH_UP_INTERVAL: Duration = Duration::from_secs(2);
@@ -938,7 +944,10 @@ where
     /// asked to wait; never once the quote has expired. While the maker has
     /// not seen the fee (`402 feeRequired`), or the accept may have gone
     /// through (a `5xx` or no answer), it is posted again as the maker asks.
-    /// Any other refusal ends the swap: nothing opens it any more.
+    /// A refusal that says nothing opened ends the swap; one that may follow
+    /// an open (`accept_refusal`'s `None`) is posted again on the next step,
+    /// until the quote's end. After it, the chain shows whether the swap
+    /// opened and with what deadlines (`not_on_chain`).
     async fn accept_with_fee(
         &self,
         store: &mut SwapStore,
@@ -947,10 +956,11 @@ where
         let now = self.clock.now();
         let mut pace = engine::fee_pace(self.account, record.index);
         if now >= record.quote.expires_at {
-            // The maker said it had not seen the fee: nothing opened. Else an
-            // accept may have, and the chain is read once the maker's open
-            // can no longer be on its way.
-            if pace.fee_unseen {
+            // No accept goes after the quote: whether the swap opened, and
+            // with what deadlines, is the chain's to show. The maker said it
+            // had not seen the fee, and the chain shows no swap: nothing
+            // opened.
+            if pace.fee_unseen && self.chain.swap(&record.swap_id.0).await?.is_none() {
                 return self.end_unopened(store, &record, NothingSentCause::FeeNotHonoured);
             }
             return self.not_on_chain(store, &record, false).await;
@@ -1127,20 +1137,29 @@ where
         record: &ForwardRecord,
         answered: bool,
     ) -> Result<ForwardStep> {
-        let gave_up = self.clock.now() > record.quote.expires_at + OPEN_GRACE_SECONDS;
-        let cause = if !gave_up || record.deposit_progress() != DepositProgress::NotStarted {
+        let now = self.clock.now();
+        let gave_up = now > record.quote.expires_at + OPEN_GRACE_SECONDS;
+        // Unanswered past its quote, no answer is coming: the chain shows
+        // whether the swap opened all the same.
+        let unanswered = !answered && now >= record.quote.expires_at;
+        let cause = if !(gave_up || unanswered)
+            || record.deposit_progress() != DepositProgress::NotStarted
+        {
             None
         } else if self.chain.swap(&record.swap_id.0).await?.is_none() {
             // A fee paid for a swap that never opened is the maker's.
-            Some(if record.open_fee_payment.is_some() {
-                NothingSentCause::FeeNotHonoured
-            } else {
-                NothingSentCause::NeverOpened
-            })
-        } else if answered {
+            match (gave_up, record.open_fee_payment.is_some()) {
+                (false, _) => None,
+                (true, true) => Some(NothingSentCause::FeeNotHonoured),
+                (true, false) => Some(NothingSentCause::NeverOpened),
+            }
+        } else if answered || self.keep_opened_deadlines(store, record).await? {
+            // Kept: the next look follows the swap to its deposit.
             None
-        } else {
+        } else if now > record.quote.expires_at + OPEN_GRACE_SECONDS + OPENED_EVENT_GRACE_SECONDS {
             Some(NothingSentCause::MakerUnavailable)
+        } else {
+            None
         };
         match cause {
             Some(cause) => self.finish(
@@ -1152,6 +1171,37 @@ where
             ),
             None => Ok(waiting(ForwardWait::Opening)),
         }
+    }
+
+    /// Keeps on `record` the `t0` and `t1` its swap opened with, from the
+    /// swap's confirmed `Opened`: an accept whose answer was lost, its quote
+    /// gone. Nothing is posted; the chain alone is the evidence, and the
+    /// confirmed read holds them, with every other term, to the swap's terms
+    /// hash before anything is paid into it (a mismatch pays nothing). The
+    /// ticket the answer carried is gone: the relayer's posts go without it.
+    /// `false` while no confirmed block shows the event.
+    async fn keep_opened_deadlines(
+        &self,
+        store: &mut SwapStore,
+        record: &ForwardRecord,
+    ) -> Result<bool> {
+        let Some((t0, t1)) = self
+            .chain
+            .confirmed_opened_deadlines(&record.swap_id.0, record.accepted_at)
+            .await?
+        else {
+            return Ok(false);
+        };
+        log::info!(
+            "private usd: forward swap {}: opened unanswered, deadlines read from the chain",
+            record.index
+        );
+        let mut opened = record.clone();
+        opened.t0 = Some(t0);
+        opened.t1 = Some(t1);
+        update(store, self.account, &opened)?;
+        engine::remove_fee_pace(self.account, record.index);
+        Ok(true)
     }
 
     /// `chain_now` is the time of the newest block the swap was read against.
@@ -1973,6 +2023,7 @@ where
             receives,
             self.clock.now(),
         )?;
+        engine::remove_fee_pace(self.account, record.index);
         Ok(ForwardStep::Finished(outcome))
     }
 
