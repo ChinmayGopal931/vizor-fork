@@ -65,6 +65,8 @@ String? privateUsdErrorMessage(
   // At quote, Rust refuses an open fee over the cap or payable outside
   // Orchard.
   ApiPrivateUsdErrorCode.openFeeRefused => l10n.privateUsdConvertErrorOpenFee,
+  // At accept, Rust pays no open fee while the wallet catches up.
+  ApiPrivateUsdErrorCode.walletSyncing => l10n.privateUsdConvertFeeWaitsForSync,
   ApiPrivateUsdErrorCode.railgunClosed ||
   ApiPrivateUsdErrorCode.zcashRejected ||
   ApiPrivateUsdErrorCode.mismatch ||

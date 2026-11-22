@@ -139,6 +139,9 @@ pub(crate) enum ErrorCode {
     /// A quote's open fee is above the cap, or payable outside Orchard or on
     /// another network: nothing is paid for it.
     OpenFeeRefused,
+    /// The main wallet has not scanned to within a few blocks of the Zcash
+    /// tip: a quote that asks an open fee is not paid for until it has.
+    WalletSyncing,
 }
 
 #[derive(Clone, PartialEq, Eq)]

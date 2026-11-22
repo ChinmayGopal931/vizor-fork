@@ -574,6 +574,7 @@ ApiForwardRecord previewPrivateUsdRecord({
     nothingSentCause: nothingSentCause,
     endedAt: outcome == null ? null : at(const Duration(minutes: 12)),
     openFeeMined: false,
+    openFeePending: false,
   );
 }
 

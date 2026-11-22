@@ -6,7 +6,7 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `api_advance`, `api_cause`, `api_code`, `api_cost_request`, `api_deposit_pass`, `api_deposit_record`, `api_deposit_terms`, `api_funding_request`, `api_quote`, `api_record`, `api_reverse_advance`, `api_reverse_phase`, `api_reverse_record`, `api_send_record`, `api_transact`, `block_on`, `catch`, `deposit_confirmations`, `drive_with`, `drive`, `internal_hex`, `late_claim_at`, `no_such_conversion`, `open_context`, `open_fee_mined`, `parse_amount`, `parse_network_and_migrate`, `seconds`, `swap_network`, `wallet_facts`, `warm_proving_keys`
+// These functions are ignored because they are not marked as `pub`: `api_advance`, `api_cause`, `api_code`, `api_cost_request`, `api_deposit_pass`, `api_deposit_record`, `api_deposit_terms`, `api_funding_request`, `api_quote`, `api_record`, `api_reverse_advance`, `api_reverse_phase`, `api_reverse_record`, `api_send_record`, `api_transact`, `block_on`, `catch`, `deposit_confirmations`, `drive_with`, `drive`, `internal_hex`, `late_claim_at`, `no_such_conversion`, `open_context`, `open_fee_status`, `parse_amount`, `parse_network_and_migrate`, `seconds`, `swap_network`, `wallet_facts`, `warm_proving_keys`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `WalletFacts`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
 // These functions are ignored (category: IgnoreBecauseOwnerTyShouldIgnore): `default`
@@ -1540,6 +1540,11 @@ class ApiForwardRecord {
   /// the maker's whatever becomes of the swap.
   final bool openFeeMined;
 
+  /// The open fee's payment is unmined and may still be mined: an ended
+  /// bridge's record is read again as the wallet scans, until the payment
+  /// is mined or expires.
+  final bool openFeePending;
+
   const ApiForwardRecord({
     required this.index,
     required this.swapId,
@@ -1569,6 +1574,7 @@ class ApiForwardRecord {
     this.openFeeNetworkZat,
     this.openFeeTxid,
     required this.openFeeMined,
+    required this.openFeePending,
   });
 
   @override
@@ -1600,7 +1606,8 @@ class ApiForwardRecord {
       openFeeZat.hashCode ^
       openFeeNetworkZat.hashCode ^
       openFeeTxid.hashCode ^
-      openFeeMined.hashCode;
+      openFeeMined.hashCode ^
+      openFeePending.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -1634,7 +1641,8 @@ class ApiForwardRecord {
           openFeeZat == other.openFeeZat &&
           openFeeNetworkZat == other.openFeeNetworkZat &&
           openFeeTxid == other.openFeeTxid &&
-          openFeeMined == other.openFeeMined;
+          openFeeMined == other.openFeeMined &&
+          openFeePending == other.openFeePending;
 }
 
 /// A paid conversion whose payout Railgun's screening sent back to its
@@ -1829,6 +1837,11 @@ enum ApiPrivateUsdErrorCode {
   /// The maker asks an open fee above the cap, or payable outside Orchard
   /// or on another network: the quote is dropped with nothing paid.
   openFeeRefused,
+
+  /// The wallet is still catching up with the Zcash chain: a quote that
+  /// asks an open fee is not bridged, nothing saved or paid, and the same
+  /// quote may be bridged once it has.
+  walletSyncing,
 }
 
 /// A proved send or withdrawal, as Dart hands it to Rust to keep before it is

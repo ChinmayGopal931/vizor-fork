@@ -14486,6 +14486,7 @@ impl SseDecode for crate::api::private_usd::ApiForwardRecord {
         let mut var_openFeeNetworkZat = <Option<u64>>::sse_decode(deserializer);
         let mut var_openFeeTxid = <Option<String>>::sse_decode(deserializer);
         let mut var_openFeeMined = <bool>::sse_decode(deserializer);
+        let mut var_openFeePending = <bool>::sse_decode(deserializer);
         return crate::api::private_usd::ApiForwardRecord {
             index: var_index,
             swap_id: var_swapId,
@@ -14515,6 +14516,7 @@ impl SseDecode for crate::api::private_usd::ApiForwardRecord {
             open_fee_network_zat: var_openFeeNetworkZat,
             open_fee_txid: var_openFeeTxid,
             open_fee_mined: var_openFeeMined,
+            open_fee_pending: var_openFeePending,
         };
     }
 }
@@ -14750,6 +14752,7 @@ impl SseDecode for crate::api::private_usd::ApiPrivateUsdErrorCode {
             22 => crate::api::private_usd::ApiPrivateUsdErrorCode::Cancelled,
             23 => crate::api::private_usd::ApiPrivateUsdErrorCode::WrongDeployment,
             24 => crate::api::private_usd::ApiPrivateUsdErrorCode::OpenFeeRefused,
+            25 => crate::api::private_usd::ApiPrivateUsdErrorCode::WalletSyncing,
             _ => unreachable!("Invalid variant for ApiPrivateUsdErrorCode: {}", inner),
         };
     }
@@ -21870,6 +21873,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::private_usd::ApiForwardRecord
             self.open_fee_network_zat.into_into_dart().into_dart(),
             self.open_fee_txid.into_into_dart().into_dart(),
             self.open_fee_mined.into_into_dart().into_dart(),
+            self.open_fee_pending.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -22200,6 +22204,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::private_usd::ApiPrivateUsdErr
             Self::Cancelled => 22.into_dart(),
             Self::WrongDeployment => 23.into_dart(),
             Self::OpenFeeRefused => 24.into_dart(),
+            Self::WalletSyncing => 25.into_dart(),
             _ => unreachable!(),
         }
     }
@@ -28011,6 +28016,7 @@ impl SseEncode for crate::api::private_usd::ApiForwardRecord {
         <Option<u64>>::sse_encode(self.open_fee_network_zat, serializer);
         <Option<String>>::sse_encode(self.open_fee_txid, serializer);
         <bool>::sse_encode(self.open_fee_mined, serializer);
+        <bool>::sse_encode(self.open_fee_pending, serializer);
     }
 }
 
@@ -28193,6 +28199,7 @@ impl SseEncode for crate::api::private_usd::ApiPrivateUsdErrorCode {
                 crate::api::private_usd::ApiPrivateUsdErrorCode::Cancelled => 22,
                 crate::api::private_usd::ApiPrivateUsdErrorCode::WrongDeployment => 23,
                 crate::api::private_usd::ApiPrivateUsdErrorCode::OpenFeeRefused => 24,
+                crate::api::private_usd::ApiPrivateUsdErrorCode::WalletSyncing => 25,
                 _ => {
                     unimplemented!("");
                 }
