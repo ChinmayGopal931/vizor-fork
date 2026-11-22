@@ -2240,7 +2240,27 @@ impl SwapCall<'_> {
         op: Option<&OpHandle>,
         step: impl AsyncFnOnce(&WalletForward<'_>, &mut SwapStore) -> Result<R>,
     ) -> Result<R> {
-        let transport = swap::transport(op);
+        self.forward_over(swap::transport(op), op, step).await
+    }
+
+    /// [`Self::forward`] for an accept: `op` stops only its open fee, at the
+    /// checks around the fee's proposal and creation, while its requests run
+    /// on a transport no cancel stops. An accept's post always completes, as
+    /// before accepts had an op: one cut short may have opened the swap.
+    pub(crate) async fn forward_accepting<R>(
+        &self,
+        op: Option<&OpHandle>,
+        step: impl AsyncFnOnce(&WalletForward<'_>, &mut SwapStore) -> Result<R>,
+    ) -> Result<R> {
+        self.forward_over(swap::transport(None), op, step).await
+    }
+
+    async fn forward_over<R>(
+        &self,
+        transport: RoutedHttp,
+        op: Option<&OpHandle>,
+        step: impl AsyncFnOnce(&WalletForward<'_>, &mut SwapStore) -> Result<R>,
+    ) -> Result<R> {
         let chain = EvmRpc::new(&transport, self.pins(), self.eth_rpc_url)?.sharing_session();
         let zcash = self.zcash(op);
         let forward = Forward::new(

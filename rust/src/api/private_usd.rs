@@ -686,6 +686,8 @@ pub fn private_usd_forward_quote(
 /// advances post the accept once the wallet shows the fee mined. The fee is
 /// a key step: it runs under `op_id`, which a lock or the background
 /// cancels (`private_usd_cancel`) before the payment is saved or created.
+/// Nothing else answers the cancel: an accept's post, with or without a fee,
+/// always completes, since one cut short may have opened the swap.
 #[allow(clippy::too_many_arguments)]
 pub fn private_usd_forward_accept(
     db_path: String,
@@ -702,7 +704,7 @@ pub fn private_usd_forward_accept(
 ) -> Result<ApiAcceptResult, ApiPrivateUsdError> {
     let secret = Zeroizing::new(mnemonic_bytes);
     catch(panic::AssertUnwindSafe(|| {
-        let outcome = drive(
+        let outcome = drive_with(
             &db_path,
             &network,
             &account_uuid,
@@ -711,8 +713,10 @@ pub fn private_usd_forward_accept(
             &lightwalletd_url,
             &eth_rpc_url,
             Some(op_id),
+            // Never stopped before it starts: only the fee's own checks.
+            false,
             async |call, op| {
-                call.forward(op, async |forward, store| {
+                call.forward_accepting(op, async |forward, store| {
                     forward
                         .accept(store, index, max_total_zat, relayer_claims)
                         .await
@@ -2287,11 +2291,40 @@ fn drive<T>(
     op_id: Option<u32>,
     step: impl AsyncFnOnce(&SwapCall<'_>, Option<&OpHandle>) -> Result<T, PrivateUsdError>,
 ) -> Result<T, ApiPrivateUsdError> {
+    drive_with(
+        db_path,
+        network,
+        account_uuid,
+        store_dir,
+        secret,
+        lightwalletd_url,
+        eth_rpc_url,
+        op_id,
+        true,
+        step,
+    )
+}
+
+/// [`drive`]; `stop_before` stops a call cancelled before it starts, which
+/// an accept never is.
+#[allow(clippy::too_many_arguments)]
+fn drive_with<T>(
+    db_path: &str,
+    network: &str,
+    account_uuid: &str,
+    store_dir: &str,
+    secret: &[u8],
+    lightwalletd_url: &str,
+    eth_rpc_url: &str,
+    op_id: Option<u32>,
+    stop_before: bool,
+    step: impl AsyncFnOnce(&SwapCall<'_>, Option<&OpHandle>) -> Result<T, PrivateUsdError>,
+) -> Result<T, ApiPrivateUsdError> {
     let op = op_id.map(OpHandle::begin).transpose()?;
     let network = parse_network_and_migrate(db_path, network)?;
     let keys = SwapKeyContext::open(db_path, network, account_uuid, secret)?;
     let _driver = engine::lock_account(account_uuid)?;
-    if op.as_ref().is_some_and(OpHandle::cancelled) {
+    if stop_before && op.as_ref().is_some_and(OpHandle::cancelled) {
         return Err(engine::cancelled().into());
     }
     let call = SwapCall {

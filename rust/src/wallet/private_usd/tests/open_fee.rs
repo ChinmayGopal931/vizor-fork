@@ -10,6 +10,10 @@
 //! never abandoned, the deposit after the fee fits its approved total, and
 //! a lock or the background stops the fee before it is saved.
 
+use std::sync::Arc;
+
+use tokio::sync::Notify;
+
 use super::super::engine::{self, OpHandle};
 use super::super::evm_rpc::SwapStage;
 use super::super::forward::{self, AcceptOutcome, ForwardStep, ForwardWait, Funds};
@@ -577,3 +581,39 @@ async fn a_cancelled_accept_saves_and_pays_no_fee() {
     );
     assert_eq!(h.world.get().fee_payments.len(), 1);
 }
+
+/// A no-fee accept whose call is cancelled (a lock, the background) while
+/// its post is out still takes the maker's answer, as before accepts had an
+/// op: only an open fee answers the cancel.
+#[tokio::test]
+async fn a_no_fee_accept_cancelled_during_its_post_still_records_the_answer() {
+    let h = Harness::new();
+    let quoted = h.quote().await.unwrap();
+    let release = Arc::new(Notify::new());
+    h.world.set().hold_accept = Some(release.clone());
+    let op_id = rand::random::<u32>();
+    let op = OpHandle::begin(op_id).unwrap();
+    let accepted = async {
+        let _driver = engine::lock_account(&h.account).unwrap();
+        h.forward_with(Some(&op))
+            .accept(
+                &mut h.store(),
+                quoted.index,
+                DEPOSIT_ZAT + DEPOSIT_FEE_ZAT,
+                false,
+            )
+            .await
+    };
+    let cancel = async {
+        while accepts(&h) == 0 {
+            tokio::task::yield_now().await;
+        }
+        engine::cancel_op(op_id);
+        release.notify_one();
+    };
+    let (accepted, ()) = tokio::join!(accepted, cancel);
+    assert_eq!(accepted.unwrap(), AcceptOutcome::Accepted);
+    assert!(h.record().t0.is_some(), "the answer is kept");
+    assert_eq!(accepts(&h), 1);
+}
+

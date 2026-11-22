@@ -632,8 +632,28 @@ impl<'s> SwapCall<'s> {
 mod tests {
     use std::time::Duration;
 
-    use super::{nap, Wake};
+    use super::{nap, transport, Wake};
+    use crate::network_privacy::test_route_policy::lock_route_policy;
+    use crate::wallet::private_usd::engine::{self, OpHandle};
     use crate::wallet::private_usd::evm_rpc::{Head, SeenHead};
+    use crate::wallet::routed_http::RoutedRequest;
+
+    /// An accept's requests (`SwapCall::forward_accepting`) run on
+    /// `transport(None)`, which no cancel stops; every other call's stop on
+    /// their op's. Judged on a request the transport refuses before any
+    /// network, a plain `http` one: stopped, it says so first.
+    #[tokio::test]
+    async fn only_a_calls_own_transport_stops_on_its_cancel() {
+        let _route = lock_route_policy();
+        let op_id = rand::random::<u32>();
+        let op = OpHandle::begin(op_id).unwrap();
+        engine::cancel_op(op_id);
+        let request = || RoutedRequest::get("http://localhost/", Duration::from_secs(5), 1_024);
+        let stopped = transport(Some(&op)).send(request()).await.unwrap_err();
+        assert!(stopped.message.contains("cancelled"), "{}", stopped.message);
+        let goes = transport(None).send(request()).await.unwrap_err();
+        assert!(!goes.message.contains("cancelled"), "{}", goes.message);
+    }
 
     /// A block made at `timestamp`, first read at `seen_at`.
     fn seen(timestamp: u64, seen_at: u64) -> SeenHead {

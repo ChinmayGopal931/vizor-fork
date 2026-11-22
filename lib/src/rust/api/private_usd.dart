@@ -6,7 +6,7 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `api_advance`, `api_cause`, `api_code`, `api_cost_request`, `api_deposit_pass`, `api_deposit_record`, `api_deposit_terms`, `api_funding_request`, `api_quote`, `api_record`, `api_reverse_advance`, `api_reverse_phase`, `api_reverse_record`, `api_send_record`, `api_transact`, `block_on`, `catch`, `deposit_confirmations`, `drive`, `internal_hex`, `late_claim_at`, `no_such_conversion`, `open_context`, `open_fee_mined`, `parse_amount`, `parse_network_and_migrate`, `seconds`, `swap_network`, `wallet_facts`, `warm_proving_keys`
+// These functions are ignored because they are not marked as `pub`: `api_advance`, `api_cause`, `api_code`, `api_cost_request`, `api_deposit_pass`, `api_deposit_record`, `api_deposit_terms`, `api_funding_request`, `api_quote`, `api_record`, `api_reverse_advance`, `api_reverse_phase`, `api_reverse_record`, `api_send_record`, `api_transact`, `block_on`, `catch`, `deposit_confirmations`, `drive_with`, `drive`, `internal_hex`, `late_claim_at`, `no_such_conversion`, `open_context`, `open_fee_mined`, `parse_amount`, `parse_network_and_migrate`, `seconds`, `swap_network`, `wallet_facts`, `warm_proving_keys`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `WalletFacts`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
 // These functions are ignored (category: IgnoreBecauseOwnerTyShouldIgnore): `default`
@@ -180,6 +180,8 @@ Future<ApiForwardQuote> privateUsdForwardQuote({
 /// advances post the accept once the wallet shows the fee mined. The fee is
 /// a key step: it runs under `op_id`, which a lock or the background
 /// cancels (`private_usd_cancel`) before the payment is saved or created.
+/// Nothing else answers the cancel: an accept's post, with or without a fee,
+/// always completes, since one cut short may have opened the swap.
 Future<ApiAcceptResult> privateUsdForwardAccept({
   required String dbPath,
   required String network,
