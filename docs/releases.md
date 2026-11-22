@@ -363,6 +363,11 @@ Linux's rules hold, in `veylor-windows.yml`'s own `publish` job:
   program and library in the app and fails a build where one is another
   architecture's or imports a runtime DLL that the app's folder or the package
   lacks.
+- **Windows N and KN editions** lack Media Foundation until the Media Feature
+  Pack is added, and `mobile_scanner_plugin.dll` (which the executable
+  imports) imports `MF.dll`, `MFPlat.DLL` and `MFReadWrite.dll`, so Veylor
+  can't start there without it. The notes say so; delay-loading them in the
+  plugin would let the app start and only the scanner need them.
 - **Anyone checks a download:**
   `gh attestation verify <file> --repo ChinmayGopal931/vizor-fork
   --signer-workflow ChinmayGopal931/vizor-fork/.github/workflows/veylor-windows.yml`.

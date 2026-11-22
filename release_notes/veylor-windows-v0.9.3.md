@@ -45,6 +45,9 @@ record of that build.
   the file isn't commonly downloaded, keep it, and check it as above.
 - Veylor installs for your Windows account, without administrator rights,
   with shortcuts on the Start menu and the desktop.
+- On a Windows N or KN edition, add the Media Feature Pack first (in
+  Settings, under Optional features): Veylor can't start without Windows's
+  media components.
 
 ## Notes
 
