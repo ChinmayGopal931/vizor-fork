@@ -41,6 +41,22 @@ desktop's wallet link fails. The Play and TestFlight builds up to 2026-11-22
 passed none. Keystore aliases do not depend on the id, but
 app-link verification (`assetlinks.json`) names the shipped id.
 
+## Shielded USD kill switch (VIZOR_PRIVATE_USD_FLAG_URL)
+
+Every Veylor build pipeline takes the kill switch's URL (`docs/private-usd.md`,
+"Defines") from one file, `scripts/release-config/veylor-private-usd-flag-url.txt`,
+through `scripts/veylor-private-usd-flag-url.sh`, which prints it or nothing and
+fails on anything but one https URL without credentials or a fragment: the APK
+builder's Veylor flavor, `scripts/build-linux-release.sh`'s Veylor flavors,
+`scripts/release-veylor-macos.sh` and `scripts/package-windows-velopack.ps1` for
+a Veylor id, with `veylor-android.yml` and `veylor-linux.yml` checking the
+define. A file in the checkout, not a CI variable, so a rebuild at a tag
+passes the same URL. A build by hand (the Play bundle, TestFlight) passes
+`--dart-define=VIZOR_PRIVATE_USD_FLAG_URL=<the script's output>` when there is
+one. The file names none yet: until the owner chooses a URL and hosts
+`{"private_usd_available": true}` there, no build reads a kill switch, and
+Shielded USD stays available.
+
 ## Android direct APK (verifiable)
 
 Veylor's APK for direct download, beside Google Play, is the same app
@@ -55,9 +71,10 @@ uninstalling.
   flavor defines `VIZOR_FORM_FACTOR=mobile`, `VIZOR_PRIVATE_USD_ENABLED=true`,
   `ZCASH_DEFAULT_NETWORK=main`, `VIZOR_APPLICATION_ID=com.veylor.app` and
   `VIZOR_WALLET_LINK_BACKEND_URL=https://functions.vizor.cash` (since
-  2026-11-22: the relay Veylor's desktops use, as above), and nothing else:
-  the price URL keeps its default, and there is no keyed RPC file (a build
-  anyone can reproduce holds no secret). Neither
+  2026-11-22: the relay Veylor's desktops use, as above), the kill switch's
+  URL where the release config names one (above), and nothing else: the
+  price URL keeps its default, and there is no keyed RPC file (a build anyone
+  can reproduce holds no secret). Neither
   build defines `VIZOR_RELEASE_VERSION`, so both show v0.0.0 in Settings; pass
   `--release-version` here once the Play build does. Upstream's builds keep
   `--flavor vizor`, the default, unchanged (`scripts/test_fdroid_tools.py`

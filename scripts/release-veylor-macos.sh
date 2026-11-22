@@ -399,6 +399,13 @@ DART_DEFINES=(
   "VIZOR_WALLET_LINK_BACKEND_URL=${VIZOR_WALLET_LINK_BACKEND_URL:-https://functions.vizor.cash}"
   "VIZOR_PRIVATE_USD_ENABLED=true"
 )
+# Shielded USD's kill switch, from the one file every Veylor pipeline reads
+# (docs/releases.md); none while it names none.
+FLAG_URL="$("$ROOT_DIR/scripts/veylor-private-usd-flag-url.sh")" ||
+  die "scripts/release-config/veylor-private-usd-flag-url.txt does not hold a usable URL"
+if [[ -n "$FLAG_URL" ]]; then
+  DART_DEFINES+=("VIZOR_PRIVATE_USD_FLAG_URL=$FLAG_URL")
+fi
 
 if [[ "$SKIP_BUILD" == true ]]; then
   log "Reusing the last build"

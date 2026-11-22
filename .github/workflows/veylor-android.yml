@@ -103,7 +103,8 @@ jobs:
             --prefix "$toolchain" --accept-android-sdk-licenses
 
       # The builder's dry run prints the command it will run; its defines must
-      # be exactly the Play build's plus VIZOR_DEGOOGLED.
+      # be exactly the Play build's plus VIZOR_DEGOOGLED, and the kill switch's
+      # URL where scripts/release-config names one.
       - name: Check the build's settings
         working-directory: ${{ matrix.checkout }}
         run: |
@@ -111,7 +112,8 @@ jobs:
           scripts/build-android-reproducible.sh --flavor veylor --universal \
             --build-name "$VEYLOR_VERSION" --build-number "$VEYLOR_BUILD_NUMBER" \
             --signing unsigned --degoogled --dry-run | tee "$RUNNER_TEMP/builder-dry-run.txt"
-          python3 -I - "$RUNNER_TEMP/builder-dry-run.txt" <<'PY'
+          FLAG_URL="$(scripts/veylor-private-usd-flag-url.sh)" \
+            python3 -I - "$RUNNER_TEMP/builder-dry-run.txt" <<'PY'
           import os, shlex, sys
           text = open(sys.argv[1], encoding="utf-8").read()
           args = shlex.split(text.split("Command:", 1)[1])
@@ -129,6 +131,8 @@ jobs:
               "VIZOR_WALLET_LINK_BACKEND_URL": "https://functions.vizor.cash",
               "VIZOR_DEGOOGLED": "true",
           }
+          if os.environ["FLAG_URL"]:
+              expected["VIZOR_PRIVATE_USD_FLAG_URL"] = os.environ["FLAG_URL"]
           problems = []
           if defines != expected:
               problems.append(f"defines {defines} are not {expected}")

@@ -1029,7 +1029,7 @@ Every knob is a Dart define, read once with `String.fromEnvironment`/`bool.fromE
 | `VIZOR_PRIVATE_USD_ENABLED` | `false` | Master switch until launch. Release builds turn it on only after M8 sign-off. |
 | `VIZOR_ETHEREUM_RPC_URL_MAINNET` | `''` | Keyed RPC (E6). **Secret.** Tried first; publicnode is the fallback for the page. |
 | `VIZOR_ETHEREUM_RPC_URL_SEPOLIA` | `''` | As above, for Sepolia. **Secret.** |
-| `VIZOR_PRIVATE_USD_FLAG_URL` | `''` | Kill-switch JSON URL (D16, E7). Empty means no fetch, so the feature is available. |
+| `VIZOR_PRIVATE_USD_FLAG_URL` | `''` | Kill-switch JSON URL (D16, E7). Empty means no fetch, so the feature is available. Veylor's pipelines take it from `scripts/release-config/veylor-private-usd-flag-url.txt` (`docs/releases.md`), empty until the owner hosts one. |
 | `VIZOR_SUPPORT_URL` | `''` | Optional support link (D17). |
 
 **The keyed RPC URLs.**
@@ -1049,6 +1049,7 @@ Every knob is a Dart define, read once with `String.fromEnvironment`/`bool.fromE
 - Fetch `{"private_usd_available": bool}` with Dart's `NetworkHttpClient`, which is Tor-aware and fails closed. Use the retries and foreground policy in `lib/src/core/config/swap_feature_config.dart:136-205` (`_kSwapOverrideRetryDelays` `:136`, `swapOverrideProcessWorkPolicyProvider` `:146`). `NetworkHttpClient` has no `get`; call `request('GET', uri, timeout: …)` (`lib/src/core/network/network_http_client.dart`), which returns `NetworkHttpResponse{statusCode, bodyBytes, headers}`.
 - Cache the last answer in `SharedPreferences` (`vizor_private_usd_available_v1`).
 - Only an explicit `false` disables the feature. A missing key, a parse error or a fetch failure keeps the last known value, defaulting to `true`.
+- Read at start and again every 30 minutes while in the foreground (veylor, 2026-11-22; zapp reads it once), a read due in the background going on the return.
 - `false` hides the strip and the entry points. It does **not** stop the engine: the banner and `/private-usd/conversion/...` stay reachable for an unfinished swap, and the loop keeps driving it to completion or refund.
 
 ## 8. veylor integration reference

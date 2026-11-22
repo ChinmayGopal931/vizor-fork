@@ -199,13 +199,21 @@ case "${flavor}" in
   veylor)
     # Exactly the Play bundle's defines (docs/releases.md, "Android direct APK
     # (verifiable)"), so the APK behaves as Play's build does. The wallet link
-    # relay is the one Veylor's desktop builds create their packages on.
+    # relay is the one Veylor's desktop builds create their packages on, and
+    # the kill switch's URL comes from the checkout, so a rebuild at the tag
+    # finds the same one.
     build_args+=(
       --dart-define=VIZOR_PRIVATE_USD_ENABLED=true
       --dart-define=ZCASH_DEFAULT_NETWORK=main
       --dart-define=VIZOR_APPLICATION_ID=com.veylor.app
       --dart-define=VIZOR_WALLET_LINK_BACKEND_URL=https://functions.vizor.cash
     )
+    if ! flag_url="$("${script_dir}/veylor-private-usd-flag-url.sh")"; then
+      exit 2
+    fi
+    if [[ -n "${flag_url}" ]]; then
+      build_args+=(--dart-define="VIZOR_PRIVATE_USD_FLAG_URL=${flag_url}")
+    fi
     if [[ -n "${release_version}" ]]; then
       build_args+=(--dart-define="VIZOR_RELEASE_VERSION=${release_version}")
     fi

@@ -113,7 +113,12 @@ Code:
 - `VIZOR_PRIVATE_USD_FLAG_URL` is the kill switch. Only an explicit `false`
   hides the feature. A missing key or a failed fetch keeps the last value,
   which defaults to available. Even `false` never stops conversions already
-  under way.
+  under way. It is read at start and again every 30 minutes while the app is
+  in the foreground (`kPrivateUsdKillSwitchRereadInterval`; one that falls
+  due in the background goes on the return), so a `false` reaches an open
+  app. Every Veylor pipeline takes the URL from one file
+  (`docs/releases.md`, "Shielded USD kill switch"), which names none yet:
+  the owner chooses and hosts it.
 - `VIZOR_SUPPORT_URL` is optional.
 
 **Foreground and unlocked only (plan D9).**

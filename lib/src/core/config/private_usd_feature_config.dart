@@ -273,8 +273,16 @@ const _kRetryDelays = <Duration>[
   Duration(seconds: 300),
 ];
 
+/// How often the kill switch is read again while the app is in the
+/// foreground, so the owner's `false` reaches an open app rather than only
+/// the next launch. A read that falls due in the background goes on the
+/// return to the foreground.
+const kPrivateUsdKillSwitchRereadInterval = Duration(minutes: 30);
+
 /// The kill switch: `false` only after the owner's document said so.
 /// `false` hides the entry points; it never stops a conversion under way.
+/// Read at start, again every [kPrivateUsdKillSwitchRereadInterval] while in
+/// the foreground, and after a failed read as [_kRetryDelays] says.
 final privateUsdKillSwitchProvider =
     NotifierProvider<PrivateUsdKillSwitchNotifier, bool>(
       PrivateUsdKillSwitchNotifier.new,
@@ -287,8 +295,10 @@ class PrivateUsdKillSwitchNotifier extends Notifier<bool> {
   var _retryPending = false;
   var _retryAttempt = 0;
   var _isInForeground = true;
+  // A retry or a re-read that fell due while hidden, owed on the return.
   var _retryDeferredToForeground = false;
   Timer? _retryTimer;
+  Timer? _rereadTimer;
   AppLifecycleListener? _lifecycle;
   bool? _lastKnown;
 
@@ -313,6 +323,7 @@ class PrivateUsdKillSwitchNotifier extends Notifier<bool> {
     ref.onDispose(() {
       _disposed = true;
       _cancelRetry();
+      _cancelReread();
       _lifecycle?.dispose();
       _lifecycle = null;
     });
@@ -360,6 +371,7 @@ class PrivateUsdKillSwitchNotifier extends Notifier<bool> {
 
   Future<void> _fetch() async {
     final bool? fetched;
+    _cancelReread();
     _fetchInFlight = true;
     try {
       fetched = await ref.read(privateUsdAvailabilitySourceProvider).fetch();
@@ -375,7 +387,11 @@ class PrivateUsdKillSwitchNotifier extends Notifier<bool> {
     _retryPending = false;
     _retryAttempt = 0;
     _cancelRetry();
-    if (_disposed || fetched == null) return;
+    if (_disposed) return;
+    // Read: again after the interval, whatever it said. A document without
+    // the flag keeps the last answer.
+    _scheduleReread();
+    if (fetched == null) return;
     _lastKnown = fetched;
     try {
       await ref.read(privateUsdAvailabilityStoreProvider).write(fetched);
@@ -413,5 +429,23 @@ class PrivateUsdKillSwitchNotifier extends Notifier<bool> {
   void _cancelRetry() {
     _retryTimer?.cancel();
     _retryTimer = null;
+  }
+
+  void _scheduleReread() {
+    _cancelReread();
+    _rereadTimer = Timer(kPrivateUsdKillSwitchRereadInterval, () {
+      _rereadTimer = null;
+      if (_disposed || _fetchInFlight || _retryPending) return;
+      if (!_mayRunNow) {
+        _retryDeferredToForeground = true;
+        return;
+      }
+      unawaited(_fetch());
+    });
+  }
+
+  void _cancelReread() {
+    _rereadTimer?.cancel();
+    _rereadTimer = null;
   }
 }

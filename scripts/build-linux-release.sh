@@ -37,7 +37,9 @@ Environment:
                                  "Private USD"); it shows where the Railgun
                                  page process starts WebKit's sandbox
                                  (docs/private-usd-linux.md). Unset: not
-                                 passed.
+                                 passed. With it, the veylor flavors take the
+                                 kill switch's URL from
+                                 scripts/release-config/veylor-private-usd-flag-url.txt.
   FVM_BIN                        fvm executable path. Default: fvm.
 
 Default flavors: mainnet,testnet
@@ -255,6 +257,13 @@ build_flavor() {
     )
     if [[ -n "${VIZOR_PRIVATE_USD_ENABLED:-}" ]]; then
       flutter_args+=(--dart-define="VIZOR_PRIVATE_USD_ENABLED=$VIZOR_PRIVATE_USD_ENABLED")
+      # Veylor's kill switch, from the one file every Veylor pipeline reads.
+      if [[ -n "$IDENTITY_APPLICATION_ID" ]]; then
+        flag_url="$("$ROOT_DIR/scripts/veylor-private-usd-flag-url.sh")"
+        if [[ -n "$flag_url" ]]; then
+          flutter_args+=(--dart-define="VIZOR_PRIVATE_USD_FLAG_URL=$flag_url")
+        fi
+      fi
     fi
     if [[ -n "${VIZOR_RELEASE_VERSION:-}" ]]; then
       release_build_name="${VIZOR_RELEASE_BUILD_NAME:-$VIZOR_RELEASE_VERSION}"
