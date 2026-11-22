@@ -384,6 +384,13 @@ keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
 - Keep every signed payout, refund payout, `ready` and Railgun send proof
   before posting it, and a claim or refund as posted, or a claim as handed
   over, before it goes. Cap every relayer fee at 2 USDC.
+- Forget a kept send only when its first post is refused: nothing of it went.
+  Once it was posted, a refusal keeps it (`refusedAt`, `swaps.db` 9) and only
+  the chain ends it: its transaction in a block or every nullifier spent
+  (landed), or some spent by another proof (it never can). Meanwhile it goes
+  again, the same bytes, every 15 minutes, and the account's next payment
+  waits. A reverted transaction is forgotten only when its nullifiers are not
+  all spent (`sends.rs`; review, 2026-11-22).
 - Joint sweeps broadcast before they store. `PROPOSAL_STORE` is
   consume-on-entry with an idempotent discard, as in the hardware invariants.
 - Joint sweeps use Discard OVK, while the deposit uses the sender's OVK.

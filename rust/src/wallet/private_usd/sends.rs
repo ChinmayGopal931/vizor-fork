@@ -11,6 +11,11 @@
 //! `unconfirmed` row blocks the account's next payment until the chain
 //! settles it, and a log that does not read keeps spending blocked.
 //!
+//! Only the first post's refusal forgets a send: nothing of it went. Once it
+//! was posted, an earlier post may still land, so a refusal keeps it and the
+//! chain settles it, as a deposit the relayer named stays until the chain
+//! ends it.
+//!
 //! Never log a record or a request: they hold the proof.
 
 use std::fmt;
@@ -63,6 +68,10 @@ pub(crate) struct Relay {
     /// Unix seconds before which the relayer asked not to be posted again.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retry_at: Option<u64>,
+    /// Unix seconds of the last refusal of a send posted before: an earlier
+    /// post may still land, so the chain settles it (`swaps.db` 9).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub refused_at: Option<u64>,
 }
 
 /// One send or withdrawal: `relay` while it is unconfirmed, none once it
@@ -108,6 +117,15 @@ impl SendRecord {
         self.to.starts_with("0x")
     }
 
+    /// Posted at least once, whatever came of it: the relayer may hold it,
+    /// or have sent it.
+    fn was_posted(&self) -> bool {
+        self.tx_hash.is_some()
+            || self.relay.as_ref().is_some_and(|relay| {
+                relay.posted_at.is_some() || relay.spent_at.is_some() || relay.refused_at.is_some()
+            })
+    }
+
     /// The relayer sent the request in `transaction`.
     fn submitted(mut self, transaction: Word, at: u64) -> Self {
         self.tx_hash = Some(transaction);
@@ -116,6 +134,7 @@ impl SendRecord {
             relay.spent_at = None;
             relay.spent_in.clear();
             relay.retry_at = None;
+            relay.refused_at = None;
         }
         self
     }
@@ -137,6 +156,18 @@ impl SendRecord {
             relay.posted_at = Some(at);
             relay.spent_at = Some(at);
             relay.spent_in = transactions;
+            relay.retry_at = None;
+            relay.refused_at = None;
+        }
+        self
+    }
+
+    /// The relayer refused it after an earlier post, which may still land:
+    /// the chain settles it from here.
+    fn refused(mut self, at: u64) -> Self {
+        if let Some(relay) = &mut self.relay {
+            relay.posted_at = Some(at);
+            relay.refused_at = Some(at);
             relay.retry_at = None;
         }
         self
@@ -322,7 +353,8 @@ impl<'a, T: HttpTransport, K: Clock> Sends<'a, T, K> {
     }
 
     /// An answer that its notes are spent settles from the chain; a named
-    /// transaction from its receipt; anything else is posted again.
+    /// transaction from its receipt; a refusal after an earlier post from
+    /// the receipt and the nullifiers; anything else is posted again.
     async fn settle<C: SendChain>(
         &self,
         store: &mut SwapStore,
@@ -333,16 +365,27 @@ impl<'a, T: HttpTransport, K: Clock> Sends<'a, T, K> {
             return Ok(());
         };
         let now = self.clock.now();
-        match (relay.spent_at, send.tx_hash) {
-            (Some(spent_at), _) => {
+        match (relay.spent_at, relay.refused_at, send.tx_hash) {
+            (Some(spent_at), _, _) => {
                 self.settle_spent(store, chain, &send.id, relay, now.saturating_sub(spent_at))
                     .await
             }
-            (None, Some(transaction)) => {
+            (None, Some(refused_at), transaction) => {
+                self.settle_refused(
+                    store,
+                    chain,
+                    &send.id,
+                    transaction,
+                    relay,
+                    now.saturating_sub(refused_at),
+                )
+                .await
+            }
+            (None, None, Some(transaction)) => {
                 self.settle_transaction(store, chain, &send.id, transaction, relay, now)
                     .await
             }
-            (None, None) => {
+            (None, None, None) => {
                 self.post_again(store, &send.id, relay).await;
                 Ok(())
             }
@@ -361,9 +404,11 @@ impl<'a, T: HttpTransport, K: Clock> Sends<'a, T, K> {
         self.post(store, id, &relay.request).await;
     }
 
-    /// A reverted send moved nothing. One still out is asked about again
-    /// after a while: the same bytes answer with the transaction now sending
-    /// them, a new one if the first was forgotten.
+    /// A send in a block landed. One whose transaction reverted landed only
+    /// if the chain shows its nullifiers spent, by the same proof in another
+    /// transaction; otherwise it moved nothing. One still out is asked about
+    /// again after a while: the same bytes answer with the transaction now
+    /// sending them, a new one if the first was forgotten.
     async fn settle_transaction<C: SendChain>(
         &self,
         store: &mut SwapStore,
@@ -377,7 +422,7 @@ impl<'a, T: HttpTransport, K: Clock> Sends<'a, T, K> {
             TransactionStatus::Confirmed => change(store, self.account, id, |send| {
                 send.landed(Some(transaction))
             }),
-            TransactionStatus::Reverted => remove(store, self.account, id),
+            TransactionStatus::Reverted => self.reverted(store, chain, id, relay).await,
             TransactionStatus::Pending | TransactionStatus::Unknown => {
                 if now.saturating_sub(relay.posted_at.unwrap_or(0)) >= ASK_AGAIN_AFTER_SECONDS {
                     self.post_again(store, id, relay).await;
@@ -387,12 +432,25 @@ impl<'a, T: HttpTransport, K: Clock> Sends<'a, T, K> {
         }
     }
 
+    /// The relayer's transaction for it reverted: landed elsewhere if every
+    /// nullifier is spent, else forgotten, since that transaction moved
+    /// nothing.
+    async fn reverted<C: SendChain>(
+        &self,
+        store: &mut SwapStore,
+        chain: &C,
+        id: &str,
+        relay: &Relay,
+    ) -> Result<()> {
+        if spent_nullifiers(chain, &relay.spends).await? == Nullifiers::AllSpent {
+            return change(store, self.account, id, |send| send.landed(None));
+        }
+        remove(store, self.account, id)
+    }
+
     /// Its notes are spent, by a transaction of the relayer's it named or by
     /// one it does not know. One of those that succeeded means it landed.
-    /// Otherwise the nullifiers tell: all spent means it landed in some
-    /// transaction; some means another proof took part of its notes, and it
-    /// never can; none means the relayer's transaction is still out, and the
-    /// relayer looks again when asked after a while.
+    /// Otherwise the nullifiers tell ([`Self::from_nullifiers`]).
     async fn settle_spent<C: SendChain>(
         &self,
         store: &mut SwapStore,
@@ -407,6 +465,50 @@ impl<'a, T: HttpTransport, K: Clock> Sends<'a, T, K> {
                 return change(store, self.account, id, |send| send.landed(Some(landed)));
             }
         }
+        self.from_nullifiers(store, chain, id, relay, since).await
+    }
+
+    /// Refused after an earlier post, which may still land: no answer of the
+    /// relayer's ends it, only the chain. The transaction it named in a
+    /// block, it landed there; reverted, as any named one. Otherwise the
+    /// nullifiers tell ([`Self::from_nullifiers`]), and it goes again after
+    /// a while, in case the relayer takes it now.
+    async fn settle_refused<C: SendChain>(
+        &self,
+        store: &mut SwapStore,
+        chain: &C,
+        id: &str,
+        transaction: Option<Word>,
+        relay: &Relay,
+        since: u64,
+    ) -> Result<()> {
+        if let Some(transaction) = transaction {
+            match chain.send_status(&transaction.0).await? {
+                TransactionStatus::Confirmed => {
+                    return change(store, self.account, id, |send| {
+                        send.landed(Some(transaction))
+                    })
+                }
+                TransactionStatus::Reverted => return self.reverted(store, chain, id, relay).await,
+                TransactionStatus::Pending | TransactionStatus::Unknown => {}
+            }
+        }
+        self.from_nullifiers(store, chain, id, relay, since).await
+    }
+
+    /// What the nullifiers tell: all spent means it landed in some
+    /// transaction; some means another proof took part of its notes, and it
+    /// never can; none means it is still out, and the same bytes go again
+    /// once `since`, the time since the answer that left it to the chain,
+    /// reaches the recheck.
+    async fn from_nullifiers<C: SendChain>(
+        &self,
+        store: &mut SwapStore,
+        chain: &C,
+        id: &str,
+        relay: &Relay,
+        since: u64,
+    ) -> Result<()> {
         match spent_nullifiers(chain, &relay.spends).await? {
             Nullifiers::AllSpent => change(store, self.account, id, |send| send.landed(None)),
             Nullifiers::PartlySpent => remove(store, self.account, id),
@@ -421,14 +523,20 @@ impl<'a, T: HttpTransport, K: Clock> Sends<'a, T, K> {
 
     /// Posts `request` and notes what the answer says before it is acted on.
     /// Once a send is kept the log is a record, not a gate:
-    /// a note that fails is logged, and the answer stands. A refusal forgets
-    /// the send, since nothing from it went or ever will.
+    /// a note that fails is logged, and the answer stands. A refusal of its
+    /// first post forgets the send, since nothing from it went or ever will;
+    /// a refusal once it was posted keeps it for the chain to settle, since
+    /// an earlier post may have gone.
     async fn post(
         &self,
         store: &mut SwapStore,
         id: &str,
         request: &RailgunTransactRequest,
     ) -> RailgunBroadcast {
+        // A log that does not read is taken as posted: never forgotten on a
+        // guess.
+        let posted_before = find(store, self.account, id)
+            .map_or(true, |found| found.is_some_and(|send| send.was_posted()));
         let answer = self.relayer.railgun_transact(request).await;
         let now = self.clock.now();
         let noted = match &answer {
@@ -437,6 +545,12 @@ impl<'a, T: HttpTransport, K: Clock> Sends<'a, T, K> {
                 change(store, self.account, id, |send| {
                     send.submitted(transaction, now)
                 })
+            }
+            RailgunBroadcast::Refused { status } if posted_before => {
+                log::warn!(
+                    "private usd: the relayer refused send {id} again (HTTP {status}); the chain settles it"
+                );
+                change(store, self.account, id, |send| send.refused(now))
             }
             RailgunBroadcast::Refused { status } => {
                 log::warn!("private usd: the relayer refused send {id} (HTTP {status})");
@@ -562,6 +676,7 @@ fn proved_record(pins: &Deployment, send: &ProvedSend<'_>, now: u64) -> Result<S
             spent_at: None,
             spent_in: Vec::new(),
             retry_at: None,
+            refused_at: None,
         }),
     })
 }

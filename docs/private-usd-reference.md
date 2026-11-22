@@ -894,7 +894,7 @@ Dollar amounts are `amount / 10^decimals` with decimals 6, taken from the table 
 - **Answers** (`of/RailgunSendsClient.kt:43-94`):
   - `200` with `{transactions}`: Sent
   - `409 alreadySpent`: Spent; settle from the chain
-  - any other 4xx: Refused; free the notes
+  - any other 4xx: Refused; free the notes (veylor frees them only on a first post: once posted, a send waits for the chain, `docs/private-usd.md`)
   - `503` with `Retry-After`, `500` or a transport failure: Retry with the **same bytes**, waiting no more than 1 h
 - **Persistence.** zapp persists the proved bytes before posting, in `PrivateUsdSendLog` (`private_usd_sends_v2`, max 100). It reconciles them on every balance sync (`PrivateUsdSender.kt:269-437`; veylor runs this in Rust, `private_usd_send_settle_all`, §8.2).
 - **One outgoing payment at a time.** `PrivateUsdSpendGuard` allows one outgoing payment per wallet, conversions included, across restarts (`PrivateUsdSpendGuard.kt:32-96`).
