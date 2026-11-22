@@ -330,8 +330,9 @@ jobs:
       # What Windows itself shows of an installed Veylor: the installer runs
       # silently, Apps & features and the Start menu name Veylor Testnet and
       # Zapp LLC, and the app starts, titles its window Veylor Testnet and
-      # keeps running, with no WebView2 before a wallet is unlocked (the
-      # Railgun page opens only behind the unlock).
+      # keeps running, with the Visual C++ runtime beside it (not the runner's
+      # redistributable, which a fresh Windows lacks) and no WebView2 before a
+      # wallet is unlocked (the Railgun page opens only behind the unlock).
       - name: Install and start Veylor Testnet
         run: |
           $setup = Get-ChildItem dist/windows/velopack/veylor-testnet -Filter "*-Setup.exe" | Select-Object -First 1
@@ -356,6 +357,13 @@ jobs:
           if (-not $app) { throw "the app did not keep running" }
           Write-Host "running: $($app.Path), window '$($app.MainWindowTitle)'"
           if ($app.MainWindowTitle -ne "Veylor Testnet") { throw "the window is titled '$($app.MainWindowTitle)'" }
+          # Windows looks in the app's folder before System32 for these.
+          $appDir = Split-Path $app.Path
+          $runtime = @($app.Modules | Where-Object { $_.ModuleName -match '^(msvcp|vcruntime)140' })
+          $runtime | ForEach-Object { Write-Host "loaded: $($_.FileName)" }
+          if (-not ($runtime | Where-Object { $_.ModuleName -eq "vcruntime140.dll" })) { throw "the app loaded no vcruntime140.dll" }
+          $elsewhere = @($runtime | Where-Object { (Split-Path $_.FileName) -ne $appDir })
+          if ($elsewhere.Count -gt 0) { throw "the app loaded $($elsewhere[0].FileName), not the runtime beside it" }
           # A WebView2 browser process is its host's child.
           $webviews = @(Get-CimInstance Win32_Process -Filter "Name = 'msedgewebview2.exe'" |
             Where-Object { $_.ParentProcessId -eq $app.Id })

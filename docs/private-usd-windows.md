@@ -234,8 +234,8 @@ not start.
   The job then installs Veylor Testnet silently and checks what Windows shows
   of it: Apps & features names it Veylor Testnet and its publisher Zapp LLC, the
   Start menu's shortcut is Veylor Testnet (none names Vizor), and the app keeps
-  running, its window titled Veylor Testnet, with no WebView2 of its own before
-  an unlock. Upstream's packaging checks run on fixtures first, under
+  running, its window titled Veylor Testnet, with the Visual C++ runtime loaded
+  from its own folder and no WebView2 of its own before an unlock. Upstream's packaging checks run on fixtures first, under
   PowerShell 7.
 
 ## Pins
