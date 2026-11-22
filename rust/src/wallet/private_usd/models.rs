@@ -1074,7 +1074,7 @@ pub(crate) struct ReverseRecord {
     /// Unix seconds when the user went ahead; none while only a preview.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub accepted_at: Option<u64>,
-    /// The maker took the quote; a token paid for it, never asked again.
+    /// The maker took the quote: it is never asked again.
     #[serde(default, skip_serializing_if = "is_false")]
     pub maker_accepted: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]

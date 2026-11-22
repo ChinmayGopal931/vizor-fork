@@ -11391,6 +11391,10 @@
   "@privateUsdConvertEtaSeconds": {
     "description": "Estimated time shown under the active bridge progress step while the ZEC is being sent: a few seconds."
   },
+  "privateUsdConvertFeeWaitsForSync": "Bridging waits until your wallet finishes syncing.",
+  "@privateUsdConvertFeeWaitsForSync": {
+    "description": "Under the amount and on the bridge review, ZEC to Shielded USD, while the market maker asks a fee and the wallet is still catching up with the Zcash chain: the fee is not paid, and Bridge is off, until it has."
+  },
   "privateUsdConvertFees": "Bridge fees",
   "@privateUsdConvertFees": {
     "description": "Row label in the bridge quote breakdown for the relayer's and Railgun's fees."
@@ -11712,9 +11716,17 @@
   "@privateUsdConvertResultRefundedLate": {
     "description": "Result body, and activity detail note, when the swap could not be completed in time: it was called off and the ZEC returned minus a small network fee."
   },
+  "privateUsdConvertResultRefundedLateFeeKept": "The swap couldn't be completed in time, so it was called off and your ZEC came back, less a small network fee. The market maker keeps its fee.",
+  "@privateUsdConvertResultRefundedLateFeeKept": {
+    "description": "Result body, and activity detail note, when a bridge whose market maker fee was paid could not be completed in time: it was called off, the ZEC returned minus a small network fee, and the fee is not refunded."
+  },
   "privateUsdConvertResultRefundedMaker": "The market maker called the swap off, so your ZEC came back to your wallet, less a small network fee.",
   "@privateUsdConvertResultRefundedMaker": {
     "description": "Result body, and activity detail note, when the market maker cancelled the swap: the ZEC returned to the wallet minus a small network fee."
+  },
+  "privateUsdConvertResultRefundedMakerFeeKept": "The market maker called the swap off, so your ZEC came back to your wallet, less a small network fee. The market maker keeps its fee.",
+  "@privateUsdConvertResultRefundedMakerFeeKept": {
+    "description": "Result body, and activity detail note, when the market maker cancelled a bridge whose market maker fee was paid: the ZEC returned minus a small network fee, and the fee is not refunded."
   },
   "privateUsdConvertResultRefundedTitle": "Your ZEC came back",
   "@privateUsdConvertResultRefundedTitle": {

@@ -373,7 +373,9 @@ async fn a_fee_quote_too_short_or_too_long_lived_pays_nothing() {
     let least = pins().open_fee_min_quote_life_seconds;
     let most = pins().open_fee_max_quote_life_seconds;
     assert_eq!((least, most), (180, 1_800));
-    for life in [least - 1, most + 1] {
+    // Offered until 20 s before the least life, for at least 30 s.
+    let shortest = least + 20 + 30;
+    for life in [shortest - 1, most + 1] {
         let h = asking(FEE, fee_address());
         h.world.set().quote_expires_at = NOW + life;
         let refused = h.quote().await.unwrap_err();
@@ -384,7 +386,7 @@ async fn a_fee_quote_too_short_or_too_long_lived_pays_nothing() {
         );
         assert!(h.world.get().fee_payments.is_empty());
     }
-    for life in [least, most] {
+    for life in [shortest, most] {
         let h = asking(FEE, fee_address());
         h.world.set().quote_expires_at = NOW + life;
         let quoted = h.quote().await.unwrap();
@@ -703,4 +705,102 @@ async fn a_failed_resend_waits_its_half_minute_and_only_a_refusal_is_quiet() {
     h.advance().await.unwrap();
     assert_eq!(h.world.get().broadcast_attempts, 4);
     assert_eq!(h.world.get().submitted.len(), 2, "the first and the last");
+}
+
+/// A wallet more than a few blocks behind the Zcash tip pays no fee: the
+/// bridge is refused (`WalletSyncing`) with nothing saved or paid, and the
+/// same offer is bridged once the wallet catches up. A few blocks behind is
+/// near enough.
+#[tokio::test]
+async fn a_wallet_behind_the_tip_is_refused_a_fee_bridge_with_nothing_paid() {
+    let h = asking(FEE, fee_address());
+    let quoted = h.quote().await.unwrap();
+    h.world.set().scan_lag = 4;
+    let behind = accept(&h, quoted.index).await.unwrap_err();
+    assert_eq!(behind.code, ErrorCode::WalletSyncing);
+    assert!(h.world.get().fee_payments.is_empty(), "nothing paid");
+    assert_eq!(
+        h.store().unfinished_count(&h.account).unwrap(),
+        0,
+        "nothing saved"
+    );
+    h.world.set().scan_lag = 3;
+    assert_eq!(
+        accept(&h, quoted.index).await.unwrap(),
+        AcceptOutcome::Accepted
+    );
+    assert_eq!(h.world.get().fee_payments.len(), 1);
+
+    // Without a fee, as before: a deposit waits for the sync instead.
+    let h = Harness::new();
+    h.world.set().scan_lag = 100;
+    let quoted = h.quote().await.unwrap();
+    assert_eq!(
+        accept(&h, quoted.index).await.unwrap(),
+        AcceptOutcome::Accepted
+    );
+}
+
+/// A fee the engine pays itself (its creation at the bridge failed) waits
+/// while the wallet trails the tip, and is paid once it does not; one still
+/// behind when too little of the quote is left ends with nothing paid.
+#[tokio::test]
+async fn the_engine_waits_for_the_wallet_before_paying_a_fee() {
+    let started = async || {
+        let h = asking(FEE, fee_address());
+        h.world.set().fee_create_fails = true;
+        let quoted = h.quote().await.unwrap();
+        assert_eq!(
+            accept(&h, quoted.index).await.unwrap_err().code,
+            ErrorCode::ZcashWallet
+        );
+        assert_eq!(h.record().open_fee_progress(), OpenFeeProgress::Started);
+        h.world.set().fee_create_fails = false;
+        h.world.set().scan_lag = 10;
+        h
+    };
+    let h = started().await;
+    let syncing = ForwardStep::Waiting {
+        wait: ForwardWait::ZcashSyncing,
+        t0: None,
+        t1: None,
+    };
+    assert_eq!(h.advance().await.unwrap(), syncing);
+    assert!(h.world.get().fee_payments.is_empty(), "not while behind");
+    h.world.set().scan_lag = 0;
+    assert_eq!(
+        h.advance().await.unwrap(),
+        waiting(ForwardWait::FeeConfirming)
+    );
+    assert_eq!(h.world.get().fee_payments.len(), 1);
+
+    let h = started().await;
+    assert_eq!(h.advance().await.unwrap(), syncing);
+    h.world.set().pass(300 - 180 + 1);
+    assert_eq!(
+        h.advance().await.unwrap(),
+        nothing_sent(NothingSentCause::QuoteExpired)
+    );
+    assert!(h.world.get().fee_payments.is_empty(), "nothing paid");
+}
+
+/// At the quote's end with the fee shown unmined (a reorg took its block
+/// back), the chain is read before the bridge is given up: a swap the maker
+/// opened meanwhile, its accept's answer lost, goes on to its deposit.
+#[tokio::test]
+async fn a_fee_shown_unmined_at_the_end_is_followed_if_the_swap_opened() {
+    let h = asking(FEE, fee_address());
+    h.world.set().accept_answer_lost = true;
+    let quoted = h.quote().await.unwrap();
+    accept(&h, quoted.index).await.unwrap();
+    mine(&h, "openfee1");
+    h.advance().await.unwrap();
+    assert!(h.world.get().opened, "the maker opened it");
+    // The fee's block is taken back.
+    h.world.set().statuses.remove(&tx_id("openfee1"));
+    h.world.set().pass(300);
+    assert_eq!(h.advance().await.unwrap(), waiting(ForwardWait::Opening));
+    assert!(h.record().t0.is_some(), "the deadlines from its Opened");
+    assert_eq!(h.advance().await.unwrap(), h.confirming());
+    assert_eq!(h.world.get().deposits.len(), 1);
 }

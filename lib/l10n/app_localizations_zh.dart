@@ -8243,6 +8243,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get privateUsdConvertEtaSeconds => '几秒钟';
 
   @override
+  String get privateUsdConvertFeeWaitsForSync => '钱包同步完成后才能跨链。';
+
+  @override
   String get privateUsdConvertFees => '跨链手续费';
 
   @override
@@ -8484,8 +8487,16 @@ class AppLocalizationsZh extends AppLocalizations {
       '兑换未能按时完成，已被取消，你的 ZEC 已在扣除少量网络手续费后退回。';
 
   @override
+  String get privateUsdConvertResultRefundedLateFeeKept =>
+      '兑换未能按时完成，已被取消，你的 ZEC 已在扣除少量网络手续费后退回。做市商会保留其手续费。';
+
+  @override
   String get privateUsdConvertResultRefundedMaker =>
       '做市商取消了兑换，你的 ZEC 已在扣除少量网络手续费后退回钱包。';
+
+  @override
+  String get privateUsdConvertResultRefundedMakerFeeKept =>
+      '做市商取消了兑换，你的 ZEC 已在扣除少量网络手续费后退回钱包。做市商会保留其手续费。';
 
   @override
   String get privateUsdConvertResultRefundedTitle => '你的 ZEC 已退回';

@@ -54,6 +54,7 @@ ApiForwardRecord forwardRecord({
   nothingSentCause: nothingSentCause,
   endedAt: endedAt,
   openFeeMined: false,
+  openFeePending: false,
 );
 
 /// What one advance answers: a result, or an error it throws.

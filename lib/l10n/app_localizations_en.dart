@@ -8908,6 +8908,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get privateUsdConvertEtaSeconds => 'A few seconds';
 
   @override
+  String get privateUsdConvertFeeWaitsForSync =>
+      'Bridging waits until your wallet finishes syncing.';
+
+  @override
   String get privateUsdConvertFees => 'Bridge fees';
 
   @override
@@ -9166,8 +9170,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'The swap couldn\'t be completed in time, so it was called off and your ZEC came back, less a small network fee.';
 
   @override
+  String get privateUsdConvertResultRefundedLateFeeKept =>
+      'The swap couldn\'t be completed in time, so it was called off and your ZEC came back, less a small network fee. The market maker keeps its fee.';
+
+  @override
   String get privateUsdConvertResultRefundedMaker =>
       'The market maker called the swap off, so your ZEC came back to your wallet, less a small network fee.';
+
+  @override
+  String get privateUsdConvertResultRefundedMakerFeeKept =>
+      'The market maker called the swap off, so your ZEC came back to your wallet, less a small network fee. The market maker keeps its fee.';
 
   @override
   String get privateUsdConvertResultRefundedTitle => 'Your ZEC came back';

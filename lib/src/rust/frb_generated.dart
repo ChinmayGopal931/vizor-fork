@@ -16346,8 +16346,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ApiForwardRecord dco_decode_api_forward_record(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 28)
-      throw Exception('unexpected arr length: expect 28 but see ${arr.length}');
+    if (arr.length != 29)
+      throw Exception('unexpected arr length: expect 29 but see ${arr.length}');
     return ApiForwardRecord(
       index: dco_decode_u_32(arr[0]),
       swapId: dco_decode_String(arr[1]),
@@ -16379,6 +16379,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       openFeeNetworkZat: dco_decode_opt_box_autoadd_u_64(arr[25]),
       openFeeTxid: dco_decode_opt_String(arr[26]),
       openFeeMined: dco_decode_bool(arr[27]),
+      openFeePending: dco_decode_bool(arr[28]),
     );
   }
 
@@ -21783,6 +21784,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_openFeeNetworkZat = sse_decode_opt_box_autoadd_u_64(deserializer);
     var var_openFeeTxid = sse_decode_opt_String(deserializer);
     var var_openFeeMined = sse_decode_bool(deserializer);
+    var var_openFeePending = sse_decode_bool(deserializer);
     return ApiForwardRecord(
       index: var_index,
       swapId: var_swapId,
@@ -21812,6 +21814,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       openFeeNetworkZat: var_openFeeNetworkZat,
       openFeeTxid: var_openFeeTxid,
       openFeeMined: var_openFeeMined,
+      openFeePending: var_openFeePending,
     );
   }
 
@@ -28761,6 +28764,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_box_autoadd_u_64(self.openFeeNetworkZat, serializer);
     sse_encode_opt_String(self.openFeeTxid, serializer);
     sse_encode_bool(self.openFeeMined, serializer);
+    sse_encode_bool(self.openFeePending, serializer);
   }
 
   @protected

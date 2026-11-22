@@ -983,6 +983,27 @@ class PrivateUsdEngine {
   Future<List<rust.ApiForwardRecord>> loadRecords(String accountUuid) =>
       _load(_forward, accountUuid, () => _backend.forwardRecords(accountUuid));
 
+  /// The wallet scanned further: an account whose ended bridge has a market
+  /// maker fee payment that may still be mined is read again, so the bridge
+  /// says whether the fee was taken once its block is scanned. The loop
+  /// reads only conversions under way.
+  Future<void> walletScanned() async {
+    if (!canRun) return;
+    final accounts = {
+      for (final entry in _forward.statuses.entries)
+        if (entry.value.record.outcome != null &&
+            entry.value.record.openFeePending)
+          entry.key.accountUuid,
+    };
+    for (final account in accounts) {
+      try {
+        await loadRecords(account);
+      } catch (error) {
+        privateUsdLog('reading conversions failed (${error.runtimeType})');
+      }
+    }
+  }
+
   /// Reads [accountUuid]'s reverse records (drafts too) and publishes them.
   Future<List<rust.ApiReverseRecord>> loadReverseRecords(String accountUuid) =>
       _load(_reverse, accountUuid, () => _backend.reverseRecords(accountUuid));

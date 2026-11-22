@@ -865,22 +865,30 @@ impl SwapStore {
     }
 }
 
-/// A forward record's open fee payment, as [`open_fee_payments`] reads it.
+/// A forward record's open fee and its payment, as [`open_fee_payments`]
+/// reads it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct OpenFeeRow {
-    /// Display order, as the record keeps it.
-    pub tx_id: String,
+    pub account_uuid: String,
+    /// The kept payment, display order, as the record keeps it; `None`
+    /// before it is kept.
+    pub tx_id: Option<String>,
+    /// The payment was started (`openFeeAttempted`): created, perhaps, but
+    /// not yet kept, as an interruption between the two leaves it.
+    pub attempted: bool,
+    /// Where the fee is paid, which a started payment is found again by.
+    pub address: String,
     /// The bridge has ended.
     pub ended: bool,
     /// Its quote's `expiresAt`.
     pub expires_at: u64,
 }
 
-/// Every kept forward record's open fee payment in `dir`'s `swaps.db`, of
-/// every account, read only: no migration, no write, and a record that does
-/// not read is skipped rather than failing the rest. The wallet's
-/// resubmission reads it (`open_fee::withheld_fee_txids`), outside any
-/// conversion step. `None` without a store.
+/// Every forward record's open fee in `dir`'s `swaps.db`, its payment kept or
+/// only started, of every account, read only: no migration, no write, and a
+/// record that does not read is skipped rather than failing the rest. The
+/// wallet's resubmission reads it (`open_fee::withheld_fee_txids`), outside
+/// any conversion step. `None` without a store.
 pub(crate) fn open_fee_payments(dir: &Path) -> Result<Option<Vec<OpenFeeRow>>> {
     let path = dir.join(FILE_NAME);
     if !path.exists() {
@@ -894,26 +902,37 @@ pub(crate) fn open_fee_payments(dir: &Path) -> Result<Option<Vec<OpenFeeRow>>> {
     conn.busy_timeout(BUSY_TIMEOUT).map_err(sql)?;
     let mut statement = conn
         .prepare(
-            "SELECT record_json FROM swaps
-             WHERE direction = 'forward' AND record_json LIKE '%\"openFeePayment\"%'",
+            "SELECT account_uuid, record_json FROM swaps
+             WHERE direction = 'forward' AND record_json LIKE '%\"openFee\"%'",
         )
         .map_err(sql)?;
     let rows = statement
-        .query_map([], |row| row.get::<_, String>(0))
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
         .map_err(sql)?;
     let mut payments = Vec::new();
-    for json in rows {
-        let Ok(record) = serde_json::from_str::<serde_json::Value>(&json.map_err(sql)?) else {
+    for row in rows {
+        let (account_uuid, json) = row.map_err(sql)?;
+        let Ok(record) = serde_json::from_str::<serde_json::Value>(&json) else {
             continue;
         };
-        let (Some(tx_id), Some(expires_at)) = (
-            record["openFeePayment"]["txId"].as_str(),
+        let (Some(address), Some(expires_at)) = (
+            record["quote"]["openFee"]["address"].as_str(),
             record["quote"]["expiresAt"].as_u64(),
         ) else {
             continue;
         };
+        let tx_id = record["openFeePayment"]["txId"].as_str().map(str::to_owned);
+        let attempted = record["openFeeAttempted"].as_bool().unwrap_or(false);
+        if tx_id.is_none() && !attempted {
+            continue;
+        }
         payments.push(OpenFeeRow {
-            tx_id: tx_id.to_owned(),
+            account_uuid,
+            tx_id,
+            attempted,
+            address: address.to_owned(),
             ended: !record["outcome"].is_null(),
             expires_at,
         });

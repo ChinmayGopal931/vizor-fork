@@ -204,6 +204,9 @@ pub(crate) trait ForwardZcash {
     async fn chain_height(&self) -> Result<u64>;
     /// Whether the main wallet has scanned to the chain's live tip.
     async fn synced(&self) -> Result<bool>;
+    /// How far the main wallet has scanned without a gap; `None` before its
+    /// first scan.
+    async fn scanned_height(&self) -> Result<Option<u64>>;
     /// The deposit's network fee from the wallet now, or `None` unless one
     /// transaction can pay it. Nothing is locked.
     async fn deposit_fee(&self, address: &str, zatoshi: u64) -> Result<Option<u64>>;
@@ -289,6 +292,15 @@ impl<Z: ForwardZcash> Drop for ProposedDeposit<'_, Z> {
             self.zcash.discard_deposit(proposal);
         }
     }
+}
+
+/// What paying a started record's open fee came to.
+enum FeePaying {
+    Paid(OpenFeePayment),
+    /// Too little of the quote is left: nothing was paid, nor will be.
+    TooLate,
+    /// The main wallet trails the Zcash tip: nothing paid yet.
+    Syncing,
 }
 
 enum Deposit {
@@ -578,6 +590,9 @@ where
         let zcash_height = self.zcash.chain_height().await?;
         let open_fee = match &quote.open_fee {
             Some(fee) => {
+                // A wallet catching up would see the fee mined, and deposit,
+                // too late: nothing is saved or paid, and the offer holds.
+                open_fee::require_scanned(self.zcash.scanned_height().await?, zcash_height)?;
                 let proposed = self
                     .propose_open_fee(index, &quote, fee, &offer, max_total_zatoshi)
                     .await?;
@@ -854,9 +869,14 @@ where
         let payment = match current.open_fee_payment.clone() {
             Some(payment) => payment,
             None => match self.pay_open_fee(store, &current, &fee).await? {
-                Some(payment) => payment,
+                FeePaying::Paid(payment) => payment,
                 // Too late to pay: dropped, with nothing paid.
-                None => return self.end_unopened(store, &current, NothingSentCause::QuoteExpired),
+                FeePaying::TooLate => {
+                    return self.end_unopened(store, &current, NothingSentCause::QuoteExpired)
+                }
+                // Paid once the wallet is at the tip, if the quote then
+                // still allows it.
+                FeePaying::Syncing => return Ok(waiting(ForwardWait::ZcashSyncing)),
             },
         };
         let current: ForwardRecord = load(store, self.account, record.index)?;
@@ -866,6 +886,11 @@ where
         }
         let now = self.clock.now();
         if now >= current.quote.expires_at {
+            // A fee the wallet shows unmined may still have opened the swap,
+            // in a block a reorg took back: the chain says.
+            if self.chain.swap(&current.swap_id.0).await?.is_some() {
+                return self.not_on_chain(store, &current, false).await;
+            }
             // Never accepted. A payment that can still be mined is the
             // maker's if it is; one provably expired paid nothing.
             let cause = if status == SwapTxStatus::Expired {
@@ -922,21 +947,26 @@ where
 
     /// Pays the open fee of a record saved before its payment was created,
     /// should the time left still allow it: the deployment's least fee quote
-    /// life, as at the bridge. `None`, with nothing paid, once it does not,
-    /// judged before the payment is proposed and again right before it is
-    /// created: a stored payment is one the wallet's sync sends again until
-    /// it is mined or expires, a few blocks after the quote.
+    /// life, as at the bridge. `TooLate`, with nothing paid, once it does
+    /// not, judged before the payment is proposed and again right before it
+    /// is created: a stored payment is one the wallet's sync sends again
+    /// until it is mined or expires, a few blocks after the quote. `Syncing`,
+    /// nothing paid yet, while the wallet trails the tip, as at the bridge.
     async fn pay_open_fee(
         &self,
         store: &mut SwapStore,
         record: &ForwardRecord,
         fee: &OpenFee,
-    ) -> Result<Option<OpenFeePayment>> {
+    ) -> Result<FeePaying> {
         // Only with the time the user's bridge needed to start it.
         if open_fee::time_left(&record.quote, self.clock.now())
             < self.pins.open_fee_min_quote_life_seconds
         {
-            return Ok(None);
+            return Ok(FeePaying::TooLate);
+        }
+        let tip = self.zcash.chain_height().await?;
+        if open_fee::require_scanned(self.zcash.scanned_height().await?, tip).is_err() {
+            return Ok(FeePaying::Syncing);
         }
         let max_total = record.open_fee_max_total_zat.ok_or_else(|| {
             PrivateUsdError::new(
@@ -957,7 +987,7 @@ where
         if open_fee::time_left(&record.quote, self.clock.now())
             < self.pins.open_fee_min_quote_life_seconds
         {
-            return Ok(None);
+            return Ok(FeePaying::TooLate);
         }
         let mut started = record.clone();
         if !started.open_fee_attempted {
@@ -966,7 +996,7 @@ where
         }
         self.create_open_fee(store, &started, proposal, network_fee)
             .await
-            .map(Some)
+            .map(FeePaying::Paid)
     }
 
     /// Posts the accept of a quote whose open fee is mined, unless the maker

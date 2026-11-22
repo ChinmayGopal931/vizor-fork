@@ -65,6 +65,8 @@ String? privateUsdErrorMessage(
   // At quote, Rust refuses an open fee over the cap or payable outside
   // Orchard.
   ApiPrivateUsdErrorCode.openFeeRefused => l10n.privateUsdConvertErrorOpenFee,
+  // At accept, Rust pays no open fee while the wallet catches up.
+  ApiPrivateUsdErrorCode.walletSyncing => l10n.privateUsdConvertFeeWaitsForSync,
   ApiPrivateUsdErrorCode.railgunClosed ||
   ApiPrivateUsdErrorCode.zcashRejected ||
   ApiPrivateUsdErrorCode.mismatch ||
@@ -138,14 +140,20 @@ String privateUsdForwardNothingSentMessage(
     ? l10n.privateUsdConvertResultFeeKept
     : privateUsdNothingSentMessage(l10n, record.nothingSentCause);
 
-/// Why a forward conversion's ZEC came back.
+/// Why a forward conversion's ZEC came back, and with [feeKept] (its quote
+/// asked an open fee, paid before the swap opened) that the market maker
+/// keeps its fee.
 String privateUsdRefundedMessage(
   AppLocalizations l10n,
-  ApiRefundCause? cause,
-) => switch (cause) {
-  ApiRefundCause.makerCancelled ||
-  null => l10n.privateUsdConvertResultRefundedMaker,
-  ApiRefundCause.notClaimedInTime => l10n.privateUsdConvertResultRefundedLate,
+  ApiRefundCause? cause, {
+  bool feeKept = false,
+}) => switch ((cause, feeKept)) {
+  (ApiRefundCause.notClaimedInTime, false) =>
+    l10n.privateUsdConvertResultRefundedLate,
+  (ApiRefundCause.notClaimedInTime, true) =>
+    l10n.privateUsdConvertResultRefundedLateFeeKept,
+  (_, false) => l10n.privateUsdConvertResultRefundedMaker,
+  (_, true) => l10n.privateUsdConvertResultRefundedMakerFeeKept,
 };
 
 /// What to say when a reverse quote fails before anything but a swap index

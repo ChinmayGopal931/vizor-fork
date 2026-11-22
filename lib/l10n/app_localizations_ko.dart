@@ -8781,6 +8781,10 @@ class AppLocalizationsKo extends AppLocalizations {
   String get privateUsdConvertEtaSeconds => '몇 초 정‍도';
 
   @override
+  String get privateUsdConvertFeeWaitsForSync =>
+      '지‍갑 동‍기‍화‍가 끝‍나‍면 브‍리‍지‍할 수 있‍어‍요.';
+
+  @override
   String get privateUsdConvertFees => '브‍리‍지 수‍수‍료';
 
   @override
@@ -9033,8 +9037,16 @@ class AppLocalizationsKo extends AppLocalizations {
       '스‍왑‍을 제‍시‍간‍에 완‍료‍하‍지 못‍해 취‍소‍됐‍고, 소‍액‍의 네‍트‍워‍크 수‍수‍료‍를 뺀 ZEC‍가 돌‍아‍왔‍어‍요.';
 
   @override
+  String get privateUsdConvertResultRefundedLateFeeKept =>
+      '스‍왑‍을 제‍시‍간‍에 완‍료‍하‍지 못‍해 취‍소‍됐‍고, 소‍액‍의 네‍트‍워‍크 수‍수‍료‍를 뺀 ZEC‍가 돌‍아‍왔‍어‍요. 마‍켓 메‍이‍커 수‍수‍료‍는 돌‍려‍받‍을 수 없‍어‍요.';
+
+  @override
   String get privateUsdConvertResultRefundedMaker =>
       '마‍켓 메‍이‍커‍가 스‍왑‍을 취‍소‍해‍서, 소‍액‍의 네‍트‍워‍크 수‍수‍료‍를 뺀 ZEC‍가 지‍갑‍으‍로 돌‍아‍왔‍어‍요.';
+
+  @override
+  String get privateUsdConvertResultRefundedMakerFeeKept =>
+      '마‍켓 메‍이‍커‍가 스‍왑‍을 취‍소‍해‍서, 소‍액‍의 네‍트‍워‍크 수‍수‍료‍를 뺀 ZEC‍가 지‍갑‍으‍로 돌‍아‍왔‍어‍요. 마‍켓 메‍이‍커 수‍수‍료‍는 돌‍려‍받‍을 수 없‍어‍요.';
 
   @override
   String get privateUsdConvertResultRefundedTitle => 'ZEC‍가 돌‍아‍왔‍어‍요';

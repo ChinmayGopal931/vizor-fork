@@ -14,14 +14,17 @@ import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
 // Home, Activity and the Shielded USD screen build their rows from one
 // activity, so each lists the account's sends and received sends too.
 void main() {
-  ProviderContainer container({required bool engine}) {
+  ProviderContainer container({
+    required bool engine,
+    List<ApiForwardRecord> records = const [],
+  }) {
     final container = ProviderContainer(
       overrides: [
         privateUsdEngineEnabledProvider.overrideWithValue(engine),
         privateUsdCurrentDeploymentProvider.overrideWithValue(_sepolia),
         privateUsdActivityRecordsProvider(
           _account,
-        ).overrideWith((ref) => const []),
+        ).overrideWith((ref) => records),
         privateUsdReverseActivityRecordsProvider(
           _account,
         ).overrideWith((ref) => const []),
@@ -47,6 +50,39 @@ void main() {
 
     expect(activity.sends, [previewPrivateUsdSendRecord()]);
     expect(activity.receipts, [previewPrivateUsdReceipt()]);
+  });
+
+  // A bridge's row stands in for its market maker fee's own wallet
+  // transaction, as for its deposit, so the feed drops that row; a fee
+  // whose bridge ended unmined keeps its own row, as it may still be mined.
+  test('a bridge\'s fee transaction folds into its row', () {
+    const fee = 'AB12CD34';
+    final txids = container(
+      engine: true,
+      records: [
+        previewPrivateUsdRecord(
+          outcome: ApiForwardOutcome.paid,
+          phase: ApiForwardPhase.paid,
+          openFeeTxid: fee,
+          openFeeMined: true,
+        ),
+      ],
+    ).read(privateUsdActivityProvider(_account)).txids;
+    expect(txids, contains(fee.toLowerCase()));
+
+    final unmined = container(
+      engine: true,
+      records: [
+        previewPrivateUsdRecord(
+          outcome: ApiForwardOutcome.nothingSent,
+          phase: ApiForwardPhase.nothingSent,
+          nothingSentCause: ApiNothingSentCause.feeNotHonoured,
+          deposited: false,
+          openFeeTxid: fee,
+        ),
+      ],
+    ).read(privateUsdActivityProvider(_account)).txids;
+    expect(unmined, isNot(contains(fee.toLowerCase())));
   });
 
   test('without the engine it reads no balance', () {

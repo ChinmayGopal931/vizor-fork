@@ -8,11 +8,16 @@
 //!   network with an Orchard receiver and no other ([`orchard_only`]), so no
 //!   choice of pool can send it in the clear. A quote that fails is dropped;
 //!   its index is spent all the same.
-//! - **Quoted to live long enough, and no longer.** A fee quote must live
-//!   the deployment's `open_fee_min_quote_life_seconds` (180 s: a 75-second
-//!   block more than 90% likely in time) and at most its
-//!   `open_fee_max_quote_life_seconds` (30 minutes) when it comes
-//!   ([`check_quote_life`]).
+//! - **Quoted to live long enough, and no longer.** A fee quote is offered
+//!   until its [`pay_by`]: the deployment's `open_fee_min_quote_life_seconds`
+//!   (180 s: a 75-second block more than 90% likely in time) and
+//!   [`OPEN_FEE_OFFER_MARGIN_SECONDS`] before its end. It must come with at
+//!   least [`OPEN_FEE_LEAST_REVIEW_SECONDS`] of that offer left, so living
+//!   230 s or more, and live at most `open_fee_max_quote_life_seconds` (30
+//!   minutes) ([`check_quote_life`]).
+//! - **From a wallet at the tip.** Nothing is paid while the main wallet's
+//!   scan trails the Zcash tip by more than [`OPEN_FEE_MAX_SCAN_LAG_BLOCKS`]
+//!   ([`require_scanned`]): it would deposit late, if at all.
 //! - **Paid only with time to be mined.** At least that least life is left
 //!   before the payment is built and again right before it is created and
 //!   stored ([`require_time_to_start`]): a stored payment is one the
@@ -35,8 +40,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use zcash_address::unified::{self, Container, Encoding};
 use zcash_protocol::consensus::NetworkType;
 
+use crate::wallet::network::WalletNetwork;
+
 use super::deployment::{
-    FEE_PACE_SECONDS, FEE_WAIT_MAX_SECONDS, FEE_WAIT_MIN_SECONDS, OPEN_FEE_MARGIN_SECONDS,
+    FEE_PACE_SECONDS, FEE_WAIT_MAX_SECONDS, FEE_WAIT_MIN_SECONDS, OPEN_FEE_LEAST_REVIEW_SECONDS,
+    OPEN_FEE_MARGIN_SECONDS, OPEN_FEE_MAX_SCAN_LAG_BLOCKS, OPEN_FEE_OFFER_MARGIN_SECONDS,
 };
 use super::models::{OpenFee, SwapQuote};
 use super::{fail, ErrorCode, Result};
@@ -114,9 +122,21 @@ fn canonical(address: &str) -> bool {
         .is_ok_and(|(network, decoded)| decoded.encode(&network) == address)
 }
 
-/// That a quote asking an open fee, quoted at `now`, lives long enough for
-/// its fee to be paid and mined in time, `min_life` seconds, and not past
-/// `max_life`. `OpenFeeRefused` otherwise, with nothing paid.
+/// Until when the review offers a quote that asks an open fee (unix
+/// seconds): `min_life`, the least of its life the fee needs to be mined in
+/// time, and [`OPEN_FEE_OFFER_MARGIN_SECONDS`] for the tap, before its end.
+/// Dart offers it until then and adds no margin of its own.
+pub(crate) fn pay_by(quote: &SwapQuote, min_life: u64) -> u64 {
+    quote
+        .expires_at
+        .saturating_sub(min_life)
+        .saturating_sub(OPEN_FEE_OFFER_MARGIN_SECONDS)
+}
+
+/// That a quote asking an open fee, quoted at `now`, is offered for at least
+/// [`OPEN_FEE_LEAST_REVIEW_SECONDS`] before its [`pay_by`], so lives long
+/// enough for its fee to be paid and mined in time, and not past `max_life`.
+/// `OpenFeeRefused` otherwise, with nothing paid.
 pub(crate) fn check_quote_life(
     quote: &SwapQuote,
     now: u64,
@@ -124,16 +144,32 @@ pub(crate) fn check_quote_life(
     max_life: u64,
 ) -> Result<()> {
     let life = time_left(quote, now);
-    if life < min_life {
+    if pay_by(quote, min_life) < now.saturating_add(OPEN_FEE_LEAST_REVIEW_SECONDS) {
         return fail(
             ErrorCode::OpenFeeRefused,
-            format!("the fee quote lives {life}s, too short for its fee to be mined first"),
+            format!("the fee quote lives {life}s, too short to review and mine its fee first"),
         );
     }
     if quote.expires_at.saturating_sub(now) > max_life {
         return fail(
             ErrorCode::OpenFeeRefused,
             format!("the fee quote lives {life}s, over the {max_life}s allowed"),
+        );
+    }
+    Ok(())
+}
+
+/// `WalletSyncing` while the main wallet's fully scanned height `scanned`
+/// trails the Zcash tip `tip` by more than [`OPEN_FEE_MAX_SCAN_LAG_BLOCKS`]:
+/// the fee is not paid yet. A wallet catching up would see the fee mined
+/// late, so post the accept late if at all, and deposit late, perhaps after
+/// the deposit window.
+pub(crate) fn require_scanned(scanned: Option<u64>, tip: u64) -> Result<()> {
+    let behind = scanned.map_or(tip, |scanned| tip.saturating_sub(scanned));
+    if behind > OPEN_FEE_MAX_SCAN_LAG_BLOCKS {
+        return fail(
+            ErrorCode::WalletSyncing,
+            format!("the wallet is {behind} blocks behind the Zcash tip"),
         );
     }
     Ok(())
@@ -170,7 +206,8 @@ const STORE_NETWORKS: [&str; 2] = ["main", "test"];
 
 /// The open fee payments the wallet DB at `db_path` must not send again:
 /// those of bridges that ended, and of quotes with less than
-/// [`OPEN_FEE_MARGIN_SECONDS`] left, the time a fee needs to be mined first.
+/// [`OPEN_FEE_MARGIN_SECONDS`] left, the time a fee needs to be mined first,
+/// a payment created but not yet kept among them.
 /// Mined later, a fee pays for nothing. The wallet's resubmission leaves
 /// these out, read from the swap store beside the wallet DB
 /// (`<support>/private_usd_<db>_<net>`) on each pass, so a restart withholds
@@ -204,11 +241,33 @@ pub(crate) fn withheld_fee_txids(db_path: &str) -> HashSet<Vec<u8>> {
             if !row.ended && now.saturating_add(OPEN_FEE_MARGIN_SECONDS) < row.expires_at {
                 continue;
             }
-            let Some(tx_id) = super::models::ZcashTxId::parse(&row.tx_id) else {
-                continue;
-            };
-            if let Ok(txid) = super::joint::internal_txid(&tx_id) {
-                withheld.insert(txid.as_ref().to_vec());
+            match &row.tx_id {
+                Some(tx_id) => {
+                    let Some(tx_id) = super::models::ZcashTxId::parse(tx_id) else {
+                        continue;
+                    };
+                    if let Ok(txid) = super::joint::internal_txid(&tx_id) {
+                        withheld.insert(txid.as_ref().to_vec());
+                    }
+                }
+                // Started, perhaps created, not yet kept: the account's sent
+                // transaction to the fee's address. Only one conversion runs
+                // at a time per account, so on a bridge under way that is its
+                // own; one that ended without a payment kept had none found.
+                None if row.attempted && !row.ended => {
+                    let Some(network) = WalletNetwork::from_str(network) else {
+                        continue;
+                    };
+                    if let Ok(Some(sent)) = super::joint::find_sent(
+                        db_path,
+                        network,
+                        &row.account_uuid,
+                        Some(&row.address),
+                    ) {
+                        withheld.insert(sent.txid.as_ref().to_vec());
+                    }
+                }
+                None => {}
             }
         }
     }
@@ -338,6 +397,22 @@ mod tests {
             hex(32, index as u8),
             paid.repeat(32),
         )
+    }
+
+    /// Dart offers Bridge on a fee quote only within the scan lag Rust takes
+    /// (`kPrivateUsdOpenFeeScanLagBlocks`): held to Rust's.
+    #[test]
+    fn darts_scan_lag_is_rusts() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../lib/src/features/private_usd/providers/private_usd_convert_provider.dart");
+        let dart = std::fs::read_to_string(path).expect("the Dart convert provider");
+        let assignment = "kPrivateUsdOpenFeeScanLagBlocks = ";
+        let start = dart.find(assignment).expect("the Dart lag") + assignment.len();
+        let end = start + dart[start..].find(';').expect("an assignment");
+        assert_eq!(
+            dart[start..end].trim(),
+            OPEN_FEE_MAX_SCAN_LAG_BLOCKS.to_string()
+        );
     }
 
     /// The wallet's resubmission withholds the open fee of a bridge that

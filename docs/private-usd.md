@@ -257,16 +257,30 @@ mainnet asks none yet, and a quote without it takes the old path unchanged.
   networks; mainnet's is a placeholder until its gas-priced fee is known), an
   address that is not a canonical unified address of our network with one
   Orchard receiver and nothing else (`orchard_only`, which the pinned
-  zecswap-core lacks), or a quote that lives less than the deployment's
+  zecswap-core lacks), or a quote offered for less than 30 s
+  (`OPEN_FEE_LEAST_REVIEW_SECONDS`) or living more than
+  `open_fee_max_quote_life_seconds` (30 minutes). A fee quote is offered
+  until `openFeePayBy`, Rust's alone: the deployment's
   `open_fee_min_quote_life_seconds` (180 s: time for a 75-second block to
-  mine the fee) or more than `open_fee_max_quote_life_seconds` (30 minutes).
-  Mainnet's quotes live 2 minutes today, so its maker must lengthen them
-  before it asks a fee.
+  mine the fee) and 20 s for the tap (`OPEN_FEE_OFFER_MARGIN_SECONDS`)
+  before its end, so it must live at least 230 s. Mainnet's quotes live 2
+  minutes today, so its maker must lengthen them before it asks a fee.
 - Paid only with that least life left, judged before it is proposed and
   again right before it is created: a stored payment is one the wallet's own
   sync sends again, so creation is the point of no return. The review offers
-  a fee quote until 20 s before then (`openFeePayBy`) and then asks for a new
-  one, so nobody bridges on terms they have not seen. The accept checks first
+  a fee quote until `openFeePayBy` and then asks for a new one, so nobody
+  bridges on terms they have not seen; on the amount step an expired fee
+  quote is replaced once, then waits for the user, since every quote spends
+  a swap index and shows the maker a payout address.
+- Paid only by a wallet at the tip: an accept of a fee quote whose main
+  wallet's scan trails the tip by more than 3 blocks
+  (`OPEN_FEE_MAX_SCAN_LAG_BLOCKS`) is refused `WALLET_SYNCING`, nothing
+  saved or paid, the offer still held; a fee the engine pays itself waits
+  (`ZcashSyncing`) and ends `QUOTE_EXPIRED`, nothing paid, if the quote runs
+  out first. Dart offers no Bridge on a fee quote, and asks for no fee quote
+  once the maker asked one, until the wallet is within those blocks
+  (`kPrivateUsdOpenFeeScanLagBlocks`, which a Rust test holds to Rust's),
+  and says so on the review. A quote without a fee is as before. The accept checks first
   that the spendable Orchard and Ironwood ZEC cover the fee, the deposit and
   both network fees; the deposit's approved total allows one logical action
   more (`marginal_fee`), since the fee can take a note the deposit counted on.
@@ -283,22 +297,33 @@ mainnet asks none yet, and a quote without it takes the old path unchanged.
   sends it, and again every 30 s while no block has it, only while that
   minute is left (a failed send waits its 30 s too); the wallet's sync stops
   sending it once its bridge ended or its quote is in that last minute
-  (`withheld_fee_txids`). "Call it off" refuses a bridge whose fee started.
+  (`withheld_fee_txids`), a payment created but not yet kept included (the
+  account's sent transaction to the fee's address). "Call it off" refuses a
+  bridge whose fee started.
 - The accept goes from the engine loop, only once Veylor's wallet shows the
   fee mined. `402 feeRequired`, a `5xx` or no answer post the same accept
   again after `Retry-After` (else 5 s, or 12 s unanswered; at least 1 s the
   first time and 12 s after, at most 30 s), and never once `expiresAt` has
   passed. A refusal that says nothing opened ends the bridge, and the fee is
   lost; one that may follow an open is posted again until `expiresAt`. A
-  quote that expires with the fee unseen ends `FEE_NOT_HONOURED`. An accept
-  whose answer was lost goes on from the chain: once the quote is over, the
-  swap's confirmed `Opened` event gives its `t0` and `t1`, which the
-  confirmed read holds to the terms hash before any deposit.
+  quote that expires with the fee unseen ends `FEE_NOT_HONOURED`, once the
+  chain shows no swap: a fee shown unmined may have opened one in a block a
+  reorg took back. An accept whose answer was lost goes on from the chain:
+  once the quote is over, the swap's confirmed `Opened` event gives its `t0`
+  and `t1`, which the confirmed read holds to the terms hash before any
+  deposit. An accept refused `QUOTE_EXPIRED` after its record was saved (a
+  fee Rust could not create in time) shows that bridge, under way until the
+  engine ends it.
 - A bridge that paid the fee waits for its change (`FundsPending`) rather
   than fail its deposit. Its fee transaction folds into its row in Activity,
-  a paid or refunded bridge's details show the fee as not refunded, and a
-  bridge that ended unstarted after its fee was mined keeps a row for the
-  fee lost. Schema 7 added these record fields.
+  a paid or refunded bridge's details show the fee as not refunded (a
+  refunded one's result says the maker keeps it), and a bridge that ended
+  unstarted after its fee was mined keeps a row for the fee lost. A bridge
+  with a fee payment is never titled "Nothing was sent". While an ended
+  bridge's fee payment may still be mined (`openFeePending`), the engine
+  reads that account's records again as the wallet scans, so its outcome
+  catches up once the fee's block is scanned. Schema 7 added these record
+  fields.
 
 **Invariants (plan §3.5).** Each one guards funds or privacy. Keep them, and
 keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and

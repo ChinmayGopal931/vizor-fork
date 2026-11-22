@@ -28,7 +28,7 @@ use crate::wallet::private_usd::{
         Address, Amount, ClaimHold, Direction, ForwardOutcome, ForwardPhase, ForwardRecord,
         NothingSentCause, RefundCause, ReversePhase, ReverseRecord, ZcashTxId,
     },
-    railgun_head, railgun_keys,
+    open_fee, railgun_head, railgun_keys,
     relayer_client::{RailgunBroadcast, RelayerClient},
     reverse::{self, FundingPrice, FundingRequest, ProvedFunding, ReverseAccept, ReverseReport},
     sends::{self, ProvedSend, SendRecord, Sends},
@@ -73,6 +73,10 @@ pub enum ApiPrivateUsdErrorCode {
     /// The maker asks an open fee above the cap, or payable outside Orchard
     /// or on another network: the quote is dropped with nothing paid.
     OpenFeeRefused,
+    /// The wallet is still catching up with the Zcash chain: a quote that
+    /// asks an open fee is not bridged, nothing saved or paid, and the same
+    /// quote may be bridged once it has.
+    WalletSyncing,
 }
 
 /// A Private USD failure. Its Dart `toString()` is the message.
@@ -128,6 +132,7 @@ fn api_code(code: ErrorCode) -> ApiPrivateUsdErrorCode {
         ErrorCode::IndicesInUse => Api::Other,
         ErrorCode::AmountUnquotable => Api::AmountRefused,
         ErrorCode::OpenFeeRefused => Api::OpenFeeRefused,
+        ErrorCode::WalletSyncing => Api::WalletSyncing,
     }
 }
 
@@ -624,6 +629,10 @@ pub struct ApiForwardRecord {
     /// The main wallet shows the open fee's payment in a block: paid, and
     /// the maker's whatever becomes of the swap.
     pub open_fee_mined: bool,
+    /// The open fee's payment is unmined and may still be mined: an ended
+    /// bridge's record is read again as the wallet scans, until the payment
+    /// is mined or expires.
+    pub open_fee_pending: bool,
 }
 
 pub struct ApiForwardAdvance {
@@ -2372,7 +2381,7 @@ fn api_quote(quoted: &Quoted) -> ApiForwardQuote {
         open_fee_network_zat: offer.open_fee_network_zatoshi,
         open_fee_pay_by: offer.quote.open_fee.as_ref().map(|_| {
             let min_life = deployment::deployment(offer.network).open_fee_min_quote_life_seconds;
-            seconds(offer.quote.expires_at.saturating_sub(min_life))
+            seconds(open_fee::pay_by(&offer.quote, min_life))
         }),
     }
 }
@@ -2411,6 +2420,7 @@ struct WalletFacts {
     /// payment found again after a restart has instead of the proposal's.
     open_fee_network_zat: Option<u64>,
     open_fee_mined: bool,
+    open_fee_pending: bool,
 }
 
 fn wallet_facts(db_path: &str, network: WalletNetwork, record: &ForwardRecord) -> WalletFacts {
@@ -2419,6 +2429,7 @@ fn wallet_facts(db_path: &str, network: WalletNetwork, record: &ForwardRecord) -
             .ok()
             .and_then(|txid| joint_ops::wallet_tx_fee(db_path, &txid).ok().flatten())
     };
+    let fee_status = open_fee_status(db_path, network, record);
     WalletFacts {
         deposit_confirmations: deposit_confirmations(db_path, network, record),
         deposit_network_zat: record
@@ -2429,7 +2440,8 @@ fn wallet_facts(db_path: &str, network: WalletNetwork, record: &ForwardRecord) -
             .open_fee_payment
             .as_ref()
             .and_then(|payment| fee_of(&payment.tx_id)),
-        open_fee_mined: open_fee_mined(db_path, network, record),
+        open_fee_mined: matches!(fee_status, Some(SwapTxStatus::Mined { .. })),
+        open_fee_pending: fee_status == Some(SwapTxStatus::Unmined),
     }
 }
 
@@ -2503,6 +2515,7 @@ fn api_record(record: &ForwardRecord, facts: WalletFacts) -> ApiForwardRecord {
             .as_ref()
             .and_then(|payment| internal_hex(&payment.tx_id)),
         open_fee_mined: facts.open_fee_mined,
+        open_fee_pending: facts.open_fee_pending,
     }
 }
 
@@ -2532,20 +2545,17 @@ fn deposit_confirmations(
     }
 }
 
-/// Whether the main wallet shows the record's open fee payment in a block;
-/// best effort, false when unknown.
-fn open_fee_mined(db_path: &str, network: WalletNetwork, record: &ForwardRecord) -> bool {
-    let Some(payment) = record.open_fee_payment.as_ref() else {
-        return false;
-    };
-    let Ok(txid) = joint_ops::internal_txid(&payment.tx_id) else {
-        return false;
-    };
+/// Where the main wallet shows the record's open fee payment, in a block,
+/// unmined or expired; best effort, `None` when unknown.
+fn open_fee_status(
+    db_path: &str,
+    network: WalletNetwork,
+    record: &ForwardRecord,
+) -> Option<SwapTxStatus> {
+    let payment = record.open_fee_payment.as_ref()?;
+    let txid = joint_ops::internal_txid(&payment.tx_id).ok()?;
     let expiry = u32::try_from(payment.expiry_height).unwrap_or(u32::MAX);
-    matches!(
-        joint_ops::swap_tx_status(db_path, network, &txid, expiry),
-        Ok(SwapTxStatus::Mined { .. })
-    )
+    joint_ops::swap_tx_status(db_path, network, &txid, expiry).ok()
 }
 
 /// A record's transaction id in the wallet DB's byte order, as history rows

@@ -11,6 +11,7 @@ import '../../../providers/account_provider.dart';
 import '../../../providers/app_security_provider.dart';
 import '../../../providers/private_usd_lifecycle_provider.dart';
 import '../../../providers/rpc_endpoint_failover_provider.dart';
+import '../../../providers/sync_provider.dart';
 import '../models/private_usd_record_key.dart';
 import '../services/private_usd_deposit_backend.dart';
 import '../services/private_usd_engine.dart';
@@ -154,6 +155,16 @@ final privateUsdEngineProvider = Provider<PrivateUsdEngine>((ref) {
   engine.conversions.addListener(publish);
   engine.reverseConversions.addListener(publish);
   engine.deposits.addListener(publishDeposits);
+  // An ended bridge's fee payment that may still be mined is read again as
+  // the wallet scans.
+  ref.listen(syncProvider.select((s) => s.value?.scannedHeight ?? 0), (
+    previous,
+    next,
+  ) {
+    if (previous != null && next > previous) {
+      unawaited(engine.walletScanned());
+    }
+  });
   // The deposits follow the active account.
   ref.listen(accountProvider.select((s) => s.value?.activeAccountUuid), (
     previous,

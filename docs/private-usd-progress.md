@@ -7,6 +7,33 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
 
 ## Where things stand (2026-10-17; read this first)
 
+- **The open fee before mainnet (2026-11-22, D-163).** An outside review of
+  the merged open fee (PR #38), before the owner switches it on for mainnet,
+  on `fix/open-fee-review`:
+  - **No fee from a wallet catching up.** An accept of a fee quote is
+    refused `WALLET_SYNCING` while the wallet's scan trails the tip by more
+    than 3 blocks, nothing saved or paid; a fee the engine pays waits
+    instead. Dart offers no Bridge on a fee quote then, asks for no fee
+    quote, and says why. No-fee quotes are as before.
+  - **An ended bridge's fee.** Records are read again as the wallet scans
+    while an ended bridge's fee payment may still be mined
+    (`openFeePending`); a bridge with a fee payment is never titled
+    "Nothing was sent", and a refunded one says the maker keeps its fee.
+  - **Offer timing.** `openFeePayBy` (`expiresAt − 200 s`) is the one
+    margin, so a fee quote must live 230 s (it had 180 s, and one living
+    180–200 s reached Dart already expired); an expired fee quote on the
+    amount step is replaced once, then waits for the user.
+  - **Smaller ones.** A fee created but never kept is withheld from the
+    resubmission near its quote's end; at `expiresAt` the chain is read
+    before an unmined fee ends the bridge; an accept refused `QUOTE_EXPIRED`
+    after its record was saved shows that bridge; token leftovers in the
+    reference and a comment.
+  - **Tests.** Rust: refused while behind with nothing saved or paid, the
+    engine waiting instead of paying, a started fee withheld (real wallet
+    DB), the chain read at the end, and Dart's lag held to Rust's. Dart, two
+    pure-logic tests: a fee quote's total is what Rust needs, and the fee's
+    transaction folds into its bridge.
+
 - **The open fee's review fixes (2026-11-21, D-162).** A review found the
   open fee safe on mainnet, which asks none, and nine gaps for testnet's,
   all closed on `feat/open-fee`:
@@ -3081,6 +3108,30 @@ M8 status (2026-10-14): the non-device parts are done.
     note the deposit's estimate counted on; one more input is one more
     logical action. The approved total carries that action's fee, and the
     review shows it as part of the most the bridge costs.
+
+- **D-163 (2026-11-22): the open fee before mainnet.** Why each fix is as
+  it is:
+  - **3 blocks of scan lag.** The deposit already waits for a wallet at the
+    tip (`synced()`); the fee came first and asked nothing. A wallet within
+    a few blocks catches up in seconds, so 3 keeps Bridge steady as blocks
+    arrive (NU7's every 25 s) while a restored or long-offline wallet,
+    thousands behind, pays nothing. Rust refuses at accept before anything
+    is saved, so the offer stays held and the same quote can be bridged
+    once the wallet has caught up; Dart's gate is the same 3, held by a
+    test, so Dart never offers what Rust refuses.
+  - **Reread on scan, not a timer.** An ended bridge's outcome changes only
+    when the wallet scans the fee's block, so the engine reads again on the
+    wallet's scanned height moving, and only accounts whose ended bridge
+    has a fee payment that may still be mined; once mined or expired it
+    stops.
+  - **The offer's margin is Rust's alone.** Dart offered until 20 s before
+    `openFeePayBy`, so Rust accepted quotes Dart showed as expired. Rust's
+    `openFeePayBy` now holds the 20 s, and a quote must come with 30 s of
+    offer or be refused: 230 s in all. Mainnet's maker must quote fee
+    quotes for at least that.
+  - **Replace once.** Every fee quote spends a swap index and shows the
+    maker a fresh payout address, so an unattended amount step no longer
+    asks one every 100 s.
 
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's
