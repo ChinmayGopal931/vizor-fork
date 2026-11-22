@@ -38,6 +38,11 @@ pub(crate) const ACCEPT_MARGIN_SECONDS: u64 = 15;
 pub(crate) const OPEN_FEE_MARGIN_SECONDS: u64 = 60;
 /// An open fee no block has yet is sent again this often.
 pub(crate) const OPEN_FEE_RESEND_SECONDS: u64 = 30;
+/// How far the main wallet's scan may trail the Zcash tip for a quote that
+/// asks an open fee to be paid: a wallet further behind would pay the fee
+/// and then wait to deposit, perhaps past the deposit window. Dart's
+/// `kPrivateUsdOpenFeeScanLagBlocks` is the same.
+pub(crate) const OPEN_FEE_MAX_SCAN_LAG_BLOCKS: u64 = 3;
 /// How long an accept waits before it is posted again while the maker has
 /// not seen the open fee, where the maker names no wait; the least it waits
 /// where it does; the least from the second wait on (a gateway may let each

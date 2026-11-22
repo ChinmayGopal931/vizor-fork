@@ -1009,6 +1009,10 @@ impl ForwardZcash for WalletZcash<'_> {
         Ok(scanned.is_some_and(|scanned| u64::from(scanned) >= tip))
     }
 
+    async fn scanned_height(&self) -> Result<Option<u64>> {
+        Ok(scanned_height(self.main_db, self.network)?.map(u64::from))
+    }
+
     async fn deposit_fee(&self, address: &str, zatoshi: u64) -> Result<Option<u64>> {
         sync::estimate_swap_deposit_fee(
             self.main_db,

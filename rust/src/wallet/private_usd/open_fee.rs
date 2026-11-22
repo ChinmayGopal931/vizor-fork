@@ -13,6 +13,9 @@
 //!   block more than 90% likely in time) and at most its
 //!   `open_fee_max_quote_life_seconds` (30 minutes) when it comes
 //!   ([`check_quote_life`]).
+//! - **From a wallet at the tip.** Nothing is paid while the main wallet's
+//!   scan trails the Zcash tip by more than [`OPEN_FEE_MAX_SCAN_LAG_BLOCKS`]
+//!   ([`require_scanned`]): it would deposit late, if at all.
 //! - **Paid only with time to be mined.** At least that least life is left
 //!   before the payment is built and again right before it is created and
 //!   stored ([`require_time_to_start`]): a stored payment is one the
@@ -37,6 +40,7 @@ use zcash_protocol::consensus::NetworkType;
 
 use super::deployment::{
     FEE_PACE_SECONDS, FEE_WAIT_MAX_SECONDS, FEE_WAIT_MIN_SECONDS, OPEN_FEE_MARGIN_SECONDS,
+    OPEN_FEE_MAX_SCAN_LAG_BLOCKS,
 };
 use super::models::{OpenFee, SwapQuote};
 use super::{fail, ErrorCode, Result};
@@ -134,6 +138,22 @@ pub(crate) fn check_quote_life(
         return fail(
             ErrorCode::OpenFeeRefused,
             format!("the fee quote lives {life}s, over the {max_life}s allowed"),
+        );
+    }
+    Ok(())
+}
+
+/// `WalletSyncing` while the main wallet's fully scanned height `scanned`
+/// trails the Zcash tip `tip` by more than [`OPEN_FEE_MAX_SCAN_LAG_BLOCKS`]:
+/// the fee is not paid yet. A wallet catching up would see the fee mined
+/// late, so post the accept late if at all, and deposit late, perhaps after
+/// the deposit window.
+pub(crate) fn require_scanned(scanned: Option<u64>, tip: u64) -> Result<()> {
+    let behind = scanned.map_or(tip, |scanned| tip.saturating_sub(scanned));
+    if behind > OPEN_FEE_MAX_SCAN_LAG_BLOCKS {
+        return fail(
+            ErrorCode::WalletSyncing,
+            format!("the wallet is {behind} blocks behind the Zcash tip"),
         );
     }
     Ok(())
@@ -338,6 +358,22 @@ mod tests {
             hex(32, index as u8),
             paid.repeat(32),
         )
+    }
+
+    /// Dart offers Bridge on a fee quote only within the scan lag Rust takes
+    /// (`kPrivateUsdOpenFeeScanLagBlocks`): held to Rust's.
+    #[test]
+    fn darts_scan_lag_is_rusts() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../lib/src/features/private_usd/providers/private_usd_convert_provider.dart");
+        let dart = std::fs::read_to_string(path).expect("the Dart convert provider");
+        let assignment = "kPrivateUsdOpenFeeScanLagBlocks = ";
+        let start = dart.find(assignment).expect("the Dart lag") + assignment.len();
+        let end = start + dart[start..].find(';').expect("an assignment");
+        assert_eq!(
+            dart[start..end].trim(),
+            OPEN_FEE_MAX_SCAN_LAG_BLOCKS.to_string()
+        );
     }
 
     /// The wallet's resubmission withholds the open fee of a bridge that

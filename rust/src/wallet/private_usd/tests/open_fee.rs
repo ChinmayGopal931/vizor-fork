@@ -704,3 +704,81 @@ async fn a_failed_resend_waits_its_half_minute_and_only_a_refusal_is_quiet() {
     assert_eq!(h.world.get().broadcast_attempts, 4);
     assert_eq!(h.world.get().submitted.len(), 2, "the first and the last");
 }
+
+/// A wallet more than a few blocks behind the Zcash tip pays no fee: the
+/// bridge is refused (`WalletSyncing`) with nothing saved or paid, and the
+/// same offer is bridged once the wallet catches up. A few blocks behind is
+/// near enough.
+#[tokio::test]
+async fn a_wallet_behind_the_tip_is_refused_a_fee_bridge_with_nothing_paid() {
+    let h = asking(FEE, fee_address());
+    let quoted = h.quote().await.unwrap();
+    h.world.set().scan_lag = 4;
+    let behind = accept(&h, quoted.index).await.unwrap_err();
+    assert_eq!(behind.code, ErrorCode::WalletSyncing);
+    assert!(h.world.get().fee_payments.is_empty(), "nothing paid");
+    assert_eq!(
+        h.store().unfinished_count(&h.account).unwrap(),
+        0,
+        "nothing saved"
+    );
+    h.world.set().scan_lag = 3;
+    assert_eq!(
+        accept(&h, quoted.index).await.unwrap(),
+        AcceptOutcome::Accepted
+    );
+    assert_eq!(h.world.get().fee_payments.len(), 1);
+
+    // Without a fee, as before: a deposit waits for the sync instead.
+    let h = Harness::new();
+    h.world.set().scan_lag = 100;
+    let quoted = h.quote().await.unwrap();
+    assert_eq!(
+        accept(&h, quoted.index).await.unwrap(),
+        AcceptOutcome::Accepted
+    );
+}
+
+/// A fee the engine pays itself (its creation at the bridge failed) waits
+/// while the wallet trails the tip, and is paid once it does not; one still
+/// behind when too little of the quote is left ends with nothing paid.
+#[tokio::test]
+async fn the_engine_waits_for_the_wallet_before_paying_a_fee() {
+    let started = async || {
+        let h = asking(FEE, fee_address());
+        h.world.set().fee_create_fails = true;
+        let quoted = h.quote().await.unwrap();
+        assert_eq!(
+            accept(&h, quoted.index).await.unwrap_err().code,
+            ErrorCode::ZcashWallet
+        );
+        assert_eq!(h.record().open_fee_progress(), OpenFeeProgress::Started);
+        h.world.set().fee_create_fails = false;
+        h.world.set().scan_lag = 10;
+        h
+    };
+    let h = started().await;
+    let syncing = ForwardStep::Waiting {
+        wait: ForwardWait::ZcashSyncing,
+        t0: None,
+        t1: None,
+    };
+    assert_eq!(h.advance().await.unwrap(), syncing);
+    assert!(h.world.get().fee_payments.is_empty(), "not while behind");
+    h.world.set().scan_lag = 0;
+    assert_eq!(
+        h.advance().await.unwrap(),
+        waiting(ForwardWait::FeeConfirming)
+    );
+    assert_eq!(h.world.get().fee_payments.len(), 1);
+
+    let h = started().await;
+    assert_eq!(h.advance().await.unwrap(), syncing);
+    h.world.set().pass(300 - 180 + 1);
+    assert_eq!(
+        h.advance().await.unwrap(),
+        nothing_sent(NothingSentCause::QuoteExpired)
+    );
+    assert!(h.world.get().fee_payments.is_empty(), "nothing paid");
+}
+

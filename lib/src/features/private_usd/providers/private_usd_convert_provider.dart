@@ -39,6 +39,11 @@ abstract final class PrivateUsdConvertTiming {
   static const tick = Duration(seconds: 1);
 }
 
+/// How far the wallet's scan may trail the Zcash tip for a quote that asks
+/// an open fee to be bridged; Rust's `OPEN_FEE_MAX_SCAN_LAG_BLOCKS`, which a
+/// Rust test holds this to.
+const kPrivateUsdOpenFeeScanLagBlocks = 3;
+
 /// The ZEC the active account can convert, as the convert screen shows it.
 @immutable
 class PrivateUsdZecHoldings {
@@ -47,6 +52,7 @@ class PrivateUsdZecHoldings {
     this.authoritative = false,
     this.catchingUp = false,
     this.syncPercent,
+    this.feeReady = false,
   });
 
   /// The shielded spendable balance; null until the wallet has one.
@@ -60,17 +66,22 @@ class PrivateUsdZecHoldings {
   final bool catchingUp;
   final int? syncPercent;
 
+  /// The wallet has scanned to within [kPrivateUsdOpenFeeScanLagBlocks] of
+  /// the tip: a quote that asks an open fee may be bridged.
+  final bool feeReady;
+
   @override
   bool operator ==(Object other) =>
       other is PrivateUsdZecHoldings &&
       other.spendable == spendable &&
       other.authoritative == authoritative &&
       other.catchingUp == catchingUp &&
-      other.syncPercent == syncPercent;
+      other.syncPercent == syncPercent &&
+      other.feeReady == feeReady;
 
   @override
   int get hashCode =>
-      Object.hash(spendable, authoritative, catchingUp, syncPercent);
+      Object.hash(spendable, authoritative, catchingUp, syncPercent, feeReady);
 }
 
 final privateUsdZecHoldingsProvider = Provider.autoDispose
@@ -95,6 +106,10 @@ final privateUsdZecHoldingsProvider = Provider.autoDispose
         syncPercent: catchingUp
             ? (sync.percentage * 100).floor().clamp(0, 99)
             : null,
+        feeReady:
+            sync.chainTipHeight > 0 &&
+            sync.scannedHeight + kPrivateUsdOpenFeeScanLagBlocks >=
+                sync.chainTipHeight,
       );
     });
 
@@ -446,7 +461,12 @@ class PrivateUsdConvertState
   /// The quote leaves something after the relayer's fee.
   bool get paysOut => quote != null && quote!.receives > BigInt.zero;
 
-  /// A quote that pays out and holds, and a known balance that covers it.
+  /// The quote asks an open fee and the wallet is still catching up: Rust
+  /// would refuse to pay it, so Bridge waits.
+  bool get waitsForSync => quote?.asksOpenFee == true && !holdings.feeReady;
+
+  /// A quote that pays out and holds, a known balance that covers it, and
+  /// for one asking an open fee a wallet at the tip.
   @override
   bool get canGoOn {
     final quote = this.quote;
@@ -455,9 +475,15 @@ class PrivateUsdConvertState
         !quoting &&
         paysOut &&
         !isExpired &&
+        !waitsForSync &&
         spendable != null &&
         quote.totalZat <= spendable;
   }
+
+  @override
+  String? reviewMessage(AppLocalizations l10n) =>
+      super.reviewMessage(l10n) ??
+      (waitsForSync ? l10n.privateUsdConvertFeeWaitsForSync : null);
 
   /// "Use it all": on the amount step, with a balance Rust vouches for, and
   /// not while the wallet catches up.
@@ -483,6 +509,7 @@ class PrivateUsdConvertState
     if (quote != null && !quoting && !paysOut) {
       return l10n.privateUsdConvertErrorBelowFee;
     }
+    if (waitsForSync) return l10n.privateUsdConvertFeeWaitsForSync;
     return null;
   }
 
@@ -529,9 +556,18 @@ class PrivateUsdConvertNotifier
     extends PrivateUsdConvertFlowNotifier<PrivateUsdConvertState> {
   late PrivateUsdZecQuoteSearch _search;
 
+  // The maker asked an open fee on a quote of this flow: the next asks one
+  // too, so none is asked while the wallet catches up.
+  bool _asksFee = false;
+
+  // A quote not asked for while the wallet caught up, asked once it has.
+  void Function()? _afterSync;
+
   @override
   PrivateUsdConvertState build() {
     setUpFlow();
+    _asksFee = false;
+    _afterSync = null;
     _search = PrivateUsdZecQuoteSearch(
       (units) =>
           ref.read(privateUsdEngineProvider).quote(this.account!, units: units),
@@ -544,9 +580,27 @@ class PrivateUsdConvertNotifier
       holdings = ref.read(privateUsdZecHoldingsProvider(account));
       ref.listen(privateUsdZecHoldingsProvider(account), (_, next) {
         state = state.copyWith(holdings: next);
+        final afterSync = _afterSync;
+        if (next.feeReady && afterSync != null) {
+          _afterSync = null;
+          afterSync();
+        }
       });
     }
     return PrivateUsdConvertState(now: clock(), holdings: holdings);
+  }
+
+  /// Whether a quote may be asked for now: not while the wallet catches up
+  /// once the maker asks an open fee, as it would not be bridged. [ask] is
+  /// then asked once the wallet is at the tip.
+  bool _mayQuote(void Function() ask) {
+    if (!_asksFee || state.holdings.feeReady) return true;
+    _afterSync = ask;
+    state = state.copyWith(
+      quoting: false,
+      quoteError: (l10n) => l10n.privateUsdConvertFeeWaitsForSync,
+    );
+    return false;
   }
 
   /// The amount field changed: an amount to quote, after typing stops.
@@ -559,8 +613,10 @@ class PrivateUsdConvertNotifier
       quoting: false,
       clearQuoteError: true,
     );
+    _afterSync = null;
     final total = state.totalZat;
     if (total == null || state.isShort) return;
+    if (!_mayQuote(() => onAmountChanged(state.amountText))) return;
     _requestQuote(
       () => _search.quote(total),
       debounce: PrivateUsdConvertTiming.typingDebounce,
@@ -573,11 +629,13 @@ class PrivateUsdConvertNotifier
     if (!state.canMax) return;
     final spendable = state.holdings.spendable!;
     cancelQuote();
+    _afterSync = null;
     state = state.copyWith(
       amountText: formatZecAmount(spendable),
       clearQuote: true,
       clearQuoteError: true,
     );
+    if (!_mayQuote(onMax)) return;
     _requestQuote(() => _search.quote(spendable), fillsAmount: true);
   }
 
@@ -593,6 +651,7 @@ class PrivateUsdConvertNotifier
     if (total == null) return;
     final requested = state.quote?.requestedUnits;
     state = state.copyWith(clearStartError: true);
+    if (!_mayQuote(refreshQuote)) return;
     _requestQuote(
       () => _search.quote(total, requestedUnits: requested),
       forReview: true,
@@ -668,6 +727,14 @@ class PrivateUsdConvertNotifier
         case rust.ApiPrivateUsdErrorCode.quoteExpired:
           startFailed((l10n) => l10n.privateUsdConvertQuoteRanOut);
           return null;
+        // Nothing saved, and the offer holds: the same quote may be bridged
+        // once the wallet is at the tip.
+        case rust.ApiPrivateUsdErrorCode.walletSyncing:
+          state = state.copyWith(
+            step: PrivateUsdConvertStep.review,
+            startError: (l10n) => l10n.privateUsdConvertFeeWaitsForSync,
+          );
+          return null;
         case rust.ApiPrivateUsdErrorCode.relayerFee:
           startFailed(
             (l10n) => _aboveCap(quote.relayerFee)
@@ -721,8 +788,11 @@ class PrivateUsdConvertNotifier
   void replaceExpiredQuote() {
     final total = state.totalZat;
     if (total == null || state.isShort) return;
-    final requested = state.quote!.requestedUnits;
-    _requestQuote(() => _search.quote(total, requestedUnits: requested));
+    final expired = state.quote!;
+    if (!_mayQuote(replaceExpiredQuote)) return;
+    _requestQuote(
+      () => _search.quote(total, requestedUnits: expired.requestedUnits),
+    );
   }
 
   Future<bool> _isUnderWay(
@@ -768,6 +838,7 @@ class PrivateUsdConvertNotifier
     required bool forReview,
   }) {
     if (!takesQuote(forReview: forReview)) return;
+    if (quote.asksOpenFee) _asksFee = true;
     final onReview = state.step != PrivateUsdConvertStep.amount;
     final now = clock();
     final arrivedExpired = !now.isBefore(privateUsdZecQuoteOfferedUntil(quote));

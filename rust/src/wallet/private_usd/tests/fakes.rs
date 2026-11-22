@@ -285,6 +285,8 @@ pub(super) struct State {
 
     // The wallet's Zcash side.
     pub synced: bool,
+    /// How many blocks the wallet's scan trails the tip.
+    pub scan_lag: u64,
     /// Every broadcast fails: the node refuses it.
     pub broadcast_fails: bool,
     /// Every broadcast fails before any node answers.
@@ -310,6 +312,8 @@ pub(super) struct State {
     /// judges its deadline, and then takes to sign: the clocks move on.
     pub fee_lock_wait: u64,
     pub fee_sign_seconds: u64,
+    /// Creating an open fee fails, nothing created.
+    pub fee_create_fails: bool,
     /// What the account's funds are, spendable and on their way.
     pub funds: Funds,
     pub statuses: HashMap<ZcashTxId, SwapTxStatus>,
@@ -426,6 +430,7 @@ impl State {
             posted_fees: Vec::new(),
             relayer_claims: false,
             synced: true,
+            scan_lag: 0,
             broadcast_fails: false,
             broadcast_unreachable: false,
             broadcast_attempts: 0,
@@ -440,6 +445,7 @@ impl State {
             fee_deadlines: Vec::new(),
             fee_lock_wait: 0,
             fee_sign_seconds: 0,
+            fee_create_fails: false,
             funds: Funds {
                 spendable: 100_000_000,
                 pending: 0,
@@ -1188,6 +1194,11 @@ impl ForwardZcash for FakeZcash {
         Ok(self.0.get().synced)
     }
 
+    /// `scan_lag` blocks behind the tip `chain_height` reads.
+    async fn scanned_height(&self) -> Result<Option<u64>> {
+        Ok(Some(ZCASH_HEIGHT - self.0.get().scan_lag))
+    }
+
     async fn deposit_fee(&self, _address: &str, _zatoshi: u64) -> Result<Option<u64>> {
         Ok(self.0.get().deposit_fee)
     }
@@ -1281,6 +1292,9 @@ impl ForwardZcash for FakeZcash {
             state.fee_deadlines.push(deadline);
             if deadline.saturating_sub(state.clock) < deployment::OPEN_FEE_MARGIN_SECONDS {
                 return fail(ErrorCode::QuoteExpired, "the deadline is too near");
+            }
+            if state.fee_create_fails {
+                return fail(ErrorCode::ZcashWallet, "the wallet could not sign");
             }
         }
         let created = self.create_deposit(proposal).await;
