@@ -185,14 +185,18 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation(
       return ended(
         badgeKind: SwapStatusBadgeKind.refunded,
         title: l10n.privateUsdConvertResultRefundedTitle,
-        body: privateUsdRefundedMessage(l10n, record.refundCause),
+        body: privateUsdRefundedMessage(
+          l10n,
+          record.refundCause,
+          feeKept: record.openFeeZat != null,
+        ),
         action: tryAgain,
       );
     case ApiForwardOutcome.nothingSent:
       return ended(
         badgeKind: SwapStatusBadgeKind.failed,
-        // A fee the maker keeps was sent: not "nothing".
-        title: record.openFeeMined
+        // A fee payment was made, mined or not yet: never "nothing".
+        title: record.openFeeTxid != null
             ? l10n.privateUsdActivityFeeLost
             : l10n.privateUsdConvertResultNothingTitle,
         body: privateUsdForwardNothingSentMessage(l10n, record),

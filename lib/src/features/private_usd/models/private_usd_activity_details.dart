@@ -196,7 +196,13 @@ List<PrivateUsdActivityDetail> privateUsdForwardDetails(
       record.outcome == ApiForwardOutcome.nothingSent && record.openFeeMined;
   return [
     if (record.outcome == ApiForwardOutcome.refunded)
-      PrivateUsdDetailNote(privateUsdRefundedMessage(l10n, record.refundCause)),
+      PrivateUsdDetailNote(
+        privateUsdRefundedMessage(
+          l10n,
+          record.refundCause,
+          feeKept: record.openFeeZat != null,
+        ),
+      ),
     if (feeLost)
       PrivateUsdDetailNote(privateUsdForwardNothingSentMessage(l10n, record)),
     if (record.outcome == ApiForwardOutcome.paid) ...[
