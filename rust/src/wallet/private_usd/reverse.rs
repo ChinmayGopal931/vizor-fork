@@ -176,8 +176,10 @@ pub(crate) trait ReverseZcash {
         confirmations: u32,
     ) -> Result<ReverseReceiveEstimate>;
     /// The sweep home with the combined `key`, paying at most
-    /// `max_fee_zatoshi`: an earlier one that may still land, else a new one
-    /// once every note is spendable; `None` until then.
+    /// `max_fee_zatoshi`, or ZIP 317's fee for the joint account's notes
+    /// where that is more (`joint::sweep_fee_limit`): an earlier one that may
+    /// still land, else a new one once every note is spendable; `None` until
+    /// then.
     async fn prepare_receive(
         &self,
         index: u32,
@@ -1392,9 +1394,10 @@ where
         update(store, self.account, &current)
     }
 
-    /// The sweep home with `key`, `e + z`, capped at the reviewed fee, kept
-    /// and sent again until it has its confirmations; then the conversion is
-    /// complete and its joint account goes.
+    /// The sweep home with `key`, `e + z`, capped at the reviewed fee, or at
+    /// ZIP 317's for the joint account's notes when the review fell short,
+    /// kept and sent again until it has its confirmations; then the
+    /// conversion is complete and its joint account goes.
     async fn receive(
         &self,
         store: &mut SwapStore,

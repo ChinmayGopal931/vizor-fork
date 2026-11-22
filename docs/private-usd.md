@@ -394,6 +394,14 @@ keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
 - Joint sweeps broadcast before they store. `PROPOSAL_STORE` is
   consume-on-entry with an idempotent discard, as in the hardware invariants.
 - Joint sweeps use Discard OVK, while the deposit uses the sender's OVK.
+- A joint sweep pays at most its reviewed fee (a reverse sweep's estimate,
+  approved with the settlement; a forward refund's 64 marginal fees), raised
+  to ZIP 317's fee for the joint account's notes where the review fell short:
+  notes paid in since, a sweep from one pool into the other, each bundle
+  padded to two actions (`joint::sweep_fee_limit`). That is never more than
+  four actions above the notes', and never the whole balance. Until
+  2026-11-22 a sweep over its cap failed every step, and the ZEC waited in
+  the joint account.
 - Import joint accounts at the exact birthday, never the rounded restore
   birthday.
 - Run one conversion at a time per account, and one outgoing Railgun payment

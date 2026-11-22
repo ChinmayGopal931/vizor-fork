@@ -252,9 +252,11 @@ pub(crate) trait ForwardZcash {
     async fn deposit_status(&self, deposit: &ZcashTransaction) -> Result<SwapTxStatus>;
     /// Sends a kept transaction once more.
     async fn broadcast(&self, transaction: &ZcashTransaction) -> Result<()>;
-    /// The refunded deposit's sweep home with the combined `key`: an earlier
-    /// one that may still land, else a new one once every note is spendable;
-    /// `None` until then.
+    /// The refunded deposit's sweep home with the combined `key`, paying at
+    /// most 64 marginal fees or ZIP 317's fee for the joint account's notes,
+    /// whichever is more (`joint::sweep_fee_limit`): an earlier one that may
+    /// still land, else a new one once every note is spendable; `None` until
+    /// then.
     async fn prepare_sweep(
         &self,
         index: u32,
