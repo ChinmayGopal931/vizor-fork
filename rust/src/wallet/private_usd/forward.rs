@@ -466,10 +466,17 @@ where
                 "the quote is for another deployment",
             );
         }
-        // An open fee over the cap, or payable outside Orchard, is refused
-        // before anything is offered: the index is spent all the same.
+        // An open fee over the cap, or payable outside Orchard, or a fee
+        // quote too short to pay it in time or too long, is refused before
+        // anything is offered: the index is spent all the same.
         if let Some(fee) = &quote.open_fee {
             open_fee::check_open_fee(fee, self.zcash_network(), self.pins.max_open_fee_zat)?;
+            open_fee::check_quote_life(
+                &quote,
+                self.clock.now(),
+                self.pins.open_fee_min_quote_life_seconds,
+                self.pins.open_fee_max_quote_life_seconds,
+            )?;
         }
         let receives = payout_after_fees(quote.amount, relayer.fee);
         // The preview pays the quote's share; the deposit itself goes to the
@@ -728,7 +735,12 @@ where
         offer: &Offer,
         max_total_zatoshi: u64,
     ) -> Result<(ProposedDeposit<'a, Z>, u64)> {
-        open_fee::require_time_to_pay(quote, self.clock.now())?;
+        // Time for a block to mine the fee before the quote ends.
+        open_fee::require_time_to_start(
+            quote,
+            self.clock.now(),
+            self.pins.open_fee_min_quote_life_seconds,
+        )?;
         let max_fee_total = offer.max_open_fee_total_zatoshi().ok_or_else(|| {
             PrivateUsdError::new(
                 ErrorCode::DepositUnpayable,
@@ -751,8 +763,13 @@ where
             proposal: Some(proposal),
         };
         // Proposing can wait on the wallet write lock: the time is judged
-        // again right before the payment is created and stored.
-        open_fee::require_time_to_pay(quote, self.clock.now())?;
+        // again, by the same least life, right before the payment is
+        // created and stored.
+        open_fee::require_time_to_start(
+            quote,
+            self.clock.now(),
+            self.pins.open_fee_min_quote_life_seconds,
+        )?;
         Ok((proposal, network_fee))
     }
 
@@ -869,17 +886,21 @@ where
     }
 
     /// Pays the open fee of a record saved before its payment was created,
-    /// should the time left still allow it. `None`, with nothing paid, once it
-    /// does not, judged before the payment is proposed and again right before
-    /// it is created: a stored payment is one the wallet's sync sends again
-    /// until it is mined.
+    /// should the time left still allow it: the deployment's least fee quote
+    /// life, as at the bridge. `None`, with nothing paid, once it does not,
+    /// judged before the payment is proposed and again right before it is
+    /// created: a stored payment is one the wallet's sync sends again until
+    /// it is mined or expires, a few blocks after the quote.
     async fn pay_open_fee(
         &self,
         store: &mut SwapStore,
         record: &ForwardRecord,
         fee: &OpenFee,
     ) -> Result<Option<OpenFeePayment>> {
-        if !open_fee::time_to_pay(&record.quote, self.clock.now()) {
+        // Only with the time the user's bridge needed to start it.
+        if open_fee::time_left(&record.quote, self.clock.now())
+            < self.pins.open_fee_min_quote_life_seconds
+        {
             return Ok(None);
         }
         let max_total = record.open_fee_max_total_zat.ok_or_else(|| {
@@ -898,7 +919,9 @@ where
             proposal: Some(proposal),
         };
         engine::check_cancelled(self.op)?;
-        if !open_fee::time_to_pay(&record.quote, self.clock.now()) {
+        if open_fee::time_left(&record.quote, self.clock.now())
+            < self.pins.open_fee_min_quote_life_seconds
+        {
             return Ok(None);
         }
         let mut started = record.clone();

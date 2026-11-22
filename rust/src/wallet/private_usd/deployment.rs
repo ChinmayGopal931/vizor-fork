@@ -31,9 +31,10 @@ pub(crate) const RELAYER_CLAIM_WAIT_BLOCKS: u64 = 5;
 pub(crate) const MAX_T0_TO_T1_SECONDS: u64 = 2 * 60 * 60;
 /// An accept is not sent this close to the quote's expiry.
 pub(crate) const ACCEPT_MARGIN_SECONDS: u64 = 15;
-/// A quote's open fee is paid, and sent again, only with this much of the
-/// quote's life left: it counts once mined, and paid any later it is likely
-/// lost (zecSwap's `OPEN_FEE_MARGIN`).
+/// A kept open fee is sent again only with this much of the quote's life
+/// left (zecSwap's `OPEN_FEE_MARGIN`): it counts once mined, and sent any
+/// later it is likely lost. Paying one needs the deployment's longer
+/// `open_fee_min_quote_life_seconds`.
 pub(crate) const OPEN_FEE_MARGIN_SECONDS: u64 = 60;
 /// An open fee no block has yet is sent again this often.
 pub(crate) const OPEN_FEE_RESEND_SECONDS: u64 = 30;
@@ -211,6 +212,14 @@ pub(crate) struct Deployment {
     /// asks more is refused before anything is paid. The fee is the one
     /// amount in a swap that rests on trust in the maker.
     pub max_open_fee_zat: u64,
+    /// The least of its life a quote that asks an open fee must have left
+    /// when the user bridges, and when a payment the engine resumes starts:
+    /// time for a Zcash block to mine the fee and the maker to see it. A
+    /// quote with less is never paid for; Dart asks a fresh one at the tap.
+    pub open_fee_min_quote_life_seconds: u64,
+    /// The most a quote that asks an open fee may live: one further off is
+    /// refused at the quote, with nothing paid.
+    pub open_fee_max_quote_life_seconds: u64,
     /// The screening time shown to the user.
     pub screening_seconds: u32,
     pub explorer_tx_prefix: &'static str,
@@ -309,8 +318,13 @@ const MAINNET: Deployment = Deployment {
     zcash_confirmations: 2,
     escrow_confirmations: 3,
     min_seconds_to_t0: 15 * 60,
-    // The reference CLI's `--max-open-fee`; mainnet asks no fee yet.
+    // The reference CLI's `--max-open-fee`; mainnet asks no fee yet, and its
+    // cap is to be decided once its gas-priced fee is known.
     max_open_fee_zat: 500_000,
+    // Its quotes live 2 minutes today: they must live longer before a fee is
+    // asked there, or every fee quote is refused.
+    open_fee_min_quote_life_seconds: 180,
+    open_fee_max_quote_life_seconds: 30 * 60,
     screening_seconds: 60 * 60,
     explorer_tx_prefix: "https://etherscan.io/tx/",
     railscan_tx_prefix: "https://railscan.io/ethereum/tx/",
@@ -381,6 +395,10 @@ const TESTNET: Deployment = Deployment {
     min_seconds_to_t0: 9 * 60,
     // Sepolia's fee is the maker's minimum, 20,000 zatoshis.
     max_open_fee_zat: 500_000,
+    // Its quotes live 5 minutes. 180 s is 2.4 blocks at 75 s, so a block in
+    // time is 91% likely, and 7.2 at NU7's 25 s, more than 99.9%.
+    open_fee_min_quote_life_seconds: 180,
+    open_fee_max_quote_life_seconds: 30 * 60,
     screening_seconds: 60,
     explorer_tx_prefix: "https://sepolia.etherscan.io/tx/",
     railscan_tx_prefix: "https://railscan.io/sepolia/tx/",

@@ -8,11 +8,19 @@
 //!   network with an Orchard receiver and no other ([`orchard_only`]), so no
 //!   choice of pool can send it in the clear. A quote that fails is dropped;
 //!   its index is spent all the same.
-//! - **Paid only with time to be mined.** At least
-//!   [`OPEN_FEE_MARGIN_SECONDS`] of the quote's life is left before the
-//!   payment is built and again right before it is created and stored: a
-//!   stored payment is one the wallet's own sync sends again until it is
-//!   mined, so that is the point of no return.
+//! - **Quoted to live long enough, and no longer.** A fee quote must live
+//!   the deployment's `open_fee_min_quote_life_seconds` (180 s: a 75-second
+//!   block more than 90% likely in time) and at most its
+//!   `open_fee_max_quote_life_seconds` (30 minutes) when it comes
+//!   ([`check_quote_life`]).
+//! - **Paid only with time to be mined.** At least that least life is left
+//!   before the payment is built and again right before it is created and
+//!   stored ([`require_time_to_start`]): a stored payment is one the
+//!   wallet's own sync sends again, so that is the point of no return. It
+//!   expires a few blocks after the quote (`create_open_fee`), and the sync
+//!   sends it no more once its bridge ended or its quote expired
+//!   ([`withheld_fee_txids`]). It is sent again only with
+//!   [`OPEN_FEE_MARGIN_SECONDS`] of the quote left.
 //! - **One payment.** Exactly `zat`, an empty memo, marked started before it
 //!   is created and kept before it is first sent, then sent again, never
 //!   built again (`forward.rs`).
@@ -106,29 +114,54 @@ fn canonical(address: &str) -> bool {
         .is_ok_and(|(network, decoded)| decoded.encode(&network) == address)
 }
 
+/// That a quote asking an open fee, quoted at `now`, lives long enough for
+/// its fee to be paid and mined in time, `min_life` seconds, and not past
+/// `max_life`. `OpenFeeRefused` otherwise, with nothing paid.
+pub(crate) fn check_quote_life(
+    quote: &SwapQuote,
+    now: u64,
+    min_life: u64,
+    max_life: u64,
+) -> Result<()> {
+    let life = time_left(quote, now);
+    if life < min_life {
+        return fail(
+            ErrorCode::OpenFeeRefused,
+            format!("the fee quote lives {life}s, too short for its fee to be mined first"),
+        );
+    }
+    if quote.expires_at.saturating_sub(now) > max_life {
+        return fail(
+            ErrorCode::OpenFeeRefused,
+            format!("the fee quote lives {life}s, over the {max_life}s allowed"),
+        );
+    }
+    Ok(())
+}
+
+/// `QuoteExpired` once `quote` has less than `min_life` seconds left at
+/// `now`: too little to start paying its open fee, which the user's bridge
+/// and a payment the engine resumes need. A fresh quote is the way on.
+pub(crate) fn require_time_to_start(quote: &SwapQuote, now: u64, min_life: u64) -> Result<()> {
+    let left = time_left(quote, now);
+    if left < min_life {
+        return fail(
+            ErrorCode::QuoteExpired,
+            format!("the quote expires in {left}s, too soon to start paying its open fee"),
+        );
+    }
+    Ok(())
+}
+
 /// Seconds of `quote`'s life left at `now`.
 pub(crate) fn time_left(quote: &SwapQuote, now: u64) -> u64 {
     quote.expires_at.saturating_sub(now)
 }
 
-/// Whether `quote` leaves its open fee the time to be mined at `now`.
+/// Whether `quote` leaves a kept open fee the time to be mined at `now`, so
+/// that sending it again is worth it.
 pub(crate) fn time_to_pay(quote: &SwapQuote, now: u64) -> bool {
     time_left(quote, now) >= OPEN_FEE_MARGIN_SECONDS
-}
-
-/// `QuoteExpired` once `quote` leaves its open fee too little time to be
-/// mined first: nothing is paid for it.
-pub(crate) fn require_time_to_pay(quote: &SwapQuote, now: u64) -> Result<()> {
-    if !time_to_pay(quote, now) {
-        return fail(
-            ErrorCode::QuoteExpired,
-            format!(
-                "the quote expires in {}s, too soon for its open fee to be mined first",
-                time_left(quote, now)
-            ),
-        );
-    }
-    Ok(())
 }
 
 /// The networks a wallet's Private USD directory is named for, as Dart

@@ -355,3 +355,53 @@ async fn the_fee_expires_with_its_quote_and_an_ended_bridge_sends_it_no_more() {
     assert_eq!(h.world.get().submitted.len(), 1, "never sent again");
 }
 
+/// Findings 2 and 5: a fee quote with less than the least life its fee
+/// needs, or one that lives past the deployment's most, is refused at the
+/// quote with nothing paid; and one whose life ran below the least by the
+/// bridge pays nothing either.
+#[tokio::test]
+async fn a_fee_quote_too_short_or_too_long_lived_pays_nothing() {
+    let least = pins().open_fee_min_quote_life_seconds;
+    let most = pins().open_fee_max_quote_life_seconds;
+    assert_eq!((least, most), (180, 1_800));
+    for life in [least - 1, most + 1] {
+        let h = asking(FEE, fee_address());
+        h.world.set().quote_expires_at = NOW + life;
+        let refused = h.quote().await.unwrap_err();
+        assert_eq!(
+            refused.code,
+            ErrorCode::OpenFeeRefused,
+            "{life}: {refused:?}"
+        );
+        assert!(h.world.get().fee_payments.is_empty());
+    }
+    for life in [least, most] {
+        let h = asking(FEE, fee_address());
+        h.world.set().quote_expires_at = NOW + life;
+        let quoted = h.quote().await.unwrap();
+        assert_eq!(
+            accept(&h, quoted.index).await.unwrap(),
+            AcceptOutcome::Accepted,
+            "{life}"
+        );
+    }
+
+    // Tapped a second too late: nothing saved, nothing paid.
+    let h = asking(FEE, fee_address());
+    let quoted = h.quote().await.unwrap();
+    h.world.set().clock = NOW + 300 - least + 1;
+    let late = accept(&h, quoted.index).await.unwrap_err();
+    assert_eq!(late.code, ErrorCode::QuoteExpired);
+    assert!(h.world.get().fee_payments.is_empty());
+    assert_eq!(h.store().unfinished_count(&h.account).unwrap(), 0);
+
+    // A quote without a fee keeps its old margin.
+    let h = Harness::new();
+    let quoted = h.quote().await.unwrap();
+    h.world.set().clock = NOW + 300 - least + 1;
+    assert_eq!(
+        accept(&h, quoted.index).await.unwrap(),
+        AcceptOutcome::Accepted
+    );
+}
+
