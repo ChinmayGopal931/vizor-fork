@@ -275,10 +275,13 @@ Future<void> deletePrivateUsdDirectories() async {
   }
 }
 
-/// Removes the device-wide token stores and their temporary files, for a
-/// full reset. The Keystore attestation key stays. Attempts every file and
-/// then rethrows the first failure.
-Future<void> deletePrivateUsdTokenStores() async {
+/// Removes the device-wide Privacy Pass token stores builds before
+/// 2026-11-21 kept (`<support>/private_usd_tokens_<network>.json`, one per
+/// network) and their temporary files: on Private USD's start and in a full
+/// reset. Nothing reads them since the token client went. Android's Keystore
+/// attestation keys stay, unused. Attempts every file and then rethrows the
+/// first failure.
+Future<void> deleteLegacyPrivateUsdTokenStores() async {
   final support = await getWalletSupportDirectory();
   Object? firstError;
   StackTrace? firstStackTrace;
