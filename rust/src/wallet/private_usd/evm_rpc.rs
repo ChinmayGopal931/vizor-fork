@@ -1480,6 +1480,72 @@ mod tests {
         }
     }
 
+    /// A real `Opened`, as a public Sepolia node's `eth_getLogs` returned it
+    /// from the pinned windows contract (block 11,958,747, transaction
+    /// `0x9e29f109…446a`): its topic is the event's signature, its four
+    /// topics and nine data words read, and its deadlines are the maker's,
+    /// `t1` an hour after `t0`. Another swap's id finds nothing.
+    #[tokio::test]
+    async fn opened_deadlines_read_from_a_real_log() {
+        let log: Value = serde_json::from_str(include_str!("tests/opened_log.json")).unwrap();
+        assert_eq!(
+            log["topics"][0],
+            json!(hex0x(&keccak(&[OPENED_EVENT.as_bytes()])))
+        );
+        assert_eq!(log["topics"].as_array().unwrap().len(), 4);
+        assert_eq!(log["data"].as_str().unwrap().len(), 2 + 9 * 64);
+        let pins = deployment::deployment(PrivateUsdNetwork::Testnet);
+        assert!(log["address"]
+            .as_str()
+            .unwrap()
+            .eq_ignore_ascii_case(&hex0x(&pins.swap_contract().unwrap().address)));
+        let swaps = pins.swap_contract().unwrap();
+        let (min, late) = (Some(swaps.min_window), Some(swaps.late_window));
+        let mined = quantity(&log["blockNumber"]).unwrap();
+        let head_time = 1_792_541_148 + 120;
+        let aggregate3 = hex0x(&abi::selector(abi::AGGREGATE3));
+        let answer = log.clone();
+        let transport = ScriptedTransport::new(move |request: &RoutedRequest| {
+            let (method, params) = method(request);
+            Ok::<RoutedResponse, RoutedError>(match method.as_str() {
+                "eth_chainId" => rpc_result(json!("0xaa36a7")),
+                "eth_getBlockByNumber" => rpc_result(json!({
+                    "number": format!("0x{:x}", mined + 10),
+                    "timestamp": format!("0x{head_time:x}"),
+                    "hash": hex0x(&[3; 32]),
+                })),
+                "eth_call" if selector_of(&params) == aggregate3 => {
+                    windows_answer(&params, min, late, None).expect("the windows check")
+                }
+                "eth_getLogs" => {
+                    let filter = &params[0];
+                    let asked = |at: &str| quantity(&filter[at]).unwrap();
+                    let matches = filter["topics"][1] == answer["topics"][1]
+                        && (asked("fromBlock")..=asked("toBlock")).contains(&mined);
+                    rpc_result(if matches { json!([answer]) } else { json!([]) })
+                }
+                other => panic!("unexpected method {other}"),
+            })
+        });
+        let rpc = EvmRpc::new(&transport, pins, "").unwrap();
+        let id = super::super::models::Word::parse(log["topics"][1].as_str().unwrap())
+            .unwrap()
+            .0;
+        let (t0, t1) = rpc
+            .confirmed_opened_deadlines(&id, head_time)
+            .await
+            .unwrap()
+            .expect("the confirmed Opened");
+        assert_eq!((t0, t1), (1_792_543_836, 1_792_547_436));
+        assert_eq!(t1 - t0, 3_600);
+        assert_eq!(
+            rpc.confirmed_opened_deadlines(&[0x11; 32], head_time)
+                .await
+                .unwrap(),
+            None
+        );
+    }
+
     #[test]
     fn get_swap_reads_exactly_four_words() {
         assert_eq!(decode_swap_state(&get_swap_answer(0)).unwrap(), None);
