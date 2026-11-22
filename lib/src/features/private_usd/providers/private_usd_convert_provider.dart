@@ -731,8 +731,14 @@ class PrivateUsdConvertNotifier
         return null;
       }
       switch (error.code) {
-        // Refused before anything was saved.
+        // Refused before anything was saved, or, a fee Rust could not create
+        // in time, after: one saved is under way and ends on its own.
         case rust.ApiPrivateUsdErrorCode.quoteExpired:
+          if (await _isUnderWay(engine, account, quote.index)) return path;
+          if (!ref.mounted) {
+            if (kDesktopFormFactor) _flowGone();
+            return null;
+          }
           startFailed((l10n) => l10n.privateUsdConvertQuoteRanOut);
           return null;
         // Nothing saved, and the offer holds: the same quote may be bridged
