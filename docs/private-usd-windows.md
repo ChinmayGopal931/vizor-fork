@@ -5,7 +5,7 @@ USD runs there as it does on the Mac and Linux: the same Dart screens and
 providers (`docs/private-usd-macos.md`), the same Rust engine, and a host of its
 own, on WebView2.
 
-Read AGENTS.md's "Private USD" section and `docs/private-usd-android-plan.md`
+Read `docs/private-usd.md` and `docs/private-usd-android-plan.md`
 §3.5 first: every invariant there holds on Windows, because the engine and the
 Dart flows are the phones' and the Mac's own. What every Railgun page host must
 do is [docs/private-usd-railgun-hosts.md](private-usd-railgun-hosts.md) (H1 to

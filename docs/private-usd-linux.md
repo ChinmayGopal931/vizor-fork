@@ -218,8 +218,9 @@ wherever the host runs the page.
 
 The desktop messages that name the Mac have Linux twins that say "your
 computer" (`privateUsd…Linux`, in English, Korean and Chinese), chosen on Linux
-by `privateUsdLinuxWording`: the quote clock, the keep-visible row's tooltip,
-the reverse bridge's proof note, and the send and withdraw proof steps.
+(and Windows) by `privateUsdComputerWording`: the quote clock, the keep-visible
+row's tooltip, the reverse bridge's proof note, and the send and withdraw proof
+steps.
 
 ## Packaging
 

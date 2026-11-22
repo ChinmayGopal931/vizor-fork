@@ -7,9 +7,9 @@
 #include <set>
 
 // The session away on Windows, as the Mac's `MacSessionLifecycle` and Linux's session_lifecycle.cc: while the user is
-// away, Shielded USD's foreground rule (AGENTS.md, "Foreground and unlocked only") sees the app as hidden. Flutter's
-// embedder reports `hidden` for a minimised or hidden window, `inactive` for one without focus and `resumed` otherwise
-// (windows_lifecycle_manager.cc), and nothing of the session; this says `AppLifecycleState.hidden` on
+// away, Shielded USD's foreground rule (docs/private-usd.md, "Foreground and unlocked only") sees the app as hidden.
+// Flutter's embedder reports `hidden` for a minimised or hidden window, `inactive` for one without focus and `resumed`
+// otherwise (windows_lifecycle_manager.cc), and nothing of the session; this says `AppLifecycleState.hidden` on
 // `flutter/lifecycle` while:
 // - the session is locked (WTS_SESSION_LOCK to WTS_SESSION_UNLOCK);
 // - another session is on the console or the remote session disconnected (fast user switching, RDP);

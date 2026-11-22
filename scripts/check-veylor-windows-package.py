@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check a Veylor Windows build and its Velopack package carry Veylor's identity alone.
 
-A public Veylor build must not show Vizor's identity anywhere (AGENTS.md,
+A public Veylor build must not show Vizor's identity anywhere (docs/releases.md,
 "Desktop identity"): the executable's name and version resource, the package's
 id, title, authors and files all name Veylor and Zapp LLC. It also checks the
 settings the app compiled with (the defines' names and the few values that

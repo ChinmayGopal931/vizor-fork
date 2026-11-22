@@ -7,7 +7,7 @@ name: Veylor Windows
 # compiled in: its Railgun page runs in WebView2, on the system's Evergreen
 # runtime (docs/private-usd-windows.md). The build runs upstream's packaging
 # script, scripts/package-windows-velopack.ps1, with the arguments its lane
-# passes (`fastlane windows package`; AGENTS.md, "Desktop identity"): the
+# passes (`fastlane windows package`; docs/releases.md, "Desktop identity"): the
 # lane's Ruby has no Windows ARM64 platform in Gemfile.lock. The packages are
 # unsigned and have no update feed.
 #

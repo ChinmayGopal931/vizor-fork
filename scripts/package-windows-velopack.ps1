@@ -24,7 +24,7 @@ param(
   # VIZOR_RELEASE_BUILD_NUMBER define; the build name is then -Version's
   # numbers. Empty keeps pubspec.yaml's version, as upstream's builds do.
   [string]$BuildNumber = $env:VIZOR_RELEASE_BUILD_NUMBER,
-  # true compiles Shielded USD in (AGENTS.md, "Private USD"); it shows where
+  # true compiles Shielded USD in (docs/private-usd.md); it shows where
   # the WebView2 Runtime runs its Railgun page (docs/private-usd-windows.md).
   # Empty: not passed.
   [string]$PrivateUsdEnabled = $env:VIZOR_PRIVATE_USD_ENABLED,

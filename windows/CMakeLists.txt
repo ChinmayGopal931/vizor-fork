@@ -7,7 +7,7 @@ project(Vizor LANGUAGES CXX)
 set(BINARY_NAME "Vizor")
 
 # The VIZOR_APPLICATION_ID environment variable selects Veylor's identity
-# (AGENTS.md, "Desktop identity"); without it the build keeps upstream's. The
+# (docs/releases.md, "Desktop identity"); without it the build keeps upstream's. The
 # identity sets the version resource's company and product names, which name
 # the app-data directory, and the prefix of its secure storage and
 # single-instance lock, so none of them is shared with an installed Vizor.
