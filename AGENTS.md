@@ -541,9 +541,8 @@ Play bundle is otherwise `flutter build appbundle --release` with
 plugins ship, or Play serves some devices a build without the core), signed
 with the upload keystore through the `ANDROID_KEYSTORE_*` variables, a build
 number above the last upload, and the keyed RPC JSON through
-`--dart-define-from-file`. Keystore and attestation aliases do not depend on
-the id, but app-link verification (`assetlinks.json`) and zecSwap's token
-issuer allowlist name the shipped id.
+`--dart-define-from-file`. Keystore aliases do not depend on the id, but
+app-link verification (`assetlinks.json`) names the shipped id.
 
 ## Android direct APK (verifiable)
 
@@ -2155,9 +2154,9 @@ Code:
   `RailgunSchemeHandler`, referenced from `ios/`) beside its own AppKit and
   FlutterMacOS versions of the rest in `macos/Runner/Railgun/` (`RailgunPage`
   with `RailgunChannel`, `RailgunPageHost`, `RailgunHostHandler` and
-  `RailgunError`), with `macos/Runner/PrivateUsdAttestationHandler.swift`,
-  `ScreenAwakeChannel.swift` and `MacSessionLifecycle.swift`. Keep the shared
-  four free of UIKit and Flutter imports.
+  `RailgunError`), with `macos/Runner/ScreenAwakeChannel.swift` and
+  `MacSessionLifecycle.swift`. Keep the shared four free of UIKit and Flutter
+  imports.
 - C++ (Linux): `linux/runner/private_usd/` (Veylor's side: the channels, the
   page's link, the session lifecycle, keep-awake and the settlement reminder)
   and `linux/runner/railgun_page/` (`veylor-railgun-page`, the page process:
@@ -2510,55 +2509,15 @@ another chain is refused.
   contract's records at 3: a build that knows an older schema refuses it as
   newer.
 
-**Privacy Pass tokens (plan M4, reference §5.9).** A maker that takes
-tokens answers an unpaid accept `401` with a `WWW-Authenticate` challenge;
-the client is built and dormant until a maker does, so no app release is
-needed then. Code: `rust/src/wallet/private_usd/tokens.rs`, the Kotlin
-`PrivateUsdAttestationHandler` (channel
-`com.zcash.wallet/private_usd_attestation`; its Swift twins, iOS's and
-the Mac's, answer `unavailable`), Dart `services/private_usd_tokens_service.dart` and
-`private_usd_attestation.dart`.
-
-- **What is stored where.** The device-wide state is one file per network,
-  `<support>/private_usd_tokens_<network>.json`
-  (`getPrivateUsdTokenStorePath`), written atomically and read leniently:
-  the tokens held, the requests for tokens back (with the swap and its
-  direction), the last challenge a maker sent, the day the issuer ran out,
-  and whether the maker asks. Never per account. A full reset deletes it;
-  the Keystore attestation key (`vizor_privateusd_attest_<issuerName>`) is
-  never deleted and is remade only once a certificate in its chain expired:
-  a new key would be a fresh allowance (X4). Every secret in the file is
-  `Redacted`; log nothing but status codes.
-- **The pins.** Only the deployment's issuer name, token key and the
-  maker's return key are honoured (`TokenPins`): a challenge naming others,
-  or a day outside today ± 600 s, is `TokensRefused`, and `/v1/info` with
-  another return key refuses the maker at the quote.
-- **The 401 rule.** An accept posts unpaid first; with tokens on, a `401`
-  is answered before the quote is taken, so re-posting is safe. With a
-  token held it posts again with `Authorization: PrivateToken` and the
-  body's `tokenRequest` (only on a paid post; never on an unpaid one, and
-  never kept on a reverse record), at most 3 paid tries, settling each by
-  its answer: `2xx` and `401` drop the token, `401` its pending return too,
-  anything else or no answer keeps the token first in line. Issuer tokens
-  go before returned ones, which go only once today is spent. No token
-  held is `TokensNeeded`: Dart runs the issuance once and accepts the same
-  index again, else abandons.
-- **Issuance (X11)** is two FRB phases around the keystore:
-  `private_usd_tokens_issuance_begin` (the maker's `/v1/info` first, then
-  `GET /v1/token-key` against the pins, the blinded batch, `GET
-  /v1/challenge`, a 5-minute session) and `…_finish` (`POST /v1/tokens`,
-  the first `403 rejected` signed again once over a fresh challenge, the
-  second `TokensDeviceRefused`; `429` or a short batch mark today spent).
-  Sessions die on finish, expiry and `private_usd_clear_sessions`.
-- **The prefetch.** The maker's challenge is deterministic, so a batch is
-  fetched ahead whenever its info shows the pinned return key: on the
-  convert screen, after every conversion ends and from a resumed accept
-  turned away at the gate. Without the return key nothing is asked of the
-  issuer. Returns are collected on every step once the deposit is out (or
-  the escrow funded) and during each prefetch pass.
-- **Route.** Issuer requests go through `routed_http` like every other,
-  over Tor when Tor is on; with Tor off the review screens disclose that
-  the issuer and the maker see one connection.
+**No Privacy Pass tokens (owner, 2026-11-21).** The open fee replaces the
+token client (plan M4), which is gone; reference §5.9 and progress D-161 say
+what went. A maker that answers an accept `401`, whatever its code, refused
+it: nothing opened or paid, and the accept is never posted again (forward
+`NothingSent(MAKER_REFUSED)`, reverse `CANCELLED`). `swaps.db` 8 dropped the
+token issuer reverse records pinned. Private USD's start and a full reset
+delete the token store earlier builds wrote
+(`deleteLegacyPrivateUsdTokenStores`); Android's Keystore attestation keys
+stay, unused.
 
 **Railgun's sync (the page).**
 
@@ -2773,8 +2732,7 @@ the Mac's, answer `unavailable`), Dart `services/private_usd_tokens_service.dart
 
 - The keyed RPC URL is never logged or stored: a swap record pins only the
   keyless URL.
-- Relayer tickets and token blinding secrets stay in `swaps.db` and the
-  token state, and are never logged.
+- Relayer tickets stay in `swaps.db` and are never logged.
 - The mnemonic and the Railgun encryption key live only in secure storage.
 
 How the code keeps to this:
@@ -2824,8 +2782,7 @@ far), per `docs/private-usd-ios-device-checklist.md`.
 **Pinned zecSwap and a local stand-in.** `zecswap-core` comes from
 `ChinmayGopal931/zecSwap`'s `veylor/zakura-v5` branch, its build on Zakura
 Common 5.4 (E1; `veylor/zakura-v4` was the Common v4 build), and
-`zecswap-railgun` and `zecswap-tokens` from its `main` (PR #18), which use no
-Zcash crate. Veylor hands zecswap-core PCZT bytes (`sign_pczt_bytes`), so it
+`zecswap-railgun` from its `main` (PR #18), which uses no Zcash crate. Veylor hands zecswap-core PCZT bytes (`sign_pczt_bytes`), so it
 must sit on the wallet's exact libraries: a wallet move to new Zcash crates
 needs a matching build on that branch first, and two Common versions side by
 side are not acceptable even when they compile. `rust/Cargo.toml` also carries

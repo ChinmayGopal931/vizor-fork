@@ -7,6 +7,32 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
 
 ## Where things stand (2026-10-17; read this first)
 
+- **The Privacy Pass token client is gone (2026-11-21, D-161).** The owner
+  decided that the open fee on ZEC → USD bridges (D-160) replaces it. It
+  never ran: both hosted makers' `/v1/info` answer `tokenReturnKey: null`.
+  - **Behaviour.** A maker that answers an accept `401`, whatever its code,
+    refused it: nothing opened, nothing paid, never posted again (forward
+    `NothingSent(MAKER_REFUSED)`, reverse `CANCELLED` with the same cause).
+    Everything else is as it was, the open fee's `402 feeRequired` and the
+    USD → ZEC accept included.
+  - **Rust.** `tokens.rs`, the `zecswap-tokens` crate, the issuer and
+    return-key pins, the maker's `/v1/info` return-key check, the token
+    error codes, `ApiAcceptKind::TokensNeeded` and the issuance calls went.
+    `swaps.db` 8 drops the token fields reverse records kept
+    (`deployment.tokenIssuer`, and `acceptance.tokenRequest`, which nothing
+    wrote in practice); every other field and table is as it was.
+  - **Dart.** The tokens service, the attestation channel's wrapper, the
+    prefetches, the token copy in en, ko and zh, and the review's Tor-off
+    disclosure went. Private USD's start, and a full reset, delete the token
+    store earlier builds wrote (`private_usd_tokens_<network>.json`).
+  - **Native.** The attestation channel is gone from Android
+    (`PrivateUsdAttestationHandler.kt` and its test), iOS and the Mac (the
+    Swift twins and their Xcode references) and Linux (its stub). Android's
+    Keystore attestation keys stay on devices, unused.
+  - **Tests.** Rust: a `401` to an accept is a refusal with nothing opened,
+    forward and reverse; the schema 6 and 7 → 8 migration. The token tests
+    went with the code.
+
 - **A ZEC → USD bridge pays the maker's open fee first (2026-11-21, D-160).**
   Since 2026-11-21 the hosted testnet maker refuses every ZEC → USD accept
   `402 feeRequired` until the quote's `openFee` (20,000 zatoshis) is in a
@@ -2703,7 +2729,7 @@ M8 status (2026-10-14): the non-device parts are done.
     Swift decoders, the balance's flag through a failure, a retry and a
     success, and the card's two offers.
 - **D-154 (owner, 2026-10-25): Privacy Pass tokens (M4), dormant until a
-  maker asks.** Built as plan M4 and reference §5.9 and §8.2 specify, with
+  maker asks.** (Removed 2026-11-21, D-161.) Built as plan M4 and reference §5.9 and §8.2 specify, with
   the brief's changes and these as-built details (§5.9 "As built" lists
   them too):
   - **The crate.** `zecswap-tokens` is a git dependency at the pinned rev,
@@ -2963,6 +2989,31 @@ M8 status (2026-10-14): the non-device parts are done.
   - **A canonical address only.** The wallet finds an interrupted payment
     by its recipient as it encodes it; a fee address spelt otherwise
     (uppercase) is refused at the quote rather than risk a second payment.
+
+- **D-161 (owner, 2026-11-21): no Privacy Pass tokens.** The open fee on
+  ZEC → USD bridges (D-160) replaces the token client D-154 built, which
+  never activated: both hosted makers' `/v1/info` show no
+  `tokenReturnKey` (their `token` is the USDC contract, unrelated). Where
+  Veylor now stands, and why:
+  - **A `401` is a refusal.** Without a client, a `401` to an accept is the
+    maker turning it down before acting: forward ends
+    `NothingSent(MAKER_REFUSED)` whatever the code, the open fee's accept
+    too, and reverse is `CANCELLED` (`MAKER_REFUSED`, where the token gate
+    used to say `MAKER_UNAVAILABLE`). Nothing is posted again. Before, a
+    `401 tokenRequired` with no token held left the record unanswered for
+    the issuance.
+  - **Records.** A reverse record pinned the issuer (`tokenIssuer`) in its
+    deployment, and records decode strictly, so the field could not simply
+    go: schema 8 removes it from every reverse record (and an
+    acceptance's `tokenRequest`, never kept in practice), and changes
+    nothing else. A build that knows 7 refuses an 8 store as newer.
+  - **What stays on a device.** The token store file is deleted, best
+    effort and silently, when Private USD starts, and by a full reset.
+    Android's Keystore attestation keys (`vizor_privateusd_attest_*`) stay:
+    nothing reads them, and deleting keys is not worth a native call.
+  - **Windows** (`feat/windows-desktop`, unmerged) still registers the
+    attestation stub in `windows/runner/private_usd_channels.cpp` and names
+    it in `docs/private-usd-windows.md`; both go when it merges.
 
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's

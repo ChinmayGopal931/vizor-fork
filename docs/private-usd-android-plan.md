@@ -748,6 +748,8 @@ Then, with the owner's go-ahead, run the regtest test once (M2.7b; done 2026-10-
 
 ### M4. Privacy Pass tokens and attestation
 
+**Removed 2026-11-21 (owner, progress D-161).** The open fee on ZEC → USD bridges replaces the token client this milestone built (D-154); it never activated, as no maker asked for tokens. A `401` to an accept is now the maker's refusal. What follows is the plan as it stood.
+
 **Goal.** A device can get and spend issuer tokens through veylor.
 
 **Needs.** N1 before any code. E3 for acceptance (E9 is done).
