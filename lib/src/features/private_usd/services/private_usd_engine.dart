@@ -947,11 +947,14 @@ class PrivateUsdEngine {
     required bool relayerClaims,
   }) async {
     try {
+      // Under its own call id: an open fee it pays is a key step, which a
+      // lock or the background cancels like an advance's.
       return await runFor(
         accountUuid,
-        (_, secret) => _backend.forwardAccept(
+        (opId, secret) => _backend.forwardAccept(
           accountUuid,
           secret,
+          opId: opId,
           index: index,
           maxTotalZat: maxTotalZat,
           relayerClaims: relayerClaims,

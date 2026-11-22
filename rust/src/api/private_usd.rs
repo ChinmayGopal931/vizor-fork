@@ -480,6 +480,11 @@ pub struct ApiForwardQuote {
     /// without a fee, or when one transaction cannot pay it (the quote is
     /// then unpayable).
     pub open_fee_network_zat: Option<u64>,
+    /// Unix seconds: from here on the quote leaves less than the least life
+    /// its open fee needs, and accept refuses it (`QuoteExpired`, nothing
+    /// paid). The review stops offering it a margin before, for a new quote.
+    /// `None` without a fee.
+    pub open_fee_pay_by: Option<i64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -576,6 +581,10 @@ pub struct ApiForwardRecord {
     pub quote_expires_at: i64,
     pub deposit_zat: u64,
     pub max_total_zat: Option<u64>,
+    /// The kept deposit's network fee as the wallet recorded it; `None`
+    /// before there is one, or where the wallet does not show it. What the
+    /// deposit cost, where `max_total_zat` is only the most it could.
+    pub deposit_network_zat: Option<u64>,
     pub amount: String,
     pub receives: String,
     pub relayer_fee: String,
@@ -671,10 +680,13 @@ pub fn private_usd_forward_quote(
 /// the claim's window opens.
 ///
 /// A quote that asks an open fee is not posted here: the fee is paid
-/// (`QuoteExpired` with under a minute of the quote left, and
-/// `DepositUnpayable` unless the wallet also covers the deposit, both with
-/// nothing saved), and the call returns `Accepted`; the advances post the
-/// accept once the wallet shows the fee mined.
+/// (`QuoteExpired` with less of the quote left than the deployment's least
+/// fee quote life, and `DepositUnpayable` unless the wallet also covers the
+/// deposit, both with nothing saved), and the call returns `Accepted`; the
+/// advances post the accept once the wallet shows the fee mined. The fee is
+/// a key step: it runs under `op_id`, which a lock or the background
+/// cancels (`private_usd_cancel`) before the payment is saved or created.
+#[allow(clippy::too_many_arguments)]
 pub fn private_usd_forward_accept(
     db_path: String,
     network: String,
@@ -683,6 +695,7 @@ pub fn private_usd_forward_accept(
     mnemonic_bytes: Vec<u8>,
     lightwalletd_url: String,
     eth_rpc_url: String,
+    op_id: u32,
     index: u32,
     max_total_zat: u64,
     relayer_claims: bool,
@@ -697,7 +710,7 @@ pub fn private_usd_forward_accept(
             &secret,
             &lightwalletd_url,
             &eth_rpc_url,
-            None,
+            Some(op_id),
             async |call, op| {
                 call.forward(op, async |forward, store| {
                     forward
@@ -778,7 +791,7 @@ pub fn private_usd_forward_abandon(
             &account_uuid,
             index,
         ))?;
-        Ok(api_record(&record, None, false))
+        Ok(api_record(&record, WalletFacts::default()))
     })
 }
 
@@ -851,7 +864,7 @@ pub fn private_usd_forward_rescue(
             async |call, op| {
                 call.forward(op, async |forward, store| {
                     let record = forward.rescue(store, index).await?;
-                    Ok(api_record(&record, None, false))
+                    Ok(api_record(&record, WalletFacts::default()))
                 })
                 .await
             },
@@ -874,13 +887,7 @@ pub fn private_usd_forward_records(
         };
         Ok(swap::records::<ForwardRecord>(&store, &account_uuid)?
             .iter()
-            .map(|record| {
-                api_record(
-                    record,
-                    deposit_confirmations(&db_path, network, record),
-                    open_fee_mined(&db_path, network, record),
-                )
-            })
+            .map(|record| api_record(record, wallet_facts(&db_path, network, record)))
             .collect())
     })
 }
@@ -2330,6 +2337,10 @@ fn api_quote(quoted: &Quoted) -> ApiForwardQuote {
         fee_expires_at: offer.fee_expires_at.map(seconds),
         open_fee_zat: offer.quote.open_fee.as_ref().map(|fee| fee.zat),
         open_fee_network_zat: offer.open_fee_network_zatoshi,
+        open_fee_pay_by: offer.quote.open_fee.as_ref().map(|_| {
+            let min_life = deployment::deployment(offer.network).open_fee_min_quote_life_seconds;
+            seconds(offer.quote.expires_at.saturating_sub(min_life))
+        }),
     }
 }
 
@@ -2337,8 +2348,7 @@ fn api_advance(report: &AdvanceReport, db_path: &str, network: WalletNetwork) ->
     ApiForwardAdvance {
         record: api_record(
             &report.record,
-            deposit_confirmations(db_path, network, &report.record),
-            open_fee_mined(db_path, network, &report.record),
+            wallet_facts(db_path, network, &report.record),
         ),
         wait: report.wait.map(|wait| match wait {
             ForwardWait::Opening => ApiForwardWait::Opening,
@@ -2356,11 +2366,41 @@ fn api_advance(report: &AdvanceReport, db_path: &str, network: WalletNetwork) ->
     }
 }
 
-fn api_record(
-    record: &ForwardRecord,
+/// What the main wallet shows of a forward record's own transactions, read
+/// best effort: nothing where it cannot be read.
+#[frb(ignore)]
+#[derive(Clone, Copy, Debug, Default)]
+struct WalletFacts {
     deposit_confirmations: Option<u32>,
+    /// The kept deposit's network fee, as the wallet recorded it.
+    deposit_network_zat: Option<u64>,
+    /// The open fee payment's network fee, as the wallet recorded it: what a
+    /// payment found again after a restart has instead of the proposal's.
+    open_fee_network_zat: Option<u64>,
     open_fee_mined: bool,
-) -> ApiForwardRecord {
+}
+
+fn wallet_facts(db_path: &str, network: WalletNetwork, record: &ForwardRecord) -> WalletFacts {
+    let fee_of = |tx_id: &ZcashTxId| {
+        joint_ops::internal_txid(tx_id)
+            .ok()
+            .and_then(|txid| joint_ops::wallet_tx_fee(db_path, &txid).ok().flatten())
+    };
+    WalletFacts {
+        deposit_confirmations: deposit_confirmations(db_path, network, record),
+        deposit_network_zat: record
+            .deposit
+            .as_ref()
+            .and_then(|deposit| fee_of(&deposit.tx_id)),
+        open_fee_network_zat: record
+            .open_fee_payment
+            .as_ref()
+            .and_then(|payment| fee_of(&payment.tx_id)),
+        open_fee_mined: open_fee_mined(db_path, network, record),
+    }
+}
+
+fn api_record(record: &ForwardRecord, facts: WalletFacts) -> ApiForwardRecord {
     let (outcome, refund_cause, nothing_sent_cause) = match &record.outcome {
         None => (None, None, None),
         Some(ForwardOutcome::Paid) => (Some(ApiForwardOutcome::Paid), None, None),
@@ -2396,6 +2436,7 @@ fn api_record(
         quote_expires_at: seconds(record.quote.expires_at),
         deposit_zat: record.quote.deposit_zat,
         max_total_zat: record.max_total_zat,
+        deposit_network_zat: facts.deposit_network_zat,
         amount: record.quote.amount.0.to_string(),
         receives: record.receives.0.to_string(),
         relayer_fee: record.relayer_fee.0.to_string(),
@@ -2406,7 +2447,7 @@ fn api_record(
             .deposit
             .as_ref()
             .and_then(|deposit| internal_hex(&deposit.tx_id)),
-        deposit_confirmations,
+        deposit_confirmations: facts.deposit_confirmations,
         sweep_txid: record
             .sweep
             .as_ref()
@@ -2422,12 +2463,13 @@ fn api_record(
         open_fee_network_zat: record
             .open_fee_payment
             .as_ref()
-            .and_then(|payment| payment.network_fee_zat),
+            .and_then(|payment| payment.network_fee_zat)
+            .or(facts.open_fee_network_zat),
         open_fee_txid: record
             .open_fee_payment
             .as_ref()
             .and_then(|payment| internal_hex(&payment.tx_id)),
-        open_fee_mined,
+        open_fee_mined: facts.open_fee_mined,
     }
 }
 

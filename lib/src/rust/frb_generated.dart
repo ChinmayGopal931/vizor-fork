@@ -1377,6 +1377,7 @@ abstract class RustLibApi extends BaseApi {
     required List<int> mnemonicBytes,
     required String lightwalletdUrl,
     required String ethRpcUrl,
+    required int opId,
     required int index,
     required BigInt maxTotalZat,
     required bool relayerClaims,
@@ -10723,6 +10724,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required List<int> mnemonicBytes,
     required String lightwalletdUrl,
     required String ethRpcUrl,
+    required int opId,
     required int index,
     required BigInt maxTotalZat,
     required bool relayerClaims,
@@ -10738,6 +10740,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_list_prim_u_8_loose(mnemonicBytes, serializer);
           sse_encode_String(lightwalletdUrl, serializer);
           sse_encode_String(ethRpcUrl, serializer);
+          sse_encode_u_32(opId, serializer);
           sse_encode_u_32(index, serializer);
           sse_encode_u_64(maxTotalZat, serializer);
           sse_encode_bool(relayerClaims, serializer);
@@ -10761,6 +10764,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           mnemonicBytes,
           lightwalletdUrl,
           ethRpcUrl,
+          opId,
           index,
           maxTotalZat,
           relayerClaims,
@@ -10781,6 +10785,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           "mnemonicBytes",
           "lightwalletdUrl",
           "ethRpcUrl",
+          "opId",
           "index",
           "maxTotalZat",
           "relayerClaims",
@@ -16318,8 +16323,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ApiForwardQuote dco_decode_api_forward_quote(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 12)
-      throw Exception('unexpected arr length: expect 12 but see ${arr.length}');
+    if (arr.length != 13)
+      throw Exception('unexpected arr length: expect 13 but see ${arr.length}');
     return ApiForwardQuote(
       index: dco_decode_u_32(arr[0]),
       expiresAt: dco_decode_i_64(arr[1]),
@@ -16333,6 +16338,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       feeExpiresAt: dco_decode_opt_box_autoadd_i_64(arr[9]),
       openFeeZat: dco_decode_opt_box_autoadd_u_64(arr[10]),
       openFeeNetworkZat: dco_decode_opt_box_autoadd_u_64(arr[11]),
+      openFeePayBy: dco_decode_opt_box_autoadd_i_64(arr[12]),
     );
   }
 
@@ -16340,8 +16346,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ApiForwardRecord dco_decode_api_forward_record(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 27)
-      throw Exception('unexpected arr length: expect 27 but see ${arr.length}');
+    if (arr.length != 28)
+      throw Exception('unexpected arr length: expect 28 but see ${arr.length}');
     return ApiForwardRecord(
       index: dco_decode_u_32(arr[0]),
       swapId: dco_decode_String(arr[1]),
@@ -16350,28 +16356,29 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       quoteExpiresAt: dco_decode_i_64(arr[4]),
       depositZat: dco_decode_u_64(arr[5]),
       maxTotalZat: dco_decode_opt_box_autoadd_u_64(arr[6]),
-      amount: dco_decode_String(arr[7]),
-      receives: dco_decode_String(arr[8]),
-      relayerFee: dco_decode_String(arr[9]),
-      t0: dco_decode_opt_box_autoadd_i_64(arr[10]),
-      t1: dco_decode_opt_box_autoadd_i_64(arr[11]),
-      lateClaimAt: dco_decode_opt_box_autoadd_i_64(arr[12]),
-      depositTxid: dco_decode_opt_String(arr[13]),
-      depositConfirmations: dco_decode_opt_box_autoadd_u_32(arr[14]),
-      sweepTxid: dco_decode_opt_String(arr[15]),
-      payoutTx: dco_decode_opt_String(arr[16]),
-      claimHeld: dco_decode_bool(arr[17]),
-      claimDeclined: dco_decode_bool(arr[18]),
-      outcome: dco_decode_opt_box_autoadd_api_forward_outcome(arr[19]),
-      refundCause: dco_decode_opt_box_autoadd_api_refund_cause(arr[20]),
+      depositNetworkZat: dco_decode_opt_box_autoadd_u_64(arr[7]),
+      amount: dco_decode_String(arr[8]),
+      receives: dco_decode_String(arr[9]),
+      relayerFee: dco_decode_String(arr[10]),
+      t0: dco_decode_opt_box_autoadd_i_64(arr[11]),
+      t1: dco_decode_opt_box_autoadd_i_64(arr[12]),
+      lateClaimAt: dco_decode_opt_box_autoadd_i_64(arr[13]),
+      depositTxid: dco_decode_opt_String(arr[14]),
+      depositConfirmations: dco_decode_opt_box_autoadd_u_32(arr[15]),
+      sweepTxid: dco_decode_opt_String(arr[16]),
+      payoutTx: dco_decode_opt_String(arr[17]),
+      claimHeld: dco_decode_bool(arr[18]),
+      claimDeclined: dco_decode_bool(arr[19]),
+      outcome: dco_decode_opt_box_autoadd_api_forward_outcome(arr[20]),
+      refundCause: dco_decode_opt_box_autoadd_api_refund_cause(arr[21]),
       nothingSentCause: dco_decode_opt_box_autoadd_api_nothing_sent_cause(
-        arr[21],
+        arr[22],
       ),
-      endedAt: dco_decode_opt_box_autoadd_i_64(arr[22]),
-      openFeeZat: dco_decode_opt_box_autoadd_u_64(arr[23]),
-      openFeeNetworkZat: dco_decode_opt_box_autoadd_u_64(arr[24]),
-      openFeeTxid: dco_decode_opt_String(arr[25]),
-      openFeeMined: dco_decode_bool(arr[26]),
+      endedAt: dco_decode_opt_box_autoadd_i_64(arr[23]),
+      openFeeZat: dco_decode_opt_box_autoadd_u_64(arr[24]),
+      openFeeNetworkZat: dco_decode_opt_box_autoadd_u_64(arr[25]),
+      openFeeTxid: dco_decode_opt_String(arr[26]),
+      openFeeMined: dco_decode_bool(arr[27]),
     );
   }
 
@@ -21720,6 +21727,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_feeExpiresAt = sse_decode_opt_box_autoadd_i_64(deserializer);
     var var_openFeeZat = sse_decode_opt_box_autoadd_u_64(deserializer);
     var var_openFeeNetworkZat = sse_decode_opt_box_autoadd_u_64(deserializer);
+    var var_openFeePayBy = sse_decode_opt_box_autoadd_i_64(deserializer);
     return ApiForwardQuote(
       index: var_index,
       expiresAt: var_expiresAt,
@@ -21733,6 +21741,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       feeExpiresAt: var_feeExpiresAt,
       openFeeZat: var_openFeeZat,
       openFeeNetworkZat: var_openFeeNetworkZat,
+      openFeePayBy: var_openFeePayBy,
     );
   }
 
@@ -21746,6 +21755,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_quoteExpiresAt = sse_decode_i_64(deserializer);
     var var_depositZat = sse_decode_u_64(deserializer);
     var var_maxTotalZat = sse_decode_opt_box_autoadd_u_64(deserializer);
+    var var_depositNetworkZat = sse_decode_opt_box_autoadd_u_64(deserializer);
     var var_amount = sse_decode_String(deserializer);
     var var_receives = sse_decode_String(deserializer);
     var var_relayerFee = sse_decode_String(deserializer);
@@ -21781,6 +21791,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       quoteExpiresAt: var_quoteExpiresAt,
       depositZat: var_depositZat,
       maxTotalZat: var_maxTotalZat,
+      depositNetworkZat: var_depositNetworkZat,
       amount: var_amount,
       receives: var_receives,
       relayerFee: var_relayerFee,
@@ -28710,6 +28721,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_box_autoadd_i_64(self.feeExpiresAt, serializer);
     sse_encode_opt_box_autoadd_u_64(self.openFeeZat, serializer);
     sse_encode_opt_box_autoadd_u_64(self.openFeeNetworkZat, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.openFeePayBy, serializer);
   }
 
   @protected
@@ -28725,6 +28737,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_64(self.quoteExpiresAt, serializer);
     sse_encode_u_64(self.depositZat, serializer);
     sse_encode_opt_box_autoadd_u_64(self.maxTotalZat, serializer);
+    sse_encode_opt_box_autoadd_u_64(self.depositNetworkZat, serializer);
     sse_encode_String(self.amount, serializer);
     sse_encode_String(self.receives, serializer);
     sse_encode_String(self.relayerFee, serializer);

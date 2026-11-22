@@ -166,6 +166,7 @@ class FakePrivateUsdBackend implements PrivateUsdSwapBackend {
   Future<ApiAcceptResult> forwardAccept(
     String accountUuid,
     PrivateUsdSecretReader secret, {
+    required int opId,
     required int index,
     required BigInt maxTotalZat,
     required bool relayerClaims,

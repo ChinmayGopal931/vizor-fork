@@ -3,9 +3,14 @@
 //! with nothing paid; an accept the maker answers `feeRequired` is posted
 //! again as it asks and the swap completes; one whose fee the maker never
 //! sees stops at the quote's end; a payment kept but not sent is sent, never
-//! built again; and a quote without a fee is accepted as before.
+//! built again; and a quote without a fee is accepted as before. Then the
+//! review's findings: the fee expires with its quote, a quote lives long
+//! enough for its fee and no longer than the deployment allows, a swap
+//! whose accept answer was lost goes on from the chain, a fee started is
+//! never abandoned, the deposit after the fee fits its approved total, and
+//! a lock or the background stops the fee before it is saved.
 
-use super::super::engine;
+use super::super::engine::{self, OpHandle};
 use super::super::evm_rpc::SwapStage;
 use super::super::forward::{self, AcceptOutcome, ForwardStep, ForwardWait, Funds};
 use super::super::models::{ForwardOutcome, NothingSentCause, OpenFeeProgress};
@@ -540,3 +545,35 @@ async fn a_deposit_after_the_fee_fits_its_approved_total_with_an_input_more() {
     assert_eq!(quoted.offer.deposit_fee_zatoshi, Some(DEPOSIT_FEE_ZAT));
 }
 
+/// Finding 8: the fee is a key step under the accept's call: one cancelled
+/// (a lock, the background) stops before the payment is saved or made.
+#[tokio::test]
+async fn a_cancelled_accept_saves_and_pays_no_fee() {
+    let h = asking(FEE, fee_address());
+    let quoted = h.quote().await.unwrap();
+    let op_id = rand::random::<u32>();
+    let op = OpHandle::begin(op_id).unwrap();
+    engine::cancel_op(op_id);
+    let stopped = {
+        let _driver = engine::lock_account(&h.account).unwrap();
+        h.forward_with(Some(&op))
+            .accept(
+                &mut h.store(),
+                quoted.index,
+                DEPOSIT_ZAT + DEPOSIT_FEE_ZAT,
+                false,
+            )
+            .await
+            .unwrap_err()
+    };
+    assert_eq!(stopped.code, ErrorCode::Cancelled);
+    assert!(h.world.get().fee_payments.is_empty());
+    assert_eq!(h.store().unfinished_count(&h.account).unwrap(), 0);
+    drop(op);
+    // The offer still holds: the bridge can be tapped again.
+    assert_eq!(
+        accept(&h, quoted.index).await.unwrap(),
+        AcceptOutcome::Accepted
+    );
+    assert_eq!(h.world.get().fee_payments.len(), 1);
+}

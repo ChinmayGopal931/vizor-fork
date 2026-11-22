@@ -567,6 +567,23 @@ pub(crate) fn swap_tx_status(
     Ok(classify(stored, fully_scanned, expiry_height))
 }
 
+/// The network fee the wallet DB at `db` records for its transaction
+/// `txid`: the wallet keeps one for each it created. `None` for one it does
+/// not hold, or holds without a fee.
+pub(crate) fn wallet_tx_fee(db: &str, txid: &TxId) -> Result<Option<u64>> {
+    let conn =
+        open_readonly_conn_with_timeout(db, Some(READ_DB_BUSY_TIMEOUT)).map_err(wallet_error)?;
+    let fee: Option<Option<i64>> = conn
+        .query_row(
+            "SELECT fee FROM transactions WHERE txid = ?1",
+            [txid.as_ref()],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(sql_error)?;
+    Ok(fee.flatten().and_then(|fee| u64::try_from(fee).ok()))
+}
+
 /// `stored` is `None` for a transaction the wallet does not hold, else its
 /// mined height.
 fn classify(

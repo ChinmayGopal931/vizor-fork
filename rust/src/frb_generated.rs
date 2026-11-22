@@ -8504,6 +8504,7 @@ fn wire__crate__api__private_usd__private_usd_forward_accept_impl(
             let api_mnemonic_bytes = <Vec<u8>>::sse_decode(&mut deserializer);
             let api_lightwalletd_url = <String>::sse_decode(&mut deserializer);
             let api_eth_rpc_url = <String>::sse_decode(&mut deserializer);
+            let api_op_id = <u32>::sse_decode(&mut deserializer);
             let api_index = <u32>::sse_decode(&mut deserializer);
             let api_max_total_zat = <u64>::sse_decode(&mut deserializer);
             let api_relayer_claims = <bool>::sse_decode(&mut deserializer);
@@ -8519,6 +8520,7 @@ fn wire__crate__api__private_usd__private_usd_forward_accept_impl(
                             api_mnemonic_bytes,
                             api_lightwalletd_url,
                             api_eth_rpc_url,
+                            api_op_id,
                             api_index,
                             api_max_total_zat,
                             api_relayer_claims,
@@ -14431,6 +14433,7 @@ impl SseDecode for crate::api::private_usd::ApiForwardQuote {
         let mut var_feeExpiresAt = <Option<i64>>::sse_decode(deserializer);
         let mut var_openFeeZat = <Option<u64>>::sse_decode(deserializer);
         let mut var_openFeeNetworkZat = <Option<u64>>::sse_decode(deserializer);
+        let mut var_openFeePayBy = <Option<i64>>::sse_decode(deserializer);
         return crate::api::private_usd::ApiForwardQuote {
             index: var_index,
             expires_at: var_expiresAt,
@@ -14444,6 +14447,7 @@ impl SseDecode for crate::api::private_usd::ApiForwardQuote {
             fee_expires_at: var_feeExpiresAt,
             open_fee_zat: var_openFeeZat,
             open_fee_network_zat: var_openFeeNetworkZat,
+            open_fee_pay_by: var_openFeePayBy,
         };
     }
 }
@@ -14458,6 +14462,7 @@ impl SseDecode for crate::api::private_usd::ApiForwardRecord {
         let mut var_quoteExpiresAt = <i64>::sse_decode(deserializer);
         let mut var_depositZat = <u64>::sse_decode(deserializer);
         let mut var_maxTotalZat = <Option<u64>>::sse_decode(deserializer);
+        let mut var_depositNetworkZat = <Option<u64>>::sse_decode(deserializer);
         let mut var_amount = <String>::sse_decode(deserializer);
         let mut var_receives = <String>::sse_decode(deserializer);
         let mut var_relayerFee = <String>::sse_decode(deserializer);
@@ -14489,6 +14494,7 @@ impl SseDecode for crate::api::private_usd::ApiForwardRecord {
             quote_expires_at: var_quoteExpiresAt,
             deposit_zat: var_depositZat,
             max_total_zat: var_maxTotalZat,
+            deposit_network_zat: var_depositNetworkZat,
             amount: var_amount,
             receives: var_receives,
             relayer_fee: var_relayerFee,
@@ -21816,6 +21822,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::private_usd::ApiForwardQuote 
             self.fee_expires_at.into_into_dart().into_dart(),
             self.open_fee_zat.into_into_dart().into_dart(),
             self.open_fee_network_zat.into_into_dart().into_dart(),
+            self.open_fee_pay_by.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -21842,6 +21849,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::private_usd::ApiForwardRecord
             self.quote_expires_at.into_into_dart().into_dart(),
             self.deposit_zat.into_into_dart().into_dart(),
             self.max_total_zat.into_into_dart().into_dart(),
+            self.deposit_network_zat.into_into_dart().into_dart(),
             self.amount.into_into_dart().into_dart(),
             self.receives.into_into_dart().into_dart(),
             self.relayer_fee.into_into_dart().into_dart(),
@@ -27962,6 +27970,7 @@ impl SseEncode for crate::api::private_usd::ApiForwardQuote {
         <Option<i64>>::sse_encode(self.fee_expires_at, serializer);
         <Option<u64>>::sse_encode(self.open_fee_zat, serializer);
         <Option<u64>>::sse_encode(self.open_fee_network_zat, serializer);
+        <Option<i64>>::sse_encode(self.open_fee_pay_by, serializer);
     }
 }
 
@@ -27975,6 +27984,7 @@ impl SseEncode for crate::api::private_usd::ApiForwardRecord {
         <i64>::sse_encode(self.quote_expires_at, serializer);
         <u64>::sse_encode(self.deposit_zat, serializer);
         <Option<u64>>::sse_encode(self.max_total_zat, serializer);
+        <Option<u64>>::sse_encode(self.deposit_network_zat, serializer);
         <String>::sse_encode(self.amount, serializer);
         <String>::sse_encode(self.receives, serializer);
         <String>::sse_encode(self.relayer_fee, serializer);

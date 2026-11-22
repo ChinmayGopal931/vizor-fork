@@ -589,6 +589,7 @@ class _GatedBackend extends FakePrivateUsdBackend {
   Future<ApiAcceptResult> forwardAccept(
     String accountUuid,
     PrivateUsdSecretReader secret, {
+    required int opId,
     required int index,
     required BigInt maxTotalZat,
     required bool relayerClaims,
@@ -598,6 +599,7 @@ class _GatedBackend extends FakePrivateUsdBackend {
     return inner.forwardAccept(
       accountUuid,
       secret,
+      opId: opId,
       index: index,
       maxTotalZat: maxTotalZat,
       relayerClaims: relayerClaims,

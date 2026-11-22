@@ -577,10 +577,16 @@ where
         // between its last time check and its creation.
         let zcash_height = self.zcash.chain_height().await?;
         let open_fee = match &quote.open_fee {
-            Some(fee) => Some(
-                self.propose_open_fee(index, &quote, fee, &offer, max_total_zatoshi)
-                    .await?,
-            ),
+            Some(fee) => {
+                let proposed = self
+                    .propose_open_fee(index, &quote, fee, &offer, max_total_zatoshi)
+                    .await?;
+                // The fee is a key step: a lock or the background that came
+                // while it was proposed stops it here, nothing saved, and the
+                // guard releases the proposal.
+                engine::check_cancelled(self.op)?;
+                Some(proposed)
+            }
             None => None,
         };
         let swap_id = terms::swap_id(&self.pins.maker, &self.keys.user_share(index)?);
@@ -617,6 +623,9 @@ where
         save(store, self.account, &record)?;
         engine::remove_offer(self.account, index);
         if let Some((proposal, network_fee)) = open_fee {
+            // Saved as started: cancelled here, the engine finds nothing in
+            // the wallet and pays it once it may.
+            engine::check_cancelled(self.op)?;
             self.create_open_fee(store, &record, proposal, network_fee)
                 .await?;
             return Ok(AcceptOutcome::Accepted);

@@ -6,8 +6,10 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `api_advance`, `api_cause`, `api_code`, `api_cost_request`, `api_deposit_pass`, `api_deposit_record`, `api_deposit_terms`, `api_funding_request`, `api_quote`, `api_record`, `api_reverse_advance`, `api_reverse_phase`, `api_reverse_record`, `api_send_record`, `api_transact`, `block_on`, `catch`, `deposit_confirmations`, `drive`, `internal_hex`, `late_claim_at`, `no_such_conversion`, `open_context`, `open_fee_mined`, `parse_amount`, `parse_network_and_migrate`, `seconds`, `swap_network`, `warm_proving_keys`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
+// These functions are ignored because they are not marked as `pub`: `api_advance`, `api_cause`, `api_code`, `api_cost_request`, `api_deposit_pass`, `api_deposit_record`, `api_deposit_terms`, `api_funding_request`, `api_quote`, `api_record`, `api_reverse_advance`, `api_reverse_phase`, `api_reverse_record`, `api_send_record`, `api_transact`, `block_on`, `catch`, `deposit_confirmations`, `drive`, `internal_hex`, `late_claim_at`, `no_such_conversion`, `open_context`, `open_fee_mined`, `parse_amount`, `parse_network_and_migrate`, `seconds`, `swap_network`, `wallet_facts`, `warm_proving_keys`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `WalletFacts`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
+// These functions are ignored (category: IgnoreBecauseOwnerTyShouldIgnore): `default`
 
 /// The deployment for the wallet network `"main"` or `"test"`; `None` on
 /// regtest or an unknown network, where Private USD is hidden.
@@ -172,10 +174,12 @@ Future<ApiForwardQuote> privateUsdForwardQuote({
 /// the claim's window opens.
 ///
 /// A quote that asks an open fee is not posted here: the fee is paid
-/// (`QuoteExpired` with under a minute of the quote left, and
-/// `DepositUnpayable` unless the wallet also covers the deposit, both with
-/// nothing saved), and the call returns `Accepted`; the advances post the
-/// accept once the wallet shows the fee mined.
+/// (`QuoteExpired` with less of the quote left than the deployment's least
+/// fee quote life, and `DepositUnpayable` unless the wallet also covers the
+/// deposit, both with nothing saved), and the call returns `Accepted`; the
+/// advances post the accept once the wallet shows the fee mined. The fee is
+/// a key step: it runs under `op_id`, which a lock or the background
+/// cancels (`private_usd_cancel`) before the payment is saved or created.
 Future<ApiAcceptResult> privateUsdForwardAccept({
   required String dbPath,
   required String network,
@@ -184,6 +188,7 @@ Future<ApiAcceptResult> privateUsdForwardAccept({
   required List<int> mnemonicBytes,
   required String lightwalletdUrl,
   required String ethRpcUrl,
+  required int opId,
   required int index,
   required BigInt maxTotalZat,
   required bool relayerClaims,
@@ -195,6 +200,7 @@ Future<ApiAcceptResult> privateUsdForwardAccept({
   mnemonicBytes: mnemonicBytes,
   lightwalletdUrl: lightwalletdUrl,
   ethRpcUrl: ethRpcUrl,
+  opId: opId,
   index: index,
   maxTotalZat: maxTotalZat,
   relayerClaims: relayerClaims,
@@ -1407,6 +1413,12 @@ class ApiForwardQuote {
   /// then unpayable).
   final BigInt? openFeeNetworkZat;
 
+  /// Unix seconds: from here on the quote leaves less than the least life
+  /// its open fee needs, and accept refuses it (`QuoteExpired`, nothing
+  /// paid). The review stops offering it a margin before, for a new quote.
+  /// `None` without a fee.
+  final PlatformInt64? openFeePayBy;
+
   const ApiForwardQuote({
     required this.index,
     required this.expiresAt,
@@ -1420,6 +1432,7 @@ class ApiForwardQuote {
     this.feeExpiresAt,
     this.openFeeZat,
     this.openFeeNetworkZat,
+    this.openFeePayBy,
   });
 
   @override
@@ -1435,7 +1448,8 @@ class ApiForwardQuote {
       maxTotalZat.hashCode ^
       feeExpiresAt.hashCode ^
       openFeeZat.hashCode ^
-      openFeeNetworkZat.hashCode;
+      openFeeNetworkZat.hashCode ^
+      openFeePayBy.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -1453,7 +1467,8 @@ class ApiForwardQuote {
           maxTotalZat == other.maxTotalZat &&
           feeExpiresAt == other.feeExpiresAt &&
           openFeeZat == other.openFeeZat &&
-          openFeeNetworkZat == other.openFeeNetworkZat;
+          openFeeNetworkZat == other.openFeeNetworkZat &&
+          openFeePayBy == other.openFeePayBy;
 }
 
 /// A flat view of a forward record; the record itself stays in Rust.
@@ -1467,6 +1482,11 @@ class ApiForwardRecord {
   final PlatformInt64 quoteExpiresAt;
   final BigInt depositZat;
   final BigInt? maxTotalZat;
+
+  /// The kept deposit's network fee as the wallet recorded it; `None`
+  /// before there is one, or where the wallet does not show it. What the
+  /// deposit cost, where `max_total_zat` is only the most it could.
+  final BigInt? depositNetworkZat;
   final String amount;
   final String receives;
   final String relayerFee;
@@ -1526,6 +1546,7 @@ class ApiForwardRecord {
     required this.quoteExpiresAt,
     required this.depositZat,
     this.maxTotalZat,
+    this.depositNetworkZat,
     required this.amount,
     required this.receives,
     required this.relayerFee,
@@ -1557,6 +1578,7 @@ class ApiForwardRecord {
       quoteExpiresAt.hashCode ^
       depositZat.hashCode ^
       maxTotalZat.hashCode ^
+      depositNetworkZat.hashCode ^
       amount.hashCode ^
       receives.hashCode ^
       relayerFee.hashCode ^
@@ -1590,6 +1612,7 @@ class ApiForwardRecord {
           quoteExpiresAt == other.quoteExpiresAt &&
           depositZat == other.depositZat &&
           maxTotalZat == other.maxTotalZat &&
+          depositNetworkZat == other.depositNetworkZat &&
           amount == other.amount &&
           receives == other.receives &&
           relayerFee == other.relayerFee &&
