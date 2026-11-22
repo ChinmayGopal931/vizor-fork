@@ -285,8 +285,12 @@ pub(super) struct State {
 
     // The wallet's Zcash side.
     pub synced: bool,
-    /// Every broadcast fails.
+    /// Every broadcast fails: the node refuses it.
     pub broadcast_fails: bool,
+    /// Every broadcast fails before any node answers.
+    pub broadcast_unreachable: bool,
+    /// How many broadcasts were tried, sent or not.
+    pub broadcast_attempts: u32,
     pub deposit_fee: Option<u64>,
     /// What a deposit built now costs in network fee, whatever was
     /// estimated: more once the open fee took a note it counted on.
@@ -419,6 +423,8 @@ impl State {
             relayer_claims: false,
             synced: true,
             broadcast_fails: false,
+            broadcast_unreachable: false,
+            broadcast_attempts: 0,
             deposit_fee: Some(DEPOSIT_FEE_ZAT),
             deposit_cost: DEPOSIT_FEE_ZAT,
             unpayable: false,
@@ -1289,6 +1295,10 @@ impl ForwardZcash for FakeZcash {
     }
 
     async fn broadcast(&self, transaction: &ZcashTransaction) -> Result<()> {
+        self.0.set().broadcast_attempts += 1;
+        if self.0.get().broadcast_unreachable {
+            return fail(ErrorCode::ZcashWallet, "no route to lightwalletd");
+        }
         if self.0.get().broadcast_fails {
             return fail(ErrorCode::ZcashRejected, "lightwalletd turned it down");
         }

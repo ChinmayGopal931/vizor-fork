@@ -821,13 +821,13 @@ where
         Ok(payment)
     }
 
-    /// Sends the kept payment, and notes when for its resends.
+    /// Sends the kept payment, and notes when, sent or not, for its resends:
+    /// a send that failed waits its half minute too.
     async fn send_open_fee(&self, record: &ForwardRecord, payment: &OpenFeePayment) -> Result<()> {
-        self.zcash.broadcast(&payment.transaction()).await?;
         let mut pace = engine::fee_pace(self.account, record.index);
         pace.sent_at = Some(self.clock.now());
         engine::put_fee_pace(self.account, record.index, pace);
-        Ok(())
+        self.zcash.broadcast(&payment.transaction()).await
     }
 
     /// A swap whose quote asks an open fee, until the maker answers its
@@ -877,15 +877,19 @@ where
             .sent_at
             .is_none_or(|sent| now >= sent.saturating_add(OPEN_FEE_RESEND_SECONDS));
         if due && open_fee::time_to_pay(&current.quote, now) && status != SwapTxStatus::Expired {
-            // Sent again best effort: one near its expiry, which follows its
-            // quote's, a node refuses as expiring soon, and the first send
-            // and the wallet's resubmission stand.
-            if let Err(error) = self.send_open_fee(&current, &payment).await {
-                log::warn!(
-                    "private usd: forward swap {}: sending the open fee again failed ({:?})",
-                    current.index,
-                    error.code
-                );
+            match self.send_open_fee(&current, &payment).await {
+                Ok(()) => {}
+                // The node refused it, such as one near its expiry, which
+                // follows the quote's: what went out before stands, and the
+                // chain says what became of it. A payment it already holds
+                // or has mined reads as sent.
+                Err(error) if error.code == ErrorCode::ZcashRejected => log::warn!(
+                    "private usd: forward swap {}: the node refused the open fee sent again",
+                    current.index
+                ),
+                // No answer, or no route: the step's failure, as any send's,
+                // and the next send waits its half minute.
+                Err(error) => return Err(error),
             }
         }
         Ok(waiting(ForwardWait::FeeConfirming))

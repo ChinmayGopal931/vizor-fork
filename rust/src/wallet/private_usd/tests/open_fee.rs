@@ -617,3 +617,48 @@ async fn a_no_fee_accept_cancelled_during_its_post_still_records_the_answer() {
     assert_eq!(accepts(&h), 1);
 }
 
+/// A resend the node refuses (one near its expiry) is no failure of the
+/// step; one that finds no node is, as any send's. Either way the next send
+/// waits its half minute, not the next step.
+#[tokio::test]
+async fn a_failed_resend_waits_its_half_minute_and_only_a_refusal_is_quiet() {
+    let h = asking(FEE, fee_address());
+    let quoted = h.quote().await.unwrap();
+    accept(&h, quoted.index).await.unwrap();
+    assert_eq!(h.world.get().broadcast_attempts, 1);
+
+    h.world.set().broadcast_fails = true;
+    h.world.set().pass(30);
+    assert_eq!(
+        h.advance().await.unwrap(),
+        waiting(ForwardWait::FeeConfirming)
+    );
+    assert_eq!(h.world.get().broadcast_attempts, 2);
+    h.world.set().pass(5);
+    assert_eq!(
+        h.advance().await.unwrap(),
+        waiting(ForwardWait::FeeConfirming)
+    );
+    assert_eq!(h.world.get().broadcast_attempts, 2, "paced after a refusal");
+
+    {
+        let mut state = h.world.set();
+        state.broadcast_fails = false;
+        state.broadcast_unreachable = true;
+    }
+    h.world.set().pass(25);
+    let unreachable = h.advance().await.unwrap_err();
+    assert_eq!(unreachable.code, ErrorCode::ZcashWallet);
+    assert_eq!(h.world.get().broadcast_attempts, 3);
+    h.world.set().pass(5);
+    assert_eq!(
+        h.advance().await.unwrap(),
+        waiting(ForwardWait::FeeConfirming)
+    );
+    assert_eq!(h.world.get().broadcast_attempts, 3, "paced after no answer");
+    h.world.set().broadcast_unreachable = false;
+    h.world.set().pass(25);
+    h.advance().await.unwrap();
+    assert_eq!(h.world.get().broadcast_attempts, 4);
+    assert_eq!(h.world.get().submitted.len(), 2, "the first and the last");
+}
