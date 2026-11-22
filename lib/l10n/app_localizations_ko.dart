@@ -8611,6 +8611,13 @@ class AppLocalizationsKo extends AppLocalizations {
       '브‍리‍지, 보‍내‍기, 출‍금 내‍역‍이 여‍기‍에 표‍시‍돼‍요.';
 
   @override
+  String get privateUsdActivityFeeLost => '브‍리‍지‍가 시‍작‍되‍지 않‍았‍어‍요';
+
+  @override
+  String get privateUsdActivityFeeLostDetail =>
+      '마‍켓 메‍이‍커 수‍수‍료‍는 환‍불‍되‍지 않‍아‍요';
+
+  @override
   String privateUsdActivityFrom(String address) {
     return '보‍낸 곳: $address';
   }
@@ -8741,6 +8748,10 @@ class AppLocalizationsKo extends AppLocalizations {
       '마‍켓 메‍이‍커‍가 다‍른 브‍리‍지‍를 처‍리‍하‍느‍라 바‍빠‍요. 몇 분 후 다‍시 시‍도‍해 주‍세‍요.';
 
   @override
+  String get privateUsdConvertErrorOpenFee =>
+      '마‍켓 메‍이‍커‍가 Veylor‍가 내‍지 않‍는 수‍수‍료‍를 요‍구‍해‍서 아‍무‍것‍도 보‍내‍지 않‍았‍어‍요.';
+
+  @override
   String get privateUsdConvertErrorRelayer =>
       '지‍금‍은 브‍리‍지‍를 완‍료‍하‍는 릴‍레‍이‍어‍에 연‍결‍할 수 없‍어‍요. 잠‍시 후 다‍시 시‍도‍해 주‍세‍요.';
 
@@ -8751,10 +8762,6 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get privateUsdConvertErrorStore =>
       'Veylor‍가 저‍장‍된 브‍리‍지 기‍록‍을 읽‍을 수 없‍어‍요. 고‍객 지‍원‍에 문‍의‍해 주‍세‍요.';
-
-  @override
-  String get privateUsdConvertErrorTokensUnavailable =>
-      '이 브‍리‍지‍에 필‍요‍한 토‍큰‍을 받‍지 못‍해‍서 아‍무‍것‍도 보‍내‍지 않‍았‍어‍요. 잠‍시 후 다‍시 시‍도‍해 주‍세‍요.';
 
   @override
   String get privateUsdConvertErrorUnpayable =>
@@ -8831,6 +8838,14 @@ class AppLocalizationsKo extends AppLocalizations {
   String get privateUsdConvertNewQuote => '견‍적 새‍로‍고‍침';
 
   @override
+  String get privateUsdConvertOpenFee => '마‍켓 메‍이‍커 수‍수‍료';
+
+  @override
+  String privateUsdConvertOpenFeeValue(String amount) {
+    return '$amount · 환‍불 불‍가';
+  }
+
+  @override
   String get privateUsdConvertOpeningSlow =>
       '마‍켓 메‍이‍커‍가 스‍왑‍을 아‍직 열‍지 않‍았‍어‍요. 지‍금‍까‍지 보‍낸 자‍금‍은 없‍어‍요.';
 
@@ -8871,10 +8886,6 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get privateUsdConvertProblemTitle => '평‍소‍보‍다 오‍래 걸‍리‍고 있‍어‍요';
-
-  @override
-  String get privateUsdConvertProblemTokens =>
-      '마‍켓 메‍이‍커‍가 토‍큰‍을 요‍구‍해‍요. Veylor‍가 오‍늘 쓸 토‍큰‍을 받‍는 중‍이‍에‍요. 받‍지 못‍하‍면 이 브‍리‍지‍는 취‍소‍돼‍요.';
 
   @override
   String get privateUsdConvertProblemUnexpected =>
@@ -8973,6 +8984,14 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get privateUsdConvertRelayerReviewNote =>
       '마‍켓 메‍이‍커‍가 입‍금‍을 확‍인‍할 때‍까‍지 몇 분 동‍안 Veylor‍를 열‍어 두‍세‍요. 그‍다‍음 릴‍레‍이‍어‍가 달‍러‍를 수‍령‍하‍니 앱‍을 나‍가‍도 돼‍요.';
+
+  @override
+  String get privateUsdConvertResultFeeKept =>
+      '브‍리‍지‍가 시‍작‍되‍지 않‍았‍어‍요. 마‍켓 메‍이‍커 수‍수‍료‍는 돌‍려‍받‍을 수 없‍고, 나‍머‍지 ZEC‍는 지‍갑‍에‍서 나‍가‍지 않‍았‍어‍요.';
+
+  @override
+  String get privateUsdConvertResultFeeNotHonoured =>
+      '마‍켓 메‍이‍커‍가 수‍수‍료‍를 확‍인‍하‍기 전‍에 견‍적‍이 만‍료‍됐‍어‍요. 확‍인‍된 수‍수‍료‍는 환‍불‍되‍지 않‍고, 확‍인‍되‍지 않‍은 수‍수‍료‍는 지‍갑‍에 그‍대‍로 남‍아‍요.';
 
   @override
   String get privateUsdConvertResultMakerCancelled =>
@@ -9101,6 +9120,17 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
+  String get privateUsdConvertWaitFeeConfirming =>
+      '마‍켓 메‍이‍커 수‍수‍료 확‍인‍을 기‍다‍리‍는 중';
+
+  @override
+  String get privateUsdConvertWaitFeeSeen =>
+      '마‍켓 메‍이‍커‍가 수‍수‍료‍를 확‍인‍하‍길 기‍다‍리‍는 중';
+
+  @override
+  String get privateUsdConvertWaitFunds => 'ZEC 확‍인‍을 기‍다‍리‍는 중';
+
+  @override
   String get privateUsdConvertWaitSyncing => 'Zcash 지‍갑 동‍기‍화 대‍기 중';
 
   @override
@@ -9111,6 +9141,10 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get privateUsdConvertZecIncludesFee => 'Zcash 네‍트‍워‍크 수‍수‍료 포‍함';
+
+  @override
+  String get privateUsdConvertZecIncludesFees =>
+      '네‍트‍워‍크 수‍수‍료‍와 마‍켓 메‍이‍커 수‍수‍료 포‍함';
 
   @override
   String get privateUsdConvertZecNoQuote =>
@@ -9250,6 +9284,9 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get privateUsdDetailFunding => '에‍스‍크‍로 결‍제';
+
+  @override
+  String get privateUsdDetailOpenFee => '마‍켓 메‍이‍커 수‍수‍료 결‍제';
 
   @override
   String get privateUsdDetailPayout => '지‍급';
@@ -10181,30 +10218,6 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get privateUsdTokenTestUsd => '테‍스‍트 달‍러';
-
-  @override
-  String get privateUsdTokensDeviceRefused =>
-      '토‍큰 발‍급‍자‍가 이 기‍기‍를 인‍식‍하‍지 못‍해 브‍리‍지‍할 수 없‍어‍요. 에‍뮬‍레‍이‍터, 부‍트‍로‍더 잠‍금‍이 해‍제‍된 기‍기, 수‍정‍된 시‍스‍템, 인‍식‍되‍지 않‍는 빌‍드‍는 거‍부‍돼‍요.';
-
-  @override
-  String get privateUsdTokensKeystore =>
-      '이 휴‍대‍폰‍의 키‍스‍토‍어‍가 토‍큰 발‍급‍자‍용 서‍명‍을 하‍지 못‍했‍어‍요. 잠‍시 후 다‍시 시‍도‍해 주‍세‍요.';
-
-  @override
-  String get privateUsdTokensNoneToday =>
-      '이 기‍기‍는 오‍늘 가‍능‍한 브‍리‍지 횟‍수‍를 모‍두 사‍용‍했‍어‍요. UTC 기‍준 자‍정‍이 지‍나‍면 다‍시 브‍리‍지‍할 수 있‍어‍요.';
-
-  @override
-  String get privateUsdTokensTorOffDisclosure =>
-      'Tor‍가 꺼‍져 있‍으‍면 토‍큰 발‍급‍자‍와 마‍켓 메‍이‍커‍는 이 브‍리‍지‍와 그 토‍큰‍이 같‍은 연‍결‍에‍서 왔‍다‍는 것‍을 알 수 있‍어‍요.';
-
-  @override
-  String get privateUsdTokensUnavailable =>
-      '마‍켓 메‍이‍커‍가 브‍리‍지‍마‍다 토‍큰‍을 요‍구‍하‍는 동‍안‍에‍는 Android 휴‍대‍폰‍에‍서‍만 브‍리‍지‍할 수 있‍어‍요.';
-
-  @override
-  String get privateUsdTokensUnreachable =>
-      '토‍큰 발‍급‍자‍에 연‍결‍하‍지 못‍했‍어‍요. 잠‍시 후 다‍시 시‍도‍해 주‍세‍요.';
 
   @override
   String privateUsdUpdated(String time) {

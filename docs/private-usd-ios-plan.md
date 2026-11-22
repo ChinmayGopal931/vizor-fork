@@ -537,7 +537,9 @@ Every milestone also follows these rules:
 
 **Done when.** The round passes, and the measurements are in §11.
 
-### MI7. Tokens and App Attest (deferred)
+### MI7. Tokens and App Attest (dropped 2026-11-21)
+
+Veylor has no token client since 2026-11-21 (A-progress D-161): the open fee replaces it, so this milestone will not be built. The plan as it stood:
 
 **Goal.** An iPhone can get and spend issuer tokens. Build this only when a maker requires tokens (A-plan D20) and the issuer supports App Attest (EI6).
 

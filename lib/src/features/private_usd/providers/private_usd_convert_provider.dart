@@ -16,7 +16,6 @@ import '../models/private_usd_desktop_wording.dart';
 import '../models/private_usd_messages.dart';
 import '../models/private_usd_record_key.dart';
 import '../private_usd_copy.dart';
-import '../services/private_usd_attestation.dart';
 import '../services/private_usd_diagnostics.dart';
 import '../services/private_usd_engine.dart';
 import '../services/private_usd_pause.dart';
@@ -25,7 +24,6 @@ import 'private_usd_available_provider.dart';
 import 'private_usd_engine_provider.dart';
 import 'private_usd_least_fee_provider.dart';
 import 'private_usd_relayer_claims_provider.dart';
-import 'private_usd_tokens_provider.dart';
 import '../../../core/l10n/l10n.dart';
 
 /// The convert flows' timing.
@@ -33,8 +31,9 @@ abstract final class PrivateUsdConvertTiming {
   /// Typing pauses this long before its amount is quoted.
   static const typingDebounce = Duration(milliseconds: 700);
 
-  /// A quote stops being offered this long before it expires: the driver
-  /// won't accept one about to run out.
+  /// A quote stops being offered this long before it expires (one that asks
+  /// an open fee, before Rust stops paying its fee): the driver won't accept
+  /// one about to run out.
   static const expiryMargin = Duration(seconds: 20);
 
   static const tick = Duration(seconds: 1);
@@ -229,51 +228,6 @@ abstract class PrivateUsdConvertFlowNotifier<
       _pending?.cancel();
       tick.cancel();
     });
-    // Today's tokens, fetched ahead of the accept while the maker asks for
-    // them (plan M4): never inside a quote's window.
-    unawaited(ref.read(privateUsdTokensServiceProvider).prefetch());
-  }
-
-  /// Gets today's Privacy Pass tokens for an accept the maker turned away
-  /// at the token gate: null once tokens are held, else what to tell the
-  /// user. Nothing opened at the gate, so the accept is safe to repeat.
-  @protected
-  Future<PrivateUsdText?> issueTokens() async {
-    try {
-      await ref.read(privateUsdTokensServiceProvider).issue();
-      return null;
-    } on rust.ApiPrivateUsdError catch (error) {
-      privateUsdLog('the issuance failed (${error.code.name})');
-      if (kDesktopFormFactor) {
-        PrivateUsdDiagnostics.instance.failure(
-          PrivateUsdDiagnosticOp.issueTokens,
-          error,
-        );
-      }
-      return (AppLocalizations l10n) =>
-          privateUsdErrorMessage(l10n, error.code) ??
-          l10n.privateUsdConvertErrorTokensUnavailable;
-    } on PrivateUsdAttestationException catch (error) {
-      privateUsdLog('the issuance failed (${error.code.name})');
-      if (kDesktopFormFactor) {
-        PrivateUsdDiagnostics.instance.failure(
-          PrivateUsdDiagnosticOp.issueTokens,
-          error,
-        );
-      }
-      return (AppLocalizations l10n) =>
-          privateUsdAttestationMessage(l10n, error.code);
-    } catch (error) {
-      privateUsdLog('the issuance failed (${error.runtimeType})');
-      if (kDesktopFormFactor) {
-        PrivateUsdDiagnostics.instance.failure(
-          PrivateUsdDiagnosticOp.issueTokens,
-          error,
-        );
-      }
-      return (AppLocalizations l10n) =>
-          l10n.privateUsdConvertErrorTokensUnavailable;
-    }
   }
 
   /// Asks again for the quote that ran out on the amount step, when it may.
@@ -487,7 +441,7 @@ class PrivateUsdConvertState
 
   @override
   DateTime? get offeredUntil =>
-      quote?.expiresAt.subtract(PrivateUsdConvertTiming.expiryMargin);
+      quote == null ? null : privateUsdZecQuoteOfferedUntil(quote!);
 
   /// The quote leaves something after the relayer's fee.
   bool get paysOut => quote != null && quote!.receives > BigInt.zero;
@@ -672,53 +626,19 @@ class PrivateUsdConvertNotifier
     );
     try {
       final relayerClaims = await privateUsdRelayerClaimsOf(ref);
-      Future<rust.ApiAcceptResult> accept() => engine.accept(
+      final result = await engine.accept(
         account,
         index: quote.index,
         maxTotalZat: quote.maxTotalZat,
         relayerClaims: relayerClaims,
       );
-      var result = await accept();
       if (!ref.mounted) {
         if (kDesktopFormFactor) _flowGone();
         return null;
       }
-      if (result.kind == rust.ApiAcceptKind.tokensNeeded) {
-        // The maker wants a Privacy Pass token and none is held: nothing
-        // opened. Get today's once, then accept the same index again; with
-        // none to be had, end the record. Never in a loop.
-        final failure = await issueTokens();
-        if (!ref.mounted) {
-          if (kDesktopFormFactor) _flowGone();
-          return null;
-        }
-        if (failure == null) {
-          result = await accept();
-          if (!ref.mounted) {
-            if (kDesktopFormFactor) _flowGone();
-            return null;
-          }
-        }
-        if (failure != null || result.kind == rust.ApiAcceptKind.tokensNeeded) {
-          if (kDesktopFormFactor) {
-            PrivateUsdDiagnostics.instance.outcome(
-              PrivateUsdDiagnosticOp.accept,
-              PrivateUsdDiagnosticOutcome.tokensUnavailable,
-            );
-          }
-          unawaited(_abandonQuietly(engine, account, quote.index));
-          startFailed(
-            failure ?? ((l10n) => l10n.privateUsdConvertErrorTokensUnavailable),
-          );
-          return null;
-        }
-      }
       switch (result.kind) {
         case rust.ApiAcceptKind.accepted:
           return path;
-        case rust.ApiAcceptKind.tokensNeeded:
-          // Handled above.
-          return null;
         case rust.ApiAcceptKind.nothingSent:
           if (kDesktopFormFactor) {
             PrivateUsdDiagnostics.instance.outcome(
@@ -820,24 +740,6 @@ class PrivateUsdConvertNotifier
     }
   }
 
-  Future<void> _abandonQuietly(
-    PrivateUsdEngine engine,
-    String account,
-    int index,
-  ) async {
-    try {
-      await engine.abandon(account, index: index);
-    } catch (error) {
-      privateUsdLog('abandon failed (${error.runtimeType})');
-      if (kDesktopFormFactor) {
-        PrivateUsdDiagnostics.instance.failure(
-          PrivateUsdDiagnosticOp.abandon,
-          error,
-        );
-      }
-    }
-  }
-
   // Without a cap from the deployment, no fee is within it.
   bool _aboveCap(BigInt fee) {
     final cap = privateUsdRelayerFeeCap(
@@ -867,19 +769,25 @@ class PrivateUsdConvertNotifier
   }) {
     if (!takesQuote(forReview: forReview)) return;
     final onReview = state.step != PrivateUsdConvertStep.amount;
-    final arrivedExpired = !clock().isBefore(
-      quote.expiresAt.subtract(PrivateUsdConvertTiming.expiryMargin),
-    );
+    final now = clock();
+    final arrivedExpired = !now.isBefore(privateUsdZecQuoteOfferedUntil(quote));
     if (arrivedExpired) {
+      // A fee quote too short for its fee to be paid in time ran out; any
+      // other says the clock is off.
+      final clockAhead = !now.isBefore(
+        quote.expiresAt.subtract(PrivateUsdConvertTiming.expiryMargin),
+      );
       // On the review the expired quote stays, so "Refresh quote" does too.
       state = state.copyWith(
         quoting: false,
         clearQuote: !onReview,
-        quoteError: (l10n) => kDesktopFormFactor
-            ? (privateUsdLinuxWording
-                  ? l10n.privateUsdConvertQuoteClockAheadLinux
-                  : l10n.privateUsdConvertQuoteClockAheadDesktop)
-            : l10n.privateUsdConvertQuoteClockAhead,
+        quoteError: !clockAhead
+            ? (l10n) => l10n.privateUsdConvertQuoteRanOut
+            : (l10n) => kDesktopFormFactor
+                  ? (privateUsdLinuxWording
+                        ? l10n.privateUsdConvertQuoteClockAheadLinux
+                        : l10n.privateUsdConvertQuoteClockAheadDesktop)
+                  : l10n.privateUsdConvertQuoteClockAhead,
       );
       return;
     }
@@ -914,6 +822,14 @@ class PrivateUsdConvertNotifier
     );
   }
 }
+
+/// When [quote] stops being offered: before Rust would refuse its accept,
+/// which for one that asks an open fee is from its pay-by, the least life
+/// its fee needs to be mined in time before the quote's end.
+DateTime privateUsdZecQuoteOfferedUntil(PrivateUsdZecQuote quote) =>
+    (quote.openFeePayBy ?? quote.expiresAt).subtract(
+      PrivateUsdConvertTiming.expiryMargin,
+    );
 
 /// [accountUuid]'s conversion under way in either direction, read from the
 /// records (opening a convert screen, or after the app died mid-accept):

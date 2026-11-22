@@ -14330,6 +14330,18 @@ abstract class AppLocalizations {
   /// **'Your bridges, sends and withdrawals will show here.'**
   String get privateUsdActivityEmpty;
 
+  /// Title of an activity row, and of the result on the bridge progress screen, for a bridge from ZEC that never started after the market maker's fee was paid and confirmed: that fee isn't refunded.
+  ///
+  /// In en, this message translates to:
+  /// **'Bridge didn\'t start'**
+  String get privateUsdActivityFeeLost;
+
+  /// Subtitle of the activity row for a bridge that never started after its fee was paid: the ZEC fee paid to the market maker isn't refunded.
+  ///
+  /// In en, this message translates to:
+  /// **'market maker fee not refunded'**
+  String get privateUsdActivityFeeLostDetail;
+
   /// Subtitle of a received Shielded USD activity row naming the sender; {address} is a shortened Railgun address such as 0zk1qy…8f3a.
   ///
   /// In en, this message translates to:
@@ -14546,6 +14558,12 @@ abstract class AppLocalizations {
   /// **'The market maker is busy with other bridges. Try again in a few minutes.'**
   String get privateUsdConvertErrorMakerBusy;
 
+  /// Shown on the bridge screen when the market maker asks a fee before it opens the swap that is above Veylor's limit, or payable in a way Veylor refuses. Nothing was paid.
+  ///
+  /// In en, this message translates to:
+  /// **'The market maker asks a fee Veylor won\'t pay, so nothing was sent.'**
+  String get privateUsdConvertErrorOpenFee;
+
   /// Error on the bridge screens when the relayer that completes bridges cannot be reached; nothing was sent.
   ///
   /// In en, this message translates to:
@@ -14563,12 +14581,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Veylor can\'t read its saved bridges. Contact support.'**
   String get privateUsdConvertErrorStore;
-
-  /// Error on the bridge review when Veylor could not get the Privacy Pass token the market maker asks for, so nothing was sent.
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn\'t get this bridge\'s token, so nothing was sent. Try again in a moment.'**
-  String get privateUsdConvertErrorTokensUnavailable;
 
   /// Error on the bridge screens when the wallet cannot pay the deposit in a single transaction right now; nothing was sent.
   ///
@@ -14684,6 +14696,18 @@ abstract class AppLocalizations {
   /// **'Refresh quote'**
   String get privateUsdConvertNewQuote;
 
+  /// Row label on the bridge review and in a bridge's details: the ZEC fee the market maker asks before it opens the swap, which is never refunded.
+  ///
+  /// In en, this message translates to:
+  /// **'Market maker fee'**
+  String get privateUsdConvertOpenFee;
+
+  /// Value of the market maker fee row on the bridge review and in a bridge's details: the fee, and that it isn't refunded, even if the bridge doesn't finish; {amount} is the fee with its unit, such as 0.0002 ZEC.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} · not refunded'**
+  String privateUsdConvertOpenFeeValue(String amount);
+
   /// Note on the bridge progress screen when the market maker is slow to open the swap: no ZEC has been sent yet.
   ///
   /// In en, this message translates to:
@@ -14749,12 +14773,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Taking longer than usual'**
   String get privateUsdConvertProblemTitle;
-
-  /// Message on a bridge's progress screen while Veylor gets the token the market maker asks for; without one, the bridge is called off.
-  ///
-  /// In en, this message translates to:
-  /// **'The market maker asks for a token. Veylor is getting one for today; if it can\'t, this bridge is called off.'**
-  String get privateUsdConvertProblemTokens;
 
   /// Problem card message for an unexpected error; Veylor keeps retrying while the app is open.
   ///
@@ -14899,6 +14917,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Keep Veylor open until the market maker confirms your deposit, a few minutes. Then the relayer claims your dollars, and you can leave.'**
   String get privateUsdConvertRelayerReviewNote;
+
+  /// Result on the bridge progress screen, and the note in its details, when a bridge ended before it started but after the market maker's fee was paid and confirmed: that fee isn't refunded.
+  ///
+  /// In en, this message translates to:
+  /// **'The bridge didn\'t start. The market maker keeps its fee; the rest of your ZEC never left your wallet.'**
+  String get privateUsdConvertResultFeeKept;
+
+  /// Result on the bridge progress screen and in the bridge's details when a bridge ended because its quote expired before the market maker saw its fee confirmed. Worded to stay true whether the fee confirms later or never does (then it stays in the wallet).
+  ///
+  /// In en, this message translates to:
+  /// **'The quote ran out before the market maker saw its fee. A fee that confirms isn\'t refunded; one that doesn\'t stays in your wallet.'**
+  String get privateUsdConvertResultFeeNotHonoured;
 
   /// Result body when a bridge ended with nothing sent: the market maker cancelled the swap before Veylor sent the ZEC, so no ZEC left the wallet.
   ///
@@ -15104,6 +15134,24 @@ abstract class AppLocalizations {
   /// **'The swap couldn\'t be completed in time, so it unwinds: your ZEC comes back after the market maker\'s refund. If the market maker hasn\'t refunded by {time}, Veylor claims your dollars instead.'**
   String privateUsdConvertUnwindingUntil(String time);
 
+  /// Detail under the first bridge progress step, and the Home banner, while the fee paid to the market maker before it opens the swap waits for a Zcash block.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the market maker\'s fee to confirm'**
+  String get privateUsdConvertWaitFeeConfirming;
+
+  /// Detail under the first bridge progress step, and the Home banner, while the market maker's fee is confirmed but the market maker hasn't seen it yet; Veylor asks it again.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the market maker to see the fee'**
+  String get privateUsdConvertWaitFeeSeen;
+
+  /// Detail under the 'Sending your ZEC' bridge step while the deposit waits for ZEC on its way back to the wallet, such as the change from the market maker's fee, to confirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for your ZEC to confirm'**
+  String get privateUsdConvertWaitFunds;
+
   /// Detail under the active bridge progress step while the user's Zcash wallet is still syncing and the bridge waits for it.
   ///
   /// In en, this message translates to:
@@ -15127,6 +15175,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Includes the Zcash network fee'**
   String get privateUsdConvertZecIncludesFee;
+
+  /// Note under the ZEC a bridge pays when its quote asks a market maker fee: the total includes the Zcash network fees and that fee.
+  ///
+  /// In en, this message translates to:
+  /// **'Includes the network and market maker fees'**
+  String get privateUsdConvertZecIncludesFees;
 
   /// Error on the bridge screen when no quote fits the entered amount; the user can change the amount or fill in the maximum with the Max button.
   ///
@@ -15331,6 +15385,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Escrow payment'**
   String get privateUsdDetailFunding;
+
+  /// Row label in a bridge's details for the Zcash transaction that paid the market maker's fee.
+  ///
+  /// In en, this message translates to:
+  /// **'Market maker fee payment'**
+  String get privateUsdDetailOpenFee;
 
   /// Row label in a ZEC-to-shielded-USD bridge's details for the Ethereum transaction that paid the dollars out to the user's shielded balance.
   ///
@@ -16849,42 +16909,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Test dollar'**
   String get privateUsdTokenTestUsd;
-
-  /// Error on the bridge screens when the token issuer does not trust this device (its hardware attestation failed), so it cannot bridge.
-  ///
-  /// In en, this message translates to:
-  /// **'The token issuer doesn\'t recognize this device, so it can\'t convert. Emulators, unlocked bootloaders, modified systems and unrecognized builds are turned away.'**
-  String get privateUsdTokensDeviceRefused;
-
-  /// Error on the bridge screens when the phone's secure keystore could not sign the request to the token issuer.
-  ///
-  /// In en, this message translates to:
-  /// **'This phone\'s keystore couldn\'t sign for the token issuer. Try again in a moment.'**
-  String get privateUsdTokensKeystore;
-
-  /// Error on the bridge screens when this device has used up today's Privacy Pass tokens, so no more bridges can start until midnight UTC.
-  ///
-  /// In en, this message translates to:
-  /// **'This device has used today\'s conversions. More are available after midnight UTC.'**
-  String get privateUsdTokensNoneToday;
-
-  /// Privacy disclosure on the bridge review while the market maker asks for tokens and Tor is off: the token issuer and the market maker can link this bridge to its token.
-  ///
-  /// In en, this message translates to:
-  /// **'With Tor off, the token issuer and the market maker can tell this bridge and its token came from the same connection.'**
-  String get privateUsdTokensTorOffDisclosure;
-
-  /// Error on the bridge screens on a phone that cannot get tokens (not Android) while the market maker asks for a token with each bridge.
-  ///
-  /// In en, this message translates to:
-  /// **'Conversions need an Android phone while the market maker asks for a token with each one.'**
-  String get privateUsdTokensUnavailable;
-
-  /// Error on the bridge screens when the token issuer cannot be reached.
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn\'t reach the token issuer. Try again in a moment.'**
-  String get privateUsdTokensUnreachable;
 
   /// Line under the Shielded USD balance, also read by screen readers, saying when the balance was last updated; {time} is a date and time formatted for the language, such as 25 May, 13:30.
   ///

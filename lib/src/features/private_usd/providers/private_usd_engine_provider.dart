@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/private_usd_feature_config.dart';
 import '../../../core/layout/app_form_factor.dart';
+import '../../../core/storage/wallet_paths.dart';
 import '../../../providers/account_provider.dart';
 import '../../../providers/app_security_provider.dart';
 import '../../../providers/private_usd_lifecycle_provider.dart';
@@ -19,7 +20,6 @@ import '../services/private_usd_spend_guard.dart';
 import '../services/private_usd_swap_backend.dart';
 import 'private_usd_available_provider.dart';
 import 'private_usd_custom_rpc_provider.dart';
-import 'private_usd_tokens_provider.dart';
 import 'private_usd_unfinished_provider.dart';
 import 'railgun_engine_provider.dart';
 
@@ -107,9 +107,10 @@ final privateUsdEngineProvider = Provider<PrivateUsdEngine>((ref) {
   // runs no key-using step until it is resumed.
   var foreground = state == null || state == AppLifecycleState.resumed;
   final depositsEnabled = ref.read(privateUsdDepositsEnabledProvider);
+  // The Privacy Pass token store an earlier build kept is no longer read.
+  unawaited(_deleteLegacyTokenStores());
   final engine = PrivateUsdEngine(
     backend: ref.watch(privateUsdSwapBackendProvider),
-    tokens: ref.watch(privateUsdTokensServiceProvider),
     // Any account's seed while unlocked; null while locked.
     readMnemonic: (accountUuid) => ref
         .read(accountProvider.notifier)
@@ -217,6 +218,15 @@ final privateUsdEngineProvider = Provider<PrivateUsdEngine>((ref) {
   scheduleMicrotask(() => engine.start(resuming: true));
   return engine;
 });
+
+/// Deletes the device-wide Privacy Pass token stores builds before
+/// 2026-11-21 kept, best effort and silently: the next start tries again,
+/// and a full reset deletes them too.
+Future<void> _deleteLegacyTokenStores() async {
+  try {
+    await deleteLegacyPrivateUsdTokenStores();
+  } catch (_) {}
+}
 
 /// The key of [accountUuid]'s conversion under way, if the engine knows one.
 final privateUsdUnderWayProvider =

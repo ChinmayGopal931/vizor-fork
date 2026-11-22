@@ -24,7 +24,6 @@ use crate::wallet::private_usd::{
     forward::{self, AcceptOutcome, AdvanceReport, ForwardWait, Quoted},
     joint::{self as joint_ops, SwapTxStatus},
     keys::{account_derivation, SwapKeyContext},
-    maker_client::MakerClient,
     models::{
         Address, Amount, ClaimHold, Direction, ForwardOutcome, ForwardPhase, ForwardRecord,
         NothingSentCause, RefundCause, ReversePhase, ReverseRecord, ZcashTxId,
@@ -35,7 +34,6 @@ use crate::wallet::private_usd::{
     sends::{self, ProvedSend, SendRecord, Sends},
     store::SwapStore,
     swap::{self, SwapCall},
-    tokens::{self, TokenPins, TokenStore},
     ErrorCode, PrivateUsdError, PrivateUsdNetwork,
 };
 use crate::wallet::routed_http::RoutedHttp;
@@ -53,18 +51,6 @@ pub enum ApiPrivateUsdErrorCode {
     DepositUnpayable,
     ZcashRejected,
     Mismatch,
-    TokensRefused,
-    TokensNeeded,
-    /// The token issuer gave no usable answer.
-    TokensUnreachable,
-    /// The token issuer refused this device's attestation.
-    TokensDeviceRefused,
-    /// This device's tokens for today are spent.
-    NoTokensToday,
-    /// The phone's keystore failed to make or use the attestation key.
-    /// Raised by Dart from the attestation channel, never by Rust; the code
-    /// lives here so one switch names every token message.
-    Keystore,
     ChainLagging,
     QuoteExpired,
     MakerUnavailable,
@@ -84,6 +70,9 @@ pub enum ApiPrivateUsdErrorCode {
     /// pins: a contract that is not the pinned windows contract, or terms
     /// that are not the pin's. Never followed.
     WrongDeployment,
+    /// The maker asks an open fee above the cap, or payable outside Orchard
+    /// or on another network: the quote is dropped with nothing paid.
+    OpenFeeRefused,
 }
 
 /// A Private USD failure. Its Dart `toString()` is the message.
@@ -120,11 +109,6 @@ fn api_code(code: ErrorCode) -> ApiPrivateUsdErrorCode {
         ErrorCode::DepositUnpayable => Api::DepositUnpayable,
         ErrorCode::ZcashRejected => Api::ZcashRejected,
         ErrorCode::Mismatch => Api::Mismatch,
-        ErrorCode::TokensRefused => Api::TokensRefused,
-        ErrorCode::TokensNeeded => Api::TokensNeeded,
-        ErrorCode::TokensUnreachable => Api::TokensUnreachable,
-        ErrorCode::TokensDeviceRefused => Api::TokensDeviceRefused,
-        ErrorCode::NoTokensToday => Api::NoTokensToday,
         ErrorCode::ChainLagging => Api::ChainLagging,
         ErrorCode::QuoteExpired => Api::QuoteExpired,
         ErrorCode::MakerUnavailable => Api::MakerUnavailable,
@@ -143,6 +127,7 @@ fn api_code(code: ErrorCode) -> ApiPrivateUsdErrorCode {
         ErrorCode::ChainUnreadable => Api::EthereumUnreachable,
         ErrorCode::IndicesInUse => Api::Other,
         ErrorCode::AmountUnquotable => Api::AmountRefused,
+        ErrorCode::OpenFeeRefused => Api::OpenFeeRefused,
     }
 }
 
@@ -421,169 +406,6 @@ pub fn private_usd_clear_sessions() {
     engine::clear_sessions();
 }
 
-// ---- Privacy Pass tokens (M4) ----
-
-/// What the device holds of the makers' Privacy Pass tokens (reference
-/// §5.9).
-pub struct ApiTokenStatus {
-    /// Tokens held for today's challenge.
-    pub held: u32,
-    /// The issuer had no more for this device today.
-    pub exhausted_today: bool,
-    /// Swaps whose token is still to come back.
-    pub awaiting_returns: u32,
-    /// The issuer refused this device's attestation when last asked.
-    pub device_refused: bool,
-    /// The maker takes tokens: its info showed the pinned return key.
-    pub maker_asks: bool,
-}
-
-/// An issuance's first phase: what the keystore signs (plan X11).
-pub struct ApiIssuanceBegin {
-    pub session_id: u64,
-    /// The issuer's name: the attestation key's alias and challenge derive
-    /// from it.
-    pub issuer_name: String,
-    /// `"zecswap-issuer-v1" ‖ challenge ‖ SHA-256(blinded₁ ‖ … ‖ blindedₙ)`.
-    pub message: Vec<u8>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ApiIssuanceKind {
-    /// Tokens are held.
-    Issued,
-    /// The issuer had none left for this device today.
-    Exhausted,
-    /// The issuer refused the attestation once: sign `next` and finish
-    /// again with the same session, once.
-    SignAgain,
-}
-
-pub struct ApiIssuanceFinish {
-    pub kind: ApiIssuanceKind,
-    /// With `SignAgain`: the message to sign once more.
-    pub next: Option<Vec<u8>>,
-    pub status: ApiTokenStatus,
-}
-
-fn api_token_status(status: tokens::TokenStatus) -> ApiTokenStatus {
-    ApiTokenStatus {
-        held: status.held,
-        exhausted_today: status.exhausted_today,
-        awaiting_returns: status.awaiting_returns,
-        device_refused: status.device_refused,
-        maker_asks: status.maker_asks,
-    }
-}
-
-fn token_store(tokens_path: &str, network: &str) -> Result<TokenStore, ApiPrivateUsdError> {
-    let network = swap_network(network)?;
-    let pins = deployment::deployment(network);
-    Ok(TokenStore::open(
-        Path::new(tokens_path),
-        TokenPins::of(pins),
-    ))
-}
-
-/// Starts an issuance of today's tokens, for the keystore to attest: `None`
-/// when nothing is needed. The maker's `/v1/info` decides first: without
-/// the pinned return key it takes no tokens, and nothing is asked of the
-/// issuer; with it, the tokens makers handed back for swaps still awaiting
-/// one are collected, then a batch is fetched ahead for today's challenge
-/// unless one is held or today is spent. Over the route policy, a fresh
-/// transport per call.
-pub fn private_usd_tokens_issuance_begin(
-    tokens_path: String,
-    network: String,
-) -> Result<Option<ApiIssuanceBegin>, ApiPrivateUsdError> {
-    catch(|| {
-        let pins = deployment::deployment(swap_network(&network)?);
-        let store = token_store(&tokens_path, &network)?;
-        let transport = RoutedHttp::new();
-        let now = SystemClock.now();
-        block_on(async {
-            let maker = MakerClient::new(&transport, pins.maker_url);
-            let info = maker.info().await?;
-            let asks = match info.token_return_key.as_deref() {
-                None => false,
-                Some(key) if key == pins.maker_token_return_key => true,
-                // A return key shown to only some devices would mark the
-                // tokens they get back.
-                Some(_) => {
-                    return Err(PrivateUsdError::new(
-                        ErrorCode::TokensRefused,
-                        "the maker returns tokens under another key",
-                    ))
-                }
-            };
-            store.set_maker_asks(asks)?;
-            if !asks {
-                return Ok(None);
-            }
-            for (swap_id, direction) in store.pending_returns(now) {
-                let status = match direction {
-                    Direction::Forward => maker.swap_status(&swap_id).await,
-                    Direction::Reverse => maker.reverse_swap_status(&swap_id).await,
-                };
-                if let Ok(status) = status {
-                    if let Some(token_return) = status.token_return {
-                        let _ = store.collect(&swap_id, &token_return.0, now);
-                    }
-                }
-            }
-            Ok(store
-                .begin(&transport, now)
-                .await?
-                .map(|issuance| ApiIssuanceBegin {
-                    session_id: issuance.session_id,
-                    issuer_name: issuance.issuer_name,
-                    message: issuance.message,
-                }))
-        })
-    })
-}
-
-/// Finishes the issuance `session_id` with the keystore's attestation: the
-/// key's certificate chain (leaf first, DER, base64url) and its signature
-/// over the message, and holds what the issuer signs. `SignAgain` once on
-/// the first refusal; `TokensDeviceRefused` on the second; `Exhausted`, or
-/// a short batch, marks today spent.
-pub fn private_usd_tokens_issuance_finish(
-    tokens_path: String,
-    network: String,
-    session_id: u64,
-    chain: Vec<String>,
-    signature: String,
-) -> Result<ApiIssuanceFinish, ApiPrivateUsdError> {
-    catch(|| {
-        let store = token_store(&tokens_path, &network)?;
-        let transport = RoutedHttp::new();
-        let now = SystemClock.now();
-        let finished = block_on(store.finish(&transport, session_id, chain, signature, now))?;
-        let (kind, next) = match finished {
-            tokens::Finished::Issued { .. } => (ApiIssuanceKind::Issued, None),
-            tokens::Finished::Exhausted => (ApiIssuanceKind::Exhausted, None),
-            tokens::Finished::SignAgain { message } => (ApiIssuanceKind::SignAgain, Some(message)),
-        };
-        Ok(ApiIssuanceFinish {
-            kind,
-            next,
-            status: api_token_status(store.status(now)),
-        })
-    })
-}
-
-/// What the device holds of the makers' tokens. Nothing is asked of anyone.
-pub fn private_usd_tokens_status(
-    tokens_path: String,
-    network: String,
-) -> Result<ApiTokenStatus, ApiPrivateUsdError> {
-    catch(|| {
-        let store = token_store(&tokens_path, &network)?;
-        Ok(api_token_status(store.status(SystemClock.now())))
-    })
-}
-
 /// The account's conversions under way, in either direction: a forward one
 /// not ended, a reverse one past its quote. The account deletion and reset
 /// warnings show it. 0 when the wallet never made one.
@@ -651,15 +473,24 @@ pub struct ApiForwardQuote {
     /// accept takes.
     pub max_total_zat: Option<u64>,
     pub fee_expires_at: Option<i64>,
+    /// What the maker asks before it opens the swap, in zatoshis, paid apart
+    /// from the deposit and never refunded; `None` where it asks none.
+    pub open_fee_zat: Option<u64>,
+    /// The open fee's payment's network fee from this wallet now; `None`
+    /// without a fee, or when one transaction cannot pay it (the quote is
+    /// then unpayable).
+    pub open_fee_network_zat: Option<u64>,
+    /// Unix seconds: from here on the quote leaves less than the least life
+    /// its open fee needs, and accept refuses it (`QuoteExpired`, nothing
+    /// paid). The review stops offering it a margin before, for a new quote.
+    /// `None` without a fee.
+    pub open_fee_pay_by: Option<i64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ApiAcceptKind {
     /// The maker opened the swap, or is opening it: show its progress.
     Accepted,
-    /// The maker wants a Privacy Pass token, which this build cannot get.
-    /// Nothing opened; abandon the conversion.
-    TokensNeeded,
     /// Over before anything was sent; `cause` says why.
     NothingSent,
 }
@@ -673,6 +504,9 @@ pub enum ApiNothingSentCause {
     Mismatch,
     DepositWindowMissed,
     MakerCancelled,
+    /// The quote expired before the maker saw its open fee, or the maker
+    /// never opened the swap it was paid for: a fee mined is the maker's.
+    FeeNotHonoured,
 }
 
 pub struct ApiAcceptResult {
@@ -700,6 +534,15 @@ pub enum ApiForwardWait {
     /// refund. If the maker never refunds, the claim goes out from
     /// `late_claim_at`.
     Unwinding,
+    /// The open fee is paid and waits for a block; it is sent again every
+    /// half minute meanwhile.
+    FeeConfirming,
+    /// The open fee is mined; the maker has not seen it yet, and the accept
+    /// is posted again as it asks until the quote expires.
+    FeeAccepting,
+    /// The deposit waits for ZEC on its way to spendable, such as the open
+    /// fee's change.
+    FundsPending,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -738,6 +581,10 @@ pub struct ApiForwardRecord {
     pub quote_expires_at: i64,
     pub deposit_zat: u64,
     pub max_total_zat: Option<u64>,
+    /// The kept deposit's network fee as the wallet recorded it; `None`
+    /// before there is one, or where the wallet does not show it. What the
+    /// deposit cost, where `max_total_zat` is only the most it could.
+    pub deposit_network_zat: Option<u64>,
     pub amount: String,
     pub receives: String,
     pub relayer_fee: String,
@@ -766,6 +613,17 @@ pub struct ApiForwardRecord {
     pub refund_cause: Option<ApiRefundCause>,
     pub nothing_sent_cause: Option<ApiNothingSentCause>,
     pub ended_at: Option<i64>,
+    /// The maker's open fee the quote asked, in zatoshis; `None` where it
+    /// asked none.
+    pub open_fee_zat: Option<u64>,
+    /// The open fee's payment's own network fee, where the wallet knows it.
+    pub open_fee_network_zat: Option<u64>,
+    /// The open fee's payment, internal byte order hex, as wallet history
+    /// rows carry it: the bridge's row stands in for it.
+    pub open_fee_txid: Option<String>,
+    /// The main wallet shows the open fee's payment in a block: paid, and
+    /// the maker's whatever becomes of the swap.
+    pub open_fee_mined: bool,
 }
 
 pub struct ApiForwardAdvance {
@@ -803,7 +661,6 @@ pub fn private_usd_forward_quote(
             &lightwalletd_url,
             &eth_rpc_url,
             None,
-            None,
             async |call, op| {
                 call.forward(op, async |forward, store| forward.quote(store, units).await)
                     .await
@@ -821,6 +678,17 @@ pub fn private_usd_forward_quote(
 /// setting, kept on the record), the claim goes to the relayer once the
 /// deposit is out and the maker's ready is confirmed, for it to send when
 /// the claim's window opens.
+///
+/// A quote that asks an open fee is not posted here: the fee is paid
+/// (`QuoteExpired` with less of the quote left than the deployment's least
+/// fee quote life, and `DepositUnpayable` unless the wallet also covers the
+/// deposit, both with nothing saved), and the call returns `Accepted`; the
+/// advances post the accept once the wallet shows the fee mined. The fee is
+/// a key step: it runs under `op_id`, which a lock or the background
+/// cancels (`private_usd_cancel`) before the payment is saved or created.
+/// Nothing else answers the cancel: an accept's post, with or without a fee,
+/// always completes, since one cut short may have opened the swap.
+#[allow(clippy::too_many_arguments)]
 pub fn private_usd_forward_accept(
     db_path: String,
     network: String,
@@ -829,14 +697,14 @@ pub fn private_usd_forward_accept(
     mnemonic_bytes: Vec<u8>,
     lightwalletd_url: String,
     eth_rpc_url: String,
-    tokens_path: String,
+    op_id: u32,
     index: u32,
     max_total_zat: u64,
     relayer_claims: bool,
 ) -> Result<ApiAcceptResult, ApiPrivateUsdError> {
     let secret = Zeroizing::new(mnemonic_bytes);
     catch(panic::AssertUnwindSafe(|| {
-        let outcome = drive(
+        let outcome = drive_with(
             &db_path,
             &network,
             &account_uuid,
@@ -844,10 +712,11 @@ pub fn private_usd_forward_accept(
             &secret,
             &lightwalletd_url,
             &eth_rpc_url,
-            Some(&tokens_path),
-            None,
+            Some(op_id),
+            // Never stopped before it starts: only the fee's own checks.
+            false,
             async |call, op| {
-                call.forward(op, async |forward, store| {
+                call.forward_accepting(op, async |forward, store| {
                     forward
                         .accept(store, index, max_total_zat, relayer_claims)
                         .await
@@ -857,7 +726,6 @@ pub fn private_usd_forward_accept(
         )?;
         let (kind, cause) = match outcome {
             AcceptOutcome::Accepted => (ApiAcceptKind::Accepted, None),
-            AcceptOutcome::TokensNeeded => (ApiAcceptKind::TokensNeeded, None),
             AcceptOutcome::NothingSent(cause) => {
                 (ApiAcceptKind::NothingSent, Some(api_cause(cause)))
             }
@@ -880,7 +748,6 @@ pub fn private_usd_forward_advance(
     mnemonic_bytes: Vec<u8>,
     lightwalletd_url: String,
     eth_rpc_url: String,
-    tokens_path: String,
     op_id: u32,
     index: u32,
 ) -> Result<ApiForwardAdvance, ApiPrivateUsdError> {
@@ -895,7 +762,6 @@ pub fn private_usd_forward_advance(
             &secret,
             &lightwalletd_url,
             &eth_rpc_url,
-            Some(&tokens_path),
             Some(op_id),
             async |call, op| {
                 let report = call
@@ -910,9 +776,8 @@ pub fn private_usd_forward_advance(
 }
 
 /// Drops swap `index` before it reached the chain: an unanswered accept ends
-/// `MakerUnavailable` (a turn-away at the token gate included), an answered
-/// one `NeverOpened`. `TooLate` once a deposit started or the chain shows
-/// the swap. No key is needed.
+/// `MakerUnavailable`, an answered one `NeverOpened`. `TooLate` once a
+/// deposit started or the chain shows the swap. No key is needed.
 pub fn private_usd_forward_abandon(
     network: String,
     account_uuid: String,
@@ -930,7 +795,7 @@ pub fn private_usd_forward_abandon(
             &account_uuid,
             index,
         ))?;
-        Ok(api_record(&record, None))
+        Ok(api_record(&record, WalletFacts::default()))
     })
 }
 
@@ -1000,11 +865,10 @@ pub fn private_usd_forward_rescue(
             "",
             &eth_rpc_url,
             None,
-            None,
             async |call, op| {
                 call.forward(op, async |forward, store| {
                     let record = forward.rescue(store, index).await?;
-                    Ok(api_record(&record, None))
+                    Ok(api_record(&record, WalletFacts::default()))
                 })
                 .await
             },
@@ -1027,7 +891,7 @@ pub fn private_usd_forward_records(
         };
         Ok(swap::records::<ForwardRecord>(&store, &account_uuid)?
             .iter()
-            .map(|record| api_record(record, deposit_confirmations(&db_path, network, record)))
+            .map(|record| api_record(record, wallet_facts(&db_path, network, record)))
             .collect())
     })
 }
@@ -1191,7 +1055,6 @@ pub fn private_usd_reverse_quote(
             &lightwalletd_url,
             &eth_rpc_url,
             None,
-            None,
             async |call, op| {
                 call.reverse(op, async |reverse, store| {
                     let quoted = reverse.quote(store, total, unshield_basis_points).await?;
@@ -1287,10 +1150,9 @@ pub fn private_usd_reverse_go_ahead(
 }
 
 /// The maker's acceptance of swap `index`, posted once, and its joint account
-/// imported (idempotent: call it again after an error). `TokensNeeded`: the
-/// maker wants a token, which this build cannot get; nothing opened, so
-/// cancel the conversion. `NothingSent`: the maker's last word
-/// ended it (`CANCELLED`), with the cause when known.
+/// imported (idempotent: call it again after an error). `NothingSent`: the
+/// maker's last word ended it (`CANCELLED`), with the cause when known (a
+/// maker answering `401` refused it).
 pub fn private_usd_reverse_accept(
     db_path: String,
     network: String,
@@ -1299,7 +1161,6 @@ pub fn private_usd_reverse_accept(
     mnemonic_bytes: Vec<u8>,
     lightwalletd_url: String,
     eth_rpc_url: String,
-    tokens_path: String,
     index: u32,
 ) -> Result<ApiAcceptResult, ApiPrivateUsdError> {
     let secret = Zeroizing::new(mnemonic_bytes);
@@ -1312,7 +1173,6 @@ pub fn private_usd_reverse_accept(
             &secret,
             &lightwalletd_url,
             &eth_rpc_url,
-            Some(&tokens_path),
             None,
             async |call, op| {
                 call.reverse(op, async |reverse, store| {
@@ -1323,7 +1183,6 @@ pub fn private_usd_reverse_accept(
         )?;
         let (kind, cause) = match outcome {
             ReverseAccept::Accepted => (ApiAcceptKind::Accepted, None),
-            ReverseAccept::TokensNeeded => (ApiAcceptKind::TokensNeeded, None),
             ReverseAccept::Ended(cause) => (ApiAcceptKind::NothingSent, cause.map(api_cause)),
         };
         Ok(ApiAcceptResult { kind, cause, index })
@@ -1358,7 +1217,6 @@ pub fn private_usd_reverse_funding_request(
             &secret,
             "",
             &eth_rpc_url,
-            None,
             None,
             async |call, op| {
                 call.reverse(op, async |reverse, store| {
@@ -1432,7 +1290,6 @@ pub fn private_usd_reverse_advance(
     mnemonic_bytes: Vec<u8>,
     lightwalletd_url: String,
     eth_rpc_url: String,
-    tokens_path: String,
     op_id: u32,
     index: u32,
 ) -> Result<ApiReverseAdvance, ApiPrivateUsdError> {
@@ -1447,7 +1304,6 @@ pub fn private_usd_reverse_advance(
             &secret,
             &lightwalletd_url,
             &eth_rpc_url,
-            Some(&tokens_path),
             Some(op_id),
             async |call, op| {
                 call.reverse(op, async |reverse, store| {
@@ -1487,7 +1343,6 @@ pub fn private_usd_reverse_authorize_ready(
             &lightwalletd_url,
             &eth_rpc_url,
             None,
-            None,
             async |call, op| {
                 call.reverse(op, async |reverse, store| {
                     let record = reverse.authorize_ready(store, index).await?;
@@ -1525,7 +1380,6 @@ pub fn private_usd_reverse_cancel(
             &secret,
             &lightwalletd_url,
             &eth_rpc_url,
-            None,
             None,
             async |call, op| {
                 call.reverse(op, async |reverse, store| {
@@ -1584,7 +1438,6 @@ pub fn private_usd_reverse_rescue(
             &secret,
             "",
             &eth_rpc_url,
-            None,
             None,
             async |call, op| {
                 call.reverse(op, async |reverse, store| {
@@ -2435,15 +2288,43 @@ fn drive<T>(
     secret: &[u8],
     lightwalletd_url: &str,
     eth_rpc_url: &str,
-    tokens_path: Option<&str>,
     op_id: Option<u32>,
+    step: impl AsyncFnOnce(&SwapCall<'_>, Option<&OpHandle>) -> Result<T, PrivateUsdError>,
+) -> Result<T, ApiPrivateUsdError> {
+    drive_with(
+        db_path,
+        network,
+        account_uuid,
+        store_dir,
+        secret,
+        lightwalletd_url,
+        eth_rpc_url,
+        op_id,
+        true,
+        step,
+    )
+}
+
+/// [`drive`]; `stop_before` stops a call cancelled before it starts, which
+/// an accept never is.
+#[allow(clippy::too_many_arguments)]
+fn drive_with<T>(
+    db_path: &str,
+    network: &str,
+    account_uuid: &str,
+    store_dir: &str,
+    secret: &[u8],
+    lightwalletd_url: &str,
+    eth_rpc_url: &str,
+    op_id: Option<u32>,
+    stop_before: bool,
     step: impl AsyncFnOnce(&SwapCall<'_>, Option<&OpHandle>) -> Result<T, PrivateUsdError>,
 ) -> Result<T, ApiPrivateUsdError> {
     let op = op_id.map(OpHandle::begin).transpose()?;
     let network = parse_network_and_migrate(db_path, network)?;
     let keys = SwapKeyContext::open(db_path, network, account_uuid, secret)?;
     let _driver = engine::lock_account(account_uuid)?;
-    if op.as_ref().is_some_and(OpHandle::cancelled) {
+    if stop_before && op.as_ref().is_some_and(OpHandle::cancelled) {
         return Err(engine::cancelled().into());
     }
     let call = SwapCall {
@@ -2453,7 +2334,6 @@ fn drive<T>(
         store_dir: Path::new(store_dir),
         lightwalletd_url,
         eth_rpc_url,
-        tokens_path: tokens_path.map(Path::new),
         keys: &keys,
     };
     block_on(step(&call, op.as_ref()))
@@ -2488,6 +2368,12 @@ fn api_quote(quoted: &Quoted) -> ApiForwardQuote {
         deposit_fee_zat: offer.deposit_fee_zatoshi,
         max_total_zat: offer.max_total_zatoshi(),
         fee_expires_at: offer.fee_expires_at.map(seconds),
+        open_fee_zat: offer.quote.open_fee.as_ref().map(|fee| fee.zat),
+        open_fee_network_zat: offer.open_fee_network_zatoshi,
+        open_fee_pay_by: offer.quote.open_fee.as_ref().map(|_| {
+            let min_life = deployment::deployment(offer.network).open_fee_min_quote_life_seconds;
+            seconds(offer.quote.expires_at.saturating_sub(min_life))
+        }),
     }
 }
 
@@ -2495,7 +2381,7 @@ fn api_advance(report: &AdvanceReport, db_path: &str, network: WalletNetwork) ->
     ApiForwardAdvance {
         record: api_record(
             &report.record,
-            deposit_confirmations(db_path, network, &report.record),
+            wallet_facts(db_path, network, &report.record),
         ),
         wait: report.wait.map(|wait| match wait {
             ForwardWait::Opening => ApiForwardWait::Opening,
@@ -2504,13 +2390,50 @@ fn api_advance(report: &AdvanceReport, db_path: &str, network: WalletNetwork) ->
             ForwardWait::Refunding => ApiForwardWait::Refunding,
             ForwardWait::ZcashSyncing => ApiForwardWait::ZcashSyncing,
             ForwardWait::Unwinding => ApiForwardWait::Unwinding,
+            ForwardWait::FeeConfirming => ApiForwardWait::FeeConfirming,
+            ForwardWait::FeeAccepting => ApiForwardWait::FeeAccepting,
+            ForwardWait::FundsPending => ApiForwardWait::FundsPending,
         }),
         next_poll_ms: u32::try_from(report.next_poll.as_millis()).unwrap_or(u32::MAX),
         problem: report.problem.map(api_code),
     }
 }
 
-fn api_record(record: &ForwardRecord, deposit_confirmations: Option<u32>) -> ApiForwardRecord {
+/// What the main wallet shows of a forward record's own transactions, read
+/// best effort: nothing where it cannot be read.
+#[frb(ignore)]
+#[derive(Clone, Copy, Debug, Default)]
+struct WalletFacts {
+    deposit_confirmations: Option<u32>,
+    /// The kept deposit's network fee, as the wallet recorded it.
+    deposit_network_zat: Option<u64>,
+    /// The open fee payment's network fee, as the wallet recorded it: what a
+    /// payment found again after a restart has instead of the proposal's.
+    open_fee_network_zat: Option<u64>,
+    open_fee_mined: bool,
+}
+
+fn wallet_facts(db_path: &str, network: WalletNetwork, record: &ForwardRecord) -> WalletFacts {
+    let fee_of = |tx_id: &ZcashTxId| {
+        joint_ops::internal_txid(tx_id)
+            .ok()
+            .and_then(|txid| joint_ops::wallet_tx_fee(db_path, &txid).ok().flatten())
+    };
+    WalletFacts {
+        deposit_confirmations: deposit_confirmations(db_path, network, record),
+        deposit_network_zat: record
+            .deposit
+            .as_ref()
+            .and_then(|deposit| fee_of(&deposit.tx_id)),
+        open_fee_network_zat: record
+            .open_fee_payment
+            .as_ref()
+            .and_then(|payment| fee_of(&payment.tx_id)),
+        open_fee_mined: open_fee_mined(db_path, network, record),
+    }
+}
+
+fn api_record(record: &ForwardRecord, facts: WalletFacts) -> ApiForwardRecord {
     let (outcome, refund_cause, nothing_sent_cause) = match &record.outcome {
         None => (None, None, None),
         Some(ForwardOutcome::Paid) => (Some(ApiForwardOutcome::Paid), None, None),
@@ -2546,6 +2469,7 @@ fn api_record(record: &ForwardRecord, deposit_confirmations: Option<u32>) -> Api
         quote_expires_at: seconds(record.quote.expires_at),
         deposit_zat: record.quote.deposit_zat,
         max_total_zat: record.max_total_zat,
+        deposit_network_zat: facts.deposit_network_zat,
         amount: record.quote.amount.0.to_string(),
         receives: record.receives.0.to_string(),
         relayer_fee: record.relayer_fee.0.to_string(),
@@ -2556,7 +2480,7 @@ fn api_record(record: &ForwardRecord, deposit_confirmations: Option<u32>) -> Api
             .deposit
             .as_ref()
             .and_then(|deposit| internal_hex(&deposit.tx_id)),
-        deposit_confirmations,
+        deposit_confirmations: facts.deposit_confirmations,
         sweep_txid: record
             .sweep
             .as_ref()
@@ -2568,6 +2492,17 @@ fn api_record(record: &ForwardRecord, deposit_confirmations: Option<u32>) -> Api
         refund_cause,
         nothing_sent_cause,
         ended_at: record.finished_at.map(seconds),
+        open_fee_zat: record.quote.open_fee.as_ref().map(|fee| fee.zat),
+        open_fee_network_zat: record
+            .open_fee_payment
+            .as_ref()
+            .and_then(|payment| payment.network_fee_zat)
+            .or(facts.open_fee_network_zat),
+        open_fee_txid: record
+            .open_fee_payment
+            .as_ref()
+            .and_then(|payment| internal_hex(&payment.tx_id)),
+        open_fee_mined: facts.open_fee_mined,
     }
 }
 
@@ -2597,6 +2532,22 @@ fn deposit_confirmations(
     }
 }
 
+/// Whether the main wallet shows the record's open fee payment in a block;
+/// best effort, false when unknown.
+fn open_fee_mined(db_path: &str, network: WalletNetwork, record: &ForwardRecord) -> bool {
+    let Some(payment) = record.open_fee_payment.as_ref() else {
+        return false;
+    };
+    let Ok(txid) = joint_ops::internal_txid(&payment.tx_id) else {
+        return false;
+    };
+    let expiry = u32::try_from(payment.expiry_height).unwrap_or(u32::MAX);
+    matches!(
+        joint_ops::swap_tx_status(db_path, network, &txid, expiry),
+        Ok(SwapTxStatus::Mined { .. })
+    )
+}
+
 /// A record's transaction id in the wallet DB's byte order, as history rows
 /// carry it.
 fn internal_hex(tx_id: &ZcashTxId) -> Option<String> {
@@ -2614,6 +2565,7 @@ fn api_cause(cause: NothingSentCause) -> ApiNothingSentCause {
         NothingSentCause::Mismatch => ApiNothingSentCause::Mismatch,
         NothingSentCause::DepositWindowMissed => ApiNothingSentCause::DepositWindowMissed,
         NothingSentCause::MakerCancelled => ApiNothingSentCause::MakerCancelled,
+        NothingSentCause::FeeNotHonoured => ApiNothingSentCause::FeeNotHonoured,
     }
 }
 

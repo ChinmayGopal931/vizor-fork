@@ -13,7 +13,6 @@ import UIKit
   private var customHapticEngine: CHHapticEngine?
   private var ledgerMobileHandler: LedgerMobileHandler?
   private var railgunHostHandler: RailgunHostHandler?
-  private var attestationHandler: PrivateUsdAttestationHandler?
   /// True while a seed-entry screen is showing (`keyboard_policy` channel).
   private(set) var rejectsCustomKeyboards = false
 
@@ -140,12 +139,6 @@ import UIKit
       .setMethodCallHandler { call, result in railgunHostHandler.handle(call, result: result) }
     FlutterEventChannel(name: RailgunHostHandler.eventChannelName, binaryMessenger: messenger)
       .setStreamHandler(railgunHostHandler)
-
-    // Private USD's Privacy Pass attestation: `unavailable` on iOS until the issuer has an iOS mode (plan M4).
-    let attestationHandler = PrivateUsdAttestationHandler()
-    self.attestationHandler = attestationHandler
-    FlutterMethodChannel(name: PrivateUsdAttestationHandler.channelName, binaryMessenger: messenger)
-      .setMethodCallHandler { call, result in attestationHandler.handle(call, result: result) }
 
     let keychainAccessibilityMigrationHandler =
       KeychainAccessibilityMigrationChannel()

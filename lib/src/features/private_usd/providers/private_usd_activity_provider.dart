@@ -84,14 +84,19 @@ DateTime privateUsdActivityTime(rust.ApiForwardRecord record) =>
       (record.endedAt ?? record.acceptedAt) * 1000,
     );
 
-/// The main-wallet transactions conversions made (deposits and refund
-/// sweeps), in the internal byte order history rows carry: their own rows
-/// stand in for them, so these rows are dropped from the feeds.
+/// The main-wallet transactions conversions made (market maker fees,
+/// deposits and refund sweeps), in the internal byte order history rows
+/// carry: their own rows stand in for them, so these rows are dropped from
+/// the feeds. A fee whose bridge ended with no row for it, unmined, keeps
+/// its own: it may still be mined, or come back.
 Set<String> _privateUsdActivityTxids(
   Iterable<rust.ApiForwardRecord> records, {
   Iterable<rust.ApiReverseRecord> reverse = const [],
 }) => {
   for (final record in records) ...[
+    if (record.outcome != rust.ApiForwardOutcome.nothingSent ||
+        record.openFeeMined)
+      ?record.openFeeTxid?.toLowerCase(),
     ?record.depositTxid?.toLowerCase(),
     ?record.sweepTxid?.toLowerCase(),
   ],

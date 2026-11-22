@@ -8738,6 +8738,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'Your bridges, sends and withdrawals will show here.';
 
   @override
+  String get privateUsdActivityFeeLost => 'Bridge didn\'t start';
+
+  @override
+  String get privateUsdActivityFeeLostDetail => 'market maker fee not refunded';
+
+  @override
   String privateUsdActivityFrom(String address) {
     return 'from $address';
   }
@@ -8869,6 +8875,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'The market maker is busy with other bridges. Try again in a few minutes.';
 
   @override
+  String get privateUsdConvertErrorOpenFee =>
+      'The market maker asks a fee Veylor won\'t pay, so nothing was sent.';
+
+  @override
   String get privateUsdConvertErrorRelayer =>
       'The relayer that completes bridges can\'t be reached right now. Try again in a moment.';
 
@@ -8879,10 +8889,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get privateUsdConvertErrorStore =>
       'Veylor can\'t read its saved bridges. Contact support.';
-
-  @override
-  String get privateUsdConvertErrorTokensUnavailable =>
-      'Couldn\'t get this bridge\'s token, so nothing was sent. Try again in a moment.';
 
   @override
   String get privateUsdConvertErrorUnpayable =>
@@ -8959,6 +8965,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get privateUsdConvertNewQuote => 'Refresh quote';
 
   @override
+  String get privateUsdConvertOpenFee => 'Market maker fee';
+
+  @override
+  String privateUsdConvertOpenFeeValue(String amount) {
+    return '$amount · not refunded';
+  }
+
+  @override
   String get privateUsdConvertOpeningSlow =>
       'The market maker hasn\'t opened the swap yet. Nothing has been sent.';
 
@@ -8999,10 +9013,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get privateUsdConvertProblemTitle => 'Taking longer than usual';
-
-  @override
-  String get privateUsdConvertProblemTokens =>
-      'The market maker asks for a token. Veylor is getting one for today; if it can\'t, this bridge is called off.';
 
   @override
   String get privateUsdConvertProblemUnexpected =>
@@ -9107,6 +9117,14 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get privateUsdConvertRelayerReviewNote =>
       'Keep Veylor open until the market maker confirms your deposit, a few minutes. Then the relayer claims your dollars, and you can leave.';
+
+  @override
+  String get privateUsdConvertResultFeeKept =>
+      'The bridge didn\'t start. The market maker keeps its fee; the rest of your ZEC never left your wallet.';
+
+  @override
+  String get privateUsdConvertResultFeeNotHonoured =>
+      'The quote ran out before the market maker saw its fee. A fee that confirms isn\'t refunded; one that doesn\'t stays in your wallet.';
 
   @override
   String get privateUsdConvertResultMakerCancelled =>
@@ -9236,6 +9254,17 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get privateUsdConvertWaitFeeConfirming =>
+      'Waiting for the market maker\'s fee to confirm';
+
+  @override
+  String get privateUsdConvertWaitFeeSeen =>
+      'Waiting for the market maker to see the fee';
+
+  @override
+  String get privateUsdConvertWaitFunds => 'Waiting for your ZEC to confirm';
+
+  @override
   String get privateUsdConvertWaitSyncing =>
       'Waiting for your Zcash wallet to sync';
 
@@ -9248,6 +9277,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get privateUsdConvertZecIncludesFee =>
       'Includes the Zcash network fee';
+
+  @override
+  String get privateUsdConvertZecIncludesFees =>
+      'Includes the network and market maker fees';
 
   @override
   String get privateUsdConvertZecNoQuote =>
@@ -9395,6 +9428,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get privateUsdDetailFunding => 'Escrow payment';
+
+  @override
+  String get privateUsdDetailOpenFee => 'Market maker fee payment';
 
   @override
   String get privateUsdDetailPayout => 'Payout';
@@ -10346,30 +10382,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get privateUsdTokenTestUsd => 'Test dollar';
-
-  @override
-  String get privateUsdTokensDeviceRefused =>
-      'The token issuer doesn\'t recognize this device, so it can\'t convert. Emulators, unlocked bootloaders, modified systems and unrecognized builds are turned away.';
-
-  @override
-  String get privateUsdTokensKeystore =>
-      'This phone\'s keystore couldn\'t sign for the token issuer. Try again in a moment.';
-
-  @override
-  String get privateUsdTokensNoneToday =>
-      'This device has used today\'s conversions. More are available after midnight UTC.';
-
-  @override
-  String get privateUsdTokensTorOffDisclosure =>
-      'With Tor off, the token issuer and the market maker can tell this bridge and its token came from the same connection.';
-
-  @override
-  String get privateUsdTokensUnavailable =>
-      'Conversions need an Android phone while the market maker asks for a token with each one.';
-
-  @override
-  String get privateUsdTokensUnreachable =>
-      'Couldn\'t reach the token issuer. Try again in a moment.';
 
   @override
   String privateUsdUpdated(String time) {

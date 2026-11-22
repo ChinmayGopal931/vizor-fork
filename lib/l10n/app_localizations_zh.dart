@@ -8086,6 +8086,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get privateUsdActivityEmpty => '你的跨链、发送和提取记录会显示在这里。';
 
   @override
+  String get privateUsdActivityFeeLost => '跨链未开始';
+
+  @override
+  String get privateUsdActivityFeeLostDetail => '做市商手续费不予退还';
+
+  @override
   String privateUsdActivityFrom(String address) {
     return '来自 $address';
   }
@@ -8208,6 +8214,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get privateUsdConvertErrorMakerBusy => '做市商正忙于处理其他跨链。请几分钟后重试。';
 
   @override
+  String get privateUsdConvertErrorOpenFee =>
+      '做市商要求的手续费 Veylor 不会支付，因此未发送任何内容。';
+
+  @override
   String get privateUsdConvertErrorRelayer => '目前无法连接负责完成跨链的中继者，请稍后重试。';
 
   @override
@@ -8215,10 +8225,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get privateUsdConvertErrorStore => 'Veylor 无法读取已保存的跨链记录。请联系支持团队。';
-
-  @override
-  String get privateUsdConvertErrorTokensUnavailable =>
-      '无法获取此次跨链所需的令牌，因此未发送任何内容。请稍后重试。';
 
   @override
   String get privateUsdConvertErrorUnpayable => '钱包目前无法用单笔交易支付此金额，请尝试更小的金额。';
@@ -8290,6 +8296,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get privateUsdConvertNewQuote => '刷新报价';
 
   @override
+  String get privateUsdConvertOpenFee => '做市商手续费';
+
+  @override
+  String privateUsdConvertOpenFeeValue(String amount) {
+    return '$amount · 不予退还';
+  }
+
+  @override
   String get privateUsdConvertOpeningSlow => '做市商还没有开启兑换，目前未发送任何资金。';
 
   @override
@@ -8328,10 +8342,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get privateUsdConvertProblemTitle => '耗时比平时长';
-
-  @override
-  String get privateUsdConvertProblemTokens =>
-      '做市商要求提供令牌。Veylor 正在获取今天的令牌；若无法获取，此次跨链将被取消。';
 
   @override
   String get privateUsdConvertProblemUnexpected => '出了点问题。Veylor 打开期间会持续重试。';
@@ -8426,6 +8436,14 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get privateUsdConvertRelayerReviewNote =>
       '请保持 Veylor 打开，直到做市商确认你的存入，约需几分钟。之后中继者会领取你的美元，你就可以离开了。';
+
+  @override
+  String get privateUsdConvertResultFeeKept =>
+      '跨链未开始。做市商会保留其手续费；其余 ZEC 从未离开钱包。';
+
+  @override
+  String get privateUsdConvertResultFeeNotHonoured =>
+      '做市商确认手续费之前，报价已过期。已确认的手续费不予退还；未确认的手续费会留在钱包中。';
 
   @override
   String get privateUsdConvertResultMakerCancelled =>
@@ -8552,6 +8570,15 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get privateUsdConvertWaitFeeConfirming => '正在等待做市商手续费确认';
+
+  @override
+  String get privateUsdConvertWaitFeeSeen => '正在等待做市商确认手续费';
+
+  @override
+  String get privateUsdConvertWaitFunds => '正在等待你的 ZEC 确认';
+
+  @override
   String get privateUsdConvertWaitSyncing => '等待 Zcash 钱包同步';
 
   @override
@@ -8562,6 +8589,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get privateUsdConvertZecIncludesFee => '含 Zcash 网络手续费';
+
+  @override
+  String get privateUsdConvertZecIncludesFees => '含网络手续费和做市商手续费';
 
   @override
   String get privateUsdConvertZecNoQuote => '没有适合此金额的报价。请尝试其他金额，或使用最大金额。';
@@ -8694,6 +8724,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get privateUsdDetailFunding => '托管付款';
+
+  @override
+  String get privateUsdDetailOpenFee => '做市商手续费付款';
 
   @override
   String get privateUsdDetailPayout => '支付';
@@ -9577,27 +9610,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get privateUsdTokenTestUsd => '测试美元';
-
-  @override
-  String get privateUsdTokensDeviceRefused =>
-      '令牌签发方无法识别此设备，因此无法跨链。模拟器、已解锁引导加载程序的设备、经过修改的系统和无法识别的构建版本都会被拒绝。';
-
-  @override
-  String get privateUsdTokensKeystore => '此手机的密钥库无法为令牌签发方签名。请稍后重试。';
-
-  @override
-  String get privateUsdTokensNoneToday => '此设备今天的跨链次数已用完。UTC 午夜后可再次跨链。';
-
-  @override
-  String get privateUsdTokensTorOffDisclosure =>
-      '关闭 Tor 时，令牌签发方和做市商可以看出此次跨链及其令牌来自同一连接。';
-
-  @override
-  String get privateUsdTokensUnavailable =>
-      '做市商要求每次跨链都提供令牌期间，只能在 Android 手机上跨链。';
-
-  @override
-  String get privateUsdTokensUnreachable => '无法连接令牌签发方，请稍后重试。';
 
   @override
   String privateUsdUpdated(String time) {

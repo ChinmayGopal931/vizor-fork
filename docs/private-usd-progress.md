@@ -7,6 +7,86 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
 
 ## Where things stand (2026-10-17; read this first)
 
+- **The open fee's review fixes (2026-11-21, D-162).** A review found the
+  open fee safe on mainnet, which asks none, and nine gaps for testnet's,
+  all closed on `feat/open-fee`:
+  - **The fee lives with its quote.** Its payment expires a few blocks after
+    the quote (`deadline_expiry_height` in `send.rs`), and the wallet's sync
+    stops sending the fee of a bridge that ended or a quote with under a
+    minute left (`open_fee::withheld_fee_txids`, read from `swaps.db`).
+  - **Quotes long enough for a block.** A fee quote must live 180 s to 30
+    minutes (`open_fee_min_quote_life_seconds`,
+    `open_fee_max_quote_life_seconds`), and is paid only with 180 s left;
+    the review offers it until 20 s before then and asks for a new one.
+    Mainnet's 2-minute quotes would be refused: its maker must lengthen them
+    before asking a fee.
+  - **A lost accept answer.** Once the quote is over, a swap the chain shows
+    takes its `t0` and `t1` from its confirmed `Opened` and goes on to its
+    deposit, fee or not, with nothing posted.
+  - **Smaller ones.** "Call it off" refuses a bridge whose fee started; the
+    deposit's approved total allows one action more after the fee; a
+    refunded bridge shows its fee as not refunded; the accept's fee step runs
+    under an op id (a lock or the background stops it before it is saved);
+    "You paid" uses the wallet's own network fees (`depositNetworkZat`, a
+    found-again payment's from the wallet), marked "≈" where a fee payment's
+    is unknown; the fee-not-honoured result is worded to stay true whether
+    the fee confirms later or not.
+  - **Tests.** `tests/open_fee.rs` gains six (the fee's deadline and no
+    resend after the end, quote life, the `Opened` recovery fee or not,
+    abandon, the deposit's slack, a cancelled accept); `open_fee.rs` the
+    resubmission exclusion; `send.rs` the deadline expiry.
+
+- **The Privacy Pass token client is gone (2026-11-21, D-161).** The owner
+  decided that the open fee on ZEC → USD bridges (D-160) replaces it. It
+  never ran: both hosted makers' `/v1/info` answer `tokenReturnKey: null`.
+  - **Behaviour.** A maker that answers an accept `401`, whatever its code,
+    refused it: nothing opened, nothing paid, never posted again (forward
+    `NothingSent(MAKER_REFUSED)`, reverse `CANCELLED` with the same cause).
+    Everything else is as it was, the open fee's `402 feeRequired` and the
+    USD → ZEC accept included.
+  - **Rust.** `tokens.rs`, the `zecswap-tokens` crate, the issuer and
+    return-key pins, the maker's `/v1/info` return-key check, the token
+    error codes, `ApiAcceptKind::TokensNeeded` and the issuance calls went.
+    `swaps.db` 8 drops the token fields reverse records kept
+    (`deployment.tokenIssuer`, and `acceptance.tokenRequest`, which nothing
+    wrote in practice); every other field and table is as it was.
+  - **Dart.** The tokens service, the attestation channel's wrapper, the
+    prefetches, the token copy in en, ko and zh, and the review's Tor-off
+    disclosure went. Private USD's start, and a full reset, delete the token
+    store earlier builds wrote (`private_usd_tokens_<network>.json`).
+  - **Native.** The attestation channel is gone from Android
+    (`PrivateUsdAttestationHandler.kt` and its test), iOS and the Mac (the
+    Swift twins and their Xcode references) and Linux (its stub). Android's
+    Keystore attestation keys stay on devices, unused.
+  - **Tests.** Rust: a `401` to an accept is a refusal with nothing opened,
+    forward and reverse; the schema 6 and 7 → 8 migration. The token tests
+    went with the code.
+
+- **A ZEC → USD bridge pays the maker's open fee first (2026-11-21, D-160).**
+  Since 2026-11-21 the hosted testnet maker refuses every ZEC → USD accept
+  `402 feeRequired` until the quote's `openFee` (20,000 zatoshis) is in a
+  block; mainnet asks none yet. Ported from zecSwap PR #6 (`feat/open-fee`,
+  `docs/open-fee.md`):
+  - **Rust.** `open_fee.rs` (the cap, the Orchard-only check, the accept's
+    pacing) and `forward.rs`: the quote refuses a fee over 500,000 zatoshis
+    or payable outside Orchard (`OPEN_FEE_REFUSED`); the accept checks the
+    minute and the funds, proposes the payment, saves the record with it
+    started, creates, keeps and sends it, and returns; the engine sends it
+    again every 30 s while unmined, posts the accept once Veylor's wallet
+    shows it mined, and posts it again through `feeRequired`, a `5xx` or
+    no answer until the quote expires (`FEE_NOT_HONOURED` then). The deposit
+    waits for the fee's change (`FUNDS_PENDING`). Schema 7 adds the record's
+    `openFeeMaxTotalZat`, `openFeeAttempted` and `openFeePayment`.
+  - **Dart.** The review's ledger shows "Market maker fee · not refunded" and
+    its total includes the fee; the quote stops being offered 80 s before
+    it expires (200 s since D-162); the progress names the fee's waits;
+    Activity folds the fee's transaction into its bridge row, and keeps a
+    row for a fee lost.
+  - **Tests.** `tests/open_fee.rs` (the five "done when" cases on the
+    fakes), `open_fee.rs` units, the schema 6 → 7 migration and the strict
+    fixtures. Not yet run against the hosted maker: the owner's Mac testnet
+    build is for that.
+
 - **A refresh the user waits on shows its progress (2026-11-01, D-156).**
   On a wallet that synced before, the sync line read `RAILGUN SYNCED`
   through every refresh while the total's arrow spun, and a tap on the
@@ -2679,7 +2759,7 @@ M8 status (2026-10-14): the non-device parts are done.
     Swift decoders, the balance's flag through a failure, a retry and a
     success, and the card's two offers.
 - **D-154 (owner, 2026-10-25): Privacy Pass tokens (M4), dormant until a
-  maker asks.** Built as plan M4 and reference §5.9 and §8.2 specify, with
+  maker asks.** (Removed 2026-11-21, D-161.) Built as plan M4 and reference §5.9 and §8.2 specify, with
   the brief's changes and these as-built details (§5.9 "As built" lists
   them too):
   - **The crate.** `zecswap-tokens` is a git dependency at the pinned rev,
@@ -2907,6 +2987,100 @@ M8 status (2026-10-14): the non-device parts are done.
   WebView sent its default User-Agent, which names the phone's model and
   Android build, to the RPC, rail-squid, the screening nodes and the artifact
   hosts; it now sends the archive fetch's `Mozilla/5.0`.
+
+- **D-160 (owner, 2026-11-21): the open fee, ported from zecSwap PR #6.**
+  Where Veylor differs from the reference CLI (`crates/zecswap-cli/src/swap.rs`)
+  and `docs/open-fee.md`, and why:
+  - **The second minute check comes before the payment is created, not
+    after.** Veylor's sync sends every unmined transaction the wallet stores
+    again (`resubmit_pending_transactions`), so a payment withheld after
+    creation would go out anyway. The check right before creation is the
+    last point at which nothing is paid; after it the payment is sent at
+    once.
+  - **The accept is the engine's step, not a loop in one call.** Each advance
+    posts it at most once and naps what `Retry-After` asks (the pacing is in
+    `engine::FeePace`, process memory); the FRB accept of a fee quote pays
+    and returns `Accepted`. After `expiresAt` nothing is posted: a last
+    answer of `feeRequired` ends the bridge at once, anything else waits the
+    5-minute grace and reads the chain, as an unanswered accept always did.
+  - **A `4xx` that may follow an open** (`unknownSwap`, `internal`, or an
+    unknown code outside 400/404/503) keeps the bridge, posted again, as
+    Veylor's no-fee accept already treats it; zecSwap ends on any `4xx`.
+  - **Funds** are the spendable Orchard and Ironwood ZEC, at least the fee,
+    the deposit and both network fees, checked at accept; the review's own
+    check (`totalZat <= spendable`) already counts the fee.
+  - **The cap is a pin** (`Deployment.max_open_fee_zat`), 500,000 zatoshis
+    (0.005 ZEC) on both networks, the CLI's default: 25 times testnet's fee.
+    Mainnet's fee will be priced from each quote's gas; revisit the cap when
+    the maker turns it on there.
+  - **The fee is paid from any note.** Paying it from a note the deposit
+    does not need is not done: a one-note wallet's deposit waits for the
+    change (`FUNDS_PENDING`).
+  - **A canonical address only.** The wallet finds an interrupted payment
+    by its recipient as it encodes it; a fee address spelt otherwise
+    (uppercase) is refused at the quote rather than risk a second payment.
+
+- **D-161 (owner, 2026-11-21): no Privacy Pass tokens.** The open fee on
+  ZEC → USD bridges (D-160) replaces the token client D-154 built, which
+  never activated: both hosted makers' `/v1/info` show no
+  `tokenReturnKey` (their `token` is the USDC contract, unrelated). Where
+  Veylor now stands, and why:
+  - **A `401` is a refusal.** Without a client, a `401` to an accept is the
+    maker turning it down before acting: forward ends
+    `NothingSent(MAKER_REFUSED)` whatever the code, the open fee's accept
+    too, and reverse is `CANCELLED` (`MAKER_REFUSED`, where the token gate
+    used to say `MAKER_UNAVAILABLE`). Nothing is posted again. Before, a
+    `401 tokenRequired` with no token held left the record unanswered for
+    the issuance.
+  - **Records.** A reverse record pinned the issuer (`tokenIssuer`) in its
+    deployment, and records decode strictly, so the field could not simply
+    go: schema 8 removes it from every reverse record (and an
+    acceptance's `tokenRequest`, never kept in practice), and changes
+    nothing else. A build that knows 7 refuses an 8 store as newer.
+  - **What stays on a device.** The token store file is deleted, best
+    effort and silently, when Private USD starts, and by a full reset.
+    Android's Keystore attestation keys (`vizor_privateusd_attest_*`) stay:
+    nothing reads them, and deleting keys is not worth a native call.
+  - **Windows** (`feat/windows-desktop`, unmerged) still registers the
+    attestation stub in `windows/runner/private_usd_channels.cpp` and names
+    it in `docs/private-usd-windows.md`; both go when it merges.
+
+- **D-162 (2026-11-21): the open fee's review.** What changed, and why:
+  - **Expiry, not resends, bounds a late fee.** A fee mined after its quote
+    pays for nothing, and an ordinary payment can be mined 40 blocks (50
+    minutes) or, from NU7, 120 blocks on, re-sent by the sync all the while.
+    The payment's expiry is the last block expected by `expiresAt` at the
+    target's spacing (the target plus the blocks left, less one: the target
+    is the first of them), plus 2 for block-time variance; nodes refuse one
+    within 3 blocks of the tip, so that is its floor, and an ordinary
+    payment's expiry (capped at an upgrade) its ceiling. With under a minute
+    of the quote left once the wallet's lock is taken, nothing is created,
+    and a payment finished inside that minute is never sent. The sync's
+    resubmission reads `swaps.db` beside the wallet DB on each pass, best
+    effort, withholding from that last minute: a store that does not read
+    withholds nothing, and the expiry still ends the payment. The short
+    expiry marks the payment on chain, a privacy cost the owner may revisit;
+    a pre-NU7 canonical crossing keeps the backend's rolling expiry, with
+    the withholding as its only guard.
+  - **180 s of quote, and why.** At 75 s blocks a fee paid with 60 s left
+    misses its block more often than not (`e^(-60/75)` ≈ 45%); with 180 s,
+    about 9%; at NU7's 25 s spacing, under 0.1%. A 30-minute ceiling keeps a
+    maker from holding a fee quote open for long. Both are pins
+    (`Deployment`), so a network can differ. A fresh quote at the tap, taken
+    at once when no worse, was the review's preference; it is not built:
+    every quote spends a swap index, and the review's countdown and "New
+    quote" already keep a user from bridging on unseen terms.
+  - **`Opened` over giving up.** A swap the maker opened whose answer was
+    lost used to end `MAKER_UNAVAILABLE` (zapp's rule), its fee lost. The
+    deadlines are in the swap's `Opened` event and nowhere else (the
+    contract stores the terms' hash), and the confirmed read holds them to
+    that hash, so the chain alone is the evidence and nothing is posted after
+    the quote. This also changes a no-fee swap's lost answer: it now goes on
+    to its deposit when the window allows, where it used to end unpaid.
+  - **The deposit's slack is in "You pay".** The fee's payment can take a
+    note the deposit's estimate counted on; one more input is one more
+    logical action. The approved total carries that action's fee, and the
+    review shows it as part of the most the bridge costs.
 
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's

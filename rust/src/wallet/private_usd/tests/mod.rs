@@ -2,7 +2,8 @@
 //! deterministic (RFC 6979), so they compare byte for byte. `joint` holds the
 //! joint-account and deposit tests, `ironwood_regtest` the ignored test
 //! against the regtest stack, `forward` the forward conversion's fund-safety
-//! tests on the `fakes`, `lifecycle` the account deletion and drain guards,
+//! tests on the `fakes`, `open_fee` the forward quote's open fee on them,
+//! `lifecycle` the account deletion and drain guards,
 //! `reverse` the reverse conversion's fund-safety tests and its funding
 //! calldata, `sends` the send log's keep-before-post, guard and settlement,
 //! and `windows` the reveal decisions against zecSwap's port oracle.
@@ -24,6 +25,7 @@ mod forward;
 mod ironwood_regtest;
 mod joint;
 mod lifecycle;
+mod open_fee;
 mod reverse;
 mod sends;
 mod windows;

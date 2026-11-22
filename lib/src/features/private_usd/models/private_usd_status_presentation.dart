@@ -95,10 +95,10 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation(
   BlockTimeEstimate blockTimes = BlockTimeEstimate.preNu7,
 }) {
   final record = status.record;
-  final totalZat = record.maxTotalZat ?? record.depositZat;
-  final zecText = privacyModeEnabled
-      ? fixedPrivacyMask()
-      : ZecAmount.fromZatoshi(totalZat).activity.toString();
+  final zecText = privateUsdForwardPaidText(
+    record,
+    privacyModeEnabled: privacyModeEnabled,
+  );
   final receives = BigInt.parse(record.receives);
   final usdText = privacyModeEnabled
       ? fixedPrivacyMask()
@@ -191,8 +191,11 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation(
     case ApiForwardOutcome.nothingSent:
       return ended(
         badgeKind: SwapStatusBadgeKind.failed,
-        title: l10n.privateUsdConvertResultNothingTitle,
-        body: privateUsdNothingSentMessage(l10n, record.nothingSentCause),
+        // A fee the maker keeps was sent: not "nothing".
+        title: record.openFeeMined
+            ? l10n.privateUsdActivityFeeLost
+            : l10n.privateUsdConvertResultNothingTitle,
+        body: privateUsdForwardNothingSentMessage(l10n, record),
         action: tryAgain,
       );
     case null:
@@ -201,6 +204,13 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation(
 
   final problem = status.problem;
   final syncing = status.wait == ApiForwardWait.zcashSyncing;
+  // The fee's own waits, plainly, rather than an opening that looks stuck.
+  final waitText = switch (status.wait) {
+    ApiForwardWait.feeConfirming => l10n.privateUsdConvertWaitFeeConfirming,
+    ApiForwardWait.feeAccepting => l10n.privateUsdConvertWaitFeeSeen,
+    ApiForwardWait.fundsPending => l10n.privateUsdConvertWaitFunds,
+    _ => null,
+  };
   final refunding =
       record.phase == ApiForwardPhase.refunding ||
       status.wait == ApiForwardWait.refunding ||
@@ -232,23 +242,27 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation(
       active: active,
       description: syncing
           ? l10n.privateUsdConvertWaitSyncing
-          : switch (active) {
-              0 || 3 => l10n.privateUsdConvertEtaMinute,
-              1 => l10n.privateUsdConvertEtaSeconds,
-              2 => _confirmationsDetail(
-                l10n,
-                record.depositConfirmations,
-                zcashConfirmations,
-                blockTimes,
-              ),
-              _ => null,
-            },
+          : waitText ??
+                switch (active) {
+                  0 || 3 => l10n.privateUsdConvertEtaMinute,
+                  1 => l10n.privateUsdConvertEtaSeconds,
+                  2 => _confirmationsDetail(
+                    l10n,
+                    record.depositConfirmations,
+                    zcashConfirmations,
+                    blockTimes,
+                  ),
+                  _ => null,
+                },
     );
   }
 
+  // An opening whose fee went out is not "nothing sent", and calling it off
+  // would give the fee up: it waits for the maker, or for its quote's end.
   final opening =
-      status.wait == ApiForwardWait.opening ||
-      (status.wait == null && record.phase == ApiForwardPhase.opening);
+      record.openFeeZat == null &&
+      (status.wait == ApiForwardWait.opening ||
+          (status.wait == null && record.phase == ApiForwardPhase.opening));
   final acceptedAt = DateTime.fromMillisecondsSinceEpoch(
     record.acceptedAt * 1000,
   );
@@ -338,8 +352,12 @@ int privateUsdForwardStepIndex(PrivateUsdConversionStatus status) {
       break;
   }
   switch (status.wait) {
-    case ApiForwardWait.opening:
+    case ApiForwardWait.opening ||
+        ApiForwardWait.feeConfirming ||
+        ApiForwardWait.feeAccepting:
       return 0;
+    case ApiForwardWait.fundsPending:
+      return 1;
     case ApiForwardWait.confirming || ApiForwardWait.depositUnsettled:
       return 2;
     default:
@@ -377,6 +395,14 @@ String privateUsdForwardStageLabel(
   }
   if (privateUsdForwardUnwinding(status)) {
     return l10n.privateUsdConvertStepUnwind;
+  }
+  switch (status.wait) {
+    case ApiForwardWait.feeConfirming:
+      return l10n.privateUsdConvertWaitFeeConfirming;
+    case ApiForwardWait.feeAccepting:
+      return l10n.privateUsdConvertWaitFeeSeen;
+    default:
+      break;
   }
   return switch (privateUsdForwardStepIndex(status)) {
     0 => l10n.privateUsdConvertStepOpen,
@@ -490,6 +516,7 @@ List<SwapStatusDetailRowData> _details(
   ApiForwardRecord record, {
   String? explorerTxPrefix,
 }) {
+  final openFee = record.openFeeTxid;
   final deposit = record.depositTxid;
   final sweep = record.sweepTxid;
   final payout = record.payoutTx;
@@ -500,6 +527,13 @@ List<SwapStatusDetailRowData> _details(
       copyable: true,
       copyText: record.swapId,
     ),
+    if (openFee != null)
+      SwapStatusDetailRowData(
+        label: l10n.privateUsdDetailOpenFee,
+        value: truncatedTxid(privateUsdDisplayTxid(openFee)),
+        copyable: true,
+        copyText: privateUsdDisplayTxid(openFee),
+      ),
     if (deposit != null)
       SwapStatusDetailRowData(
         label: l10n.privateUsdDetailDeposit,
@@ -530,6 +564,37 @@ List<SwapStatusDetailRowData> _details(
       ),
     ),
   ];
+}
+
+/// The ZEC a forward conversion pays: its deposit with the network fee it
+/// cost, or before the wallet shows that its approved total (the most it may
+/// cost), and the market maker's fee, with its payment's network fee, where
+/// its quote asked one.
+BigInt privateUsdForwardPaidZat(ApiForwardRecord record) {
+  final depositNetwork = record.depositNetworkZat;
+  final deposit = depositNetwork != null && record.depositTxid != null
+      ? record.depositZat + depositNetwork
+      : (record.maxTotalZat ?? record.depositZat);
+  return deposit +
+      (record.openFeeZat ?? BigInt.zero) +
+      (record.openFeeNetworkZat ?? BigInt.zero);
+}
+
+/// [privateUsdForwardPaidZat] as an amount: masked in privacy mode, and
+/// approximate ("≈") where the market maker fee's payment's own network fee
+/// is not known, as for a payment found again after a restart in a wallet
+/// that does not show its fee.
+String privateUsdForwardPaidText(
+  ApiForwardRecord record, {
+  required bool privacyModeEnabled,
+}) {
+  if (privacyModeEnabled) return fixedPrivacyMask();
+  final text = ZecAmount.fromZatoshi(
+    privateUsdForwardPaidZat(record),
+  ).activity.toString();
+  final approximate =
+      record.openFeeTxid != null && record.openFeeNetworkZat == null;
+  return approximate ? PrivateUsdCopy.approximately(text) : text;
 }
 
 /// A txid as explorers show it: records carry the wallet's internal

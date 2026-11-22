@@ -148,11 +148,14 @@ abstract interface class PrivateUsdSwapBackend {
     required int units,
   });
 
-  /// Accepts the quote of swap [index]; re-entrant for the same index. With
-  /// [relayerClaims] the relayer gets the claim once the deposit is out.
+  /// Accepts the quote of swap [index] under call [opId], which [cancel]
+  /// stops before an open fee is saved or paid; re-entrant for the same
+  /// index. With [relayerClaims] the relayer gets the claim once the deposit
+  /// is out.
   Future<rust.ApiAcceptResult> forwardAccept(
     String accountUuid,
     PrivateUsdSecretReader secret, {
+    required int opId,
     required int index,
     required BigInt maxTotalZat,
     required bool relayerClaims,
@@ -268,22 +271,6 @@ abstract interface class PrivateUsdSwapBackend {
     required int index,
   });
 
-  /// Starts an issuance of today's Privacy Pass tokens (plan M4): what the
-  /// keystore signs, or null when nothing is needed (no maker asks, a token
-  /// is held, or today is spent).
-  Future<rust.ApiIssuanceBegin?> tokensIssuanceBegin();
-
-  /// Finishes the issuance [sessionId] with the keystore's chain and
-  /// signature; `signAgain` once asks for a second signature over `next`.
-  Future<rust.ApiIssuanceFinish> tokensIssuanceFinish({
-    required BigInt sessionId,
-    required List<String> chain,
-    required String signature,
-  });
-
-  /// What the device holds of the makers' tokens.
-  Future<rust.ApiTokenStatus> tokensStatus();
-
   /// Stops call [opId] at its next safe point (`cancelled`).
   void cancel(int opId);
 
@@ -373,6 +360,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
   Future<rust.ApiAcceptResult> forwardAccept(
     String accountUuid,
     PrivateUsdSecretReader secret, {
+    required int opId,
     required int index,
     required BigInt maxTotalZat,
     required bool relayerClaims,
@@ -382,7 +370,6 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
     final dbPath = await getWalletDbPath();
     final ethRpcUrl = await context.ethRpcUrl();
     final lightwalletdUrl = await context.lightwalletdUrl();
-    final tokensPath = await getPrivateUsdTokenStorePath(context.network);
     return withPrivateUsdSeed(
       secret,
       (mnemonic) => rust.privateUsdForwardAccept(
@@ -393,7 +380,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
         mnemonicBytes: mnemonic,
         lightwalletdUrl: lightwalletdUrl,
         ethRpcUrl: ethRpcUrl,
-        tokensPath: tokensPath,
+        opId: opId,
         index: index,
         maxTotalZat: maxTotalZat,
         relayerClaims: relayerClaims,
@@ -413,7 +400,6 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
     final dbPath = await getWalletDbPath();
     final ethRpcUrl = await context.ethRpcUrl();
     final lightwalletdUrl = await context.lightwalletdUrl();
-    final tokensPath = await getPrivateUsdTokenStorePath(context.network);
     return withPrivateUsdSeed(
       secret,
       (mnemonic) => rust.privateUsdForwardAdvance(
@@ -424,7 +410,6 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
         mnemonicBytes: mnemonic,
         lightwalletdUrl: lightwalletdUrl,
         ethRpcUrl: ethRpcUrl,
-        tokensPath: tokensPath,
         opId: opId,
         index: index,
       ),
@@ -544,7 +529,6 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
     final dbPath = await getWalletDbPath();
     final ethRpcUrl = await context.ethRpcUrl();
     final lightwalletdUrl = await context.lightwalletdUrl();
-    final tokensPath = await getPrivateUsdTokenStorePath(context.network);
     return withPrivateUsdSeed(
       secret,
       (mnemonic) => rust.privateUsdReverseAccept(
@@ -555,7 +539,6 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
         mnemonicBytes: mnemonic,
         lightwalletdUrl: lightwalletdUrl,
         ethRpcUrl: ethRpcUrl,
-        tokensPath: tokensPath,
         index: index,
       ),
     );
@@ -625,7 +608,6 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
     final dbPath = await getWalletDbPath();
     final ethRpcUrl = await context.ethRpcUrl();
     final lightwalletdUrl = await context.lightwalletdUrl();
-    final tokensPath = await getPrivateUsdTokenStorePath(context.network);
     return withPrivateUsdSeed(
       secret,
       (mnemonic) => rust.privateUsdReverseAdvance(
@@ -636,7 +618,6 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
         mnemonicBytes: mnemonic,
         lightwalletdUrl: lightwalletdUrl,
         ethRpcUrl: ethRpcUrl,
-        tokensPath: tokensPath,
         opId: opId,
         index: index,
       ),
@@ -733,40 +714,6 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
         ethRpcUrl: ethRpcUrl,
         index: index,
       ),
-    );
-  }
-
-  @override
-  Future<rust.ApiIssuanceBegin?> tokensIssuanceBegin() async {
-    final network = _context().network;
-    return rust.privateUsdTokensIssuanceBegin(
-      tokensPath: await getPrivateUsdTokenStorePath(network),
-      network: network,
-    );
-  }
-
-  @override
-  Future<rust.ApiIssuanceFinish> tokensIssuanceFinish({
-    required BigInt sessionId,
-    required List<String> chain,
-    required String signature,
-  }) async {
-    final network = _context().network;
-    return rust.privateUsdTokensIssuanceFinish(
-      tokensPath: await getPrivateUsdTokenStorePath(network),
-      network: network,
-      sessionId: sessionId,
-      chain: chain,
-      signature: signature,
-    );
-  }
-
-  @override
-  Future<rust.ApiTokenStatus> tokensStatus() async {
-    final network = _context().network;
-    return rust.privateUsdTokensStatus(
-      tokensPath: await getPrivateUsdTokenStorePath(network),
-      network: network,
     );
   }
 

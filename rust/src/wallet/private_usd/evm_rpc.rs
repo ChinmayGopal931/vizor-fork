@@ -72,6 +72,13 @@ pub(crate) const TOKEN_BLOCKLIST: &str = "tokenBlocklist(address)";
 pub(crate) const BALANCE_OF: &str = "balanceOf(address)";
 pub(crate) const PAID_OUT_EVENT: &str = "PaidOut(bytes32,address,uint256)";
 pub(crate) const REFUNDED_EVENT: &str = "Refunded(bytes32,uint256)";
+/// `Opened(id, maker, user, token, amount, makerKey, userKey, t0, t1,
+/// payoutNote)`, its first three indexed: the deadlines a swap opened with.
+pub(crate) const OPENED_EVENT: &str =
+    "Opened(bytes32,address,address,address,uint256,uint256[2],uint256[2],uint64,uint64,bytes32)";
+/// `Opened`'s data: token, amount, the two keys' coordinates, `t0`, `t1`,
+/// payoutNote, a word each.
+const OPENED_DATA_WORDS: usize = 9;
 /// Railgun's proxy: whether a note's nullifier in a tree is spent.
 pub(crate) const NULLIFIERS: &str = "nullifiers(uint256,bytes32)";
 /// A relayed send counts as landed once its receipt has this many blocks.
@@ -223,6 +230,15 @@ pub(crate) trait ChainReader {
     /// When the confirmed refund of `id` mined (its block's time), looking
     /// back to `since`.
     async fn confirmed_refund_time(&self, id: &[u8; 32], since: u64) -> Result<Option<u64>>;
+    /// The `t0` and `t1` a confirmed `Opened` of `id` names, looking back to
+    /// `since`: a swap whose accept's answer was lost. They are checked with
+    /// every other term against the swap's terms hash before anything is
+    /// paid into it, so the chain alone is the evidence.
+    async fn confirmed_opened_deadlines(
+        &self,
+        id: &[u8; 32],
+        since: u64,
+    ) -> Result<Option<(u64, u64)>>;
     async fn transaction_status(
         &self,
         transaction: &[u8; 32],
@@ -632,10 +648,12 @@ impl<'a, T: HttpTransport> EvmRpc<'a, T> {
 
     /// The swap contract's confirmed `event` for `id`, looking back to
     /// `since` (unix seconds) in bounded pages, events delayed past it
-    /// included.
+    /// included. `topics` is how many the event carries: its signature's and
+    /// one per indexed field, the id first.
     async fn confirmed_event(
         &self,
         event: &str,
+        topics: usize,
         id: &[u8; 32],
         since: u64,
     ) -> Result<Option<SwapEvent>> {
@@ -669,7 +687,7 @@ impl<'a, T: HttpTransport> EvmRpc<'a, T> {
                 let block = quantity(&Value::String(log.block_number.clone()))?;
                 if log.removed
                     || !log.address.eq_ignore_ascii_case(&contract)
-                    || log.topics.len() != 2
+                    || log.topics.len() != topics
                     || !log.topics[0].eq_ignore_ascii_case(&topic)
                     || !log.topics[1].eq_ignore_ascii_case(&id_topic)
                     || !(from..=to).contains(&block)
@@ -943,7 +961,7 @@ impl<T: HttpTransport> ChainReader for EvmRpc<'_, T> {
     }
 
     async fn confirmed_payout(&self, id: &[u8; 32], since: u64) -> Result<Option<PaidOut>> {
-        let Some(event) = self.confirmed_event(PAID_OUT_EVENT, id, since).await? else {
+        let Some(event) = self.confirmed_event(PAID_OUT_EVENT, 2, id, since).await? else {
             return Ok(None);
         };
         let fields = words(&event.data, 2)?;
@@ -955,7 +973,7 @@ impl<T: HttpTransport> ChainReader for EvmRpc<'_, T> {
     }
 
     async fn confirmed_refund_time(&self, id: &[u8; 32], since: u64) -> Result<Option<u64>> {
-        let Some(event) = self.confirmed_event(REFUNDED_EVENT, id, since).await? else {
+        let Some(event) = self.confirmed_event(REFUNDED_EVENT, 2, id, since).await? else {
             return Ok(None);
         };
         let block = self
@@ -968,6 +986,18 @@ impl<T: HttpTransport> ChainReader for EvmRpc<'_, T> {
             return fail(ErrorCode::ChainUnreadable, "the refund's block is unknown");
         }
         Ok(Some(head_of(&block)?.timestamp))
+    }
+
+    async fn confirmed_opened_deadlines(
+        &self,
+        id: &[u8; 32],
+        since: u64,
+    ) -> Result<Option<(u64, u64)>> {
+        let Some(event) = self.confirmed_event(OPENED_EVENT, 4, id, since).await? else {
+            return Ok(None);
+        };
+        let fields = words(&event.data, OPENED_DATA_WORDS)?;
+        Ok(Some((u64_word(&fields[6])?, u64_word(&fields[7])?)))
     }
 
     async fn transaction_status(
@@ -1448,6 +1478,72 @@ mod tests {
             t1: 2,
             payout_note: [0; 32],
         }
+    }
+
+    /// A real `Opened`, as a public Sepolia node's `eth_getLogs` returned it
+    /// from the pinned windows contract (block 11,958,747, transaction
+    /// `0x9e29f109…446a`): its topic is the event's signature, its four
+    /// topics and nine data words read, and its deadlines are the maker's,
+    /// `t1` an hour after `t0`. Another swap's id finds nothing.
+    #[tokio::test]
+    async fn opened_deadlines_read_from_a_real_log() {
+        let log: Value = serde_json::from_str(include_str!("tests/opened_log.json")).unwrap();
+        assert_eq!(
+            log["topics"][0],
+            json!(hex0x(&keccak(&[OPENED_EVENT.as_bytes()])))
+        );
+        assert_eq!(log["topics"].as_array().unwrap().len(), 4);
+        assert_eq!(log["data"].as_str().unwrap().len(), 2 + 9 * 64);
+        let pins = deployment::deployment(PrivateUsdNetwork::Testnet);
+        assert!(log["address"]
+            .as_str()
+            .unwrap()
+            .eq_ignore_ascii_case(&hex0x(&pins.swap_contract().unwrap().address)));
+        let swaps = pins.swap_contract().unwrap();
+        let (min, late) = (Some(swaps.min_window), Some(swaps.late_window));
+        let mined = quantity(&log["blockNumber"]).unwrap();
+        let head_time = 1_792_541_148 + 120;
+        let aggregate3 = hex0x(&abi::selector(abi::AGGREGATE3));
+        let answer = log.clone();
+        let transport = ScriptedTransport::new(move |request: &RoutedRequest| {
+            let (method, params) = method(request);
+            Ok::<RoutedResponse, RoutedError>(match method.as_str() {
+                "eth_chainId" => rpc_result(json!("0xaa36a7")),
+                "eth_getBlockByNumber" => rpc_result(json!({
+                    "number": format!("0x{:x}", mined + 10),
+                    "timestamp": format!("0x{head_time:x}"),
+                    "hash": hex0x(&[3; 32]),
+                })),
+                "eth_call" if selector_of(&params) == aggregate3 => {
+                    windows_answer(&params, min, late, None).expect("the windows check")
+                }
+                "eth_getLogs" => {
+                    let filter = &params[0];
+                    let asked = |at: &str| quantity(&filter[at]).unwrap();
+                    let matches = filter["topics"][1] == answer["topics"][1]
+                        && (asked("fromBlock")..=asked("toBlock")).contains(&mined);
+                    rpc_result(if matches { json!([answer]) } else { json!([]) })
+                }
+                other => panic!("unexpected method {other}"),
+            })
+        });
+        let rpc = EvmRpc::new(&transport, pins, "").unwrap();
+        let id = super::super::models::Word::parse(log["topics"][1].as_str().unwrap())
+            .unwrap()
+            .0;
+        let (t0, t1) = rpc
+            .confirmed_opened_deadlines(&id, head_time)
+            .await
+            .unwrap()
+            .expect("the confirmed Opened");
+        assert_eq!((t0, t1), (1_792_543_836, 1_792_547_436));
+        assert_eq!(t1 - t0, 3_600);
+        assert_eq!(
+            rpc.confirmed_opened_deadlines(&[0x11; 32], head_time)
+                .await
+                .unwrap(),
+            None
+        );
     }
 
     #[test]

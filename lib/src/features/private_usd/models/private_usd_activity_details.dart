@@ -9,6 +9,7 @@ import 'private_usd_explorer.dart';
 import 'private_usd_messages.dart';
 import 'private_usd_reverse_presentation.dart';
 import 'private_usd_send.dart';
+import 'private_usd_status_presentation.dart' show privateUsdForwardPaidText;
 import 'railgun_models.dart';
 
 /// One line of a Private USD activity row's details: what the row's record
@@ -175,24 +176,36 @@ List<PrivateUsdActivityDetail> privateUsdDepositDetails(
   ];
 }
 
-/// An ended forward conversion's details: paid, its amounts and fee;
-/// refunded, why. Then its swap and transactions.
+/// An ended forward conversion's details: paid, its amounts and fees;
+/// refunded, why; ended unstarted after its market maker fee was paid, that
+/// the fee isn't refunded. The market maker fee shows on each of them, a
+/// refunded bridge's too: the refund never includes it. Then its swap and
+/// transactions.
 List<PrivateUsdActivityDetail> privateUsdForwardDetails(
   AppLocalizations l10n,
   ApiForwardRecord record, {
   bool privacyModeEnabled = false,
 }) {
+  final openFee = record.openFeeZat;
+  final openFeeTxid = record.openFeeTxid;
   final deposit = record.depositTxid;
   final payout = record.payoutTx;
   final sweep = record.sweepTxid;
   final endedAt = record.endedAt;
+  final feeLost =
+      record.outcome == ApiForwardOutcome.nothingSent && record.openFeeMined;
   return [
     if (record.outcome == ApiForwardOutcome.refunded)
       PrivateUsdDetailNote(privateUsdRefundedMessage(l10n, record.refundCause)),
+    if (feeLost)
+      PrivateUsdDetailNote(privateUsdForwardNothingSentMessage(l10n, record)),
     if (record.outcome == ApiForwardOutcome.paid) ...[
       PrivateUsdDetailValue(
         l10n.privateUsdBridgedYouPaid,
-        _zec(record.maxTotalZat ?? record.depositZat, privacyModeEnabled),
+        privateUsdForwardPaidText(
+          record,
+          privacyModeEnabled: privacyModeEnabled,
+        ),
       ),
       PrivateUsdDetailValue(
         l10n.privateUsdBridgedYouReceived,
@@ -203,11 +216,24 @@ List<PrivateUsdActivityDetail> privateUsdForwardDetails(
         _usd(_units(record.relayerFee), privacyModeEnabled),
       ),
     ],
+    if (openFee != null &&
+        (record.outcome == ApiForwardOutcome.paid ||
+            record.outcome == ApiForwardOutcome.refunded ||
+            feeLost))
+      PrivateUsdDetailValue(
+        l10n.privateUsdConvertOpenFee,
+        l10n.privateUsdConvertOpenFeeValue(_zec(openFee, privacyModeEnabled)),
+      ),
     PrivateUsdDetailValue(
       l10n.privateUsdDetailSwapId,
       truncatedTxid(record.swapId),
       copyText: record.swapId,
     ),
+    if (openFeeTxid != null)
+      PrivateUsdDetailTransaction.zcash(
+        l10n.privateUsdDetailOpenFee,
+        openFeeTxid,
+      ),
     if (deposit != null)
       PrivateUsdDetailTransaction.zcash(l10n.privateUsdDetailDeposit, deposit),
     if (payout != null)
