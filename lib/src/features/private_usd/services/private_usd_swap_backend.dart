@@ -148,10 +148,10 @@ abstract interface class PrivateUsdSwapBackend {
     required int units,
   });
 
-  /// Accepts the quote of swap [index]; re-entrant for the same index. With
-  /// [relayerClaims] the relayer gets the claim once the deposit is out.
-  /// Accepts swap [index]'s quote under call [opId], which [cancel] stops
-  /// before an open fee is saved or paid.
+  /// Accepts the quote of swap [index] under call [opId], which [cancel]
+  /// stops before an open fee is saved or paid; re-entrant for the same
+  /// index. With [relayerClaims] the relayer gets the claim once the deposit
+  /// is out.
   Future<rust.ApiAcceptResult> forwardAccept(
     String accountUuid,
     PrivateUsdSecretReader secret, {
