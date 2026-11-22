@@ -290,6 +290,8 @@ pub(super) struct State {
     pub created_fee: Option<ZcashTransaction>,
     /// Where a crash cuts the open fee's payment short.
     pub fee_crash: Option<Crash>,
+    /// The deadline each open fee payment was created to expire by.
+    pub fee_deadlines: Vec<u64>,
     /// What the account's funds are, spendable and on their way.
     pub funds: Funds,
     pub statuses: HashMap<ZcashTxId, SwapTxStatus>,
@@ -411,6 +413,7 @@ impl State {
             fee_payments: Vec::new(),
             created_fee: None,
             fee_crash: None,
+            fee_deadlines: Vec::new(),
             funds: Funds {
                 spendable: 100_000_000,
                 pending: 0,
@@ -1206,6 +1209,16 @@ impl ForwardZcash for FakeZcash {
             store::crash_before_next_commit();
         }
         Ok(created)
+    }
+
+    async fn create_open_fee(
+        &self,
+        proposal: FakeProposal,
+        deadline: u64,
+    ) -> Result<ZcashTransaction> {
+        assert!(proposal.open_fee, "a deposit is created as a deposit");
+        self.0.set().fee_deadlines.push(deadline);
+        self.create_deposit(proposal).await
     }
 
     fn discard_deposit(&self, _proposal: FakeProposal) {

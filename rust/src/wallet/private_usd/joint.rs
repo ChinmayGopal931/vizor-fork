@@ -1057,6 +1057,30 @@ impl ForwardZcash for WalletZcash<'_> {
         }
     }
 
+    async fn create_open_fee(
+        &self,
+        proposal: DepositProposal,
+        deadline: u64,
+    ) -> Result<ZcashTransaction> {
+        let created = sync::create_stored_proposal_transactions_expiring_by(
+            self.main_db,
+            self.lightwalletd_url,
+            proposal.proposal_id,
+            &proposal.send_flow_id,
+            self.keys.seed(),
+            deadline,
+        )
+        .await
+        .map_err(wallet_error)?;
+        match created.as_slice() {
+            [payment] => kept_transaction(payment),
+            _ => fail(
+                ErrorCode::ZcashWallet,
+                "the open fee was not one transaction",
+            ),
+        }
+    }
+
     fn discard_deposit(&self, proposal: DepositProposal) {
         if sync::discard_proposal(proposal.proposal_id, &proposal.send_flow_id).is_err() {
             log::warn!("private usd: releasing a deposit proposal failed");

@@ -224,6 +224,15 @@ pub(crate) trait ForwardZcash {
     ) -> Result<(Self::Proposal, u64)>;
     /// Signs and stores a proposed deposit or open fee without sending it.
     async fn create_deposit(&self, proposal: Self::Proposal) -> Result<ZcashTransaction>;
+    /// Signs and stores a proposed open fee without sending it, expiring a
+    /// few blocks after `deadline` (unix seconds, its quote's `expiresAt`)
+    /// rather than the ordinary 40 or 120: neither a resend nor the wallet's
+    /// resubmission can then have it mined long after its quote.
+    async fn create_open_fee(
+        &self,
+        proposal: Self::Proposal,
+        deadline: u64,
+    ) -> Result<ZcashTransaction>;
     fn discard_deposit(&self, proposal: Self::Proposal);
     /// A payment to `address` the wallet created that may still land: a
     /// deposit, or an open fee.
@@ -540,6 +549,9 @@ where
         require_time_to_accept(&quote, now)?;
         // The maker's proof is checked before anything is paid.
         let acceptance = self.acceptance(index, &quote)?;
+        // Read before the fee is proposed: nothing waits on the network
+        // between its last time check and its creation.
+        let zcash_height = self.zcash.chain_height().await?;
         let open_fee = match &quote.open_fee {
             Some(fee) => Some(
                 self.propose_open_fee(index, &quote, fee, &offer, max_total_zatoshi)
@@ -552,7 +564,7 @@ where
             index,
             quote,
             swap_id: Hex(swap_id),
-            zcash_height: self.zcash.chain_height().await?,
+            zcash_height,
             accepted_at: self.clock.now(),
             receives: offer.receives,
             relayer_fee: offer.relayer_fee,
@@ -753,7 +765,10 @@ where
         proposal: ProposedDeposit<'_, Z>,
         network_fee: u64,
     ) -> Result<OpenFeePayment> {
-        let created = self.zcash.create_deposit(proposal.take()).await?;
+        let created = self
+            .zcash
+            .create_open_fee(proposal.take(), record.quote.expires_at)
+            .await?;
         let payment = OpenFeePayment::new(created, Some(network_fee));
         // Kept before it is first sent.
         let mut current: ForwardRecord = load(store, self.account, record.index)?;
@@ -819,7 +834,16 @@ where
             .sent_at
             .is_none_or(|sent| now >= sent.saturating_add(OPEN_FEE_RESEND_SECONDS));
         if due && open_fee::time_to_pay(&current.quote, now) && status != SwapTxStatus::Expired {
-            self.send_open_fee(&current, &payment).await?;
+            // Sent again best effort: one near its expiry, which follows its
+            // quote's, a node refuses as expiring soon, and the first send
+            // and the wallet's resubmission stand.
+            if let Err(error) = self.send_open_fee(&current, &payment).await {
+                log::warn!(
+                    "private usd: forward swap {}: sending the open fee again failed ({:?})",
+                    current.index,
+                    error.code
+                );
+            }
         }
         Ok(waiting(ForwardWait::FeeConfirming))
     }

@@ -865,6 +865,62 @@ impl SwapStore {
     }
 }
 
+/// A forward record's open fee payment, as [`open_fee_payments`] reads it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct OpenFeeRow {
+    /// Display order, as the record keeps it.
+    pub tx_id: String,
+    /// The bridge has ended.
+    pub ended: bool,
+    /// Its quote's `expiresAt`.
+    pub expires_at: u64,
+}
+
+/// Every kept forward record's open fee payment in `dir`'s `swaps.db`, of
+/// every account, read only: no migration, no write, and a record that does
+/// not read is skipped rather than failing the rest. The wallet's
+/// resubmission reads it (`open_fee::withheld_fee_txids`), outside any
+/// conversion step. `None` without a store.
+pub(crate) fn open_fee_payments(dir: &Path) -> Result<Option<Vec<OpenFeeRow>>> {
+    let path = dir.join(FILE_NAME);
+    if !path.exists() {
+        return Ok(None);
+    }
+    let conn = Connection::open_with_flags(
+        &path,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .map_err(sql)?;
+    conn.busy_timeout(BUSY_TIMEOUT).map_err(sql)?;
+    let mut statement = conn
+        .prepare(
+            "SELECT record_json FROM swaps
+             WHERE direction = 'forward' AND record_json LIKE '%\"openFeePayment\"%'",
+        )
+        .map_err(sql)?;
+    let rows = statement
+        .query_map([], |row| row.get::<_, String>(0))
+        .map_err(sql)?;
+    let mut payments = Vec::new();
+    for json in rows {
+        let Ok(record) = serde_json::from_str::<serde_json::Value>(&json.map_err(sql)?) else {
+            continue;
+        };
+        let (Some(tx_id), Some(expires_at)) = (
+            record["openFeePayment"]["txId"].as_str(),
+            record["quote"]["expiresAt"].as_u64(),
+        ) else {
+            continue;
+        };
+        payments.push(OpenFeeRow {
+            tx_id: tx_id.to_owned(),
+            ended: !record["outcome"].is_null(),
+            expires_at,
+        });
+    }
+    Ok(Some(payments))
+}
+
 /// A kept record, strictly: unreadable, or not the row's own swap, is an
 /// error.
 fn decode(direction: Direction, index: i64, json: &str) -> Result<StoredRecord> {

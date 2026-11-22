@@ -333,3 +333,25 @@ async fn a_quote_without_an_open_fee_is_accepted_as_before() {
             .contains("openFee")
     );
 }
+
+/// Finding 1: the fee's payment is created to expire with its quote, not
+/// 40 or 120 blocks on, and a bridge that ended sends it no more.
+#[tokio::test]
+async fn the_fee_expires_with_its_quote_and_an_ended_bridge_sends_it_no_more() {
+    let h = asking(FEE, fee_address());
+    h.world.set().fee_unseen_accepts = u32::MAX;
+    let quoted = h.quote().await.unwrap();
+    accept(&h, quoted.index).await.unwrap();
+    assert_eq!(h.world.get().fee_deadlines, [NOW + 300]);
+    assert_eq!(h.world.get().submitted.len(), 1);
+
+    h.world.set().clock = NOW + 300;
+    assert_eq!(
+        h.advance().await.unwrap(),
+        nothing_sent(NothingSentCause::FeeNotHonoured)
+    );
+    h.world.set().pass(60);
+    h.advance().await.unwrap();
+    assert_eq!(h.world.get().submitted.len(), 1, "never sent again");
+}
+
