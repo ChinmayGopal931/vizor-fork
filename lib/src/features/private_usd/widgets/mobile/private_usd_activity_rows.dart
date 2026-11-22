@@ -149,6 +149,11 @@ ActivityRowData? buildPrivateUsdActivityRow({
       final zec = privacyModeEnabled
           ? fixedPrivacyMask()
           : ZecAmount.fromZatoshi(paid).activity.toString();
+      final out = PrivateUsdCopy.activityOut(zec);
+      // Its payment's own network fee unknown, the amount is approximate:
+      // "≈ −0.25 ZEC", the sign kept with the number.
+      final approximate =
+          record.openFeeNetworkZat == null && !privacyModeEnabled;
       return ActivityRowData(
         stableId: base.stableId,
         title: context.l10n.privateUsdActivityFeeLost,
@@ -158,7 +163,7 @@ ActivityRowData? buildPrivateUsdActivityRow({
         leadingIconColor: base.leadingIconColor,
         subtitle: context.l10n.privateUsdActivityFeeLostDetail,
         amountText: activityAmountTextForFormFactor(
-          PrivateUsdCopy.activityOut(zec),
+          approximate ? PrivateUsdCopy.approximately(out) : out,
         ),
         amountColor: outgoingAmountColor(colors),
         statusText: '',
