@@ -105,11 +105,10 @@ ActivityRowData? buildPrivateUsdActivityRow({
         onTap: onOpenConversion,
       );
     case ApiForwardOutcome.paid:
-      final zec = privacyModeEnabled
-          ? fixedPrivacyMask()
-          : ZecAmount.fromZatoshi(
-              privateUsdForwardPaidZat(record),
-            ).activity.toString();
+      final zec = privateUsdForwardPaidText(
+        record,
+        privacyModeEnabled: privacyModeEnabled,
+      );
       return ActivityRowData(
         stableId: base.stableId,
         title: context.l10n.privateUsdActivityConverted,

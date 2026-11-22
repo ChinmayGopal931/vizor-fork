@@ -95,10 +95,10 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation(
   BlockTimeEstimate blockTimes = BlockTimeEstimate.preNu7,
 }) {
   final record = status.record;
-  final totalZat = privateUsdForwardPaidZat(record);
-  final zecText = privacyModeEnabled
-      ? fixedPrivacyMask()
-      : ZecAmount.fromZatoshi(totalZat).activity.toString();
+  final zecText = privateUsdForwardPaidText(
+    record,
+    privacyModeEnabled: privacyModeEnabled,
+  );
   final receives = BigInt.parse(record.receives);
   final usdText = privacyModeEnabled
       ? fixedPrivacyMask()
@@ -566,13 +566,36 @@ List<SwapStatusDetailRowData> _details(
   ];
 }
 
-/// The ZEC a forward conversion pays: its deposit's approved total, and the
-/// market maker's fee, with its payment's network fee, where its quote asked
-/// one.
-BigInt privateUsdForwardPaidZat(ApiForwardRecord record) =>
-    (record.maxTotalZat ?? record.depositZat) +
-    (record.openFeeZat ?? BigInt.zero) +
-    (record.openFeeNetworkZat ?? BigInt.zero);
+/// The ZEC a forward conversion pays: its deposit with the network fee it
+/// cost, or before the wallet shows that its approved total (the most it may
+/// cost), and the market maker's fee, with its payment's network fee, where
+/// its quote asked one.
+BigInt privateUsdForwardPaidZat(ApiForwardRecord record) {
+  final depositNetwork = record.depositNetworkZat;
+  final deposit = depositNetwork != null && record.depositTxid != null
+      ? record.depositZat + depositNetwork
+      : (record.maxTotalZat ?? record.depositZat);
+  return deposit +
+      (record.openFeeZat ?? BigInt.zero) +
+      (record.openFeeNetworkZat ?? BigInt.zero);
+}
+
+/// [privateUsdForwardPaidZat] as an amount: masked in privacy mode, and
+/// approximate ("≈") where the market maker fee's payment's own network fee
+/// is not known, as for a payment found again after a restart in a wallet
+/// that does not show its fee.
+String privateUsdForwardPaidText(
+  ApiForwardRecord record, {
+  required bool privacyModeEnabled,
+}) {
+  if (privacyModeEnabled) return fixedPrivacyMask();
+  final text = ZecAmount.fromZatoshi(
+    privateUsdForwardPaidZat(record),
+  ).activity.toString();
+  final approximate =
+      record.openFeeTxid != null && record.openFeeNetworkZat == null;
+  return approximate ? PrivateUsdCopy.approximately(text) : text;
+}
 
 /// A txid as explorers show it: records carry the wallet's internal
 /// (protocol) byte order, as history rows do.

@@ -9,7 +9,7 @@ import 'private_usd_explorer.dart';
 import 'private_usd_messages.dart';
 import 'private_usd_reverse_presentation.dart';
 import 'private_usd_send.dart';
-import 'private_usd_status_presentation.dart' show privateUsdForwardPaidZat;
+import 'private_usd_status_presentation.dart' show privateUsdForwardPaidText;
 import 'railgun_models.dart';
 
 /// One line of a Private USD activity row's details: what the row's record
@@ -178,7 +178,9 @@ List<PrivateUsdActivityDetail> privateUsdDepositDetails(
 
 /// An ended forward conversion's details: paid, its amounts and fees;
 /// refunded, why; ended unstarted after its market maker fee was paid, that
-/// the fee isn't refunded. Then its swap and transactions.
+/// the fee isn't refunded. The market maker fee shows on each of them, a
+/// refunded bridge's too: the refund never includes it. Then its swap and
+/// transactions.
 List<PrivateUsdActivityDetail> privateUsdForwardDetails(
   AppLocalizations l10n,
   ApiForwardRecord record, {
@@ -200,7 +202,10 @@ List<PrivateUsdActivityDetail> privateUsdForwardDetails(
     if (record.outcome == ApiForwardOutcome.paid) ...[
       PrivateUsdDetailValue(
         l10n.privateUsdBridgedYouPaid,
-        _zec(privateUsdForwardPaidZat(record), privacyModeEnabled),
+        privateUsdForwardPaidText(
+          record,
+          privacyModeEnabled: privacyModeEnabled,
+        ),
       ),
       PrivateUsdDetailValue(
         l10n.privateUsdBridgedYouReceived,
@@ -212,7 +217,9 @@ List<PrivateUsdActivityDetail> privateUsdForwardDetails(
       ),
     ],
     if (openFee != null &&
-        (record.outcome == ApiForwardOutcome.paid || feeLost))
+        (record.outcome == ApiForwardOutcome.paid ||
+            record.outcome == ApiForwardOutcome.refunded ||
+            feeLost))
       PrivateUsdDetailValue(
         l10n.privateUsdConvertOpenFee,
         l10n.privateUsdConvertOpenFeeValue(_zec(openFee, privacyModeEnabled)),
