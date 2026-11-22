@@ -2376,17 +2376,19 @@ mainnet asks none yet, and a quote without it takes the old path unchanged.
   both network fees; the deposit's approved total allows one logical action
   more (`marginal_fee`), since the fee can take a note the deposit counted on.
   The accept runs under an op id, so a lock or the background stops the fee
-  before it is saved, as any key step.
+  before it is saved, as any key step; nothing else answers that cancel, so
+  an accept's post, fee or not, always completes.
 - One payment of exactly `zat`, no memo (send flow
   `private-usd-open-fee:{account}:{index}`): the record is saved with the
   payment started before it is created (`openFeeAttempted`), the payment kept
   before it is first sent (`openFeePayment`), found again in the wallet after
-  an interruption, and never built twice. It expires a few blocks after the
-  quote (`deadline_expiry_height`), not 40 or 120 on; the wallet's sync stops
-  sending it once its bridge ended or its quote expired
-  (`withheld_fee_txids`), and Veylor sends it again every 30 s while no block
-  has it and a minute of the quote is left. "Call it off" refuses a bridge
-  whose fee started.
+  an interruption, and never built twice. It expires two blocks past the
+  last one its quote's end expects (`deadline_expiry_height`), not 40 or 120
+  on, and is not created with under a minute of the quote left. Veylor
+  sends it, and again every 30 s while no block has it, only while that
+  minute is left (a failed send waits its 30 s too); the wallet's sync stops
+  sending it once its bridge ended or its quote is in that last minute
+  (`withheld_fee_txids`). "Call it off" refuses a bridge whose fee started.
 - The accept goes from the engine loop, only once Veylor's wallet shows the
   fee mined. `402 feeRequired`, a `5xx` or no answer post the same accept
   again after `Retry-After` (else 5 s, or 12 s unanswered; at least 1 s the

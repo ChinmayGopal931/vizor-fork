@@ -12,8 +12,8 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
   all closed on `feat/open-fee`:
   - **The fee lives with its quote.** Its payment expires a few blocks after
     the quote (`deadline_expiry_height` in `send.rs`), and the wallet's sync
-    stops sending the fee of a bridge that ended or a quote that expired
-    (`open_fee::withheld_fee_txids`, read from `swaps.db`).
+    stops sending the fee of a bridge that ended or a quote with under a
+    minute left (`open_fee::withheld_fee_txids`, read from `swaps.db`).
   - **Quotes long enough for a block.** A fee quote must live 180 s to 30
     minutes (`open_fee_min_quote_life_seconds`,
     `open_fee_max_quote_life_seconds`), and is paid only with 180 s left;
@@ -3049,13 +3049,19 @@ M8 status (2026-10-14): the non-device parts are done.
   - **Expiry, not resends, bounds a late fee.** A fee mined after its quote
     pays for nothing, and an ordinary payment can be mined 40 blocks (50
     minutes) or, from NU7, 120 blocks on, re-sent by the sync all the while.
-    The payment's expiry is the target height plus the blocks left until
-    `expiresAt` at the target's spacing, plus 2 for block-time variance;
-    nodes refuse one within 3 blocks of the tip, so that is its floor, and
-    an ordinary payment's expiry (capped at an upgrade) its ceiling. The
-    sync's resubmission reads `swaps.db` beside the wallet DB on each pass,
-    best effort: a store that does not read withholds nothing, and the
-    expiry still ends the payment.
+    The payment's expiry is the last block expected by `expiresAt` at the
+    target's spacing (the target plus the blocks left, less one: the target
+    is the first of them), plus 2 for block-time variance; nodes refuse one
+    within 3 blocks of the tip, so that is its floor, and an ordinary
+    payment's expiry (capped at an upgrade) its ceiling. With under a minute
+    of the quote left once the wallet's lock is taken, nothing is created,
+    and a payment finished inside that minute is never sent. The sync's
+    resubmission reads `swaps.db` beside the wallet DB on each pass, best
+    effort, withholding from that last minute: a store that does not read
+    withholds nothing, and the expiry still ends the payment. The short
+    expiry marks the payment on chain, a privacy cost the owner may revisit;
+    a pre-NU7 canonical crossing keeps the backend's rolling expiry, with
+    the withholding as its only guard.
   - **180 s of quote, and why.** At 75 s blocks a fee paid with 60 s left
     misses its block more often than not (`e^(-60/75)` ≈ 45%); with 180 s,
     about 9%; at NU7's 25 s spacing, under 0.1%. A 30-minute ceiling keeps a
