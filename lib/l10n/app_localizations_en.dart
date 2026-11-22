@@ -8891,10 +8891,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Veylor can\'t read its saved bridges. Contact support.';
 
   @override
-  String get privateUsdConvertErrorTokensUnavailable =>
-      'Couldn\'t get this bridge\'s token, so nothing was sent. Try again in a moment.';
-
-  @override
   String get privateUsdConvertErrorUnpayable =>
       'Your wallet can\'t pay this in one transaction right now. Try a smaller amount.';
 
@@ -9017,10 +9013,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get privateUsdConvertProblemTitle => 'Taking longer than usual';
-
-  @override
-  String get privateUsdConvertProblemTokens =>
-      'The market maker asks for a token. Veylor is getting one for today; if it can\'t, this bridge is called off.';
 
   @override
   String get privateUsdConvertProblemUnexpected =>
@@ -10390,30 +10382,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get privateUsdTokenTestUsd => 'Test dollar';
-
-  @override
-  String get privateUsdTokensDeviceRefused =>
-      'The token issuer doesn\'t recognize this device, so it can\'t convert. Emulators, unlocked bootloaders, modified systems and unrecognized builds are turned away.';
-
-  @override
-  String get privateUsdTokensKeystore =>
-      'This phone\'s keystore couldn\'t sign for the token issuer. Try again in a moment.';
-
-  @override
-  String get privateUsdTokensNoneToday =>
-      'This device has used today\'s conversions. More are available after midnight UTC.';
-
-  @override
-  String get privateUsdTokensTorOffDisclosure =>
-      'With Tor off, the token issuer and the market maker can tell this bridge and its token came from the same connection.';
-
-  @override
-  String get privateUsdTokensUnavailable =>
-      'Conversions need an Android phone while the market maker asks for a token with each one.';
-
-  @override
-  String get privateUsdTokensUnreachable =>
-      'Couldn\'t reach the token issuer. Try again in a moment.';
 
   @override
   String privateUsdUpdated(String time) {

@@ -14582,12 +14582,6 @@ abstract class AppLocalizations {
   /// **'Veylor can\'t read its saved bridges. Contact support.'**
   String get privateUsdConvertErrorStore;
 
-  /// Error on the bridge review when Veylor could not get the Privacy Pass token the market maker asks for, so nothing was sent.
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn\'t get this bridge\'s token, so nothing was sent. Try again in a moment.'**
-  String get privateUsdConvertErrorTokensUnavailable;
-
   /// Error on the bridge screens when the wallet cannot pay the deposit in a single transaction right now; nothing was sent.
   ///
   /// In en, this message translates to:
@@ -14779,12 +14773,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Taking longer than usual'**
   String get privateUsdConvertProblemTitle;
-
-  /// Message on a bridge's progress screen while Veylor gets the token the market maker asks for; without one, the bridge is called off.
-  ///
-  /// In en, this message translates to:
-  /// **'The market maker asks for a token. Veylor is getting one for today; if it can\'t, this bridge is called off.'**
-  String get privateUsdConvertProblemTokens;
 
   /// Problem card message for an unexpected error; Veylor keeps retrying while the app is open.
   ///
@@ -16921,42 +16909,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Test dollar'**
   String get privateUsdTokenTestUsd;
-
-  /// Error on the bridge screens when the token issuer does not trust this device (its hardware attestation failed), so it cannot bridge.
-  ///
-  /// In en, this message translates to:
-  /// **'The token issuer doesn\'t recognize this device, so it can\'t convert. Emulators, unlocked bootloaders, modified systems and unrecognized builds are turned away.'**
-  String get privateUsdTokensDeviceRefused;
-
-  /// Error on the bridge screens when the phone's secure keystore could not sign the request to the token issuer.
-  ///
-  /// In en, this message translates to:
-  /// **'This phone\'s keystore couldn\'t sign for the token issuer. Try again in a moment.'**
-  String get privateUsdTokensKeystore;
-
-  /// Error on the bridge screens when this device has used up today's Privacy Pass tokens, so no more bridges can start until midnight UTC.
-  ///
-  /// In en, this message translates to:
-  /// **'This device has used today\'s conversions. More are available after midnight UTC.'**
-  String get privateUsdTokensNoneToday;
-
-  /// Privacy disclosure on the bridge review while the market maker asks for tokens and Tor is off: the token issuer and the market maker can link this bridge to its token.
-  ///
-  /// In en, this message translates to:
-  /// **'With Tor off, the token issuer and the market maker can tell this bridge and its token came from the same connection.'**
-  String get privateUsdTokensTorOffDisclosure;
-
-  /// Error on the bridge screens on a phone that cannot get tokens (not Android) while the market maker asks for a token with each bridge.
-  ///
-  /// In en, this message translates to:
-  /// **'Conversions need an Android phone while the market maker asks for a token with each one.'**
-  String get privateUsdTokensUnavailable;
-
-  /// Error on the bridge screens when the token issuer cannot be reached.
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn\'t reach the token issuer. Try again in a moment.'**
-  String get privateUsdTokensUnreachable;
 
   /// Line under the Shielded USD balance, also read by screen readers, saying when the balance was last updated; {time} is a date and time formatted for the language, such as 25 May, 13:30.
   ///
