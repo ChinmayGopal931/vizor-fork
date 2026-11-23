@@ -5,7 +5,8 @@ A public Veylor build must not show Vizor's identity anywhere (docs/releases.md,
 "Desktop identity"): the executable's name and version resource, the package's
 id, title, authors and files all name Veylor and Zapp LLC. It also checks the
 settings the app compiled with (the defines' names and the few values that
-matter; no keyed RPC URL), and that the Railgun page's bundle is in the app.
+matter: no keyed RPC URL, and the kill switch the release config names, if
+any), and that the Railgun page's bundle is in the app.
 
 It reads every program and library in the app (PE files) too: each is built
 for the package's architecture, and every DLL of the Visual C++ runtime one
@@ -185,6 +186,22 @@ def version_info(path: Path) -> dict:
     return json.loads(out or "{}")
 
 
+def release_flag_url() -> str:
+    """The kill switch's URL the release config names, or '' while it names none.
+
+    scripts/veylor-private-usd-flag-url.sh's rule, which every Veylor pipeline
+    follows (package-windows-velopack.ps1 reads the file by it): one https URL
+    at most, without credentials, a fragment or whitespace.
+    """
+    path = REPO / "scripts/release-config/veylor-private-usd-flag-url.txt"
+    urls = [line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    if len(urls) > 1:
+        sys.exit(f"{path} must hold one URL at most")
+    if urls and not re.fullmatch(r"https://[A-Za-z0-9.-]+(:443)?(/[^@#\s]*)?", urls[0]):
+        sys.exit(f"{path} must hold an https URL without credentials or a fragment")
+    return urls[0] if urls else ""
+
+
 def dart_defines() -> dict[str, str]:
     config = (REPO / "windows/flutter/ephemeral/generated_config.cmake").read_text(encoding="utf-8")
     match = re.search(r'"DART_DEFINES=([^"]*)"', config)
@@ -222,6 +239,11 @@ def main() -> int:
     check(defines.get("VIZOR_RELEASE_BUILD_NUMBER") == args.build_number, "the build number")
     check(defines.get("VIZOR_FORM_FACTOR", "desktop") == "desktop", "the desktop form factor")
     check(not any(key.startswith("VIZOR_ETHEREUM_RPC_URL") for key in defines), "no keyed RPC URL")
+    flag_url = release_flag_url()
+    check(
+        defines.get("VIZOR_PRIVATE_USD_FLAG_URL", "") == flag_url,
+        "the kill switch the release config names" if flag_url else "no kill switch: the release config names none",
+    )
 
     executables = sorted(path.name for path in args.pack_dir.glob("*.exe"))
     print("executables:", ", ".join(executables))

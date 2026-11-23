@@ -49,8 +49,10 @@ through `scripts/veylor-private-usd-flag-url.sh`, which prints it or nothing and
 fails on anything but one https URL without credentials or a fragment: the APK
 builder's Veylor flavor, `scripts/build-linux-release.sh`'s Veylor flavors,
 `scripts/release-veylor-macos.sh` and `scripts/package-windows-velopack.ps1` for
-a Veylor id, with `veylor-android.yml` and `veylor-linux.yml` checking the
-define. A file in the checkout, not a CI variable, so a rebuild at a tag
+a Veylor id (which reads the file itself, by the script's rule), with
+`veylor-android.yml`, `veylor-linux.yml` and `veylor-windows.yml` (through
+`scripts/check-veylor-windows-package.py`) checking the define. A file in the
+checkout, not a CI variable, so a rebuild at a tag
 passes the same URL. A build by hand (the Play bundle, TestFlight) passes
 `--dart-define=VIZOR_PRIVATE_USD_FLAG_URL=<the script's output>` when there is
 one. The file names none yet: until the owner chooses a URL and hosts
@@ -231,7 +233,8 @@ own way, and a malformed or unknown id fails the build:
     `VIZOR_PRIVATE_USD_ENABLED=true` and the run's build number, stamped
     `<version>-internal.<run>`, or the workflow's `VEYLOR_VERSION` on a
     dispatch with `public_release`. `scripts/check-veylor-windows-package.py`
-    fails a build whose defines (no keyed RPC URL), executable, version
+    fails a build whose defines (no keyed RPC URL, and the kill switch the
+    release config names, if any), executable, version
     resource, page bundle, installer or package manifest differ or name Vizor,
     whose programs and libraries are another architecture's, or whose Visual
     C++ runtime is missing ("Veylor Windows release" below).
