@@ -588,7 +588,11 @@ stay, unused.
     completing between, the page rebuilds every tree from the start with
     the archive off for a week, at most once a day from when the last
     rebuild completed (`tree-recovery.js`); a root an RPC hasn't caught up
-    to passes by then. A scan that broke before that check counts for
+    to passes by then. A refusal by an RPC whose newest block is not five
+    blocks past the refused tree's newest leaf counts for nothing (the scan
+    fails, saying the RPC is behind): rail-squid's lists can run ahead of an
+    RPC that lags, which would otherwise rebuild the trees once a day
+    (review, 2026-11-22). A scan that broke before that check counts for
     nothing: its store can end inside an on-chain batch, at a root the
     contract never had. The rebuild clears the transaction list first
     (rebuilt notes lack the railgunTxids its sync gave them, which proofs

@@ -14,9 +14,11 @@ import {
   ARCHIVE_OFF_MS,
   REBUILD_AFTER_MS,
   REBUILD_EVERY_MS,
+  RPC_LAG_BLOCKS,
   archiveOff,
   localStore,
   rebuildTrees,
+  rpcBehindLeaf,
   takeRefusedRoot,
   treeRecovery,
 } from '../src/tree-recovery.js';
@@ -277,7 +279,7 @@ test("the engine's end-of-scan check reports the root it refuses, and still fail
   roots.delete(`0:${root}`);
   await scan();
   assert.deepEqual(ends, ['complete', 'incomplete']);
-  assert.deepEqual(takeRefusedRoot(), { tree: 0, root });
+  assert.deepEqual(takeRefusedRoot(), { tree: 0, root, index: await utxo.getLatestIndexForTree(0) });
 });
 
 test('a tree the engine keeps refusing as new notes move its root on is rebuilt in ten minutes all the same', async () => {
@@ -455,6 +457,7 @@ test('the build rewrites the end-of-scan check and the full rescan, and refuses 
   const source = readFileSync(path.join(ENGINE, 'railgun-engine.js'), 'utf8');
   const rewritten = throughRailgunEngineHooks(source);
   assert.ok(rewritten.includes('.rootRefused(treeIndex, root, new Error(`Invalid merkleroot: ${root}.'));
+  assert.ok(rewritten.includes('Index: ${index}.`), index);'), 'the refusal says which leaf the root follows');
   assert.ok(!rewritten.includes('await this.fullResetTXIDMerkletreesV2(chain);'));
   assert.ok(rewritten.includes('async fullResetTXIDMerkletreesV2(chain) {'), "the engine's reset itself stays");
   assert.throws(
@@ -465,4 +468,12 @@ test('the build rewrites the end-of-scan check and the full rescan, and refuses 
     () => withoutRescanTxidReset(source.replace('Must reset txid merkletree', 'Must reset the txid merkletree')),
     /no longer applies/,
   );
+});
+
+test("a refusal by an RPC that hasn't reached the tree's newest leaf counts for nothing", () => {
+  assert.equal(rpcBehindLeaf(1_000, 999), true, 'the leaf is past the newest block');
+  assert.equal(rpcBehindLeaf(1_000, 1_000 + RPC_LAG_BLOCKS - 1), true, 'too close to the newest block to tell');
+  assert.equal(rpcBehindLeaf(1_000, 1_000 + RPC_LAG_BLOCKS), false);
+  assert.equal(rpcBehindLeaf(undefined, 1_000), false, 'an unread leaf counts the refusal, as before');
+  assert.equal(rpcBehindLeaf(1_000, undefined), false, 'an unread newest block counts it too');
 });

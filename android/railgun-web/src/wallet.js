@@ -46,7 +46,7 @@ import { syncFailure } from './rpc-probe.js';
 import { screeningActivity } from './screening-activity.js';
 import { squidQueries } from './squid.js';
 import { syncFinisher } from './sync-finish.js';
-import { archiveOff, localStore, rebuildTrees, takeRefusedRoot, treeRecovery } from './tree-recovery.js';
+import { archiveOff, localStore, rebuildTrees, rpcBehindLeaf, takeRefusedRoot, treeRecovery } from './tree-recovery.js';
 import { TxidListStopped, catchUpTxids } from './txid-catch-up.js';
 import { changeTxidList, forgettingStops, takeListStop, txidRepair } from './txid-repair.js';
 import { walletNamespaces } from './wallet-namespaces.js';
@@ -598,9 +598,12 @@ async function scanNotesNow(walletId) {
       notesScan = undefined;
     }
     if (scan.incomplete) {
-      // A tree whose root the contract has never had fails every scan until it is rebuilt (tree-recovery.js).
-      if (await recovery(walletId).broke(takeRefusedRoot())) continue;
-      throw new Error('the notes scan broke off, so the balances may be stale');
+      // A tree whose root the contract has never had fails every scan until it is rebuilt (tree-recovery.js), unless the
+      // RPC that refused it hasn't reached its newest leaf: that refusal counts for nothing.
+      const refusal = takeRefusedRoot();
+      const lag = refusal === undefined ? undefined : await rpcLag(refusal);
+      if (await recovery(walletId).broke(lag === undefined ? refusal : undefined)) continue;
+      throw new Error(lag ?? 'the notes scan broke off, so the balances may be stale');
     }
     if (scan.started) {
       recovery(walletId).passed();
@@ -609,6 +612,23 @@ async function scanNotesNow(walletId) {
     await delay(NOTES_SCAN_RETRY_MS);
   }
   throw new Error('no notes scan started for a minute: one may be stuck');
+}
+
+/**
+ * Why `refusal`, a root the end-of-scan check refused (`takeRefusedRoot`), may be the RPC's lag rather than the trees':
+ * a message saying so where the RPC's newest block hasn't passed the tree's newest leaf (`rpcBehindLeaf`), undefined
+ * otherwise, and where either block can't be read. The newest block is the same request every wallet makes.
+ */
+async function rpcLag({ tree, index }) {
+  try {
+    const leaf = await getEngine().getUTXOMerkletree(TXID_VERSION, chain()).getCommitmentSafe(tree, index);
+    const leafBlock = Number(leaf?.blockNumber);
+    const { blockNumber: head } = await readNewestBlock(network);
+    if (!rpcBehindLeaf(leafBlock, head)) return undefined;
+    return `the Ethereum RPC is behind the notes trees: tree ${tree}'s newest leaf is in block ${leafBlock}, the RPC at ${head}`;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
