@@ -34,7 +34,7 @@ import { archive } from './archive.js';
 import { ARCHIVES, installArchiveSync } from './archive-sync.js';
 import { installArchiveTxids, misrecordedTransaction, relistIfMisrecorded } from './archive-txids.js';
 import { setArtifactProgressListener } from './artifact-mirror.js';
-import { artifactStore } from './artifacts.js';
+import { artifactStore, withKeysDroppedOnRefusal } from './artifacts.js';
 import { mainnetBlockAt, mainnetBlockTime } from './block-times.js';
 import { creationBlock } from './creation-block.js';
 import { badRequest } from './errors.js';
@@ -209,7 +209,7 @@ async function startEngine(networkName, database, rpcUrls, poiNodeUrls, history,
   if (debug) setLoggers((message) => emit('log', String(message)), (error) => emit('log', String(error?.stack ?? error)));
   setEngineTxidSyncBatchSize(TXID_SYNC_BATCH_SIZES.squid);
   await startRailgunEngine(WALLET_SOURCE, new LevelJS(database), debug, artifactStore, false, false, poiNodeUrls);
-  getProver().setSnarkJSGroth16(groth16);
+  getProver().setSnarkJSGroth16(withKeysDroppedOnRefusal(groth16));
   const engine = getEngine();
   const queries = squidQueries(networkName);
   indexerQueries = queries;

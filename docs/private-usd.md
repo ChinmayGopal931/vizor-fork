@@ -699,7 +699,12 @@ stay, unused.
   otherwise stalls the page on its first IPv6 address.
 - The page downloads Railgun's circuit artifacts from ipfs-lb.com and falls
   back to our mirror (`android/railgun-web/src/artifact-mirror.js`); the
-  mirror's tooling is in `scripts/private-usd/artifacts-mirror/`.
+  mirror's tooling is in `scripts/private-usd/artifacts-mirror/`. The SDK
+  checks every file against its pinned hashes but a circuit's verification
+  key, which only checks the page's own proofs before they go out: a proof
+  the key refuses drops every kept key (`withKeysDroppedOnRefusal`), so one
+  served wrong fails that proof, not every proof of its circuit for good
+  (review, 2026-11-22).
 - The POI nodes verify only proofs from the POI circuits wallet 11.2.0 ships
   (older ones get `Invalid proof`). A wallet bump that changes circuit
   artifacts needs the mirror refreshed and deployed first: every send and
