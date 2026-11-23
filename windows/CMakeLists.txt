@@ -7,7 +7,7 @@ project(Vizor LANGUAGES CXX)
 set(BINARY_NAME "Vizor")
 
 # The VIZOR_APPLICATION_ID environment variable selects Veylor's identity
-# (AGENTS.md, "Desktop identity"); without it the build keeps upstream's. The
+# (docs/releases.md, "Desktop identity"); without it the build keeps upstream's. The
 # identity sets the version resource's company and product names, which name
 # the app-data directory, and the prefix of its secure storage and
 # single-instance lock, so none of them is shared with an installed Vizor.
@@ -157,3 +157,111 @@ install(DIRECTORY "${PROJECT_BUILD_DIR}/${FLUTTER_ASSET_DIR_NAME}"
 install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
   CONFIGURATIONS Profile;Release
   COMPONENT Runtime)
+
+# Shielded USD's Railgun page bundle in data/railgun: the copy
+# android/railgun-web/build.mjs writes for iOS, which the Mac and Linux serve
+# too (no further copy). The host serves it as veylor-railgun://app/
+# (docs/private-usd-windows.md).
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../ios/Runner/Railgun/railgun/"
+  DESTINATION "${INSTALL_BUNDLE_DATA_DIR}/railgun" COMPONENT Runtime)
+
+# The Visual C++ runtime beside the executable (app-local deployment, which
+# Microsoft allows), so a release starts on a computer without the Visual C++
+# Redistributable: the app, the plugins and the wallet library import
+# vcruntime140.dll and msvcp140.dll (vcruntime140_1.dll too on x64), which only
+# the redistributable puts in Windows. Without them Velopack's installer says
+# its install hook failed. Every DLL of the runtime comes from the redist folder
+# of the Visual Studio whose compiler builds the app, for the architecture it
+# builds for, its newest version there (a runtime may be newer than the toolset
+# that linked against it, never older), and only the DLLs built for that
+# architecture: the arm64 folder also holds an x64 vcruntime140_1.dll, for
+# ARM64EC and x64 code, which an ARM64 process can't load. CMake's
+# InstallRequiredSystemLibraries knows only the compilers of its own release;
+# this reads the folders instead. scripts/check-veylor-windows-package.py checks
+# what every binary imports.
+
+# A PE file's machine, as file(READ ... HEX) spells its COFF header's: 8664 for
+# x64, aa64 for ARM64. Empty if the file is no PE file.
+function(veylor_pe_machine PE_FILE OUTPUT)
+  set(machine "")
+  file(READ "${PE_FILE}" pe_offset OFFSET 60 LIMIT 4 HEX)
+  if(pe_offset MATCHES "^(..)(..)(..)(..)$")
+    math(EXPR pe_offset
+      "0x${CMAKE_MATCH_4}${CMAKE_MATCH_3}${CMAKE_MATCH_2}${CMAKE_MATCH_1}")
+    file(READ "${PE_FILE}" pe_header OFFSET ${pe_offset} LIMIT 6 HEX)
+    if(pe_header MATCHES "^50450000(..)(..)$")
+      set(machine "${CMAKE_MATCH_2}${CMAKE_MATCH_1}")
+    endif()
+  endif()
+  set(${OUTPUT} "${machine}" PARENT_SCOPE)
+endfunction()
+
+set(VEYLOR_MSVC_RUNTIME_PROBLEM "")
+set(VEYLOR_MSVC_RUNTIME_DLLS "")
+set(VEYLOR_MSVC_RUNTIME_NAMES "")
+set(VEYLOR_MSVC_RUNTIME_LEFT_OUT "")
+set(VEYLOR_MSVC_MACHINE_x64 "8664")
+set(VEYLOR_MSVC_MACHINE_arm64 "aa64")
+string(TOLOWER "${MSVC_CXX_ARCHITECTURE_ID}" VEYLOR_MSVC_ARCH)
+if(NOT VEYLOR_MSVC_ARCH MATCHES "^(x64|arm64)$")
+  set(VEYLOR_MSVC_RUNTIME_PROBLEM
+    "the compiler builds for '${MSVC_CXX_ARCHITECTURE_ID}', not x64 or ARM64")
+elseif(NOT CMAKE_CXX_COMPILER MATCHES "^(.*/VC)/Tools/MSVC/[^/]+/bin/")
+  set(VEYLOR_MSVC_RUNTIME_PROBLEM
+    "the compiler ${CMAKE_CXX_COMPILER} is not a Visual Studio's VC/Tools/MSVC")
+else()
+  set(VEYLOR_VC_DIR "${CMAKE_MATCH_1}")
+  # <VC>/Redist/MSVC/<version>/<arch>/Microsoft.VC14x.CRT
+  file(GLOB VEYLOR_MSVC_CRT_DIRS LIST_DIRECTORIES true
+    "${VEYLOR_VC_DIR}/Redist/MSVC/*/${VEYLOR_MSVC_ARCH}/Microsoft.VC*.CRT")
+  set(VEYLOR_MSVC_CRT_DIR "")
+  set(VEYLOR_MSVC_REDIST_VERSION "0")
+  foreach(crt_dir IN LISTS VEYLOR_MSVC_CRT_DIRS)
+    get_filename_component(redist_version "${crt_dir}/../.." ABSOLUTE)
+    get_filename_component(redist_version "${redist_version}" NAME)
+    if(redist_version MATCHES "^[0-9]+(\\.[0-9]+)+$" AND
+       redist_version VERSION_GREATER VEYLOR_MSVC_REDIST_VERSION AND
+       EXISTS "${crt_dir}/vcruntime140.dll" AND EXISTS "${crt_dir}/msvcp140.dll")
+      set(VEYLOR_MSVC_REDIST_VERSION "${redist_version}")
+      set(VEYLOR_MSVC_CRT_DIR "${crt_dir}")
+    endif()
+  endforeach()
+  if(VEYLOR_MSVC_CRT_DIR STREQUAL "")
+    set(VEYLOR_MSVC_RUNTIME_PROBLEM
+      "${VEYLOR_VC_DIR}/Redist/MSVC has no ${VEYLOR_MSVC_ARCH} runtime")
+  else()
+    file(GLOB crt_dlls "${VEYLOR_MSVC_CRT_DIR}/*.dll")
+    foreach(dll IN LISTS crt_dlls)
+      veylor_pe_machine("${dll}" machine)
+      get_filename_component(name "${dll}" NAME)
+      string(TOLOWER "${name}" name)
+      if(machine STREQUAL "${VEYLOR_MSVC_MACHINE_${VEYLOR_MSVC_ARCH}}")
+        list(APPEND VEYLOR_MSVC_RUNTIME_DLLS "${dll}")
+        list(APPEND VEYLOR_MSVC_RUNTIME_NAMES "${name}")
+      else()
+        list(APPEND VEYLOR_MSVC_RUNTIME_LEFT_OUT "${name}")
+      endif()
+    endforeach()
+    if(NOT "vcruntime140.dll" IN_LIST VEYLOR_MSVC_RUNTIME_NAMES OR
+       NOT "msvcp140.dll" IN_LIST VEYLOR_MSVC_RUNTIME_NAMES)
+      set(VEYLOR_MSVC_RUNTIME_PROBLEM
+        "${VEYLOR_MSVC_CRT_DIR} has no ${VEYLOR_MSVC_ARCH} vcruntime140.dll and msvcp140.dll")
+    endif()
+  endif()
+endif()
+if(VEYLOR_MSVC_RUNTIME_PROBLEM STREQUAL "")
+  message(STATUS "The C++ runtime beside the app, from ${VEYLOR_MSVC_CRT_DIR}: "
+    "${VEYLOR_MSVC_RUNTIME_NAMES}; left out, another architecture's: "
+    "${VEYLOR_MSVC_RUNTIME_LEFT_OUT}")
+  install(FILES ${VEYLOR_MSVC_RUNTIME_DLLS} DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+    CONFIGURATIONS Profile;Release COMPONENT Runtime)
+else()
+  # A Debug build runs where Visual Studio is; a release build without the
+  # runtime would not start on a computer without the redistributable.
+  message(WARNING "No C++ runtime to ship: ${VEYLOR_MSVC_RUNTIME_PROBLEM}.")
+  install(CODE "
+    if(CMAKE_INSTALL_CONFIG_NAME MATCHES \"^(Profile|Release)$\")
+      message(FATAL_ERROR \"No C++ runtime to ship: ${VEYLOR_MSVC_RUNTIME_PROBLEM}.\")
+    endif()
+    " COMPONENT Runtime)
+endif()

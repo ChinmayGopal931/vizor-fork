@@ -80,8 +80,11 @@ Future<void> initializeDesktopWindow({
 
   await windowManager.ensureInitialized();
 
+  // On Windows the runner titles the window after the build's identity
+  // ("Veylor", "Veylor Testnet": its version resource's product name), so a
+  // title here would override it and name both installs alike.
   final options = Platform.isWindows
-      ? WindowOptions(title: 'Veylor') // l10n-ignore: product name
+      ? const WindowOptions()
       : WindowOptions(
           size: initialMode.defaultSize,
           minimumSize: initialMode.minimumSize,

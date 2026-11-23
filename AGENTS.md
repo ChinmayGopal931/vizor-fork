@@ -5,7 +5,7 @@ Shielded USD: USDC held privately on Railgun and bridged to and from shielded
 ZEC through zecSwap. Flutter with Rust through `flutter_rust_bridge` v2: all
 Zcash cryptography and sync run in Rust (librustzcash crates); Dart holds the UI
 (Riverpod) and secure storage. It ships on Android, iOS, macOS and Linux;
-Windows is in progress.
+Windows is in beta.
 
 This file holds what every task needs. Before changing an area, read its doc.
 
@@ -59,7 +59,8 @@ log stream --predicate 'subsystem == "frb_user"' --level info
 | Ledger send, Gift Card, shielding, swap and voting flows | `docs/ledger/limitations.md` |
 | Shielded USD (Private USD): invariants, the open fee, Railgun's page and sync | `docs/private-usd.md`, then `docs/private-usd-android-plan.md` §3.5 |
 | A Railgun page host (Android, iOS, Mac, Linux, Windows) | `docs/private-usd-railgun-hosts.md` |
-| App identities, Google Play, the direct APK, the macOS and Linux releases | `docs/releases.md` |
+| Shielded USD on Windows: the WebView2 host, its CI checks, what has run, trying a build | `docs/private-usd-windows.md` |
+| App identities, Google Play, the direct APK, the macOS, Linux and Windows releases | `docs/releases.md` |
 | Release notes or a changelog | `release_notes/README.md` |
 | Tests, regtest, E2E, `clear-app.sh` | `docs/testing.md` |
 

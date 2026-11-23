@@ -39,7 +39,7 @@ String privateUsdSendErrorMessage(
 /// That this device's clock runs ahead of Ethereum's, naming the phone, the
 /// Mac or the computer: a step was refused, nothing sent.
 String privateUsdClockErrorMessage(AppLocalizations l10n) => kDesktopFormFactor
-    ? (privateUsdLinuxWording
+    ? (privateUsdComputerWording
           ? l10n.privateUsdConvertErrorClockLinux
           : l10n.privateUsdConvertErrorClockDesktop)
     : l10n.privateUsdConvertErrorClock;
@@ -48,7 +48,7 @@ String privateUsdClockErrorMessage(AppLocalizations l10n) => kDesktopFormFactor
 /// waits for the clock.
 String privateUsdClockProblemMessage(AppLocalizations l10n) =>
     kDesktopFormFactor
-    ? (privateUsdLinuxWording
+    ? (privateUsdComputerWording
           ? l10n.privateUsdConvertProblemClockLinux
           : l10n.privateUsdConvertProblemClockDesktop)
     : l10n.privateUsdConvertProblemClock;

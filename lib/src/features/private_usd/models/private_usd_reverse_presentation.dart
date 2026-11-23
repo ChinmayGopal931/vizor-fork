@@ -396,7 +396,7 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation(
     // proves while it is hidden.
     provingNote: proving
         ? (kDesktopFormFactor
-              ? (privateUsdLinuxWording
+              ? (privateUsdComputerWording
                     ? l10n.privateUsdReverseProvingNoteLinux
                     : l10n.privateUsdReverseProvingNoteDesktop)
               : l10n.privateUsdReverseProvingNote)

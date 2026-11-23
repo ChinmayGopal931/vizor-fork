@@ -14,7 +14,7 @@ const _deviceBackupChannel = MethodChannel('com.zcash.wallet/network_privacy');
 /// `data_extraction_rules.xml`, whose paths are fixed at build time: a
 /// directory named after the generated wallet database cannot be listed
 /// there, so the rules leave every app file (`domain="file"`) out of a
-/// transfer. Linux has no backup the app can mark.
+/// transfer. Linux and Windows have no backup the app can mark.
 Future<void> excludeFromDeviceBackup(String directory) async {
   if (!Platform.isIOS && !Platform.isMacOS) return;
   try {

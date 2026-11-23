@@ -22,11 +22,11 @@ const kVizorPrivateUsdEnabled = bool.fromEnvironment(
 );
 
 /// Whether this build can have Private USD at all: the define, in a mobile
-/// build or (since the Mac and Linux host the Railgun page) a desktop one.
-/// Const, so a build without it drops the feature's code. Where no host runs
-/// the page (Windows, macOS below 14, iOS below 17, Linux without WebKitGTK
-/// 4.1 or where WebKit's sandbox can't start), `privateUsdPlatformHostsPage`
-/// keeps it hidden.
+/// build or (since the Mac, Linux and Windows host the Railgun page) a desktop
+/// one. Const, so a build without it drops the feature's code. Where no host
+/// runs the page (macOS below 14, iOS below 17, Linux without WebKitGTK 4.1 or
+/// where WebKit's sandbox can't start, Windows without the WebView2 Runtime),
+/// `privateUsdPlatformHostsPage` keeps it hidden.
 const kPrivateUsdBuildEnabled = kVizorPrivateUsdEnabled;
 
 /// The kill-switch JSON's URL. Empty: no fetch, and the feature is

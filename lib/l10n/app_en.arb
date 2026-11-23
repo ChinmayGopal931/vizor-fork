@@ -11345,7 +11345,7 @@
   },
   "privateUsdConvertErrorClockLinux": "Your computer's clock is off. Set it to the right time, then try again.",
   "@privateUsdConvertErrorClockLinux": {
-    "description": "In the Linux app: the error on the bridge screens when a step was refused because the computer's clock runs minutes ahead of Ethereum's; nothing was sent."
+    "description": "In the Linux and Windows apps: the error on the bridge screens when a step was refused because the computer's clock runs minutes ahead of Ethereum's; nothing was sent."
   },
   "privateUsdConvertErrorEthereum": "Veylor can't reach Ethereum right now. Try again in a moment.",
   "@privateUsdConvertErrorEthereum": {
@@ -11518,7 +11518,7 @@
   },
   "privateUsdConvertProblemClockLinux": "Your computer's clock is off, so the bridge can't go on. Set it to the right time. Veylor keeps trying while it's open.",
   "@privateUsdConvertProblemClockLinux": {
-    "description": "In the Linux app: the problem card message when the bridge's next step waits because the computer's clock runs minutes ahead of Ethereum's; Veylor retries while it is open."
+    "description": "In the Linux and Windows apps: the problem card message when the bridge's next step waits because the computer's clock runs minutes ahead of Ethereum's; Veylor retries while it is open."
   },
   "privateUsdConvertProblemEthereum": "Veylor can't reach Ethereum right now. It keeps trying while it's open.",
   "@privateUsdConvertProblemEthereum": {
@@ -11640,7 +11640,7 @@
   },
   "privateUsdConvertQuoteClockAheadLinux": "The quote had expired by the time it arrived. Check that your computer's clock is right, then try again.",
   "@privateUsdConvertQuoteClockAheadLinux": {
-    "description": "In the Linux app: the message on the bridge screens when a quote arrived already expired, which usually means the computer's clock is wrong."
+    "description": "In the Linux and Windows apps: the message on the bridge screens when a quote arrived already expired, which usually means the computer's clock is wrong."
   },
   "privateUsdConvertQuoteExpires": "Quote expires in {minutesSeconds}",
   "@privateUsdConvertQuoteExpires": {
@@ -12366,7 +12366,7 @@
   },
   "privateUsdKeepVisibleDetailLinux": "If it's minimised, or your computer locks or sleeps, the bridge pauses until you're back.",
   "@privateUsdKeepVisibleDetailLinux": {
-    "description": "Tooltip of the glyph in the Linux app's slim keep-Veylor-visible row on a bridge's progress screen: the bridge pauses while Veylor's window is minimised or the computer is locked or asleep, and goes on when the user is back."
+    "description": "Tooltip of the glyph in the Linux and Windows apps' slim keep-Veylor-visible row on a bridge's progress screen: the bridge pauses while Veylor's window is minimised or the computer is locked or asleep, and goes on when the user is back."
   },
   "privateUsdLoadFailed": "Couldn't load the balance. Try again in a moment.",
   "@privateUsdLoadFailed": {
@@ -12727,7 +12727,7 @@
   },
   "privateUsdReverseProvingNoteLinux": "Your computer builds a zero-knowledge proof of the payment. This can take a few minutes. Keep Veylor open, with its window showing.",
   "@privateUsdReverseProvingNoteLinux": {
-    "description": "Note under the progress steps of a shielded-USD-to-ZEC bridge in the Linux app while the computer builds the zero-knowledge proof for the escrow payment, which can take minutes; the window must stay visible meanwhile."
+    "description": "Note under the progress steps of a shielded-USD-to-ZEC bridge in the Linux and Windows apps while the computer builds the zero-knowledge proof for the escrow payment, which can take minutes; the window must stay visible meanwhile."
   },
   "privateUsdReverseRailgunFee": "Railgun unshield fee",
   "@privateUsdReverseRailgunFee": {
@@ -13197,7 +13197,7 @@
   },
   "privateUsdSendInfoStepProofLinux": "Your computer builds a zero-knowledge proof. This takes a few seconds.",
   "@privateUsdSendInfoStepProofLinux": {
-    "description": "In the Linux app: the second step in the send info card, where the computer builds a zero-knowledge proof."
+    "description": "In the Linux and Windows apps: the second step in the send info card, where the computer builds a zero-knowledge proof."
   },
   "privateUsdSendInfoTitle": "Sending shielded USD",
   "@privateUsdSendInfoTitle": {
@@ -13242,7 +13242,7 @@
   },
   "privateUsdSendProvingDetailLinux": "Your computer builds a zero-knowledge proof so nobody can see what you send. This takes a few seconds. Keep Veylor open, with its window showing.",
   "@privateUsdSendProvingDetailLinux": {
-    "description": "In the Linux app: the body of the send and withdraw progress screen while the zero-knowledge proof is built. The window must stay showing, because the proof pauses while it's hidden."
+    "description": "In the Linux and Windows apps: the body of the send and withdraw progress screen while the zero-knowledge proof is built. The window must stay showing, because the proof pauses while it's hidden."
   },
   "privateUsdSendProvingPercent": "Proving your transaction · {percent}%",
   "@privateUsdSendProvingPercent": {
@@ -13439,7 +13439,7 @@
   },
   "privateUsdWithdrawInfoStepProofLinux": "Your computer builds a proof, and the dollars leave Railgun for that address.",
   "@privateUsdWithdrawInfoStepProofLinux": {
-    "description": "In the Linux app: the second step in the withdraw info card, where the computer builds a proof and the dollars leave Railgun for the address."
+    "description": "In the Linux and Windows apps: the second step in the withdraw info card, where the computer builds a proof and the dollars leave Railgun for the address."
   },
   "privateUsdWithdrawInfoTitle": "Withdrawing makes it public",
   "@privateUsdWithdrawInfoTitle": {

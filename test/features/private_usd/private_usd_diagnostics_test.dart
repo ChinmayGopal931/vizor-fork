@@ -63,6 +63,9 @@ void main() {
             'notes_scan_broke_off(storage_quota)',
         'POI node request failed: Load failed':
             'screening_failed(network_failed)',
+        // Windows's host.
+        'Shielded USD needs the WebView2 Runtime': 'os_unsupported',
+        "the last page's WebView2 did not close": 'webview_failed',
         'a message nobody has seen before': 'unknown',
       };
       for (final MapEntry(key: message, value: code) in expected.entries) {

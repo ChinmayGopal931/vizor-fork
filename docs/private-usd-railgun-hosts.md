@@ -4,7 +4,9 @@ Shielded USD runs Railgun in a hidden web page (`android/railgun-web/src/`,
 built into one bundle that every host loads). A host is the native code that
 runs that page: Android's (Kotlin, `android/app/src/main/kotlin/com/keplr/vizor/railgun/`),
 iOS's (`ios/Runner/Railgun/`), the Mac's (`macos/Runner/Railgun/`, with four
-of iOS's files), and Linux's (in progress). This is the list of what a host
+of iOS's files), Linux's (`linux/runner/`, `docs/private-usd-linux.md`) and
+Windows's (`windows/runner/railgun/`, WebView2, with three of Linux's files;
+`docs/private-usd-windows.md`). This is the list of what a host
 must do so that the page syncs Railgun as fast and as reliably as it does on
 Android, which was tested and reviewed in depth and is the reference
 throughout. It was written on 2026-11-20 from the Android and Mac code at
@@ -27,7 +29,8 @@ Prefixes below: `kt/` is the Android host's directory, `rw/` is
   and `com.zcash.wallet/railgun/events` (a stream of strings). Every host
   answers the same methods with the same codes, so Dart treats them alike:
   - `supported`: whether the page can run here. Android: always (minSdk 30).
-    Mac: macOS 14 and later (the store's proxy API). Register the handler
+    Mac: macOS 14 and later (the store's proxy API). Windows: the Evergreen
+    WebView2 Runtime, 120 or later, read without starting it. Register the handler
     before Dart's bootstrap asks (`queryRailgunHostSupported` in
     `lib/src/features/private_usd/services/railgun_host_channel.dart`): a
     missing handler reads as no host, except on iOS. An answer that takes a
@@ -61,6 +64,8 @@ Prefixes below: `kt/` is the Android host's directory, `rw/` is
   (`RailgunPageClock`: iOS from the app's background to its foreground, the
   Mac from the page's window's occlusion), since 2026-11-22: a page
   suspended through a call's deadline was closed as it came back.
+  **(Windows)** WebView2 throttles a hidden page and runs it on, never
+  suspending it, so Windows's deadlines (`SetTimer`) need no such clock.
 - **H3. Events.** Forward the page's unasked messages as their raw JSON:
   `scan`, `proof`, `screening`, `refresh`, `synced`, and `log` only from a
   page loaded with `debug`. Drop any other name. Keep up to 256 while nobody
@@ -133,6 +138,10 @@ Prefixes below: `kt/` is the Android host's directory, `rw/` is
   - **What each engine allows.** WebKitGTK's default per-origin quota is 1 GiB, so
     the Linux host sets `origin-storage-ratio` to 0.6, as Chromium allows an
     origin about 60% of the disk. The Mac's WebKit allows an app's origin 15% of it.
+    **(Chromium)** the page's own `navigator.storage.estimate()` no longer shows
+    the quota: since Chromium 133 it reports the usage plus 10 GiB whatever the disk
+    (StaticStorageQuota). DevTools' `Storage.getUsageAndQuota` reads the quota
+    Chromium enforces (Windows's check program does).
   - **What happens past the quota.** Every write fails, so every notes scan breaks
     off and every refresh fails. Linux hit this on 2026-11-20: see
     `docs/private-usd-linux.md`.
@@ -222,13 +231,21 @@ Prefixes below: `kt/` is the Android host's directory, `rw/` is
   kind and its iOS version, so iOS sets the page's to the same `Mozilla/5.0`
   (`RailgunPage.userAgent`, `customUserAgent`, since 2026-11-22). **(Chromium)** set the page's
   User-Agent before it loads; check what it names on a host whose engine's
-  own isn't frozen. The page's own requests also name the same language on
-  every device and every host, `Accept-Language: en-US,en;q=0.9`, which the
-  page sets itself on every `fetch` and `XMLHttpRequest` (`rw/src/accept-language.js`,
-  run first from `shims.js`; a host's archive prelude wraps the `fetch` it
-  leaves): the engine's own names the device's languages, and WebKit and
-  Android's WebView have no setting for it (review, 2026-11-22; Windows's
-  host sets its environment's language to en-US as well).
+  own isn't frozen, and check the User-Agent client hints too (`Sec-CH-UA*`,
+  `navigator.userAgentData`): WebView2's `put_UserAgent` fixes the string but
+  keeps the hints, which name the platform and the runtime's version, so
+  Windows's host also overrides the string through DevTools with no metadata,
+  which turns them off, as Android's WebView turns them off for a page whose
+  User-Agent its host set. The page's own requests also name the same
+  language on every device and every host, `Accept-Language: en-US,en;q=0.9`,
+  which the page sets itself on every `fetch` and `XMLHttpRequest`
+  (`rw/src/accept-language.js`, run first from `shims.js`; a host's archive
+  prelude wraps the `fetch` it leaves): the engine's own names the device's
+  languages, and WebKit and Android's WebView have no setting for it (review,
+  2026-11-22). Windows's host also sets its environment's language to en-US
+  (`put_Language`), for which Chromium's own header is that same value, so
+  the page names one language there whichever sets it; Windows's check
+  program holds every request on the wire to it.
 
 ## 4. Anon's archive: whether the page reads it
 
@@ -404,13 +421,14 @@ Shared Dart and the shared page do all of this; a host must only let it run.
   screen on; the Mac takes an IOKit display assertion while its window is not
   hidden (`macos/Runner/ScreenAwakeChannel.swift`). **(Linux)** an idle
   inhibitor (`gtk_application_inhibit` with `IDLE`, or the desktop's
-  `ScreenSaver.Inhibit`), released when Dart says so.
+  `ScreenSaver.Inhibit`), released when Dart says so. **(Windows)**
+  `SetThreadExecutionState` with the display and the system required.
 - **H36. `rpc_failed`.** A sync that fails while the RPC doesn't answer, or
   answers 403 or 429, and a screening node does, fails as `RPC_FAILED`
   (`rw/src/rpc-probe.js`), and so does a `start` whose provider load fails or
   has no answer in 75 s; map it to `rpc_failed` whatever the method, and Dart
   offers another RPC.
-- **H37. Failure codes (desktop).** On the Mac and Linux, Dart keeps a short
+- **H37. Failure codes (desktop).** On the Mac, Linux and Windows, Dart keeps a short
   coded record of what failed (`private_usd_diagnostics.dart`, docs/private-usd.md,
   "Failure codes"): for a failed call, the host's code and a reason matched
   from its message, in

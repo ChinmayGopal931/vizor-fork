@@ -49,8 +49,10 @@ through `scripts/veylor-private-usd-flag-url.sh`, which prints it or nothing and
 fails on anything but one https URL without credentials or a fragment: the APK
 builder's Veylor flavor, `scripts/build-linux-release.sh`'s Veylor flavors,
 `scripts/release-veylor-macos.sh` and `scripts/package-windows-velopack.ps1` for
-a Veylor id, with `veylor-android.yml` and `veylor-linux.yml` checking the
-define. A file in the checkout, not a CI variable, so a rebuild at a tag
+a Veylor id (which reads the file itself, by the script's rule), with
+`veylor-android.yml`, `veylor-linux.yml` and `veylor-windows.yml` (through
+`scripts/check-veylor-windows-package.py`) checking the define. A file in the
+checkout, not a CI variable, so a rebuild at a tag
 passes the same URL. A build by hand (the Play bundle, TestFlight) passes
 `--dart-define=VIZOR_PRIVATE_USD_FLAG_URL=<the script's output>` when there is
 one. The file names none yet: until the owner chooses a URL and hosts
@@ -216,7 +218,38 @@ own way, and a malformed or unknown id fails the build:
   copyright Zapp LLC), the
   window title, `veylor_app_icon.ico` and the storage prefix `Veylor`, and
   fails if an inherited `VIZOR_WINDOWS_STORAGE_PREFIX`, `_COMPANY_NAME` or
-  `_PRODUCT_NAME` disagrees. `Vizor.exe` keeps its name.
+  `_PRODUCT_NAME` disagrees. The build keeps `Vizor.exe`, which `flutter run`
+  finds (`BINARY_NAME` stays a literal); a Veylor package names it
+  `Veylor.exe` (`VeylorTestnet.exe` for testnet), as its version resource's
+  original file name, and its authors Zapp LLC, so nothing it installs names
+  Vizor (`scripts/package-windows-velopack.ps1`).
+  - **Builds run on GitHub Actions** (`.github/workflows/veylor-windows.yml`,
+    on the fork, for pushes to `main` and `feat/windows-desktop` and on
+    demand), never on the Mac: x64 on `windows-latest` and ARM64 on
+    `windows-11-arm`, both identities in one job per architecture, through
+    upstream's packaging script with the arguments `fastlane windows package`
+    passes (the lane's Ruby has no Windows ARM64 platform in Gemfile.lock).
+  - **What it builds:** the desktop form factor,
+    `VIZOR_PRIVATE_USD_ENABLED=true` and the run's build number, stamped
+    `<version>-internal.<run>`, or the workflow's `VEYLOR_VERSION` on a
+    dispatch with `public_release`. `scripts/check-veylor-windows-package.py`
+    fails a build whose defines (no keyed RPC URL, and the kill switch the
+    release config names, if any), executable, version
+    resource, page bundle, installer or package manifest differ or name Vizor,
+    whose programs and libraries are another architecture's, or whose Visual
+    C++ runtime is missing ("Veylor Windows release" below).
+  - **What it keeps:** each identity's Velopack installer
+    (`com.veylor.desktop-win-<arch>-mainnet-Setup.exe`), full package, feed
+    and assets, as workflow artifacts for 30 days. A run dispatched with
+    `public_release` also publishes the mainnet installers ("Veylor Windows
+    release" below).
+  - **Signing:** unsigned, with no update feed, so Windows's SmartScreen warns
+    on the installer until a code-signing certificate signs it.
+  - **Caches:** the Cargo registry and pub caches. There is no compiler cache:
+    sccache spawns rustc with the whole command line, which for the Tor crates
+    passes Windows's limit, so each run builds Rust afresh; cargokit's target
+    directory survives between the two identities, so the second builds Rust
+    incrementally.
 
 Every store follows from the identity, never from a renamed key, so nothing is
 shared with an installed Vizor: the macOS container and Keychain access group,
@@ -241,8 +274,7 @@ fastlane builds leave Sparkle out, the Linux check is off, and Windows hides
 its updater in a build without a feed key. The lanes keep upstream's signing,
 Apple team, match and release targets, and the macOS lane refuses to sign a
 Veylor flavor. Veylor's macOS release has its own signing, notarization and
-update feed, and Linux's comes from CI (both below); Windows has no Veylor
-release yet.
+update feed; Linux's and Windows's come from CI (all three below).
 
 ### Veylor macOS release
 
@@ -322,6 +354,61 @@ A run without `public_release` stays `-internal.<run>` and publishes nothing.
 - **Not yet:** the AppImages are unsigned (`LINUX_APPIMAGE_UNSIGNED`), the .debs
   come from no repository, and nothing updates itself.
 
+### Veylor Windows release
+
+`gh workflow run veylor-windows.yml --ref main -f public_release=true` builds
+`VEYLOR_VERSION` (set in the workflow) for x64 and ARM64 and publishes it. A
+run without `public_release` stays `-internal.<run>` and publishes nothing.
+Linux's rules hold, in `veylor-windows.yml`'s own `publish` job:
+
+- **What it publishes.** The two mainnet installers, renamed from Velopack's
+  `com.veylor.desktop-win-<arch>-mainnet-Setup.exe` to
+  `Veylor-windows-x64-Setup.exe` and `Veylor-windows-arm64-Setup.exe`, and
+  `SHA256SUMS`. Not the packages or their feed: nothing updates itself yet.
+  The testnet builds stay workflow artifacts.
+- **Attested.** The package job gives every file Velopack writes signed build
+  provenance. A rename keeps the digest, so the `publish` job verifies each
+  installer under its new name, signed by `veylor-windows.yml`
+  (`--signer-workflow`), and checks that the package beside it carries
+  `VEYLOR_VERSION`, so it is this version's build, not an internal one.
+- **Published by the run**, after both architectures' page checks and packages
+  and the pins have passed: the release `veylor-windows/vX.Y.Z`, tagged at the
+  commit it built, titled "Veylor X.Y.Z (beta) for Windows", with the notes
+  from `release_notes/veylor-windows-vX.Y.Z.md`. The downloads go to the
+  runner's temporary directory, never a folder of the checkout.
+- **A published version keeps its files**, **never cancelled** and **never
+  latest** (`--latest=false`), as Linux's.
+- **The C++ runtime ships with the app.** The app, its plugins and the wallet
+  library import Microsoft's C++ runtime (`vcruntime140.dll` and
+  `msvcp140.dll`, and `vcruntime140_1.dll` on x64), which Windows has only
+  once the Visual C++ Redistributable is installed. On a fresh Windows 11 ARM
+  VM the installer said its install hook failed: the app couldn't start
+  (2026-11-22). `windows/CMakeLists.txt` installs the runtime's DLLs beside the
+  executable (app-local, as Microsoft allows), from the redist folder of the
+  Visual Studio whose compiler builds the app, for the architecture it builds,
+  its newest version there, and only those built for that architecture: the
+  arm64 folder also holds an x64 `vcruntime140_1.dll`, for ARM64EC and x64
+  code, which an ARM64 process can't load. A Release build that finds no
+  runtime fails.
+  GitHub's runners have the redistributable, so the package check reads every
+  program and library in the app and fails a build where one is another
+  architecture's or imports a runtime DLL that the app's folder or the package
+  lacks, and the installed testnet app must have loaded the runtime from its
+  own folder.
+- **Windows 11**, x64 or ARM64, is what the notes ask for: Veylor has run on
+  Windows 11 (a VM, CI's ARM64 runner) and CI's x64 Windows Server 2025, never
+  on Windows 10, so they don't claim it.
+- **Windows N and KN editions** lack Media Foundation until the Media Feature
+  Pack is added, and `mobile_scanner_plugin.dll` (which the executable
+  imports) imports `MF.dll`, `MFPlat.DLL` and `MFReadWrite.dll`, so Veylor
+  can't start there without it. The notes say so; delay-loading them in the
+  plugin would let the app start and only the scanner need them.
+- **Anyone checks a download:**
+  `gh attestation verify <file> --repo ChinmayGopal931/vizor-fork
+  --signer-workflow ChinmayGopal931/vizor-fork/.github/workflows/veylor-windows.yml`.
+- **Not yet:** the installers are unsigned (SmartScreen warns until a
+  code-signing certificate signs them), and nothing updates itself.
+
 ## Release Notes
 
 When asked to prepare user-facing release notes or a changelog for a release,
@@ -329,4 +416,6 @@ read `release_notes/README.md` and create `release_notes/vX.Y.Z.md`.
 Unless the request explicitly says otherwise, draft desktop release notes for
 Windows, Linux, and macOS from desktop user-facing changes only. Exclude
 mobile-only changes. Veylor's macOS releases use
-`release_notes/veylor-macos-vX.Y.Z.md` ("Veylor macOS release").
+`release_notes/veylor-macos-vX.Y.Z.md` ("Veylor macOS release"), and its Linux
+and Windows releases `release_notes/veylor-linux-vX.Y.Z.md` and
+`release_notes/veylor-windows-vX.Y.Z.md`, which their workflows publish.

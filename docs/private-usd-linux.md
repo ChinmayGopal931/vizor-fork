@@ -3,7 +3,7 @@
 The Railgun page host for Veylor's Linux desktop app (2026-11-20), so Shielded
 USD runs there as it does on the Mac: the same Dart screens and providers
 (`docs/private-usd-macos.md`), the same Rust engine, and a host of its own. It
-is Linux only; Windows still hides Shielded USD.
+is Linux only; Windows has a host of its own (`docs/private-usd-windows.md`).
 
 Read `docs/private-usd.md` and `docs/private-usd-android-plan.md`
 §3.5 first: every invariant there holds on Linux, because the engine and the
@@ -236,8 +236,9 @@ wherever the host runs the page.
 
 The desktop messages that name the Mac have Linux twins that say "your
 computer" (`privateUsd…Linux`, in English, Korean and Chinese), chosen on Linux
-by `privateUsdLinuxWording`: the quote clock, the keep-visible row's tooltip,
-the reverse bridge's proof note, and the send and withdraw proof steps.
+(and Windows) by `privateUsdComputerWording`: the quote clock, the keep-visible
+row's tooltip, the reverse bridge's proof note, and the send and withdraw proof
+steps.
 
 ## Packaging
 
@@ -307,7 +308,9 @@ item. Items not named here hold as on Android and the Mac.
   than before it (kept: the check runs a process of its own).
 - **H4.** Linux joins `privateUsdPlatformHostsPage` and
   `privateUsdArchiveAvailableProvider`, and `private_usd_archive_sync_test.dart`
-  covers it. `replaceDeadBridge` stays iOS's: Linux keeps its sockets.
+  covers it. The dead-bridge check on a return (`replaceDeadBridge`) runs here
+  too since 2026-11-22: Linux keeps its sockets, but a bridge whose listener
+  kept failing to accept ends, and the check replaces it.
 - **H6.** The scheme is registered secure. The sandbox check loads its page on
   that scheme and requires a secure context, `crypto.subtle`, WebAssembly,
   IndexedDB, `localStorage` and workers (fixed 2026-11-20).

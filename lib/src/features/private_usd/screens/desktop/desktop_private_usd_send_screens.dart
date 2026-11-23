@@ -46,7 +46,7 @@ void _showSendInfo(BuildContext context, PrivateUsdSendMode mode, String fee) {
             title: l10n.privateUsdSendInfoTitle,
             steps: [
               l10n.privateUsdSendInfoStepAddress,
-              privateUsdLinuxWording
+              privateUsdComputerWording
                   ? l10n.privateUsdSendInfoStepProofLinux
                   : l10n.privateUsdSendInfoStepProofDesktop,
               l10n.privateUsdSendInfoStepPrivate,
@@ -57,7 +57,7 @@ void _showSendInfo(BuildContext context, PrivateUsdSendMode mode, String fee) {
             title: l10n.privateUsdWithdrawInfoTitle,
             steps: [
               l10n.privateUsdWithdrawInfoStepAddress,
-              privateUsdLinuxWording
+              privateUsdComputerWording
                   ? l10n.privateUsdWithdrawInfoStepProofLinux
                   : l10n.privateUsdWithdrawInfoStepProofDesktop,
             ],
@@ -578,7 +578,7 @@ class _DesktopPrivateUsdSendStatusScreenState
           : context.l10n.privateUsdSendProvingPercent(percent);
       body = posting
           ? context.l10n.privateUsdSendLanding
-          : privateUsdLinuxWording
+          : privateUsdComputerWording
           ? context.l10n.privateUsdSendProvingDetailLinux
           : context.l10n.privateUsdSendProvingDetailDesktop;
       actions = const [];

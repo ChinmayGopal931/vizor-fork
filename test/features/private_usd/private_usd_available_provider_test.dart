@@ -155,10 +155,11 @@ void main() {
     );
   });
 
-  // Linux's host says yes only once WebKit's sandbox has started for it: a
-  // page never runs without it.
+  // Linux's host says yes only once WebKit's sandbox has started for it, and
+  // Windows's only with the WebView2 Runtime: a page never runs without them.
   test(
-    'desktop hosts the page on the Mac and Linux where the host says so',
+    'desktop hosts the page on the Mac, Linux and Windows where the host '
+    'says so',
     () {
       bool hosts(TargetPlatform platform, {required bool hostSupported}) =>
           privateUsdPlatformHostsPage(
@@ -166,7 +167,11 @@ void main() {
             platform: platform,
             hostSupported: hostSupported,
           );
-      for (final platform in [TargetPlatform.macOS, TargetPlatform.linux]) {
+      for (final platform in [
+        TargetPlatform.macOS,
+        TargetPlatform.linux,
+        TargetPlatform.windows,
+      ]) {
         expect(
           hosts(platform, hostSupported: true),
           isTrue,
@@ -178,7 +183,7 @@ void main() {
           reason: platform.name,
         );
       }
-      expect(hosts(TargetPlatform.windows, hostSupported: true), isFalse);
+      expect(hosts(TargetPlatform.fuchsia, hostSupported: true), isFalse);
     },
   );
 

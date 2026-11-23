@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.14)
 project(runner LANGUAGES CXX)
 
+set(LINUX_RUNNER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../linux/runner")
+
 # Define the application target. To change its name, change BINARY_NAME in the
 # top-level CMakeLists.txt, not the value here, or `flutter run` will no longer
 # work.
@@ -12,11 +14,26 @@ add_executable(${BINARY_NAME} WIN32
   "payment_uri_handoff.cpp"
   "password_input_source.cpp"
   "payment_uri_protocol.cpp"
+  "private_usd_channels.cpp"
+  "railgun/railgun_archive.cpp"
+  "railgun/railgun_channel.cpp"
+  "railgun/railgun_dispatch.cpp"
+  "railgun/railgun_host_channels.cpp"
+  "railgun/railgun_network.cpp"
+  "railgun/railgun_page.cpp"
+  "railgun/railgun_page_host.cpp"
+  "railgun/railgun_requests.cpp"
+  "session_lifecycle.cpp"
   "single_instance.cpp"
   "utils.cpp"
   "velopack_uninstall.cpp"
   "velopack_update.cpp"
   "win32_window.cpp"
+  # Shielded USD's protocol, JSON reader and page hosts, shared with Linux's
+  # host unchanged (docs/private-usd-windows.md): keep them free of GLib.
+  "${LINUX_RUNNER_DIR}/private_usd/railgun_json.cc"
+  "${LINUX_RUNNER_DIR}/private_usd/railgun_protocol.cc"
+  "${LINUX_RUNNER_DIR}/railgun_page/railgun_endpoints.cc"
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
   "Runner.rc"
   "runner.exe.manifest"
@@ -136,6 +153,17 @@ target_link_libraries(${BINARY_NAME} PRIVATE "${VELOPACK_LIBC_IMPLIB}")
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 target_include_directories(${BINARY_NAME} PRIVATE "${VELOPACK_LIBC_ROOT}/include")
+
+# Shielded USD's Railgun page runs in WebView2 (docs/private-usd-windows.md):
+# the SDK's headers and its static loader, pinned in webview2_sdk.cmake, on
+# the system's Evergreen WebView2 Runtime. Without the runtime the host answers
+# `supported` false and Shielded USD stays hidden.
+include("${CMAKE_CURRENT_SOURCE_DIR}/webview2_sdk.cmake")
+veylor_webview2_sdk(VEYLOR_WEBVIEW2_INCLUDE VEYLOR_WEBVIEW2_LOADER "${VELOPACK_LIBC_ARCH}")
+target_include_directories(${BINARY_NAME} PRIVATE
+  "${CMAKE_CURRENT_SOURCE_DIR}" "${LINUX_RUNNER_DIR}" "${VEYLOR_WEBVIEW2_INCLUDE}")
+target_link_libraries(${BINARY_NAME} PRIVATE "${VEYLOR_WEBVIEW2_LOADER}"
+  "iphlpapi.lib" "shlwapi.lib" "ws2_32.lib" "wtsapi32.lib")
 
 add_custom_command(TARGET ${BINARY_NAME} POST_BUILD
   COMMAND "${CMAKE_COMMAND}" -E copy_if_different
