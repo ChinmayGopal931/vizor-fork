@@ -562,7 +562,10 @@ async function proveSends(walletId) {
       );
       return (await misrecordedTransaction(getEngine().getTXIDMerkletree(TXID_VERSION, chain()), sends)) !== undefined;
     },
-    clear: () => getEngine().clearTXIDMerkletreeData(TXID_VERSION, chain()),
+    clear: () =>
+      changeTxidList(getEngine().getTXIDMerkletree(TXID_VERSION, chain()), () =>
+        getEngine().clearTXIDMerkletreeData(TXID_VERSION, chain()),
+      ),
     catchUp: catchUpTxidList,
     store: recoveryStore,
   });

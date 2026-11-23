@@ -2,6 +2,7 @@
 // each scan, and every scan after the leaf fails there while the store keeps it. The archive is a second source of
 // leaves, on by default, so once the engine has refused one tree's root for a while the page rebuilds the trees from
 // the start with the archive off.
+import { changeTxidList } from './txid-list.js';
 
 /** How long, and over how many refusals in a row, one tree's root must fail before the trees are rebuilt. */
 export const REBUILD_AFTER_MS = 10 * 60_000;
@@ -120,7 +121,8 @@ export async function rebuildTrees(
   if (utxo.isScanning || engine.getTXIDMerkletree(txidVersion, chain).isScanning || busy()) return false;
   started();
   engine.emitUTXOMerkletreeScanUpdateEvent(txidVersion, chain, 0.01);
-  await engine.clearTXIDMerkletreeData(txidVersion, chain);
+  const list = engine.getTXIDMerkletree(txidVersion, chain);
+  await changeTxidList(list, () => engine.clearTXIDMerkletreeData(txidVersion, chain));
   // No scan while the leaves go, as in the engine's rescan.
   utxo.isScanning = true;
   try {
