@@ -556,9 +556,12 @@ stay, unused.
   from the RPC itself, 500 blocks a read: more than 100,000 blocks behind
   the newest block (about two weeks; a first sync is over 11 million),
   the scan fails instead, saying the indexer didn't answer, rather than
-  read for hours. A quick sync that leaves leaves its trees didn't take,
-  written once more, fails the scan too (`guardQuickSync`): the end-of-scan
-  check would pass the trees short of them (review, 2026-11-22).
+  read for hours. Leaves the trees still lack once that read is done,
+  written once more, fail the scan too (`guardQuickSync`): the end-of-scan
+  check would pass the trees short of them. Not sooner: the engine's
+  listener queues the newest blocks' leaves as they come, and rail-squid,
+  behind the RPC, can leave a stretch that only the engine's read fills
+  (review, 2026-11-22).
 - `engine-hooks-plugin.mjs` holds every rewrite of the engine's code: the
   unshield watermark (`unshield-events.js`), the archive's leaf hashing
   (`archive-txids.js`), the txid sync's record updates

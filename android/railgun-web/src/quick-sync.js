@@ -286,18 +286,19 @@ export function takeQuickSyncStop() {
 }
 
 /**
- * Stops `engine`'s notes scan where its quick sync would leave it worse off than a failure, and says why
- * (`takeQuickSyncStop`). The engine goes on from a quick sync that failed, after one more try, by reading Railgun's
- * events from the RPC itself, from its newest stored commitment (or the last block it scanned) to the chain's newest
- * block; and from one whose trees didn't take every leaf, to its end-of-scan root check of the trees as they stand.
+ * Stops `engine`'s notes scan where it would go on worse off than a failure, and says why (`takeQuickSyncStop`). The
+ * engine goes on from a quick sync that failed, after one more try, by reading Railgun's events from the RPC itself,
+ * from its newest stored commitment (or the last block it scanned) to the chain's newest block; and after that read,
+ * to its end-of-scan root check of the trees as they stand, whatever leaves they didn't take.
  *
  * - A quick sync that failed with that read more than `maxChainScanBlocks` behind `head()` (the chain's newest block
  *   number) stops the scan, saying the indexer didn't answer: rather than hours of log reads that a first sync, or a
  *   wallet months behind, would make while rail-squid is out of reach. Closer, or with no newest block to judge by,
  *   the engine's read goes on as before.
- * - Leaves left in the trees' write queue after the quick sync, once written again after `writeRetryMs`, stop the
- *   scan: it would end with the trees short of them, at a root the contract recorded, so the check would pass with
- *   notes missing.
+ * - Leaves still in the trees' write queue once the engine's own read is done, written again after `writeRetryMs`,
+ *   stop the scan: it would end with the trees short of them, at a root the contract recorded, so the check would
+ *   pass with notes missing. Not sooner: the engine's listener queues the newest blocks' leaves as they come, and
+ *   rail-squid, behind the RPC, can leave a stretch between them that only the engine's read fills.
  *
  * Install it after every other change to the quick sync: it watches the one the engine calls.
  */
@@ -317,29 +318,31 @@ export function guardQuickSync(
       throw error;
     }
   };
+  const stop = (reason) => {
+    stopped = reason;
+    throw new Error(reason);
+  };
   const quickSync = engine.performQuickSync;
   // The engine tries a failed quick sync once more through this same method, so the try that ends it judges.
   engine.performQuickSync = async function performQuickSync(version, ...rest) {
     failed = false;
     await quickSync.call(this, version, ...rest);
-    if (version !== txidVersion) return;
-    const stop = (reason) => {
-      stopped = reason;
-      throw new Error(reason);
-    };
-    if (failed) {
-      const from = await engine.getNextStartingBlockSlowScan(txidVersion, chain);
-      const newest = await head().catch(() => undefined);
-      if (newest !== undefined && newest - from > maxChainScanBlocks) {
-        stop(`the indexer did not answer, and ${newest - from} blocks are too many to read from the RPC`);
-      }
+    if (version !== txidVersion || !failed) return;
+    const from = await engine.getNextStartingBlockSlowScan(txidVersion, chain);
+    const newest = await head().catch(() => undefined);
+    if (newest !== undefined && newest - from > maxChainScanBlocks) {
+      stop(`the indexer did not answer, and ${newest - from} blocks are too many to read from the RPC`);
     }
+  };
+  // The engine's own read of the chain after the quick sync (V2's: Ethereum's and Sepolia's trees).
+  const chainRead = engine.slowSyncV2;
+  engine.slowSyncV2 = async function slowSyncV2(...args) {
+    await chainRead.call(this, ...args);
     const merkletree = engine.getUTXOMerkletree(txidVersion, chain);
-    if (leavesLeft(merkletree)) {
-      await delay(writeRetryMs);
-      await merkletree.updateTreesFromWriteQueue(true);
-      if (leavesLeft(merkletree)) stop('the trees stopped short of the leaves the quick sync gave them');
-    }
+    if (!leavesLeft(merkletree)) return;
+    await delay(writeRetryMs);
+    await merkletree.updateTreesFromWriteQueue(true);
+    if (leavesLeft(merkletree)) stop('the trees stopped short of the leaves they were given');
   };
 }
 

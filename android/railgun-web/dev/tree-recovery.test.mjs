@@ -244,13 +244,13 @@ const ROOTS = await contractRoots();
 
 /**
  * The contract as a scan reads it: the roots it has had (`roots`, as `tree:root`), and its logs past the quick sync,
- * none unless `logs()` throws.
+ * none unless `logs(commitments)` throws or hands the engine's commitments listener some.
  */
 const contract = ({ roots = ROOTS, logs = () => {} } = {}) => ({
   contract: { runner: { provider: { getBlockNumber: async () => fixture.to } } },
   validateMerkleroot: async (tree, root) => roots.has(`${tree}:${root}`),
-  getHistoricalEvents: async (_from, to, _next, _commitments, _nullifiers, _unshields, synced) => {
-    logs();
+  getHistoricalEvents: async (_from, to, _next, commitments, _nullifiers, _unshields, synced) => {
+    await logs(commitments);
     await synced(to);
   },
 });
@@ -478,10 +478,17 @@ test("a refusal by an RPC that hasn't reached the tree's newest leaf counts for 
   assert.equal(rpcBehindLeaf(1_000, undefined), false, 'an unread newest block counts it too');
 });
 
-/** `engineOn`'s engine, its quick sync guarded as the page's is, with `newest` the chain's newest block. */
-async function guardedEngineOn({ newest, maxChainScanBlocks, ...options }) {
+/**
+ * `engineOn`'s engine, its quick sync guarded as the page's is, with `newest` the chain's newest block; its read of the
+ * chain hands over `chainCommitments`.
+ */
+async function guardedEngineOn({ newest, maxChainScanBlocks, chainCommitments = [], ...options }) {
   let reads = 0;
-  const built = await engineOn({ ...options, logs: () => (reads += 1) });
+  const logs = async (commitments) => {
+    reads += 1;
+    if (chainCommitments.length > 0) await commitments(V2, chainCommitments);
+  };
+  const built = await engineOn({ ...options, logs });
   const head = async () => newest;
   guardQuickSync(built.engine, { txidVersion: V2, chain: CHAIN, head, maxChainScanBlocks, writeRetryMs: 0 });
   takeQuickSyncStop();
@@ -530,4 +537,20 @@ test('a quick sync whose trees did not take every leaf stops the scan, which wou
   await scan();
   assert.deepEqual(ends, ['incomplete']);
   assert.match(takeQuickSyncStop(), /trees stopped short/);
+});
+
+test("a stretch rail-squid left out that the engine's own read fills passes, as it did", async () => {
+  // Rail-squid behind the RPC: the leaves after a stretch it hasn't listed wait in the queue until the engine reads it.
+  const dropped = formatCommitments(fixture.squid.commitments)[3];
+  const commitments = fixture.squid.commitments.filter(
+    ({ batchStartTreePosition }) => Number(batchStartTreePosition) !== dropped.startPosition,
+  );
+  const { ends, scan } = await guardedEngineOn({
+    queries: indexer({ ...fixture.squid, commitments }, PAGE).queries,
+    newest: fixture.to,
+    chainCommitments: [dropped],
+  });
+  await scan();
+  assert.deepEqual(ends, ['complete']);
+  assert.equal(takeQuickSyncStop(), undefined);
 });
