@@ -66,7 +66,8 @@ ComPtr<CoreWebView2EnvironmentOptions> PageOptions(int bridge_port) {
   ComPtr<CoreWebView2EnvironmentOptions> options = BaseOptions();
   if (!options) return nullptr;
   options->put_AdditionalBrowserArguments(BrowserArguments(bridge_port).c_str());
-  // The same Accept-Language on every computer: the page has no UI.
+  // One language on every computer: the page sets `en-US,en;q=0.9` on its own requests on every host
+  // (accept-language.js), Chromium's header for en-US, so whatever it doesn't set names the same. It has no UI.
   options->put_Language(L"en-US");
   ComPtr<ICoreWebView2EnvironmentOptions2> options2;
   if (SUCCEEDED(options.As(&options2))) options2->put_ExclusiveUserDataFolderAccess(TRUE);

@@ -62,6 +62,15 @@ ARCHIVE_HOST = "digest.anon.inc"
 LABEL = re.compile(r"^[a-z0-9]+(-+[a-z0-9]+)*$", re.IGNORECASE)
 
 
+def page_accept_language() -> str:
+    """The one language the page names on every host (android/railgun-web/src/accept-language.js)."""
+    source = (REPO / "android/railgun-web/src/accept-language.js").read_text(encoding="utf-8")
+    match = re.search(r"export const ACCEPT_LANGUAGE = '([^']+)';", source)
+    if not match:
+        sys.exit("accept-language.js has no ACCEPT_LANGUAGE")
+    return match.group(1)
+
+
 def page_hosts() -> list[str]:
     source = ENDPOINTS.read_text(encoding="utf-8")
     body = source.split("kHosts[] = {", 1)[1].split("};", 1)[0]
@@ -377,10 +386,13 @@ def main() -> int:
                 not any(name.startswith("sec-ch-ua") for headers in lowered for name in headers),
                 "no request sends User-Agent client hints",
             )
-            run.check(
-                all(headers.get("accept-language", "en-US").startswith("en-US") for headers in lowered),
-                "every request's Accept-Language is en-US",
-            )
+            # The page sets its one language on its own requests, on every host, and Windows's environment language
+            # (en-US) gives Chromium's own header the same value: every request that names one names it.
+            accept_language = page_accept_language()
+            languages = sorted({headers["accept-language"] for headers in lowered if "accept-language" in headers})
+            run.report["accept_languages"] = languages
+            run.report["navigator_languages"] = value.get("languages")
+            run.check(languages == [accept_language], f"every request's Accept-Language is {accept_language}")
 
         if args.firewall:
             firewall.block()
