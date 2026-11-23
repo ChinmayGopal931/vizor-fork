@@ -654,7 +654,10 @@ stay, unused.
   (CI's `pins` job in `veylor-linux.yml`).
   Its User-Agent is a fixed `Mozilla/5.0` (`RailgunRequests.USER_AGENT`),
   the archive fetch's too: the WebView's own names the phone's model and its
-  Android build to every host the page reaches.
+  Android build to every host the page reaches. On every host the page's
+  requests also name one language, `en-US,en;q=0.9`, which the page sets on
+  each `fetch` and `XMLHttpRequest` itself (`accept-language.js`): the
+  engine's own Accept-Language names the device's languages.
 - On iOS a Swift `WKWebView` host behind the same channel serves the page
   from `veylor-railgun://app/`, in a data store of its own whose SOCKS5
   proxy is the bridge (no failover), with a `WKContentRuleList` allowlist

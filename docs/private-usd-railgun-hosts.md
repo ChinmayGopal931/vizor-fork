@@ -209,7 +209,13 @@ Prefixes below: `kt/` is the Android host's directory, `rw/` is
   on the Mac freezes the OS version (`Macintosh; Intel Mac OS X 10_15_7`) and
   names no model, and the Mac keeps it. **(Chromium)** set the page's
   User-Agent before it loads; check what it names on a host whose engine's
-  own isn't frozen.
+  own isn't frozen. The page's own requests also name the same language on
+  every device and every host, `Accept-Language: en-US,en;q=0.9`, which the
+  page sets itself on every `fetch` and `XMLHttpRequest` (`rw/src/accept-language.js`,
+  run first from `shims.js`; a host's archive prelude wraps the `fetch` it
+  leaves): the engine's own names the device's languages, and WebKit and
+  Android's WebView have no setting for it (review, 2026-11-22; Windows's
+  host sets its environment's language to en-US as well).
 
 ## 4. Anon's archive: whether the page reads it
 
