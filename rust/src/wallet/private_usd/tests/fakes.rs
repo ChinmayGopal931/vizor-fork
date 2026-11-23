@@ -270,6 +270,8 @@ pub(super) struct State {
     pub fund_hash: Option<[u8; 32]>,
     /// Holds the funding's answer until notified.
     pub hold_fund: Option<Arc<Notify>>,
+    /// `/v1/reverse/fund` turns every funding down so, status and code.
+    pub fund_refusal: Option<(u16, &'static str)>,
     /// Every funding posted, answered or not, in order.
     pub fundings: Vec<Value>,
     /// Runs once at the next `/v1/terms` read.
@@ -426,6 +428,7 @@ impl State {
             funding_fee: Some(FUNDING_FEE),
             fund_hash: Some(word(8)),
             hold_fund: None,
+            fund_refusal: None,
             fundings: Vec::new(),
             on_terms: None,
             paths: Vec::new(),
@@ -1103,6 +1106,9 @@ impl FakeServices {
             }
             (&Method::POST, "/v1/reverse/fund") => {
                 let state = self.0.get();
+                if let Some((status, code)) = state.fund_refusal {
+                    return answer(status, json!({ "code": code, "error": "turned down" }));
+                }
                 let sent: Vec<String> = state.fund_hash.iter().map(|hash| hex0x(hash)).collect();
                 answer(200, json!({ "transactions": sent }))
             }

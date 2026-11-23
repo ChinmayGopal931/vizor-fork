@@ -409,7 +409,10 @@ keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
   landed, never lapsed; it lapses only on one consistent read of a fresh
   head past its deadline that shows the escrow still open, and a refund
   that cannot land yet waits in the phase that read supports.
-- Never prove a second reverse funding because a response was lost. Sign
+- Never prove a second reverse funding because a response was lost. Only
+  a refusal of a funding's first post drops it for the user to pay again; a
+  refusal of a later post keeps it, since an earlier post whose answer was
+  lost may still land, and the chain ends it (review, 2026-11-22). Sign
   `ready` only before `t0` (its deadline, the head plus 120 s, before it),
   keep that deadline first, and never sign or send one once a refund was
   posted. Never re-sign `ready` after a restart; resend it.
