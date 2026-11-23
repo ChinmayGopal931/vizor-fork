@@ -11345,7 +11345,7 @@
   },
   "privateUsdConvertErrorClockLinux": "Your computer's clock is off. Set it to the right time, then try again.",
   "@privateUsdConvertErrorClockLinux": {
-    "description": "In the Linux app: the error on the bridge screens when a step was refused because the computer's clock runs minutes ahead of Ethereum's; nothing was sent."
+    "description": "In the Linux and Windows apps: the error on the bridge screens when a step was refused because the computer's clock runs minutes ahead of Ethereum's; nothing was sent."
   },
   "privateUsdConvertErrorEthereum": "Veylor can't reach Ethereum right now. Try again in a moment.",
   "@privateUsdConvertErrorEthereum": {
@@ -11518,7 +11518,7 @@
   },
   "privateUsdConvertProblemClockLinux": "Your computer's clock is off, so the bridge can't go on. Set it to the right time. Veylor keeps trying while it's open.",
   "@privateUsdConvertProblemClockLinux": {
-    "description": "In the Linux app: the problem card message when the bridge's next step waits because the computer's clock runs minutes ahead of Ethereum's; Veylor retries while it is open."
+    "description": "In the Linux and Windows apps: the problem card message when the bridge's next step waits because the computer's clock runs minutes ahead of Ethereum's; Veylor retries while it is open."
   },
   "privateUsdConvertProblemEthereum": "Veylor can't reach Ethereum right now. It keeps trying while it's open.",
   "@privateUsdConvertProblemEthereum": {

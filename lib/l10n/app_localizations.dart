@@ -14540,7 +14540,7 @@ abstract class AppLocalizations {
   /// **'Your Mac\'s clock is off. Set it to the right time, then try again.'**
   String get privateUsdConvertErrorClockDesktop;
 
-  /// In the Linux app: the error on the bridge screens when a step was refused because the computer's clock runs minutes ahead of Ethereum's; nothing was sent.
+  /// In the Linux and Windows apps: the error on the bridge screens when a step was refused because the computer's clock runs minutes ahead of Ethereum's; nothing was sent.
   ///
   /// In en, this message translates to:
   /// **'Your computer\'s clock is off. Set it to the right time, then try again.'**
@@ -14750,7 +14750,7 @@ abstract class AppLocalizations {
   /// **'Your Mac\'s clock is off, so the bridge can\'t go on. Set it to the right time. Veylor keeps trying while it\'s open.'**
   String get privateUsdConvertProblemClockDesktop;
 
-  /// In the Linux app: the problem card message when the bridge's next step waits because the computer's clock runs minutes ahead of Ethereum's; Veylor retries while it is open.
+  /// In the Linux and Windows apps: the problem card message when the bridge's next step waits because the computer's clock runs minutes ahead of Ethereum's; Veylor retries while it is open.
   ///
   /// In en, this message translates to:
   /// **'Your computer\'s clock is off, so the bridge can\'t go on. Set it to the right time. Veylor keeps trying while it\'s open.'**
