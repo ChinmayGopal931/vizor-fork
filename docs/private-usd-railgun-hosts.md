@@ -53,7 +53,14 @@ Prefixes below: `kt/` is the Android host's directory, `rw/` is
   `deleteWallet` 1 min, `transfer` and `unshield` 10 min, `broadcasterFee`
   2 min, `reverseCost` 30 s, `prepareReverse` 10 min. Kotlin's
   `RailgunMethod` (`kt/RailgunProtocol.kt`) and Swift's
-  (`ios/RailgunProtocol.swift`) are the same table.
+  (`ios/RailgunProtocol.swift`) are the same table. A deadline counts the
+  time the page could run: Android's `Handler` counts uptime, which stops
+  while the phone sleeps, and its page runs on in the background. **(WebKit)**
+  WebKit suspends the page with the app (iOS) or its window out of sight
+  (the Mac), so iOS and the Mac count uptime less that time
+  (`RailgunPageClock`: iOS from the app's background to its foreground, the
+  Mac from the page's window's occlusion), since 2026-11-22: a page
+  suspended through a call's deadline was closed as it came back.
 - **H3. Events.** Forward the page's unasked messages as their raw JSON:
   `scan`, `proof`, `screening`, `refresh`, `synced`, and `log` only from a
   page loaded with `debug`. Drop any other name. Keep up to 256 while nobody
