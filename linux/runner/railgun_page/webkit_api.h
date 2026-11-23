@@ -78,6 +78,7 @@ namespace railgun_page {
   X(soup_message_new)                                     \
   X(soup_message_set_flags)                               \
   X(soup_message_get_status)                              \
+  X(soup_message_get_http_version)                        \
   X(soup_message_get_request_headers)                     \
   X(soup_message_get_response_headers)                    \
   X(soup_message_headers_new)                             \

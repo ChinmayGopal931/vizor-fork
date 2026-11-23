@@ -36,13 +36,17 @@ constexpr guint kProbeTimeoutSeconds = 30;
 constexpr int kWipeAttempts = 5;
 constexpr guint kWipeRetryMs = 500;
 constexpr guint kQuitGraceMs = 2000;
+// The most a load waits for the page processes before it to exit: each is ended after `kQuitGraceMs`, so one still
+// there after this is stuck, and the load fails as a timeout rather than wait for good (Dart reopens on the next use).
+constexpr guint kLoadWaitSeconds = 30;
 // How long a page process waits after the one before it exited: WebKit's own processes exit as their link to it
 // closes, a moment later, and two pages must never share the data store.
 constexpr gint64 kAfterExitUs = 500 * 1000;
 constexpr char kHelperName[] = "veylor-railgun-page";
 // The page process's own diagnostic lines; whatever else WebKit prints there is dropped, since it could quote a URL.
 constexpr char kLogPrefix[] = "veylor-railgun-page: ";
-// The page process's exit status when WebKit's sandbox did not start (railgun_page/railgun_page_main.cc).
+// The page process's exit status when WebKit's sandbox did not start (railgun_page/railgun_page.h); a fatal error
+// after the page ran inside it exits otherwise (`kExitFatal`, 6), which closes the page as any stop does.
 constexpr int kExitSandbox = 3;
 
 // Whether this build may debug the page at all; `load`'s `debug` can only narrow it.
@@ -233,17 +237,21 @@ struct LogReader {
   GDataInputStream* stream;
 };
 
+// Lines are read as bytes: WebKit's own processes share the pipe and may write anything, and a reader that stopped
+// at a line that isn't UTF-8 would leave the pipe to fill, and the page process to block on its next write. Only the
+// end of the pipe or a failed read ends it.
 void ReadLogLine(GObject* source, GAsyncResult* result, gpointer data) {
   auto* reader = static_cast<LogReader*>(data);
   gsize length = 0;
-  g_autofree gchar* line =
-      g_data_input_stream_read_line_finish_utf8(G_DATA_INPUT_STREAM(source), result, &length, nullptr);
+  g_autofree gchar* line = g_data_input_stream_read_line_finish(G_DATA_INPUT_STREAM(source), result, &length, nullptr);
   if (line == nullptr) {
     g_object_unref(reader->stream);
     delete reader;
     return;
   }
-  if (g_str_has_prefix(line, kLogPrefix)) g_message("Railgun page: %s", line + std::strlen(kLogPrefix));
+  if (g_str_has_prefix(line, kLogPrefix) && g_utf8_validate(line, static_cast<gssize>(length), nullptr)) {
+    g_message("Railgun page: %s", line + std::strlen(kLogPrefix));
+  }
   g_data_input_stream_read_line_async(reader->stream, G_PRIORITY_LOW, nullptr, ReadLogLine, reader);
 }
 
@@ -366,6 +374,8 @@ class Host {
   static void OnProcessExited(GObject* source, GAsyncResult* result, gpointer data);
   static gboolean OnKill(gpointer data);
   static gboolean OnLoadTimer(gpointer data);
+  static gboolean OnLoadWaitExpired(gpointer data);
+  void DropPendingLoad(const Error& reason);
 
   FlMethodChannel* methods_ = nullptr;
   FlEventChannel* events_ = nullptr;
@@ -383,6 +393,8 @@ class Host {
   // The load waiting for the page processes before it to exit, if any.
   std::optional<PendingLoad> pending_load_;
   guint load_timer_ = 0;
+  // Ends the pending load after `kLoadWaitSeconds`.
+  guint load_wait_timer_ = 0;
   gint64 last_exit_ = 0;
   // Every page process started and not yet exited, each with the page it served.
   std::map<GSubprocess*, std::weak_ptr<Page>> processes_;
@@ -812,7 +824,31 @@ void Host::Load(int port, bool debug, FlMethodCall* call) {
     return;
   }
   pending_load_ = PendingLoad{port, debug, static_cast<FlMethodCall*>(g_object_ref(call))};
+  load_wait_timer_ = g_timeout_add_seconds(kLoadWaitSeconds, OnLoadWaitExpired, this);
   StartPendingLoad();
+}
+
+gboolean Host::OnLoadWaitExpired(gpointer data) {
+  auto* self = static_cast<Host*>(data);
+  self->load_wait_timer_ = 0;
+  if (self->pending_load_.has_value()) {
+    g_message("Railgun page: a load gave up waiting for the last page process to exit");
+    self->DropPendingLoad(Error::Timeout("waiting for the last page to close"));
+  }
+  return G_SOURCE_REMOVE;
+}
+
+// Answers the pending load with `reason`, if one waits, and stops its timers.
+void Host::DropPendingLoad(const Error& reason) {
+  if (load_wait_timer_ != 0) g_source_remove(load_wait_timer_);
+  load_wait_timer_ = 0;
+  if (!pending_load_.has_value()) return;
+  FlMethodCall* call = pending_load_->call;
+  pending_load_.reset();
+  if (load_timer_ != 0) g_source_remove(load_timer_);
+  load_timer_ = 0;
+  AnswerError(call, reason);
+  g_object_unref(call);
 }
 
 void Host::StartPendingLoad() {
@@ -824,6 +860,8 @@ void Host::StartPendingLoad() {
   }
   PendingLoad load = *pending_load_;
   pending_load_.reset();
+  if (load_wait_timer_ != 0) g_source_remove(load_wait_timer_);
+  load_wait_timer_ = 0;
   Spawn(load);
 }
 
@@ -856,14 +894,7 @@ void Host::Spawn(PendingLoad load) {
 }
 
 void Host::ClosePage(const Error& reason) {
-  if (pending_load_.has_value()) {
-    FlMethodCall* call = pending_load_->call;
-    pending_load_.reset();
-    if (load_timer_ != 0) g_source_remove(load_timer_);
-    load_timer_ = 0;
-    AnswerError(call, Error::Disconnected(reason.message));
-    g_object_unref(call);
-  }
+  DropPendingLoad(Error::Disconnected(reason.message));
   std::shared_ptr<Page> closing = std::move(page_);
   page_.reset();
   if (closing != nullptr) closing->Close(reason);

@@ -42,7 +42,11 @@ channel contract, method for method and code for code
   sandbox check behind `supported`; one page at a time, each with its pending
   calls, their timeouts (a timeout closes the page) and the 30 s load timeout;
   the event buffer (256); the wipe; and the page's visibility. Memory pressure
-  never closes the page, as on Android (H11).
+  never closes the page, as on Android (H11). A load waits for the page
+  processes before it to exit (each is ended 2 s after its quit), 30 s at
+  most, then fails `timeout`. The page process's stderr is read as bytes, so
+  a line that isn't UTF-8 (WebKit's processes share the pipe) never stops the
+  reader and leaves the pipe to fill (review, 2026-11-22).
 - `railgun_protocol.h/.cc`: the methods and timeouts, the events, the request
   envelope (params spliced, never re-serialized) and the page's replies, read
   by `railgun_json.cc`, a strict reader that keeps every value as its text.
@@ -114,7 +118,10 @@ outside it:
   and checks that the web process is bubblewrap's child, not its own: a WebKit
   built without the sandbox would start it directly. WebKit's `g_error` for a
   sandbox that can't start becomes exit status 3 (a GLib log writer), never a
-  crash report.
+  crash report. Once a page said hello from inside the sandbox, a fatal
+  error is no sandbox that can't start: it exits 6 and closes the page as a
+  stop (`disconnected`), which Dart reopens on its next use (review,
+  2026-11-22).
 - **Every page checks it again.** On the page's hello, a web process outside
   bubblewrap closes the page as `unavailable`.
 - **Where it fails**, `supported` is false and Shielded USD stays hidden, as
@@ -169,7 +176,11 @@ the checklist's sections 4 and 5:
   a proxy, so the bridge's route alone gives HTTP/1.1 (Ubuntu 22.04's 3.0,
   Debian 12's 3.2); from 3.4 the request also asks for it
   (`soup_message_set_force_http1`, resolved by name, since older headers lack
-  it). The pool keeps five per host, each idle five minutes at most. An answer
+  it). Nothing before 3.4 can force it, so an answer that came over HTTP/2 all
+  the same (`soup_message_get_http_version`) is a 404 and turns the archive
+  off for the page's life: the page goes on from rail-squid at once (review,
+  2026-11-22; unverified on a real 3.0 or 3.2). The pool keeps five per host,
+  each idle five minutes at most. An answer
   read whole leaves its connection for the next request. Any other end (a
   failure, a stall, the size cap, the deadline) closes its body cancelled, so
   libsoup never uses that connection again. A network change
