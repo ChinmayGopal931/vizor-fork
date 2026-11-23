@@ -415,10 +415,10 @@ confirming step, and Back from the progress lands on it rather than on
   app has one window, so it never moves. AppKit has no
   `isUserInteractionEnabled`: the view is a `WKWebView` subclass that refuses
   first responder, the key view loop, the pointer and VoiceOver.
-- **No close for memory.** iOS closes an idle page on a memory warning; the
-  Mac did on a memory-pressure warning until 2026-11-20 and no longer does,
-  as Android never does: the rest of a sync runs with no call waiting, and
-  warnings are routine on a Mac beside a page this size.
+- **No close for memory.** The Mac closed an idle page on a memory-pressure
+  warning until 2026-11-20, and iOS on a memory warning until 2026-11-22;
+  neither does now, as Android never does: the rest of a sync runs with no
+  call waiting, and warnings are routine beside a page this size.
 - **No bridge check after the background.** iOS may reclaim a suspended app's
   listening socket; the Mac app keeps running (App Nap is off), so Dart's
   check stays iOS only.

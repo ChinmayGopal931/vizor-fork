@@ -139,9 +139,10 @@ Prefixes below: `kt/` is the Android host's directory, `rw/` is
   the rest of a sync runs with no call waiting, so a page that looks idle may
   be the one syncing. The Mac closed an idle page on a memory-pressure
   warning (carried over from iOS) until 2026-11-20; warnings are routine
-  beside a 500 to 800 MB page. Only iOS, whose memory warning comes before
-  the system ends the app, closes it. Dart closes a page nobody uses after
-  ten minutes.
+  beside a 500 to 800 MB page. iOS closed one on a memory warning until
+  2026-11-22, which cut off the rest of a sync; under real pressure iOS ends
+  WebKit's content process first, which closes the page (H8). Dart closes a
+  page nobody uses after ten minutes.
 - **H12. Workers.** The page works a notes scan's keys out in up to six Web
   Workers (`rw/src/note-keys.js`, one per core but two,
   `navigator.hardwareConcurrency`). They need `worker-src blob:` (the CSP
