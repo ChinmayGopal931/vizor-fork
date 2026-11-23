@@ -350,6 +350,7 @@ class Host {
   void Supported(FlMethodCall* call);
   void StartProbe();
   void ProbeEnded(bool passed);
+  void ProbeTimedOut();
   void Load(int port, bool debug, FlMethodCall* call);
   void StartPendingLoad();
   void Spawn(PendingLoad load);
@@ -707,7 +708,8 @@ void Host::HandleCall(FlMethodCall* call) {
 
 // Whether the page can run here: the page process loads WebKitGTK and starts a sandboxed page, once per process. It
 // never runs a page without WebKit's sandbox, and WebKit aborts a process whose sandbox can't start, so the check
-// runs in a process of its own. Asked after the first frame (app_bootstrap.dart), so it never delays the start.
+// runs in a process of its own. Asked after the first frame (app_bootstrap.dart), so it never delays the start. A check
+// that ran to its end is kept for the process's life; one that took too long is no answer, and runs again when asked.
 void Host::Supported(FlMethodCall* call) {
   if (probe_ == Probe::kPassed || probe_ == Probe::kFailed) {
     AnswerValue(call, fl_value_new_bool(probe_ == Probe::kPassed));
@@ -767,12 +769,24 @@ gboolean Host::OnProbeTimeout(gpointer data) {
   auto* self = static_cast<Host*>(data);
   self->probe_timer_ = 0;
   if (self->probe_process_ != nullptr) {
-    g_message("Railgun page: unavailable (the check took too long)");
+    g_message("Railgun page: the check took too long; it runs again when asked");
     g_subprocess_force_exit(self->probe_process_);
     g_clear_object(&self->probe_process_);
-    self->ProbeEnded(false);
+    self->ProbeTimedOut();
   }
   return G_SOURCE_REMOVE;
+}
+
+// A desktop still busy starting can hold the check past its time. That says nothing of the sandbox: the waiting calls
+// fail `timeout`, which Dart asks again after, and the next `supported` starts a new check.
+void Host::ProbeTimedOut() {
+  probe_ = Probe::kUnknown;
+  std::vector<FlMethodCall*> calls;
+  calls.swap(waiting_supported_);
+  for (FlMethodCall* call : calls) {
+    AnswerError(call, Error::Timeout("the sandbox check"));
+    g_object_unref(call);
+  }
 }
 
 void Host::ProbeEnded(bool passed) {

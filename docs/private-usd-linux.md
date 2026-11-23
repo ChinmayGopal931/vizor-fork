@@ -118,7 +118,14 @@ outside it:
 - **Every page checks it again.** On the page's hello, a web process outside
   bubblewrap closes the page as `unavailable`.
 - **Where it fails**, `supported` is false and Shielded USD stays hidden, as
-  below macOS 14.
+  below macOS 14. Bridges already under way still advance: the engine runs
+  for them without the page (`docs/private-usd.md`, "Foreground and unlocked
+  only").
+- **A check that takes too long** (30 s, a desktop still busy starting) is no
+  answer: the waiting calls fail `timeout`, the next `supported` runs the
+  check again, and `RailgunHostSupportedNotifier` asks again after 30 s, 1, 2,
+  5 and 10 minutes. Until 2026-11-22 a timeout was kept as a no for the
+  process's life. A check that ran to its end is kept.
 - **Asked after the first frame.** On Linux the bootstrap does not wait for
   `supported` before the first frame (`app_bootstrap.dart`), so the check (a
   second or so) never delays the start. It starts once the first frame is up,

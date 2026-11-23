@@ -171,7 +171,11 @@ Code:
   offered while the app was away buzzes on its return.
 - While unlocked, the engine (`PrivateUsdEngineHost` in `lib/app.dart`)
   advances the conversions of every software account, not only the active
-  one (D14).
+  one (D14). It runs where the page runs, and also where the host says it
+  can't (a Linux sandbox check that failed, macOS below 14) while `swaps.db`
+  holds a bridge under way (`privateUsdBridgesUnderWayProvider`): every step
+  but the reverse funding's proof is Rust's, so those bridges still finish or
+  come back (review, 2026-11-22).
 - Hardware accounts, accounts without ZIP-32 metadata, and regtest hide the
   feature.
 - **On the Mac** the foreground is a shown window, focused or not: a window

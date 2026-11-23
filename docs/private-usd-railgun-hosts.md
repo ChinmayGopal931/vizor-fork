@@ -30,7 +30,11 @@ Prefixes below: `kt/` is the Android host's directory, `rw/` is
     Mac: macOS 14 and later (the store's proxy API). Register the handler
     before Dart's bootstrap asks (`queryRailgunHostSupported` in
     `lib/src/features/private_usd/services/railgun_host_channel.dart`): a
-    missing handler reads as no host, except on iOS.
+    missing handler reads as no host, except on iOS. An answer that takes a
+    check of its own (Linux's sandbox) answers `timeout` when the check runs
+    out of time, never `false`, and checks again on the next ask; Dart asks
+    again a few times. Where the answer is no, bridges under way still
+    advance: the engine runs for them without the page.
   - `load {proxyPort, debug}`: close any page, load a fresh one whose every
     connection goes through the bridge at `proxyPort`, answer once the page
     said `ready` (30 s, else close it and fail). A port outside 1 to 65535

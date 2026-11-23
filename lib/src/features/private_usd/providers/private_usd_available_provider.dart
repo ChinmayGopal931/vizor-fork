@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart' show WidgetsBinding;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -73,24 +75,52 @@ final railgunHostSupportQueryProvider = Provider<Future<bool?> Function()>(
 /// Whether this platform's Railgun host can run the page: the bootstrap's
 /// answer, so it is known from the first frame. When the iOS handler had not
 /// answered yet, it counts as no until it is asked again after the first
-/// frame.
+/// frame. Linux is asked after the first frame, and again after a check that
+/// took too long ([kRailgunHostSupportRetries]).
 final railgunHostSupportedProvider =
     NotifierProvider<RailgunHostSupportedNotifier, bool>(
       RailgunHostSupportedNotifier.new,
     );
 
+/// When Linux's host is asked again after a sandbox check that took too long
+/// (a desktop still busy starting): a few times, later and later.
+const kRailgunHostSupportRetries = <Duration>[
+  Duration(seconds: 30),
+  Duration(minutes: 1),
+  Duration(minutes: 2),
+  Duration(minutes: 5),
+  Duration(minutes: 10),
+];
+
 class RailgunHostSupportedNotifier extends Notifier<bool> {
+  Timer? _retry;
+
   @override
   bool build() {
+    ref.onDispose(() => _retry?.cancel());
     final known = ref.watch(appBootstrapProvider).railgunHostSupported;
     if (known != null) return known;
     WidgetsBinding.instance.addPostFrameCallback((_) => _askAgain());
     return false;
   }
 
-  Future<void> _askAgain() async {
+  Future<void> _askAgain([int attempt = 0]) async {
     final supported = await ref.read(railgunHostSupportQueryProvider)();
-    if (ref.mounted && supported == true) state = true;
+    if (!ref.mounted) return;
+    if (supported == true) {
+      state = true;
+      return;
+    }
+    // Which OS runs is an OS behaviour, not a layout choice.
+    if (supported == null &&
+        defaultTargetPlatform == TargetPlatform.linux &&
+        attempt < kRailgunHostSupportRetries.length) {
+      _retry?.cancel();
+      _retry = Timer(
+        kRailgunHostSupportRetries[attempt],
+        () => unawaited(_askAgain(attempt + 1)),
+      );
+    }
   }
 }
 
