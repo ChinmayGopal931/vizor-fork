@@ -52,6 +52,14 @@ test('every fetch names the same language, and keeps what it asked for', async (
   assert.equal(screening.init.headers.get('x-kept'), 'yes');
 });
 
+test('the fetch reads as the one it wraps, as localforage checks it', () => {
+  const scope = { Headers, Request, fetch };
+  pinAcceptLanguage(scope);
+  assert.notEqual(scope.fetch, fetch);
+  // A browser's reads `function fetch() { [native code] }`.
+  assert.equal(scope.fetch.toString(), Function.prototype.toString.call(fetch));
+});
+
 test('a fetch that names its own language is sent as it is', async () => {
   const { scope, sent } = fetchScope();
   const init = { headers: { 'Accept-Language': 'de' } };

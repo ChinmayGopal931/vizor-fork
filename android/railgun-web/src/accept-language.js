@@ -17,13 +17,21 @@ const HEADER = 'accept-language';
 export function pinAcceptLanguage(scope = globalThis) {
   const pageFetch = scope.fetch;
   if (typeof pageFetch === 'function' && typeof scope.Headers === 'function') {
-    scope.fetch = function fetch(input, init) {
+    const pinned = function fetch(input, init) {
       const given = init?.headers ?? (input instanceof scope.Request ? input.headers : undefined);
       const headers = new scope.Headers(given);
       if (headers.has(HEADER)) return pageFetch.call(scope, input, init);
       headers.set(HEADER, ACCEPT_LANGUAGE);
       return pageFetch.call(scope, input, { ...init, headers });
     };
+    // localforage, which the SDK's GraphQL client caches through, judges a WebKit page's IndexedDB by whether `fetch`
+    // reads as native: this one reads as the fetch it wraps, so the cache's store is the one it was.
+    Object.defineProperty(pinned, 'toString', {
+      value: () => Function.prototype.toString.call(pageFetch),
+      configurable: true,
+      writable: true,
+    });
+    scope.fetch = pinned;
   }
   const Request = scope.XMLHttpRequest;
   if (typeof Request === 'function') {
