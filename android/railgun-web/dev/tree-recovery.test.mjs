@@ -9,7 +9,7 @@ import {
   createRailgunTransactionWithHash,
 } from '@railgun-community/engine';
 import { throughRailgunEngineHooks, throughRootRefusals, withoutRescanTxidReset } from '../engine-hooks-plugin.mjs';
-import { formatCommitments, installQuickSync } from '../src/quick-sync.js';
+import { formatCommitments, guardQuickSync, installQuickSync, takeQuickSyncStop } from '../src/quick-sync.js';
 import {
   ARCHIVE_OFF_MS,
   REBUILD_AFTER_MS,
@@ -476,4 +476,58 @@ test("a refusal by an RPC that hasn't reached the tree's newest leaf counts for 
   assert.equal(rpcBehindLeaf(1_000, 1_000 + RPC_LAG_BLOCKS), false);
   assert.equal(rpcBehindLeaf(undefined, 1_000), false, 'an unread leaf counts the refusal, as before');
   assert.equal(rpcBehindLeaf(1_000, undefined), false, 'an unread newest block counts it too');
+});
+
+/** `engineOn`'s engine, its quick sync guarded as the page's is, with `newest` the chain's newest block. */
+async function guardedEngineOn({ newest, maxChainScanBlocks, ...options }) {
+  let reads = 0;
+  const built = await engineOn({ ...options, logs: () => (reads += 1) });
+  const head = async () => newest;
+  guardQuickSync(built.engine, { txidVersion: V2, chain: CHAIN, head, maxChainScanBlocks, writeRetryMs: 0 });
+  takeQuickSyncStop();
+  return { ...built, reads: () => reads };
+}
+
+const unanswered = {
+  nullifiers: async () => Promise.reject(new Error('the indexer did not answer in time')),
+  unshields: async () => Promise.reject(new Error('the indexer did not answer in time')),
+  commitments: async () => Promise.reject(new Error('the indexer did not answer in time')),
+};
+
+test('rail-squid out of reach far behind the newest block stops the scan rather than read the history from the RPC', async () => {
+  const { ends, scan, reads } = await guardedEngineOn({
+    queries: unanswered,
+    newest: fixture.from + 100_001,
+    maxChainScanBlocks: 100_000,
+  });
+  await scan();
+  assert.deepEqual(ends, ['incomplete']);
+  assert.equal(reads(), 0, "the engine read none of Railgun's events from the RPC");
+  assert.match(takeQuickSyncStop(), /indexer did not answer/);
+});
+
+test('rail-squid out of reach close to the newest block leaves the gap to the RPC, as before', async () => {
+  const { scan, reads } = await guardedEngineOn({
+    queries: unanswered,
+    newest: fixture.from + 100_000,
+    maxChainScanBlocks: 100_000,
+  });
+  await scan();
+  assert.equal(reads(), 1, 'the engine read the gap from the RPC');
+  assert.equal(takeQuickSyncStop(), undefined);
+});
+
+test('a quick sync whose trees did not take every leaf stops the scan, which would pass the trees short', async () => {
+  // A batch rail-squid's commitments skip: the trees stop at it, and the leaves after stay queued.
+  const dropped = formatCommitments(fixture.squid.commitments)[3];
+  const commitments = fixture.squid.commitments.filter(
+    ({ batchStartTreePosition }) => Number(batchStartTreePosition) !== dropped.startPosition,
+  );
+  const { ends, scan } = await guardedEngineOn({
+    queries: indexer({ ...fixture.squid, commitments }, PAGE).queries,
+    newest: fixture.to,
+  });
+  await scan();
+  assert.deepEqual(ends, ['incomplete']);
+  assert.match(takeQuickSyncStop(), /trees stopped short/);
 });

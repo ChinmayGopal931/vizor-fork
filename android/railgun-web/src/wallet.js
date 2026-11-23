@@ -39,7 +39,7 @@ import { mainnetBlockAt, mainnetBlockTime } from './block-times.js';
 import { creationBlock } from './creation-block.js';
 import { badRequest } from './errors.js';
 import { pauseMark, pausedSince } from './page-clock.js';
-import { formatUnshields, installQuickSync, squidPages } from './quick-sync.js';
+import { formatUnshields, guardQuickSync, installQuickSync, squidPages, takeQuickSyncStop } from './quick-sync.js';
 import { pendingShields, receivedSends } from './received.js';
 import { refreshProgress } from './refresh-progress.js';
 import { syncFailure } from './rpc-probe.js';
@@ -240,6 +240,12 @@ async function startEngine(networkName, database, rpcUrls, poiNodeUrls, history,
       useArchive,
     });
   }
+  // Last of the quick sync's changes: it watches the one the engine calls.
+  guardQuickSync(engine, {
+    txidVersion: TXID_VERSION,
+    chain: NETWORK_CONFIG[networkName].chain,
+    head: async () => (await readNewestBlock(networkName)).blockNumber,
+  });
   // Without the archive too: a list an archive sync left goes on from rail-squid.
   installArchiveTxids(engine, {
     reader,
@@ -592,6 +598,7 @@ async function scanNotesNow(walletId) {
     notesScan = scan;
     // A root the last rebuild's own scan refused is left out: this scan shows whether the rebuild took.
     takeRefusedRoot();
+    takeQuickSyncStop();
     try {
       await getEngine().scanUTXOHistory(TXID_VERSION, chain(), [walletId]);
     } finally {
@@ -603,7 +610,8 @@ async function scanNotesNow(walletId) {
       const refusal = takeRefusedRoot();
       const lag = refusal === undefined ? undefined : await rpcLag(refusal);
       if (await recovery(walletId).broke(lag === undefined ? refusal : undefined)) continue;
-      throw new Error(lag ?? 'the notes scan broke off, so the balances may be stale');
+      // A quick sync that left the scan to hours of reads from the RPC, or left the trees short, says so.
+      throw new Error(takeQuickSyncStop() ?? lag ?? 'the notes scan broke off, so the balances may be stale');
     }
     if (scan.started) {
       recovery(walletId).passed();

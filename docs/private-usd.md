@@ -533,7 +533,14 @@ stay, unused.
   ignores the answer (a write can end inside an on-chain batch, at a root
   the contract never recorded), though a call that fails stops the write.
   What holds the trees to the chain is the check of every tree's root at
-  the end of each scan: a wrong one fails the scan, never a balance.
+  the end of each scan: a wrong one fails the scan, never a balance. The
+  engine goes on from a quick sync that failed by reading Railgun's events
+  from the RPC itself, 500 blocks a read: more than 100,000 blocks behind
+  the newest block (about two weeks; a first sync is over 11 million),
+  the scan fails instead, saying the indexer didn't answer, rather than
+  read for hours. A quick sync that leaves leaves its trees didn't take,
+  written once more, fails the scan too (`guardQuickSync`): the end-of-scan
+  check would pass the trees short of them (review, 2026-11-22).
 - `engine-hooks-plugin.mjs` holds every rewrite of the engine's code: the
   unshield watermark (`unshield-events.js`), the archive's leaf hashing
   (`archive-txids.js`), the txid sync's record updates

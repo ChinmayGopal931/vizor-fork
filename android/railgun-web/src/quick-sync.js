@@ -269,6 +269,80 @@ export function installQuickSync(engine, { queries, head, pages }) {
   };
 }
 
+/**
+ * The most blocks the engine is left to scan through the RPC once its quick sync has failed: about two weeks, 200 of
+ * its 500-block log reads. Railgun's whole history is over 11 million blocks, hours of them.
+ */
+export const MAX_CHAIN_SCAN_BLOCKS = 100_000;
+
+// Why the guard stopped the last notes scan, until it is taken.
+let stopped;
+
+/** Why `guardQuickSync` stopped a notes scan since this was last asked, if it did. */
+export function takeQuickSyncStop() {
+  const taken = stopped;
+  stopped = undefined;
+  return taken;
+}
+
+/**
+ * Stops `engine`'s notes scan where its quick sync would leave it worse off than a failure, and says why
+ * (`takeQuickSyncStop`). The engine goes on from a quick sync that failed, after one more try, by reading Railgun's
+ * events from the RPC itself, from its newest stored commitment (or the last block it scanned) to the chain's newest
+ * block; and from one whose trees didn't take every leaf, to its end-of-scan root check of the trees as they stand.
+ *
+ * - A quick sync that failed with that read more than `maxChainScanBlocks` behind `head()` (the chain's newest block
+ *   number) stops the scan, saying the indexer didn't answer: rather than hours of log reads that a first sync, or a
+ *   wallet months behind, would make while rail-squid is out of reach. Closer, or with no newest block to judge by,
+ *   the engine's read goes on as before.
+ * - Leaves left in the trees' write queue after the quick sync, once written again after `writeRetryMs`, stop the
+ *   scan: it would end with the trees short of them, at a root the contract recorded, so the check would pass with
+ *   notes missing.
+ *
+ * Install it after every other change to the quick sync: it watches the one the engine calls.
+ */
+export function guardQuickSync(
+  engine,
+  { txidVersion, chain, head, maxChainScanBlocks = MAX_CHAIN_SCAN_BLOCKS, writeRetryMs = WRITE_RETRY_MS },
+) {
+  const events = engine.quickSyncEvents;
+  let failed = false;
+  engine.quickSyncEvents = async (...args) => {
+    try {
+      const answer = await events(...args);
+      failed = false;
+      return answer;
+    } catch (error) {
+      failed = true;
+      throw error;
+    }
+  };
+  const quickSync = engine.performQuickSync;
+  // The engine tries a failed quick sync once more through this same method, so the try that ends it judges.
+  engine.performQuickSync = async function performQuickSync(version, ...rest) {
+    failed = false;
+    await quickSync.call(this, version, ...rest);
+    if (version !== txidVersion) return;
+    const stop = (reason) => {
+      stopped = reason;
+      throw new Error(reason);
+    };
+    if (failed) {
+      const from = await engine.getNextStartingBlockSlowScan(txidVersion, chain);
+      const newest = await head().catch(() => undefined);
+      if (newest !== undefined && newest - from > maxChainScanBlocks) {
+        stop(`the indexer did not answer, and ${newest - from} blocks are too many to read from the RPC`);
+      }
+    }
+    const merkletree = engine.getUTXOMerkletree(txidVersion, chain);
+    if (leavesLeft(merkletree)) {
+      await delay(writeRetryMs);
+      await merkletree.updateTreesFromWriteQueue(true);
+      if (leavesLeft(merkletree)) stop('the trees stopped short of the leaves the quick sync gave them');
+    }
+  };
+}
+
 /** The indexer's three lists from `startingBlock` on. */
 export const squidLists = (queries, startingBlock, options) => ({
   unshields: squidPages(queries.unshields, formatUnshields, startingBlock, options),
