@@ -1220,12 +1220,8 @@ class PrivateUsdEngine {
     required int index,
   }) => _reverseStep(
     accountUuid,
-    (opId, secret) => _backend.reverseCancel(
-      accountUuid,
-      secret,
-      opId: opId,
-      index: index,
-    ),
+    (opId, secret) =>
+        _backend.reverseCancel(accountUuid, secret, opId: opId, index: index),
     nudges: true,
   );
 
@@ -1245,12 +1241,8 @@ class PrivateUsdEngine {
     required int index,
   }) => _reverseStep(
     accountUuid,
-    (opId, secret) => _backend.reverseRescue(
-      accountUuid,
-      secret,
-      opId: opId,
-      index: index,
-    ),
+    (opId, secret) =>
+        _backend.reverseRescue(accountUuid, secret, opId: opId, index: index),
   );
 
   Future<rust.ApiReverseRecord> _reverseStep(
