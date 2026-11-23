@@ -2428,7 +2428,7 @@
   "privateUsdConvertOpenFee": "마켓 메이커 수수료",
   "privateUsdConvertOpenFeeValue": "{amount} · 환불 불가",
   "privateUsdConvertOpeningSlow": "마켓 메이커가 스왑을 아직 열지 않았어요. 지금까지 보낸 자금은 없어요.",
-  "privateUsdConvertProblemClock": "휴대폰 시계가 맞지 않아 브리지를 진행할 수 없어요. 올바른 시간으로 맞춰 주세요. 앱이 열려 있는 동안 계속 시도해요.",
+  "privateUsdConvertProblemClock": "휴대폰 시계가 맞지 않아 브리지를 진행할 수 없어요. 올바른 시간으로 맞춰 주세요. Veylor가 열려 있는 동안 계속 시도해요.",
   "privateUsdConvertProblemClockDesktop": "Mac 시계가 맞지 않아 브리지를 진행할 수 없어요. 올바른 시간으로 맞춰 주세요. Veylor가 열려 있는 동안 계속 시도해요.",
   "privateUsdConvertProblemClockLinux": "컴퓨터 시계가 맞지 않아 브리지를 진행할 수 없어요. 올바른 시간으로 맞춰 주세요. Veylor가 열려 있는 동안 계속 시도해요.",
   "privateUsdConvertProblemEthereum": "지금 Veylor가 Ethereum에 연결할 수 없어요. 앱이 열려 있는 동안 계속 시도해요.",

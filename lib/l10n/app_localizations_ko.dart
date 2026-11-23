@@ -8867,7 +8867,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get privateUsdConvertProblemClock =>
-      '휴‍대‍폰 시‍계‍가 맞‍지 않‍아 브‍리‍지‍를 진‍행‍할 수 없‍어‍요. 올‍바‍른 시‍간‍으‍로 맞‍춰 주‍세‍요. 앱‍이 열‍려 있‍는 동‍안 계‍속 시‍도‍해‍요.';
+      '휴‍대‍폰 시‍계‍가 맞‍지 않‍아 브‍리‍지‍를 진‍행‍할 수 없‍어‍요. 올‍바‍른 시‍간‍으‍로 맞‍춰 주‍세‍요. Veylor‍가 열‍려 있‍는 동‍안 계‍속 시‍도‍해‍요.';
 
   @override
   String get privateUsdConvertProblemClockDesktop =>
