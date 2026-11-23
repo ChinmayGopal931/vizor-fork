@@ -7,6 +7,7 @@ import { ByteLength, ByteUtils, CommitmentType } from '@railgun-community/engine
 import { throughNoteKeyBatches, throughPreparedKeys, throughPreparedLegacyKeys } from '../engine-hooks-plugin.mjs';
 import { prepareKeys, preparedKey, preparedLegacyKey, useKeyPool, workerPool } from '../src/note-keys.js';
 import { multiplyAll } from '../src/note-keys-worker.js';
+import { notePause, stopWatchingPauses } from '../src/page-clock.js';
 import { installQuickSync } from '../src/quick-sync.js';
 import { CHAIN, ENGINE, V2, builtEngineModule, wholeEngine } from './engine-harness.mjs';
 import { history, indexer } from './history-fixture.mjs';
@@ -171,6 +172,29 @@ test('a batch the workers fail prepares nothing, and after a second the page lea
     release();
   }
   assert.equal(made, 2, 'started again once after the first failure, never after the second');
+});
+
+test('a batch a pause of the page cut through fails without counting, so the workers stay on', async () => {
+  let made = 0;
+  useKeyPool(async () => {
+    made += 1;
+    return {
+      multiply: async () => {
+        // The page stood still with the batch out, and its timeout came due as it woke.
+        notePause();
+        throw new Error('the note keys workers did not answer in time');
+      },
+      close() {},
+    };
+  });
+  const privateKey = randomBytes(32);
+  const points = Array.from({ length: 5 }, point);
+  for (let batch = 0; batch < 4; batch += 1) {
+    const { release } = await prepareKeys(privateKey, leavesOf(points), typeOf);
+    release();
+  }
+  stopWatchingPauses();
+  assert.equal(made, 4, 'started again after every paused batch');
 });
 
 test('workers that never start leave every key to the engine, and no batch waits on them twice', async () => {
