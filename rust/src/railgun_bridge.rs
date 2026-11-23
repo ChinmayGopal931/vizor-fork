@@ -226,13 +226,34 @@ async fn shut_down(running: BridgeState) {
     let _ = running.task.await;
 }
 
+/// The wait after an accept that failed, doubling with each failure in a
+/// row up to the most: a listener out of descriptors (`EMFILE`) or memory, or
+/// a connection aborted before it was taken, takes the next one once that
+/// passes, rather than end the bridge.
+const ACCEPT_RETRY_FIRST: Duration = Duration::from_millis(50);
+const ACCEPT_RETRY_MOST: Duration = Duration::from_secs(1);
+/// So many failed accepts in a row, about 16 s of them with nothing
+/// accepted between, end the bridge: its socket is gone (iOS reclaims a
+/// suspended app's), and Dart replaces a bridge that stopped accepting.
+const ACCEPT_FAILURES_ALLOWED: u32 = 20;
+
+/// How long to wait after `failures` failed accepts in a row.
+fn accept_retry(failures: u32) -> Duration {
+    let doublings = failures.saturating_sub(1).min(16);
+    ACCEPT_RETRY_FIRST
+        .saturating_mul(1 << doublings)
+        .min(ACCEPT_RETRY_MOST)
+}
+
 async fn run(listener: TcpListener, session: Session, mut shutdown: oneshot::Receiver<()>) {
     let mut connections = JoinSet::new();
+    let mut failures = 0u32;
     loop {
-        tokio::select! {
+        let wait = tokio::select! {
             _ = &mut shutdown => break,
             accepted = listener.accept() => match accepted {
                 Ok((stream, _)) => {
+                    failures = 0;
                     let session = session.clone();
                     connections.spawn(async move {
                         let allowed = session.allowed();
@@ -242,14 +263,30 @@ async fn run(listener: TcpListener, session: Session, mut shutdown: oneshot::Rec
                         // alone, never the target (`connect_upstream`).
                         let _ = serve(stream, allowed, connect).await;
                     });
+                    None
                 }
                 Err(error) => {
-                    log::warn!("network privacy: Railgun bridge accept failed: {error}");
-                    break;
+                    failures += 1;
+                    if failures >= ACCEPT_FAILURES_ALLOWED {
+                        log::warn!("network privacy: Railgun bridge stopped accepting: {error}");
+                        break;
+                    }
+                    // The first of a run says why; the rest of it would only
+                    // repeat that.
+                    if failures == 1 {
+                        log::warn!("network privacy: Railgun bridge accept failed, waiting: {error}");
+                    }
+                    Some(accept_retry(failures))
                 }
             },
             // Reaps finished tunnels, so the set does not grow for the page's life.
-            Some(_) = connections.join_next(), if !connections.is_empty() => {}
+            Some(_) = connections.join_next(), if !connections.is_empty() => None,
+        };
+        if let Some(wait) = wait {
+            tokio::select! {
+                _ = &mut shutdown => break,
+                _ = tokio::time::sleep(wait) => {}
+            }
         }
     }
     connections.abort_all();

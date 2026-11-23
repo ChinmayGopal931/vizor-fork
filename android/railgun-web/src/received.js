@@ -30,9 +30,6 @@ export function receivedSends(history, head) {
 
 const isReceived = ({ category }) => category === TransactionHistoryItemCategory.TransferReceiveERC20s;
 
-/** Whether a received send in `history` has no time of its own: then the newest block is worth reading to date it. */
-export const hasUndatedReceipts = (history) => history.some((item) => isReceived(item) && !item.timestamp);
-
 /**
  * The shields screening still holds (`ShieldPending`), from the wallet's history: `{timestamp, token}` for each token
  * amount, dated as `receivedSends` dates a send. A deposit, a bridge's payout and a shield from another wallet all
@@ -46,10 +43,6 @@ export function pendingShields(history, head) {
       .map(({ tokenAddress }) => ({ timestamp: timeOf(item, dated), token: tokenAddress })),
   );
 }
-
-/** Whether a shield screening still holds has no time of its own: then the newest block is worth reading too. */
-export const hasUndatedShields = (history) =>
-  history.some((item) => !item.timestamp && item.receiveERC20Amounts.some(isPending));
 
 const isPending = ({ balanceBucket }) => balanceBucket === RailgunWalletBalanceBucket.ShieldPending;
 

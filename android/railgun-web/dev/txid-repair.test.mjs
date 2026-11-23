@@ -207,6 +207,15 @@ test('a rewind or clear that throws leaves the list unmarked, as the engine leav
   );
   assert.equal(list.isScanning, false);
   assert.equal(await changeTxidList(list, async () => 'done'), 'done');
+  // A list already marked (a clear or a sync under way) keeps its owner's mark when the step refuses to start.
+  list.isScanning = true;
+  await assert.rejects(
+    changeTxidList(list, async () => {
+      throw new Error('Full reset of txids already in progress.');
+    }),
+    /in progress/,
+  );
+  assert.equal(list.isScanning, true);
 });
 
 test('every boundary is fixed: the same for each wallet a list stops for', () => {

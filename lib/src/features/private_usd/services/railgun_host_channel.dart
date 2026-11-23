@@ -100,7 +100,8 @@ String redactRailgunMessage(
 /// once that check has run). No handler means no host (Windows), except on
 /// iOS, where it can only mean the handler was not registered yet: the answer
 /// is then unknown (`null`), and the caller asks again after the first frame.
-/// Any other failure means no.
+/// Linux's check that took too long (`timeout`) is unknown too: its host runs
+/// it again when asked. Any other failure means no.
 Future<bool?> queryRailgunHostSupported({
   MethodChannel channel = const MethodChannel(
     RailgunHostChannel.methodChannelName,
@@ -113,6 +114,8 @@ Future<bool?> queryRailgunHostSupported({
     return (platform ?? defaultTargetPlatform) == TargetPlatform.iOS
         ? null
         : false;
+  } on PlatformException catch (error) {
+    return error.code == 'timeout' ? null : false;
   } catch (_) {
     return false;
   }

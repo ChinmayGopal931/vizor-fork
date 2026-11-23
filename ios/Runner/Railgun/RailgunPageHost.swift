@@ -40,11 +40,10 @@ final class RailgunPageHost {
         let window = note.object as? UIWindow
         MainActor.assumeIsolated { self?.follow(window) }
       })
-    observers.append(
-      center.addObserver(forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: .main) {
-        [weak self] _ in
-        MainActor.assumeIsolated { self?.memoryWarning() }
-      })
+    // No memory warning closes the page, as on Android and the other hosts: the rest of a sync runs with no call
+    // waiting, so a page that looks idle may be the one syncing. Under real pressure the system ends WebKit's content
+    // process first, which closes the page (`webViewWebContentProcessDidTerminate`); Dart reopens it on the next use,
+    // and closes a page nobody uses after ten minutes.
   }
 
   /// A loaded page that is still open.
@@ -83,6 +82,7 @@ final class RailgunPageHost {
 
     let page = RailgunPage(
       store: store,
+      bridgePort: port,
       rules: rules,
       debug: debug,
       onEvent: { [weak self] rawJSON in self?.emit(rawJSON) },
@@ -153,12 +153,6 @@ final class RailgunPageHost {
 
   private func forget(_ closed: RailgunPage) {
     if page === closed { page = nil }
-  }
-
-  // A memory warning closes an idle page; it reopens on the next use.
-  private func memoryWarning() {
-    guard let page, page.isLoaded, page.isOpen, !page.hasPendingCalls else { return }
-    closePage(.disconnected("closed to free memory"))
   }
 
   // MARK: The window

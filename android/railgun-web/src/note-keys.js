@@ -8,6 +8,7 @@ import { ByteLength, ByteUtils, CommitmentType } from '@railgun-community/engine
 import { sha256 } from '../node_modules/@railgun-community/engine/dist/utils/hash.js';
 import { getPrivateScalarFromPrivateKey } from '../node_modules/@railgun-community/engine/dist/utils/keys-utils.js';
 import workerSource from './note-keys-worker-source.js';
+import { pauseMark, pausedSince } from './page-clock.js';
 
 const WASM_FILE = 'curve25519_scalarmult_wasm_bg.wasm';
 /** The most workers a batch is split among; a phone keeps two cores besides. */
@@ -18,7 +19,8 @@ export const BATCH_TIMEOUT_MS = 60_000;
 export const POOL_TIMEOUT_MS = 30_000;
 /** Workers left idle this long are stopped; the next batch starts them again. */
 export const IDLE_MS = 30_000;
-// After this many batches failed, a page works its keys out on its own thread.
+// After this many batches failed, a page works its keys out on its own thread. A batch a pause of the page cut through
+// (page-clock.js) doesn't count: the workers stood still with the page, and its timeout came due as the page woke.
 const FAILURES_ALLOWED = 2;
 
 const hex = (bytes) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
@@ -112,10 +114,12 @@ export async function prepareKeys(viewingPrivateKey, leaves, commitmentTypeOf) {
   pool ??= startPool();
   const workers = await pool;
   if (workers === null) return { release };
+  let mark;
   try {
     const scalar = ByteUtils.nToBytes(await getPrivateScalarFromPrivateKey(viewingPrivateKey), ByteLength.UINT_256);
     const packed = new Uint8Array(points.length * 32);
     points.forEach(({ bytes }, i) => packed.set(bytes, i * 32));
+    mark = pauseMark();
     const { products, failed } = await workers.multiply(scalar, packed);
     // Workers whose WebAssembly never started refuse every point, as the engine refuses almost none.
     if (failed.every((refused) => refused !== 0)) throw new Error('the note keys workers refused every point');
@@ -136,7 +140,7 @@ export async function prepareKeys(viewingPrivateKey, leaves, commitmentTypeOf) {
     counted.workers = workers.size ?? counted.workers;
   } catch {
     // The batch's keys are the engine's to work out; workers that failed are started again for the next.
-    failures += 1;
+    if (mark === undefined || !pausedSince(mark)) failures += 1;
     closePool();
   }
   if (pool !== undefined) {

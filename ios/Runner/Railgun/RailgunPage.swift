@@ -1,6 +1,65 @@
 import Foundation
+import Network
 import UIKit
 import WebKit
+
+/// The time a page can run: the device's uptime, which stops while it sleeps, less the time the app spent in the
+/// background, where iOS suspends the page with it. Every call's deadline counts this time, as Android's do (its
+/// `Handler` counts uptime, and its page runs on in the background): a page suspended through a call's deadline did
+/// nothing wrong, and closing it as the app came back would cut off a sync, a start or a send's proof.
+@MainActor
+final class RailgunPageClock {
+  static let shared = RailgunPageClock(followingTheApp: true)
+
+  private var suspendedSince: TimeInterval?
+  private var suspendedFor: TimeInterval = 0
+  private var observers: [NSObjectProtocol] = []
+
+  /// One that follows the app's background and foreground; tests drive their own.
+  init(followingTheApp: Bool = false) {
+    guard followingTheApp else { return }
+    let center = NotificationCenter.default
+    observers.append(
+      center.addObserver(
+        forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main
+      ) { [weak self] _ in
+        MainActor.assumeIsolated { self?.suspend() }
+      })
+    observers.append(
+      center.addObserver(
+        forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main
+      ) { [weak self] _ in
+        MainActor.assumeIsolated { self?.resume() }
+      })
+  }
+
+  /// Seconds of the page's time, from an arbitrary start.
+  func now() -> TimeInterval {
+    let uptime = ProcessInfo.processInfo.systemUptime
+    return uptime - suspendedFor - (suspendedSince.map { uptime - $0 } ?? 0)
+  }
+
+  /// The page stands still from now until `resume()`: its time doesn't pass.
+  func suspend() {
+    if suspendedSince == nil { suspendedSince = ProcessInfo.processInfo.systemUptime }
+  }
+
+  func resume() {
+    guard let since = suspendedSince else { return }
+    suspendedFor += ProcessInfo.processInfo.systemUptime - since
+    suspendedSince = nil
+  }
+
+  /// Returns once `seconds` of the page's time have passed, or the task is cancelled.
+  func sleep(_ seconds: TimeInterval) async {
+    let end = now() + seconds
+    while !Task.isCancelled {
+      let left = end - now()
+      if left <= 0 { return }
+      try? await Task.sleep(nanoseconds: UInt64(left * 1_000_000_000))
+    }
+  }
+}
 
 /// One page's end of the transport: requests out, replies matched back to them, events to their listener. Every
 /// call is answered exactly once, by its reply, its failure, its timeout or the close, and everything fails once the
@@ -19,6 +78,8 @@ final class RailgunChannel {
   private let deliver: Deliver
   private let onEvent: @MainActor (_ name: String, _ rawJSON: String) -> Void
   private let timeout: (RailgunMethod) -> TimeInterval
+  /// What every deadline counts: the page's time, not the time it stood suspended.
+  private let clock: RailgunPageClock
   private var lastID: Int64 = 0
   private var pending: [Int64: Pending] = [:]
   private var ready = false
@@ -29,11 +90,13 @@ final class RailgunChannel {
   init(
     deliver: @escaping Deliver,
     onEvent: @escaping @MainActor (_ name: String, _ rawJSON: String) -> Void,
-    timeout: @escaping (RailgunMethod) -> TimeInterval = { $0.timeout }
+    timeout: @escaping (RailgunMethod) -> TimeInterval = { $0.timeout },
+    clock: RailgunPageClock? = nil
   ) {
     self.deliver = deliver
     self.onEvent = onEvent
     self.timeout = timeout
+    self.clock = clock ?? .shared
   }
 
   var isOpen: Bool { closedBy == nil }
@@ -47,8 +110,8 @@ final class RailgunChannel {
     if readyWaiter != nil { throw RailgunError.protocol("the page is already loading") }
     try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
       readyWaiter = continuation
-      readyDeadline = Task { [weak self] in
-        try? await Task.sleep(nanoseconds: Self.nanoseconds(timeout))
+      readyDeadline = Task { [weak self, clock] in
+        await clock.sleep(timeout)
         guard !Task.isCancelled else { return }
         self?.settleReady(.failure(RailgunError.timeout("loading the page")))
       }
@@ -62,8 +125,8 @@ final class RailgunChannel {
     let request = try RailgunProtocol.request(id: id, method: method, paramsJSON: paramsJSON)
     let seconds = timeout(method)
     return try await withCheckedThrowingContinuation { continuation in
-      let deadline = Task { [weak self] in
-        try? await Task.sleep(nanoseconds: Self.nanoseconds(seconds))
+      let deadline = Task { [weak self, clock] in
+        await clock.sleep(seconds)
         guard !Task.isCancelled else { return }
         self?.settle(id, .failure(.timeout(method.rawValue)))
       }
@@ -119,18 +182,19 @@ final class RailgunChannel {
     waiter.resume(with: outcome)
   }
 
-  private nonisolated static func nanoseconds(_ seconds: TimeInterval) -> UInt64 {
-    UInt64(max(0, seconds) * 1_000_000_000)
-  }
 }
 
 /// One hidden page: a `WKWebView` of its own, configured once before it exists (WebKit copies the configuration),
 /// loading the bundle over the custom scheme and talking to the host through `railgunHost` and
 /// `__railgunHostDeliver`. It never takes touches, is hidden from accessibility and is inspectable only in a debug
-/// build loaded with `debug`.
+/// build loaded with `debug`. It fetches Anon's archive for the page through its bridge (`RailgunArchive`, the Mac's,
+/// compiled here unchanged), as Android's and the Mac's hosts do.
 @MainActor
 final class RailgunPage: NSObject, WKNavigationDelegate, WKUIDelegate {
   static let loadTimeout: TimeInterval = 30
+  /// The page's User-Agent: Android's (`RailgunRequests.USER_AGENT`) and the archive fetch's. WebKit's own on iOS
+  /// names the device's kind and its iOS version to every host the page reaches.
+  static let userAgent = "Mozilla/5.0"
   static let messageHandlerName = "railgunHost"
   /// Delivers one message as a `callAsyncJavaScript` argument, never spliced into the script; it returns at once.
   static let deliveryScript = "__railgunHostDeliver(m); return true;"
@@ -141,10 +205,13 @@ final class RailgunPage: NSObject, WKNavigationDelegate, WKUIDelegate {
   private var channel: RailgunChannel!
   private let debug: Bool
   private let onClosed: @MainActor (RailgunPage) -> Void
+  /// The page's archive requests, through the bridge at `bridgePort`, the one `store`'s proxy names.
+  private let archive: RailgunArchiveFetch
 
-  /// `store` must already carry the bridge's proxy.
+  /// `store` must already carry the proxy of the bridge at `bridgePort`.
   init(
     store: WKWebsiteDataStore,
+    bridgePort: NWEndpoint.Port,
     rules: WKContentRuleList,
     debug: Bool,
     onEvent: @escaping @MainActor (String) -> Void,
@@ -152,6 +219,7 @@ final class RailgunPage: NSObject, WKNavigationDelegate, WKUIDelegate {
   ) {
     self.debug = debug
     self.onClosed = onClosed
+    archive = RailgunArchiveFetch(bridgePort: bridgePort)
     super.init()
     channel = RailgunChannel(
       deliver: { [weak self] request, failed in self?.deliver(request, failed: failed) },
@@ -164,13 +232,17 @@ final class RailgunPage: NSObject, WKNavigationDelegate, WKUIDelegate {
     let files = RailgunSchemeHandler()
     files.onRefused = { [weak self] in self?.ownFileRefused() }
     let content = WKUserContentController()
-    // No WKUserScript: nothing is injected into the page.
+    // No WKUserScript: nothing is injected into the page as it loads. Only a start that reads Anon's archive runs
+    // `RailgunArchive.prelude` first.
     content.add(MessageRelay(self), contentWorld: .page, name: Self.messageHandlerName)
     content.add(rules)
 
     let configuration = WKWebViewConfiguration()
     configuration.websiteDataStore = store
-    configuration.setURLSchemeHandler(files, forURLScheme: RailgunSchemeHandler.scheme)
+    configuration.setURLSchemeHandler(
+      RailgunPageSchemeHandler(files: files, archive: archive),
+      forURLScheme: RailgunSchemeHandler.scheme
+    )
     configuration.userContentController = content
     configuration.defaultWebpagePreferences.allowsContentJavaScript = true
     configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
@@ -181,6 +253,8 @@ final class RailgunPage: NSObject, WKNavigationDelegate, WKUIDelegate {
     let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 1, height: 1), configuration: configuration)
     webView.navigationDelegate = self
     webView.uiDelegate = self
+    // Before the first load, so every request the page makes carries it.
+    webView.customUserAgent = Self.userAgent
     webView.isUserInteractionEnabled = false
     webView.accessibilityElementsHidden = true
     webView.isAccessibilityElement = false
@@ -213,8 +287,12 @@ final class RailgunPage: NSObject, WKNavigationDelegate, WKUIDelegate {
     }
   }
 
-  /// A call that times out closes the page, as on Android: the engine may be stuck.
+  /// A call that times out closes the page, as on Android: the engine may be stuck. A `start` that reads Anon's
+  /// archive gets the page ready for it first.
   func call(_ method: RailgunMethod, paramsJSON: String) async throws -> String {
+    if method == .start, RailgunArchive.startsWithArchive(paramsJSON) {
+      await prepareArchive()
+    }
     do {
       return try await channel.call(method, paramsJSON: paramsJSON)
     } catch let error as RailgunError {
@@ -223,10 +301,24 @@ final class RailgunPage: NSObject, WKNavigationDelegate, WKUIDelegate {
     }
   }
 
+  /// Runs `RailgunArchive.prelude` in the page and lets its archive requests through once it took. One that did not
+  /// leaves the page as it was: it starts without the archive and syncs from rail-squid alone, as iOS did before.
+  private func prepareArchive() async {
+    guard let webView, isLoaded, channel.isOpen else { return }
+    let reads = try? await webView.callAsyncJavaScript(
+      RailgunArchive.prelude,
+      arguments: [:],
+      in: nil,
+      contentWorld: .page
+    )
+    if (reads as? Bool) == true, channel.isOpen { archive.enabled = true }
+  }
+
   /// Fails every call still waiting and takes the web view down. Idempotent.
   func close(_ reason: RailgunError) {
     guard channel.isOpen else { return }
     channel.close(reason)
+    archive.close()
     if let webView {
       webView.stopLoading()
       webView.navigationDelegate = nil

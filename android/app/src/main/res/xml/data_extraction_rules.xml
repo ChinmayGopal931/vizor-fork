@@ -9,6 +9,15 @@
   secure-storage key, which does not transfer, so the new device starts the
   Railgun sync afresh instead.
 
+  Shielded USD's `private_usd_<wallet database>_<network>` directories hold the
+  swap records (relayer tickets, kept proofs and signatures) and the joint
+  accounts, as iOS and the Mac keep them out of their backups. Their names
+  come from the generated wallet database's, and a rule takes no wildcard, so
+  every app file (`domain="file"`, path ".") stays behind: the wallet's
+  secrets live in secure storage, whose Keystore keys never transfer, so a
+  transferred install could not read its wallet's files anyway. The `tor`
+  line stays as it was, should a device skip the whole-domain rule.
+
   `allowBackup="false"` already covers cloud backup, but from target SDK 31
   device-to-device transfer is governed here instead and defaults to including
   app data. `domain="file"` is getFilesDir(), which is what
@@ -17,10 +26,12 @@
 -->
 <data-extraction-rules>
     <cloud-backup>
+        <exclude domain="file" path="." />
         <exclude domain="file" path="tor" />
         <exclude domain="root" path="app_webview" />
     </cloud-backup>
     <device-transfer>
+        <exclude domain="file" path="." />
         <exclude domain="file" path="tor" />
         <exclude domain="root" path="app_webview" />
     </device-transfer>

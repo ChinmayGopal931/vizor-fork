@@ -5,8 +5,10 @@
 //! the relayer, and since schema 5 it may rescue a payout Railgun sent back,
 //! so paid records are kept. Since schema 6 indices are counted per seed and
 //! ZIP-32 index, not per account, and the counters survive the account.
-//! Since schema 7 a forward record may pay its quote's open fee, and since
-//! schema 8 a reverse record keeps no Privacy Pass token fields.
+//! Since schema 7 a forward record may pay its quote's open fee, since
+//! schema 8 a reverse record keeps no Privacy Pass token fields, and since
+//! schema 9 a send the relayer refused after an earlier post, and a forward
+//! accept posted before, are recorded as such.
 //!
 //! A plain SQLite file in app-private storage, opened per call (WAL,
 //! `synchronous = FULL`, a busy timeout), migrated by `PRAGMA user_version`.
@@ -30,9 +32,10 @@ const FILE_NAME: &str = "swaps.db";
 /// returned payouts, and paid forward records kept for them. 6: the index
 /// counters per seed and ZIP-32 index. 7: forward records that pay their
 /// quote's open fee. 8: reverse records without the token issuer their
-/// deployment pinned. A build refuses a store newer than itself, never
-/// resetting it.
-const SCHEMA_VERSION: i32 = 8;
+/// deployment pinned. 9: sends refused after an earlier post, and forward
+/// records whose accept was posted. A build refuses a store newer than
+/// itself, never resetting it.
+const SCHEMA_VERSION: i32 = 9;
 const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 /// Finished records kept per direction. Reverse `REFUNDED` and forward
 /// `PAID` ones are kept beyond it: a rescue may still be possible.
@@ -246,8 +249,9 @@ impl SwapStore {
             // no table: records gain the open fee, which a build that knows
             // 6 would not read. 7 → 8 changes no table: reverse records lose
             // their Privacy Pass token fields, which this build no longer
-            // reads.
-            1..=7 => {
+            // reads. 8 → 9 changes no table: sends and forward records gain
+            // fields a build that knows 8 would not read.
+            1..=8 => {
                 if version == 1 {
                     tx.execute_batch(SCHEMA_V2).map_err(sql)?;
                 }
@@ -1316,14 +1320,14 @@ mod tests {
         assert_eq!(store.take_index(SPACE, ACCOUNT).unwrap(), next + 1);
     }
 
-    /// A store schema 1, 3, 4, 5, 6 or 7 wrote opens at schema 8: the
+    /// A store schema 1, 3, 4, 5, 6, 7 or 8 wrote opens at schema 9: the
     /// deposits tables and the seed's index counters join schema 1's, and
     /// every record, the active pointer and the send log stay as they were.
     /// The account's counter is folded into its seed's on the next index
     /// taken.
     #[test]
     fn an_older_store_migrates_keeping_its_records() {
-        for version in [1, 3, 4, 5, 6, 7] {
+        for version in [1, 3, 4, 5, 6, 7, 8] {
             older_store_migrates_keeping_its_records(version);
         }
     }
@@ -1450,7 +1454,7 @@ mod tests {
             .query_row("PRAGMA user_version", [], |row| row.get(0))
             .unwrap();
         assert_eq!(version, SCHEMA_VERSION);
-        assert_eq!(SCHEMA_VERSION, 8);
+        assert_eq!(SCHEMA_VERSION, 9);
         assert_eq!(
             store.active(ACCOUNT, Direction::Forward).unwrap(),
             Some(StoredRecord::Forward(Box::new(forward(&json))))

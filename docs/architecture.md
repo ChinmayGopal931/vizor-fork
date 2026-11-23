@@ -479,8 +479,8 @@ the chart no longer reads that define.
   requested; only an already cached series is drawn. On desktop the
   foreground is a window on screen, focused or not (`inactive` counts); a
   window that is minimised, hidden or on another Space is `hidden`, and from
-  then the gate stays shut until the app is active again (`resumed`), however
-  many syncs complete meanwhile. Locking ("Sign out") shuts it too. An
+  then the gate stays shut until the window shows again (`onShow`), focused or
+  not, however many syncs complete meanwhile. Locking ("Sign out") shuts it too. An
   empty, non-https or invalid `VIZOR_PRICING_ENGINE_BASE_URL` has the same
   effect for good: no price switch in Settings and no request.
 - **The answer is untrusted data.** `parsePricingEnginePage` and

@@ -8728,6 +8728,18 @@ class AppLocalizationsKo extends AppLocalizations {
       '이 금‍액‍으‍로‍는 릴‍레‍이‍어 수‍수‍료‍를 충‍당‍할 수 없‍어‍요. 더 큰 금‍액‍으‍로 시‍도‍해 주‍세‍요.';
 
   @override
+  String get privateUsdConvertErrorClock =>
+      '휴‍대‍폰 시‍계‍가 맞‍지 않‍아‍요. 올‍바‍른 시‍간‍으‍로 맞‍춘 뒤 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdConvertErrorClockDesktop =>
+      'Mac 시‍계‍가 맞‍지 않‍아‍요. 올‍바‍른 시‍간‍으‍로 맞‍춘 뒤 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdConvertErrorClockLinux =>
+      '컴‍퓨‍터 시‍계‍가 맞‍지 않‍아‍요. 올‍바‍른 시‍간‍으‍로 맞‍춘 뒤 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
   String get privateUsdConvertErrorEthereum =>
       '지‍금‍은 Veylor‍가 Ethereum‍에 연‍결‍할 수 없‍어‍요. 잠‍시 후 다‍시 시‍도‍해 주‍세‍요.';
 
@@ -8852,6 +8864,18 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get privateUsdConvertOpeningSlow =>
       '마‍켓 메‍이‍커‍가 스‍왑‍을 아‍직 열‍지 않‍았‍어‍요. 지‍금‍까‍지 보‍낸 자‍금‍은 없‍어‍요.';
+
+  @override
+  String get privateUsdConvertProblemClock =>
+      '휴‍대‍폰 시‍계‍가 맞‍지 않‍아 브‍리‍지‍를 진‍행‍할 수 없‍어‍요. 올‍바‍른 시‍간‍으‍로 맞‍춰 주‍세‍요. Veylor‍가 열‍려 있‍는 동‍안 계‍속 시‍도‍해‍요.';
+
+  @override
+  String get privateUsdConvertProblemClockDesktop =>
+      'Mac 시‍계‍가 맞‍지 않‍아 브‍리‍지‍를 진‍행‍할 수 없‍어‍요. 올‍바‍른 시‍간‍으‍로 맞‍춰 주‍세‍요. Veylor‍가 열‍려 있‍는 동‍안 계‍속 시‍도‍해‍요.';
+
+  @override
+  String get privateUsdConvertProblemClockLinux =>
+      '컴‍퓨‍터 시‍계‍가 맞‍지 않‍아 브‍리‍지‍를 진‍행‍할 수 없‍어‍요. 올‍바‍른 시‍간‍으‍로 맞‍춰 주‍세‍요. Veylor‍가 열‍려 있‍는 동‍안 계‍속 시‍도‍해‍요.';
 
   @override
   String get privateUsdConvertProblemEthereum =>

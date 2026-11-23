@@ -287,7 +287,7 @@ jobs:
           APP_ID: ${{ matrix.app_id }}
           BINARY: ${{ matrix.binary }}
         run: |
-          python3 -I - <<'PY'
+          FLAG_URL="$(scripts/veylor-private-usd-flag-url.sh)" python3 -I - <<'PY'
           import base64, os, re, sys
           config = open("linux/flutter/ephemeral/generated_config.cmake", encoding="utf-8").read()
           match = re.search(r'"DART_DEFINES=([^"]*)"', config)
@@ -303,6 +303,11 @@ jobs:
               "VIZOR_PRIVATE_USD_ENABLED": "true",
               "VIZOR_RELEASE_FLAVOR": os.environ["FLAVOR"],
           }
+          # The kill switch, where scripts/release-config names one.
+          if os.environ["FLAG_URL"]:
+              expected["VIZOR_PRIVATE_USD_FLAG_URL"] = os.environ["FLAG_URL"]
+          elif "VIZOR_PRIVATE_USD_FLAG_URL" in defines:
+              sys.exit("a kill switch the release config does not name")
           wrong = [key for key, value in expected.items() if defines.get(key) != value]
           if defines.get("VIZOR_FORM_FACTOR", "desktop") != "desktop":
               wrong.append("VIZOR_FORM_FACTOR")

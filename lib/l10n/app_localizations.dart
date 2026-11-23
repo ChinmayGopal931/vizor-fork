@@ -14528,6 +14528,24 @@ abstract class AppLocalizations {
   /// **'This amount doesn\'t cover the relayer\'s fee. Try a larger amount.'**
   String get privateUsdConvertErrorBelowFee;
 
+  /// Error on the bridge screens when a step was refused because the phone's clock runs minutes ahead of Ethereum's; nothing was sent.
+  ///
+  /// In en, this message translates to:
+  /// **'Your phone\'s clock is off. Set it to the right time, then try again.'**
+  String get privateUsdConvertErrorClock;
+
+  /// In the Mac app: the error on the bridge screens when a step was refused because the Mac's clock runs minutes ahead of Ethereum's; nothing was sent.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Mac\'s clock is off. Set it to the right time, then try again.'**
+  String get privateUsdConvertErrorClockDesktop;
+
+  /// In the Linux app: the error on the bridge screens when a step was refused because the computer's clock runs minutes ahead of Ethereum's; nothing was sent.
+  ///
+  /// In en, this message translates to:
+  /// **'Your computer\'s clock is off. Set it to the right time, then try again.'**
+  String get privateUsdConvertErrorClockLinux;
+
   /// Error on the bridge screens when Veylor cannot reach Ethereum (or its node is behind); nothing was sent.
   ///
   /// In en, this message translates to:
@@ -14719,6 +14737,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The market maker hasn\'t opened the swap yet. Nothing has been sent.'**
   String get privateUsdConvertOpeningSlow;
+
+  /// Problem card message: the bridge's next step waits because the phone's clock runs minutes ahead of Ethereum's; Veylor retries while the app is open.
+  ///
+  /// In en, this message translates to:
+  /// **'Your phone\'s clock is off, so the bridge can\'t go on. Set it to the right time. Veylor keeps trying while it\'s open.'**
+  String get privateUsdConvertProblemClock;
+
+  /// In the Mac app: the problem card message when the bridge's next step waits because the Mac's clock runs minutes ahead of Ethereum's; Veylor retries while it is open.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Mac\'s clock is off, so the bridge can\'t go on. Set it to the right time. Veylor keeps trying while it\'s open.'**
+  String get privateUsdConvertProblemClockDesktop;
+
+  /// In the Linux app: the problem card message when the bridge's next step waits because the computer's clock runs minutes ahead of Ethereum's; Veylor retries while it is open.
+  ///
+  /// In en, this message translates to:
+  /// **'Your computer\'s clock is off, so the bridge can\'t go on. Set it to the right time. Veylor keeps trying while it\'s open.'**
+  String get privateUsdConvertProblemClockLinux;
 
   /// Problem card message: Veylor cannot reach the Ethereum network right now and keeps retrying while the app is open.
   ///

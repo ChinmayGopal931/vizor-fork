@@ -8373,6 +8373,7 @@ fn wire__crate__api__private_usd__private_usd_deposit_rescue_impl(
             let api_store_dir = <String>::sse_decode(&mut deserializer);
             let api_mnemonic_bytes = <Vec<u8>>::sse_decode(&mut deserializer);
             let api_eth_rpc_url = <String>::sse_decode(&mut deserializer);
+            let api_op_id = <u32>::sse_decode(&mut deserializer);
             let api_index = <u32>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
@@ -8385,6 +8386,7 @@ fn wire__crate__api__private_usd__private_usd_deposit_rescue_impl(
                             api_store_dir,
                             api_mnemonic_bytes,
                             api_eth_rpc_url,
+                            api_op_id,
                             api_index,
                         )?;
                         Ok(output_ok)
@@ -8707,6 +8709,7 @@ fn wire__crate__api__private_usd__private_usd_forward_rescue_impl(
             let api_store_dir = <String>::sse_decode(&mut deserializer);
             let api_mnemonic_bytes = <Vec<u8>>::sse_decode(&mut deserializer);
             let api_eth_rpc_url = <String>::sse_decode(&mut deserializer);
+            let api_op_id = <u32>::sse_decode(&mut deserializer);
             let api_index = <u32>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
@@ -8719,6 +8722,7 @@ fn wire__crate__api__private_usd__private_usd_forward_rescue_impl(
                             api_store_dir,
                             api_mnemonic_bytes,
                             api_eth_rpc_url,
+                            api_op_id,
                             api_index,
                         )?;
                         Ok(output_ok)
@@ -9138,6 +9142,7 @@ fn wire__crate__api__private_usd__private_usd_reverse_authorize_ready_impl(
             let api_mnemonic_bytes = <Vec<u8>>::sse_decode(&mut deserializer);
             let api_lightwalletd_url = <String>::sse_decode(&mut deserializer);
             let api_eth_rpc_url = <String>::sse_decode(&mut deserializer);
+            let api_op_id = <u32>::sse_decode(&mut deserializer);
             let api_index = <u32>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
@@ -9152,6 +9157,7 @@ fn wire__crate__api__private_usd__private_usd_reverse_authorize_ready_impl(
                                 api_mnemonic_bytes,
                                 api_lightwalletd_url,
                                 api_eth_rpc_url,
+                                api_op_id,
                                 api_index,
                             )?;
                         Ok(output_ok)
@@ -9235,6 +9241,7 @@ fn wire__crate__api__private_usd__private_usd_reverse_cancel_impl(
             let api_mnemonic_bytes = <Vec<u8>>::sse_decode(&mut deserializer);
             let api_lightwalletd_url = <String>::sse_decode(&mut deserializer);
             let api_eth_rpc_url = <String>::sse_decode(&mut deserializer);
+            let api_op_id = <u32>::sse_decode(&mut deserializer);
             let api_index = <u32>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
@@ -9248,6 +9255,7 @@ fn wire__crate__api__private_usd__private_usd_reverse_cancel_impl(
                             api_mnemonic_bytes,
                             api_lightwalletd_url,
                             api_eth_rpc_url,
+                            api_op_id,
                             api_index,
                         )?;
                         Ok(output_ok)
@@ -9517,6 +9525,7 @@ fn wire__crate__api__private_usd__private_usd_reverse_rescue_impl(
             let api_store_dir = <String>::sse_decode(&mut deserializer);
             let api_mnemonic_bytes = <Vec<u8>>::sse_decode(&mut deserializer);
             let api_eth_rpc_url = <String>::sse_decode(&mut deserializer);
+            let api_op_id = <u32>::sse_decode(&mut deserializer);
             let api_index = <u32>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
@@ -9529,6 +9538,7 @@ fn wire__crate__api__private_usd__private_usd_reverse_rescue_impl(
                             api_store_dir,
                             api_mnemonic_bytes,
                             api_eth_rpc_url,
+                            api_op_id,
                             api_index,
                         )?;
                         Ok(output_ok)
@@ -14753,6 +14763,7 @@ impl SseDecode for crate::api::private_usd::ApiPrivateUsdErrorCode {
             23 => crate::api::private_usd::ApiPrivateUsdErrorCode::WrongDeployment,
             24 => crate::api::private_usd::ApiPrivateUsdErrorCode::OpenFeeRefused,
             25 => crate::api::private_usd::ApiPrivateUsdErrorCode::WalletSyncing,
+            26 => crate::api::private_usd::ApiPrivateUsdErrorCode::ClockOff,
             _ => unreachable!("Invalid variant for ApiPrivateUsdErrorCode: {}", inner),
         };
     }
@@ -22205,6 +22216,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::private_usd::ApiPrivateUsdErr
             Self::WrongDeployment => 23.into_dart(),
             Self::OpenFeeRefused => 24.into_dart(),
             Self::WalletSyncing => 25.into_dart(),
+            Self::ClockOff => 26.into_dart(),
             _ => unreachable!(),
         }
     }
@@ -28200,6 +28212,7 @@ impl SseEncode for crate::api::private_usd::ApiPrivateUsdErrorCode {
                 crate::api::private_usd::ApiPrivateUsdErrorCode::WrongDeployment => 23,
                 crate::api::private_usd::ApiPrivateUsdErrorCode::OpenFeeRefused => 24,
                 crate::api::private_usd::ApiPrivateUsdErrorCode::WalletSyncing => 25,
+                crate::api::private_usd::ApiPrivateUsdErrorCode::ClockOff => 26,
                 _ => {
                     unimplemented!("");
                 }

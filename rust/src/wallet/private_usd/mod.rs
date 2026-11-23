@@ -142,6 +142,10 @@ pub(crate) enum ErrorCode {
     /// The main wallet has not scanned to within a few blocks of the Zcash
     /// tip: a quote that asks an open fee is not paid for until it has.
     WalletSyncing,
+    /// This device's clock runs minutes ahead of the Ethereum node's, as its
+    /// answers date them: a reveal is refused, as on a lagging node, but the
+    /// clock is what to fix.
+    ClockOff,
 }
 
 #[derive(Clone, PartialEq, Eq)]

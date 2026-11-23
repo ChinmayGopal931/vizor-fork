@@ -190,6 +190,11 @@ pub(crate) trait ChainReader {
     /// The newest block this reader has read, if any: the next one is due a
     /// slot after it.
     fn newest_head(&self) -> Option<SeenHead>;
+    /// How many seconds this device's clock ran ahead of the node's when the
+    /// node last answered, by the answer's HTTP `Date`; `None` without one.
+    fn clock_ahead(&self) -> Option<i64> {
+        None
+    }
     /// `latest`, unconfirmed: never authorizes anything.
     async fn swap(&self, id: &[u8; 32]) -> Result<Option<SwapState>>;
     /// The swap at `latest`, unconfirmed, once its terms hash to `terms`. It
@@ -417,6 +422,8 @@ pub(crate) struct EvmRpc<'a, T: HttpTransport> {
     session: Option<([u8; 32], u64)>,
     /// The newest block this reader read.
     newest_head: Mutex<Option<SeenHead>>,
+    /// The device clock less the node's, at its last dated answer.
+    clock_ahead: Mutex<Option<i64>>,
     next_id: AtomicU64,
 }
 
@@ -436,6 +443,7 @@ impl<'a, T: HttpTransport> EvmRpc<'a, T> {
             shown: Mutex::default(),
             session: None,
             newest_head: Mutex::default(),
+            clock_ahead: Mutex::default(),
             next_id: AtomicU64::new(1),
         })
     }
@@ -508,6 +516,16 @@ impl<'a, T: HttpTransport> EvmRpc<'a, T> {
                 "Ethereum node answered HTTP {} ({method})",
                 response.status
             )));
+        }
+        // The node's clock, to tell a device clock that runs ahead from a
+        // node that lags (`swap::fresh_head`).
+        if let Some(date) = response.header("date").and_then(super::swap::http_date) {
+            let now = SystemClock.now();
+            *lock(&self.clock_ahead) = Some(
+                i64::try_from(now)
+                    .unwrap_or(i64::MAX)
+                    .saturating_sub(i64::try_from(date).unwrap_or(i64::MAX)),
+            );
         }
         let answer: RpcAnswer = serde_json::from_slice(&response.body).map_err(|_| {
             RpcError::Failed(PrivateUsdError::new(
@@ -738,6 +756,10 @@ impl<T: HttpTransport> ChainReader for EvmRpc<'_, T> {
 
     fn newest_head(&self) -> Option<SeenHead> {
         *lock(&self.newest_head)
+    }
+
+    fn clock_ahead(&self) -> Option<i64> {
+        *lock(&self.clock_ahead)
     }
 
     async fn swap(&self, id: &[u8; 32]) -> Result<Option<SwapState>> {

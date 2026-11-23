@@ -122,10 +122,10 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
     _lifecycle = AppLifecycleListener(
       onHide: _pausePolling,
       onPause: _pausePolling,
-      onResume: () {
-        _foreground = true;
-        _ensurePolling();
-      },
+      onResume: _resumePolling,
+      // On desktop a window shown again is the foreground, focused or not:
+      // polling resumes without waiting for focus.
+      onShow: kDesktopFormFactor ? _resumePolling : null,
     );
     ref.onDispose(() {
       _lifecycle?.dispose();
@@ -205,8 +205,14 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
   Future<bool> _refreshNow({required bool showProgress}) async {
     // With nothing shown yet, this may be the wallet's first sync, which
     // keeps the screen on until it completes or fails, even past this
-    // notifier: the page goes on syncing.
-    final firstSync = state.balances == null
+    // notifier: the page goes on syncing. A balance last synced long ago
+    // catches up the same way, timeout and screen alike.
+    final updatedAt = state.updatedAt;
+    final longCatchUp =
+        state.balances != null &&
+        updatedAt != null &&
+        _now().difference(updatedAt) > PrivateUsdBalanceTiming.longCatchUpAge;
+    final firstSync = state.balances == null || longCatchUp
         ? ref.read(privateUsdFirstSyncsProvider.notifier).begin(accountUuid)
         : null;
     _runningFirstSync = firstSync;
@@ -510,6 +516,11 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
   Duration? _age() {
     final updatedAt = state.updatedAt;
     return updatedAt == null ? null : _now().difference(updatedAt);
+  }
+
+  void _resumePolling() {
+    _foreground = true;
+    _ensurePolling();
   }
 
   void _pausePolling() {

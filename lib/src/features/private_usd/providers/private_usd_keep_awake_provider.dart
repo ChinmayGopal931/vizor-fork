@@ -26,7 +26,9 @@ class PrivateUsdScreenMaySleepNotifier
 }
 
 /// One first sync of an account's Railgun wallet, running: the sync of a
-/// wallet that never completed one, which reads all of Railgun's history.
+/// wallet that never completed one, which reads all of Railgun's history, or
+/// the catch-up of one last synced more than
+/// `PrivateUsdBalanceTiming.longCatchUpAge` ago.
 class PrivateUsdFirstSync {
   PrivateUsdFirstSync._(this._syncs, this.accountUuid);
 

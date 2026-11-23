@@ -77,6 +77,9 @@ pub enum ApiPrivateUsdErrorCode {
     /// asks an open fee is not bridged, nothing saved or paid, and the same
     /// quote may be bridged once it has.
     WalletSyncing,
+    /// This device's clock runs minutes ahead of the Ethereum node's: a step
+    /// that reveals a share waits until the clock is right.
+    ClockOff,
 }
 
 /// A Private USD failure. Its Dart `toString()` is the message.
@@ -133,6 +136,7 @@ fn api_code(code: ErrorCode) -> ApiPrivateUsdErrorCode {
         ErrorCode::AmountUnquotable => Api::AmountRefused,
         ErrorCode::OpenFeeRefused => Api::OpenFeeRefused,
         ErrorCode::WalletSyncing => Api::WalletSyncing,
+        ErrorCode::ClockOff => Api::ClockOff,
     }
 }
 
@@ -853,7 +857,7 @@ pub fn private_usd_forward_returned_payouts(
 /// it, and asks the relayer to shield the returned payout again into this
 /// account's note. The record stays `Paid`. Nothing happens when the vault
 /// holds no more than the fee (check `private_usd_forward_returned_payouts`
-/// again).
+/// again). Registered as `op_id`, which a lock cancels at its next request.
 pub fn private_usd_forward_rescue(
     db_path: String,
     network: String,
@@ -861,6 +865,7 @@ pub fn private_usd_forward_rescue(
     store_dir: String,
     mnemonic_bytes: Vec<u8>,
     eth_rpc_url: String,
+    op_id: u32,
     index: u32,
 ) -> Result<ApiForwardRecord, ApiPrivateUsdError> {
     let secret = Zeroizing::new(mnemonic_bytes);
@@ -873,7 +878,7 @@ pub fn private_usd_forward_rescue(
             &secret,
             "",
             &eth_rpc_url,
-            None,
+            Some(op_id),
             async |call, op| {
                 call.forward(op, async |forward, store| {
                     let record = forward.rescue(store, index).await?;
@@ -1331,6 +1336,8 @@ pub fn private_usd_reverse_advance(
 /// `DepositUnconfirmed` before the deposit or the escrow is confirmed,
 /// `TooLate` past the deadline. A kept `ready` is only sent again; an error
 /// after the keep leaves it kept, and the loop sends it until its deadline.
+/// Registered as `op_id`: `private_usd_cancel(op_id)` (a lock) stops it with
+/// `Cancelled` at its next request, before the signature or after the keep.
 pub fn private_usd_reverse_authorize_ready(
     db_path: String,
     network: String,
@@ -1339,6 +1346,7 @@ pub fn private_usd_reverse_authorize_ready(
     mnemonic_bytes: Vec<u8>,
     lightwalletd_url: String,
     eth_rpc_url: String,
+    op_id: u32,
     index: u32,
 ) -> Result<ApiReverseRecord, ApiPrivateUsdError> {
     let secret = Zeroizing::new(mnemonic_bytes);
@@ -1351,7 +1359,7 @@ pub fn private_usd_reverse_authorize_ready(
             &secret,
             &lightwalletd_url,
             &eth_rpc_url,
-            None,
+            Some(op_id),
             async |call, op| {
                 call.reverse(op, async |reverse, store| {
                     let record = reverse.authorize_ready(store, index).await?;
@@ -1368,7 +1376,9 @@ pub fn private_usd_reverse_authorize_ready(
 /// escrow, its refund starts (`RefundWait`, then `Refunding`). `TooLate`
 /// once settled ("already settled, can no longer be refunded"), also when it
 /// settled during this call. An error after the keep leaves the request
-/// kept: read the record.
+/// kept: read the record. Registered as `op_id`, which a lock cancels: the
+/// request is kept all the same, and the advance after it stops at its next
+/// safe point, for the loop to go on with once the wallet is unlocked.
 pub fn private_usd_reverse_cancel(
     db_path: String,
     network: String,
@@ -1377,11 +1387,14 @@ pub fn private_usd_reverse_cancel(
     mnemonic_bytes: Vec<u8>,
     lightwalletd_url: String,
     eth_rpc_url: String,
+    op_id: u32,
     index: u32,
 ) -> Result<ApiReverseRecord, ApiPrivateUsdError> {
     let secret = Zeroizing::new(mnemonic_bytes);
     catch(panic::AssertUnwindSafe(|| {
-        drive(
+        // Never stopped before it starts: the request is kept whatever comes,
+        // and a cancel stops only the advance after it.
+        drive_with(
             &db_path,
             &network,
             &account_uuid,
@@ -1389,7 +1402,8 @@ pub fn private_usd_reverse_cancel(
             &secret,
             &lightwalletd_url,
             &eth_rpc_url,
-            None,
+            Some(op_id),
+            false,
             async |call, op| {
                 call.reverse(op, async |reverse, store| {
                     let record = reverse.cancel(store, index).await?;
@@ -1427,7 +1441,8 @@ pub fn private_usd_reverse_can_rescue(
 /// "Recover refund": signs a rescue with a fresh nonce and deadline, keeps
 /// it, and asks the relayer to shield the refund again into this account's
 /// note. The record stays `Refunded`. Nothing happens when nothing is
-/// rescuable now (check `private_usd_reverse_can_rescue` again).
+/// rescuable now (check `private_usd_reverse_can_rescue` again). Registered
+/// as `op_id`, which a lock cancels at its next request.
 pub fn private_usd_reverse_rescue(
     db_path: String,
     network: String,
@@ -1435,6 +1450,7 @@ pub fn private_usd_reverse_rescue(
     store_dir: String,
     mnemonic_bytes: Vec<u8>,
     eth_rpc_url: String,
+    op_id: u32,
     index: u32,
 ) -> Result<ApiReverseRecord, ApiPrivateUsdError> {
     let secret = Zeroizing::new(mnemonic_bytes);
@@ -1447,7 +1463,7 @@ pub fn private_usd_reverse_rescue(
             &secret,
             "",
             &eth_rpc_url,
-            None,
+            Some(op_id),
             async |call, op| {
                 call.reverse(op, async |reverse, store| {
                     let record = reverse.rescue(store, index).await?;
@@ -2027,7 +2043,8 @@ pub fn private_usd_deposit_records(
 /// a rescue with the vault's next nonce, keeps it and posts it. It pays the
 /// relayer's `fee` alone, at most 2 USDC. `Unavailable` when
 /// the vault holds no more than the fee, `Busy` while a rescue of the
-/// address or a pass runs.
+/// address or a pass runs. Registered as `op_id`, which a lock cancels at
+/// its next request.
 pub fn private_usd_deposit_rescue(
     db_path: String,
     network: String,
@@ -2035,18 +2052,23 @@ pub fn private_usd_deposit_rescue(
     store_dir: String,
     mnemonic_bytes: Vec<u8>,
     eth_rpc_url: String,
+    op_id: u32,
     index: u32,
 ) -> Result<ApiDepositRecord, ApiPrivateUsdError> {
     let secret = Zeroizing::new(mnemonic_bytes);
     catch(panic::AssertUnwindSafe(|| {
+        let op = OpHandle::begin(op_id)?;
         let keys = open_context(&db_path, &network, &account_uuid, &secret)?;
         let _guard = deposits::lock_account(&account_uuid)?;
+        if op.cancelled() {
+            return Err(engine::cancelled().into());
+        }
         let record = block_on(deposits::run(
             Path::new(&store_dir),
             &keys,
             &account_uuid,
             &eth_rpc_url,
-            None,
+            Some(&op),
             async |deposits, store| deposits.rescue(store, index).await,
         ))?;
         Ok(api_deposit_record(&record))

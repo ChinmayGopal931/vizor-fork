@@ -1,6 +1,7 @@
 // Injected into every module by esbuild: the Node globals Railgun's engine and its deps expect.
 import { Buffer } from 'buffer';
 import process from 'process';
+import { pinAcceptLanguage } from './accept-language.js';
 
 // The shim's nextTick waits on a clamped setTimeout, which slows the streams a sync runs through.
 process.nextTick = (fn, ...args) => queueMicrotask(() => fn(...args));
@@ -12,5 +13,8 @@ globalThis.process ??= process;
 for (const name of ['RTCPeerConnection', 'webkitRTCPeerConnection', 'RTCDataChannel']) {
   delete globalThis[name];
 }
+
+// The same language in every request, before any module takes `fetch` (accept-language.js).
+pinAcceptLanguage(globalThis);
 
 export { Buffer, process };

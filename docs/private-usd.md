@@ -109,11 +109,19 @@ Code:
   Railgun sync that fails while the RPC does not answer, or answers 403 or
   429, and a screening node still answers, fails as `rpc_failed` (the page
   asks both as the sync fails, `rpc-probe.js`), and the balance offers
-  another RPC; a connection that is down is never put on the RPC.
+  another RPC; a connection that is down is never put on the RPC. A page's
+  `start` is told apart the same way: its provider load (Railgun's fees,
+  read from the RPC) that fails, or has no answer in 75 s, inside the host's
+  two minutes (review, 2026-11-22).
 - `VIZOR_PRIVATE_USD_FLAG_URL` is the kill switch. Only an explicit `false`
   hides the feature. A missing key or a failed fetch keeps the last value,
   which defaults to available. Even `false` never stops conversions already
-  under way.
+  under way. It is read at start and again every 30 minutes while the app is
+  in the foreground (`kPrivateUsdKillSwitchRereadInterval`; one that falls
+  due in the background goes on the return), so a `false` reaches an open
+  app. Every Veylor pipeline takes the URL from one file
+  (`docs/releases.md`, "Shielded USD kill switch"), which names none yet:
+  the owner chooses and hosts it.
 - `VIZOR_SUPPORT_URL` is optional.
 
 **Foreground and unlocked only (plan D9).**
@@ -139,12 +147,19 @@ Code:
 - There is no worker, alarm or notification, and no per-swap key is stored.
 - Background cancels the Rust step and stops polling, but leaves the
   Railgun page open.
-- Lock cancels the step, closes the page and drops Dart-held secrets.
+- Lock cancels the step, closes the page and drops Dart-held secrets. The
+  user's own steps run under an op id too, so a lock stops them as it stops
+  an advance: "Authorize settlement" (before it signs, or after the `ready`
+  is kept, which the loop then sends), the rescues of a refund, a payout or
+  a deposit, and a reverse "Cancel", whose request is kept whatever comes and
+  whose advance stops (review, 2026-11-22).
 - Screen-off means background, so while unlocked the screen stays on
   through a bridge with a key step to come, whichever screen shows (not
-  once the relayer holds the claim), and through a Railgun first sync
+  once the relayer holds the claim), and through a Railgun first sync or
+  the catch-up of a balance last synced more than a week ago, which also
+  gets the first sync's two hours rather than a refresh's five minutes
   (`privateUsdKeepAwakeProvider`, through `SyncKeepAwakeNativeHost`'s one
-  native flag, foreground only). A bridge's progress says so in a card that
+  native flag, foreground only; review, 2026-11-22). A bridge's progress says so in a card that
   slides in while the bridge needs Veylor (`PrivateUsdKeepOpenCard`, either
   direction; a ZEC → USD bridge the relayer is to claim says instead to stay
   until the market maker confirms the deposit), with "Keep screen on": on
@@ -166,14 +181,19 @@ Code:
   offered while the app was away buzzes on its return.
 - While unlocked, the engine (`PrivateUsdEngineHost` in `lib/app.dart`)
   advances the conversions of every software account, not only the active
-  one (D14).
+  one (D14). It runs where the page runs, and also where the host says it
+  can't (a Linux sandbox check that failed, macOS below 14) while `swaps.db`
+  holds a bridge under way (`privateUsdBridgesUnderWayProvider`): every step
+  but the reverse funding's proof is Rust's, so those bridges still finish or
+  come back (review, 2026-11-22).
 - Hardware accounts, accounts without ZIP-32 metadata, and regtest hide the
   feature.
-- **On the Mac** the foreground is a shown window, focused or not. A
-  minimised or hidden window, a hidden app or a window fully covered by others
-  is `AppLifecycleState.hidden` (the engine's occlusion), and so are a locked
-  screen, displays asleep, a Mac going to sleep and another user's session in
-  front (`MacSessionLifecycle` says so on `flutter/lifecycle`, and once nothing
+- **On the Mac** the foreground is a shown window, focused or not: a window
+  shown again resumes Private USD at once (`onShow`), without waiting for
+  focus. A minimised or hidden window, a hidden app or a window fully covered
+  by others is `AppLifecycleState.hidden` (the engine's occlusion), and so are
+  a locked screen, displays asleep, a Mac going to sleep and another user's
+  session in front (`MacSessionLifecycle` says so on `flutter/lifecycle`, and once nothing
   keeps the Mac away sends the state the engine would report). WebKit
   suspends the page while its window is not visible, as iOS does in the
   background. The keep-awake flag is an IOKit `PreventUserIdleDisplaySleep`
@@ -214,6 +234,14 @@ Code:
   joint-account index and the Railgun send log. Records decode strictly: an
   unreadable record is an error, never a reset.
 - `joint.db` is a librustzcash DB for the short-lived joint accounts.
+
+The directory stays out of every backup the platform makes: iOS marks it out
+of iCloud and device backups and the Mac out of Time Machine
+(`excludeFromDeviceBackup`, `isExcludedFromBackup`), before anything is
+written in it, and Android leaves every app file out of a device transfer
+(`data_extraction_rules.xml`; its cloud backup is off), since the directory's
+name, from the generated wallet database's, can't be listed there (review,
+2026-11-22).
 
 Never put joint accounts in `zcash_wallet.db`: hidden accounts would leak
 into account lists, sync, voting, PIR and the migration. Never let losing
@@ -313,7 +341,12 @@ mainnet asks none yet, and a quote without it takes the old path unchanged.
   and `t1`, which the confirmed read holds to the terms hash before any
   deposit. An accept refused `QUOTE_EXPIRED` after its record was saved (a
   fee Rust could not create in time) shows that bridge, under way until the
-  engine ends it.
+  engine ends it. After a post whose answer is unknown (lost, a `5xx`, or
+  made before a restart: the record's `acceptPosted`, `swaps.db` 9), an
+  unknown quote, a `400` or a `404` is no word that nothing opened: the maker
+  may answer so the second accept of a quote the first opened. The accept is
+  posted again as an unanswered one is, and the chain decides at the quote's
+  end; a quote without a fee, accepted again, likewise (review, 2026-11-22).
 - A bridge that paid the fee waits for its change (`FundsPending`) rather
   than fail its deposit. Its fee transaction folds into its row in Activity,
   a paid or refunded bridge's details show the fee as not refunded (a
@@ -334,7 +367,8 @@ keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
   a re-import changes), and never reuse a swap index (a shared `z` hands
   that swap to its maker).
 - Save the record before accept, and treat an accept that timed out or
-  failed in transport as maybe opened.
+  failed in transport as maybe opened, and so a refusal of a later post that
+  may follow its open (an unknown quote, a `400`, a `404`).
 - Never pay a deposit twice. Save `Started` before building it and the bytes
   before the first broadcast. Rebuild only once the old one is proven
   expired.
@@ -346,7 +380,12 @@ keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
 - Reveal `z` only in its window, decided on one consistent read (the swap at
   the newest block's hash, with that block's number and time) of a fresh
   head, and again immediately before the post. A window opens by the block's
-  time and closes by the later of it and the device clock. A forward claim
+  time and closes by the later of it and the device clock. A head three
+  minutes behind the device's clock is no fresh head (`ChainLagging`, shown as
+  Ethereum out of reach), unless the node's own answers, by their HTTP
+  `Date`, put the device's clock over two minutes ahead: then it is
+  `ClockOff`, and the copy asks for the phone's, Mac's or computer's clock to
+  be set (`privateUsdConvert{Error,Problem}Clock*`). A forward claim
   goes once the swap is ready (2 blocks deep before `t0`) or from `t0`, with
   more than 300 s left before `t1`, or for good from `t1 + LATE_WINDOW`; in
   between, the swap unwinds through the maker's refund. A reverse refund goes
@@ -377,16 +416,34 @@ keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
   landed, never lapsed; it lapses only on one consistent read of a fresh
   head past its deadline that shows the escrow still open, and a refund
   that cannot land yet waits in the phase that read supports.
-- Never prove a second reverse funding because a response was lost. Sign
+- Never prove a second reverse funding because a response was lost. Only
+  a refusal of a funding's first post drops it for the user to pay again; a
+  refusal of a later post keeps it, since an earlier post whose answer was
+  lost may still land, and the chain ends it (review, 2026-11-22). Sign
   `ready` only before `t0` (its deadline, the head plus 120 s, before it),
   keep that deadline first, and never sign or send one once a refund was
   posted. Never re-sign `ready` after a restart; resend it.
 - Keep every signed payout, refund payout, `ready` and Railgun send proof
   before posting it, and a claim or refund as posted, or a claim as handed
   over, before it goes. Cap every relayer fee at 2 USDC.
+- Forget a kept send only when its first post is refused: nothing of it went.
+  Once it was posted, a refusal keeps it (`refusedAt`, `swaps.db` 9) and only
+  the chain ends it: its transaction in a block or every nullifier spent
+  (landed), or some spent by another proof (it never can). Meanwhile it goes
+  again, the same bytes, every 15 minutes, and the account's next payment
+  waits. A reverted transaction is forgotten only when its nullifiers are not
+  all spent (`sends.rs`; review, 2026-11-22).
 - Joint sweeps broadcast before they store. `PROPOSAL_STORE` is
   consume-on-entry with an idempotent discard, as in the hardware invariants.
 - Joint sweeps use Discard OVK, while the deposit uses the sender's OVK.
+- A joint sweep pays at most its reviewed fee (a reverse sweep's estimate,
+  approved with the settlement; a forward refund's 64 marginal fees), raised
+  to ZIP 317's fee for the joint account's notes where the review fell short:
+  notes paid in since, a sweep from one pool into the other, each bundle
+  padded to two actions (`joint::sweep_fee_limit`). That is never more than
+  four actions above the notes', and never the whole balance. Until
+  2026-11-22 a sweep over its cap failed every step, and the ZEC waited in
+  the joint account.
 - Import joint accounts at the exact birthday, never the rounded restore
   birthday.
 - Run one conversion at a time per account, and one outgoing Railgun payment
@@ -494,7 +551,17 @@ stay, unused.
   ignores the answer (a write can end inside an on-chain batch, at a root
   the contract never recorded), though a call that fails stops the write.
   What holds the trees to the chain is the check of every tree's root at
-  the end of each scan: a wrong one fails the scan, never a balance.
+  the end of each scan: a wrong one fails the scan, never a balance. The
+  engine goes on from a quick sync that failed by reading Railgun's events
+  from the RPC itself, 500 blocks a read: more than 100,000 blocks behind
+  the newest block (about two weeks; a first sync is over 11 million),
+  the scan fails instead, saying the indexer didn't answer, rather than
+  read for hours. Leaves the trees still lack once that read is done,
+  written once more, fail the scan too (`guardQuickSync`): the end-of-scan
+  check would pass the trees short of them. Not sooner: the engine's
+  listener queues the newest blocks' leaves as they come, and rail-squid,
+  behind the RPC, can leave a stretch that only the engine's read fills
+  (review, 2026-11-22).
 - `engine-hooks-plugin.mjs` holds every rewrite of the engine's code: the
   unshield watermark (`unshield-events.js`), the archive's leaf hashing
   (`archive-txids.js`), the txid sync's record updates
@@ -506,7 +573,7 @@ stay, unused.
   SDK's rescan still calls it). Each names the exact source of the pinned
   engine and fails the build against any other: re-check them when
   bumping it.
-- **Anon's archive** (Android, the Mac and Linux, mainnet, Settings, on by
+- **Anon's archive** (Android, iOS, the Mac and Linux, mainnet, Settings, on by
   default; `archive*.js`):
   - It gives commitments and the transaction list only. Unshields and
     nullifiers come from rail-squid: the archive drops a nullifier spent
@@ -549,7 +616,11 @@ stay, unused.
     completing between, the page rebuilds every tree from the start with
     the archive off for a week, at most once a day from when the last
     rebuild completed (`tree-recovery.js`); a root an RPC hasn't caught up
-    to passes by then. A scan that broke before that check counts for
+    to passes by then. A refusal by an RPC whose newest block is not five
+    blocks past the refused tree's newest leaf counts for nothing (the scan
+    fails, saying the RPC is behind): rail-squid's lists can run ahead of an
+    RPC that lags, which would otherwise rebuild the trees once a day
+    (review, 2026-11-22). A scan that broke before that check counts for
     nothing: its store can end inside an on-chain batch, at a root the
     contract never had. The rebuild clears the transaction list first
     (rebuilt notes lack the railgunTxids its sync gave them, which proofs
@@ -590,7 +661,9 @@ stay, unused.
     archive. Linux's page process does the same (`railgun_archive.cc`: the
     prelude defines `messageHandlers` on the page's `webkit` object and holds
     that object; libsoup through the bridge, with the same limits and
-    headers). iOS starts the page without it. Every archive request depends
+    headers). iOS compiles the Mac's `RailgunArchive.swift` unchanged and
+    runs its prelude and fetch the same way (since 2026-11-22; until then
+    iOS started the page without the archive). Every archive request depends
     on the chain's state alone. What every host must do:
     `docs/private-usd-railgun-hosts.md`.
   - A host keeps the archive's connections as Android's `HttpURLConnection`
@@ -615,11 +688,15 @@ stay, unused.
   (CI's `pins` job in `veylor-linux.yml`).
   Its User-Agent is a fixed `Mozilla/5.0` (`RailgunRequests.USER_AGENT`),
   the archive fetch's too: the WebView's own names the phone's model and its
-  Android build to every host the page reaches.
+  Android build to every host the page reaches. On every host the page's
+  requests also name one language, `en-US,en;q=0.9`, which the page sets on
+  each `fetch` and `XMLHttpRequest` itself (`accept-language.js`): the
+  engine's own Accept-Language names the device's languages.
 - On iOS a Swift `WKWebView` host behind the same channel serves the page
   from `veylor-railgun://app/`, in a data store of its own whose SOCKS5
   proxy is the bridge (no failover), with a `WKContentRuleList` allowlist
-  (iOS reference §6). The macOS host is the same on AppKit (macOS 14 and
+  (iOS reference §6) and Android's `Mozilla/5.0` as the page's User-Agent:
+  WebKit's own on iOS names the device's kind and its iOS version. The macOS host is the same on AppKit (macOS 14 and
   later): the same files serve the page, the same store identifier, proxy and
   rule list, and the 1×1 web view sits in the window's content view below the
   Flutter view, refusing the pointer, the keyboard and VoiceOver. Because the
@@ -645,7 +722,12 @@ stay, unused.
   otherwise stalls the page on its first IPv6 address.
 - The page downloads Railgun's circuit artifacts from ipfs-lb.com and falls
   back to our mirror (`android/railgun-web/src/artifact-mirror.js`); the
-  mirror's tooling is in `scripts/private-usd/artifacts-mirror/`.
+  mirror's tooling is in `scripts/private-usd/artifacts-mirror/`. The SDK
+  checks every file against its pinned hashes but a circuit's verification
+  key, which only checks the page's own proofs before they go out: a proof
+  the key refuses drops every kept key (`withKeysDroppedOnRefusal`), so one
+  served wrong fails that proof, not every proof of its circuit for good
+  (review, 2026-11-22).
 - The POI nodes verify only proofs from the POI circuits wallet 11.2.0 ships
   (older ones get `Invalid proof`). A wallet bump that changes circuit
   artifacts needs the mirror refreshed and deployed first: every send and

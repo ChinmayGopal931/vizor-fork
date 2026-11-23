@@ -1855,10 +1855,11 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
       count = await ref
           .read(privateUsdLifecycleProvider)
           .unfinishedCount(accountUuids);
-    } catch (e, st) {
+    } catch (e) {
       // Conversions may be under way; reconfirm without a count rather than
-      // proceed silently.
-      log('private USD conversion recheck failed: $e\n$st');
+      // proceed silently. The type only: a Private USD error's text can carry
+      // what it was about (docs/private-usd.md, "Never log secrets").
+      log('private USD conversion recheck failed (${e.runtimeType})');
       throw const PrivateUsdUnfinishedConversionsException();
     }
     if (count > confirmedCount) {
@@ -2015,19 +2016,20 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
     // goes last, below.
     try {
       await deletePrivateUsdAccountData(_storage, uuid);
-    } catch (e, st) {
+    } catch (e) {
       log(
-        'removeAccount: failed to delete Private USD data for $uuid: $e\n$st',
+        'removeAccount: failed to delete Private USD data for $uuid '
+        '(${e.runtimeType})',
       );
     }
     // Its conversion records and joint accounts, only now that the wallet
     // account is gone (the user confirmed losing any under way).
     try {
       await privateUsd.deleteAccountConversions(uuid);
-    } catch (e, st) {
+    } catch (e) {
       log(
-        'removeAccount: failed to delete Private USD conversions for '
-        '$uuid: $e\n$st',
+        'removeAccount: failed to delete Private USD conversions for $uuid '
+        '(${e.runtimeType})',
       );
     }
     try {

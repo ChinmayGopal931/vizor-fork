@@ -705,6 +705,11 @@ pub(crate) struct ForwardRecord {
     /// The open fee's payment, kept before it is first sent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub open_fee_payment: Option<OpenFeePayment>,
+    /// Its accept was posted: marked before the first post (`swaps.db` 9).
+    /// A later post's refusal that says nothing opened may follow an
+    /// earlier one's open, so the chain decides.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub accept_posted: bool,
 }
 
 /// Where a forward swap stands, by what its record keeps: the stage while
