@@ -228,6 +228,14 @@ Code:
   unreadable record is an error, never a reset.
 - `joint.db` is a librustzcash DB for the short-lived joint accounts.
 
+The directory stays out of every backup the platform makes: iOS marks it out
+of iCloud and device backups and the Mac out of Time Machine
+(`excludeFromDeviceBackup`, `isExcludedFromBackup`), before anything is
+written in it, and Android leaves every app file out of a device transfer
+(`data_extraction_rules.xml`; its cloud backup is off), since the directory's
+name, from the generated wallet database's, can't be listed there (review,
+2026-11-22).
+
 Never put joint accounts in `zcash_wallet.db`: hidden accounts would leak
 into account lists, sync, voting, PIR and the migration. Never let losing
 `joint.db` take `swaps.db` with it. Account deletion removes that account's
