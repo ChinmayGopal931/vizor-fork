@@ -9,9 +9,10 @@ import '../../providers/private_usd_settlement_reminder_provider.dart';
 /// sender, which settles the sends a crash or a kill left unconfirmed, and
 /// the settlement reminder. The engine advances every account's conversions
 /// while the app is in the foreground and unlocked, and follows the lock and
-/// the lifecycle itself. Inert unless the build has Private USD, the Railgun
-/// page runs here (the phones and the desktop hosts) and the network has a
-/// deployment.
+/// the lifecycle itself. Inert unless the build has Private USD and the
+/// network has a deployment, and the Railgun page runs here (the phones and
+/// the desktop hosts) or bridges are under way, which it drives without the
+/// page.
 class PrivateUsdEngineHost extends ConsumerWidget {
   const PrivateUsdEngineHost({required this.child, super.key});
 

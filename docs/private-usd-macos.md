@@ -132,9 +132,10 @@ Railgun's sync reads history from Anon's archive before rail-squid, as on
 Android: mainnet only, behind Settings' "Sync history from Anon's archive"
 (`privateUsdArchiveSyncProvider`, on by default, the phone's setting and
 storage), which `privateUsdArchiveAvailableProvider` offers on the Mac wherever
-its host runs the page (macOS 14 and later). iOS still starts the page without
-it. The page and its rules are Android's, unchanged (docs/private-usd.md, "Anon's
-archive"); only the host is new (`macos/Runner/Railgun/RailgunArchive.swift`).
+its host runs the page (macOS 14 and later). iOS compiles the same file and
+reads the archive the same way since 2026-11-22. The page and its rules are
+Android's, unchanged (docs/private-usd.md, "Anon's archive"); only the host is
+new (`macos/Runner/Railgun/RailgunArchive.swift`).
 What every host must do for the archive, and for the page as a whole, item by
 item against Android's, is in `docs/private-usd-railgun-hosts.md`.
 
@@ -241,6 +242,13 @@ window, focused or not:
   app that becomes active clears it whatever was missed.
 - An unfocused window (another app in front, the window still showing) is
   `inactive`, and Private USD runs on, as the phones run on while inactive.
+- A window shown again is the foreground at once, focused or not: on `onShow`
+  (`hidden` to `inactive`) the engine resumes, and so do the balance's
+  polling, `appInForegroundProvider` and the kill switch's deferred fetch.
+  Until 2026-11-22 they waited for the window to take focus (`resumed`), so a
+  window brought back behind another app left a bridge paused. An app that
+  starts with its window unfocused runs too. The phones still resume on
+  `onResume` alone (each gated on `kDesktopFormFactor`).
 - WebKit suspends the page while its window is not visible, as iOS suspends it
   in the background: a sync waits, and resumes when the window shows again.
 - The kill switch's retries wait for the foreground on desktop too
@@ -407,10 +415,10 @@ confirming step, and Back from the progress lands on it rather than on
   app has one window, so it never moves. AppKit has no
   `isUserInteractionEnabled`: the view is a `WKWebView` subclass that refuses
   first responder, the key view loop, the pointer and VoiceOver.
-- **No close for memory.** iOS closes an idle page on a memory warning; the
-  Mac did on a memory-pressure warning until 2026-11-20 and no longer does,
-  as Android never does: the rest of a sync runs with no call waiting, and
-  warnings are routine on a Mac beside a page this size.
+- **No close for memory.** The Mac closed an idle page on a memory-pressure
+  warning until 2026-11-20, and iOS on a memory warning until 2026-11-22;
+  neither does now, as Android never does: the rest of a sync runs with no
+  call waiting, and warnings are routine beside a page this size.
 - **No bridge check after the background.** iOS may reclaim a suspended app's
   listening socket; the Mac app keeps running (App Nap is off), so Dart's
   check stays iOS only.

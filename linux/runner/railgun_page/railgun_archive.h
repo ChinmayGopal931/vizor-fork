@@ -82,6 +82,9 @@ class ArchiveFetch {
 
   // Off until the page's start reads the archive: before that, a request under `kArchivePath` is refused.
   void Enable() { enabled_ = true; }
+  // Off again for the page's life: every request under `kArchivePath` is refused, and the page goes on from
+  // rail-squid.
+  void Disable() { enabled_ = false; }
 
   void Start(WebKitURISchemeRequest* request);
 

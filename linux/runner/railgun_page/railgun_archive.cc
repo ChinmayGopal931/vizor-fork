@@ -152,6 +152,15 @@ void OnSent(GObject* source, GAsyncResult* result, gpointer data) {
     return;
   }
   fetch->body_stream = stream;
+  // Never an answer over HTTP/2, whose one connection would carry every request, and which one that stops answering
+  // would hold whole (H27). libsoup offers HTTP/2 only on a direct connection, and from 3.4 the message forces
+  // HTTP/1.1 besides; before 3.4 nothing here can force it, so an answer that came over HTTP/2 all the same leaves the
+  // archive for the page's life. A 4xx: the page leaves the archive at once and goes on from rail-squid.
+  if (wk.soup_message_get_http_version(fetch->message) == SOUP_HTTP_2_0) {
+    if (fetch->owner != nullptr) fetch->owner->Disable();
+    Finish(fetch, false, 404, "text/plain; charset=utf-8", nullptr);
+    return;
+  }
   fetch->status = wk.soup_message_get_status(fetch->message);
   SoupMessageHeaders* headers = wk.soup_message_get_response_headers(fetch->message);
   const bool declared = wk.soup_message_headers_get_encoding(headers) == SOUP_ENCODING_CONTENT_LENGTH;

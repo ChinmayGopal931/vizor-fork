@@ -9,14 +9,16 @@ import {
   createRailgunTransactionWithHash,
 } from '@railgun-community/engine';
 import { throughRailgunEngineHooks, throughRootRefusals, withoutRescanTxidReset } from '../engine-hooks-plugin.mjs';
-import { formatCommitments, installQuickSync } from '../src/quick-sync.js';
+import { formatCommitments, guardQuickSync, installQuickSync, takeQuickSyncStop } from '../src/quick-sync.js';
 import {
   ARCHIVE_OFF_MS,
   REBUILD_AFTER_MS,
   REBUILD_EVERY_MS,
+  RPC_LAG_BLOCKS,
   archiveOff,
   localStore,
   rebuildTrees,
+  rpcBehindLeaf,
   takeRefusedRoot,
   treeRecovery,
 } from '../src/tree-recovery.js';
@@ -242,13 +244,13 @@ const ROOTS = await contractRoots();
 
 /**
  * The contract as a scan reads it: the roots it has had (`roots`, as `tree:root`), and its logs past the quick sync,
- * none unless `logs()` throws.
+ * none unless `logs(commitments)` throws or hands the engine's commitments listener some.
  */
 const contract = ({ roots = ROOTS, logs = () => {} } = {}) => ({
   contract: { runner: { provider: { getBlockNumber: async () => fixture.to } } },
   validateMerkleroot: async (tree, root) => roots.has(`${tree}:${root}`),
-  getHistoricalEvents: async (_from, to, _next, _commitments, _nullifiers, _unshields, synced) => {
-    logs();
+  getHistoricalEvents: async (_from, to, _next, commitments, _nullifiers, _unshields, synced) => {
+    await logs(commitments);
     await synced(to);
   },
 });
@@ -277,7 +279,7 @@ test("the engine's end-of-scan check reports the root it refuses, and still fail
   roots.delete(`0:${root}`);
   await scan();
   assert.deepEqual(ends, ['complete', 'incomplete']);
-  assert.deepEqual(takeRefusedRoot(), { tree: 0, root });
+  assert.deepEqual(takeRefusedRoot(), { tree: 0, root, index: await utxo.getLatestIndexForTree(0) });
 });
 
 test('a tree the engine keeps refusing as new notes move its root on is rebuilt in ten minutes all the same', async () => {
@@ -455,6 +457,7 @@ test('the build rewrites the end-of-scan check and the full rescan, and refuses 
   const source = readFileSync(path.join(ENGINE, 'railgun-engine.js'), 'utf8');
   const rewritten = throughRailgunEngineHooks(source);
   assert.ok(rewritten.includes('.rootRefused(treeIndex, root, new Error(`Invalid merkleroot: ${root}.'));
+  assert.ok(rewritten.includes('Index: ${index}.`), index);'), 'the refusal says which leaf the root follows');
   assert.ok(!rewritten.includes('await this.fullResetTXIDMerkletreesV2(chain);'));
   assert.ok(rewritten.includes('async fullResetTXIDMerkletreesV2(chain) {'), "the engine's reset itself stays");
   assert.throws(
@@ -465,4 +468,89 @@ test('the build rewrites the end-of-scan check and the full rescan, and refuses 
     () => withoutRescanTxidReset(source.replace('Must reset txid merkletree', 'Must reset the txid merkletree')),
     /no longer applies/,
   );
+});
+
+test("a refusal by an RPC that hasn't reached the tree's newest leaf counts for nothing", () => {
+  assert.equal(rpcBehindLeaf(1_000, 999), true, 'the leaf is past the newest block');
+  assert.equal(rpcBehindLeaf(1_000, 1_000 + RPC_LAG_BLOCKS - 1), true, 'too close to the newest block to tell');
+  assert.equal(rpcBehindLeaf(1_000, 1_000 + RPC_LAG_BLOCKS), false);
+  assert.equal(rpcBehindLeaf(undefined, 1_000), false, 'an unread leaf counts the refusal, as before');
+  assert.equal(rpcBehindLeaf(1_000, undefined), false, 'an unread newest block counts it too');
+});
+
+/**
+ * `engineOn`'s engine, its quick sync guarded as the page's is, with `newest` the chain's newest block; its read of the
+ * chain hands over `chainCommitments`.
+ */
+async function guardedEngineOn({ newest, maxChainScanBlocks, chainCommitments = [], ...options }) {
+  let reads = 0;
+  const logs = async (commitments) => {
+    reads += 1;
+    if (chainCommitments.length > 0) await commitments(V2, chainCommitments);
+  };
+  const built = await engineOn({ ...options, logs });
+  const head = async () => newest;
+  guardQuickSync(built.engine, { txidVersion: V2, chain: CHAIN, head, maxChainScanBlocks, writeRetryMs: 0 });
+  takeQuickSyncStop();
+  return { ...built, reads: () => reads };
+}
+
+const unanswered = {
+  nullifiers: async () => Promise.reject(new Error('the indexer did not answer in time')),
+  unshields: async () => Promise.reject(new Error('the indexer did not answer in time')),
+  commitments: async () => Promise.reject(new Error('the indexer did not answer in time')),
+};
+
+test('rail-squid out of reach far behind the newest block stops the scan rather than read the history from the RPC', async () => {
+  const { ends, scan, reads } = await guardedEngineOn({
+    queries: unanswered,
+    newest: fixture.from + 100_001,
+    maxChainScanBlocks: 100_000,
+  });
+  await scan();
+  assert.deepEqual(ends, ['incomplete']);
+  assert.equal(reads(), 0, "the engine read none of Railgun's events from the RPC");
+  assert.match(takeQuickSyncStop(), /indexer did not answer/);
+});
+
+test('rail-squid out of reach close to the newest block leaves the gap to the RPC, as before', async () => {
+  const { scan, reads } = await guardedEngineOn({
+    queries: unanswered,
+    newest: fixture.from + 100_000,
+    maxChainScanBlocks: 100_000,
+  });
+  await scan();
+  assert.equal(reads(), 1, 'the engine read the gap from the RPC');
+  assert.equal(takeQuickSyncStop(), undefined);
+});
+
+test('a quick sync whose trees did not take every leaf stops the scan, which would pass the trees short', async () => {
+  // A batch rail-squid's commitments skip: the trees stop at it, and the leaves after stay queued.
+  const dropped = formatCommitments(fixture.squid.commitments)[3];
+  const commitments = fixture.squid.commitments.filter(
+    ({ batchStartTreePosition }) => Number(batchStartTreePosition) !== dropped.startPosition,
+  );
+  const { ends, scan } = await guardedEngineOn({
+    queries: indexer({ ...fixture.squid, commitments }, PAGE).queries,
+    newest: fixture.to,
+  });
+  await scan();
+  assert.deepEqual(ends, ['incomplete']);
+  assert.match(takeQuickSyncStop(), /trees stopped short/);
+});
+
+test("a stretch rail-squid left out that the engine's own read fills passes, as it did", async () => {
+  // Rail-squid behind the RPC: the leaves after a stretch it hasn't listed wait in the queue until the engine reads it.
+  const dropped = formatCommitments(fixture.squid.commitments)[3];
+  const commitments = fixture.squid.commitments.filter(
+    ({ batchStartTreePosition }) => Number(batchStartTreePosition) !== dropped.startPosition,
+  );
+  const { ends, scan } = await guardedEngineOn({
+    queries: indexer({ ...fixture.squid, commitments }, PAGE).queries,
+    newest: fixture.to,
+    chainCommitments: [dropped],
+  });
+  await scan();
+  assert.deepEqual(ends, ['complete']);
+  assert.equal(takeQuickSyncStop(), undefined);
 });

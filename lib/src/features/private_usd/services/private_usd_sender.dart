@@ -575,9 +575,15 @@ class PrivateUsdSender {
       case rust.ApiTransactKind.sent:
         return _land(accountUuid, sendId, named);
       case rust.ApiTransactKind.refused:
-        // Nothing went and Rust dropped the row: a higher fee the relayer
-        // now asks is the user's to confirm.
+        // Rust drops the row only when nothing went. One a settlement pass
+        // posted first may still land, so Rust keeps it for the chain to
+        // settle, and it is never priced or proved again.
         await _guard.check(accountUuid);
+        if (_guard.recordsFor(accountUuid).any((row) => row.sendId == sendId)) {
+          return PrivateUsdSendUnconfirmed(named);
+        }
+        // Nothing went: a higher fee the relayer now asks is the user's to
+        // confirm.
         return _refused(accountUuid, request, quote.fee);
       case rust.ApiTransactKind.spent:
       case rust.ApiTransactKind.retry:

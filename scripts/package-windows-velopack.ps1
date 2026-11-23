@@ -475,6 +475,22 @@ if (-not [string]::IsNullOrEmpty($BuildNumber)) {
     "--dart-define=VIZOR_RELEASE_BUILD_NUMBER=$BuildNumber"
   )
 }
+# Veylor's Shielded USD kill switch, from the one file every Veylor pipeline
+# reads (scripts/veylor-private-usd-flag-url.sh has the same rule); none while
+# it names none.
+if ($null -ne $VeylorIdentity) {
+  $flagUrlFile = Join-Path $repoRoot "scripts\release-config\veylor-private-usd-flag-url.txt"
+  $flagUrls = @(Get-Content -LiteralPath $flagUrlFile | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" })
+  if ($flagUrls.Count -gt 1) {
+    throw "$flagUrlFile must hold one URL at most."
+  }
+  if ($flagUrls.Count -eq 1) {
+    if ($flagUrls[0] -cnotmatch '^https://[A-Za-z0-9.-]+(:443)?(/[^@#\s]*)?$') {
+      throw "$flagUrlFile must hold an https URL without credentials or a fragment."
+    }
+    $flutterBuildArgs += "--dart-define=VIZOR_PRIVATE_USD_FLAG_URL=$($flagUrls[0])"
+  }
+}
 
 $cmakeCache = Join-Path $repoRoot "build\windows\$Arch\CMakeCache.txt"
 if (Test-Path $cmakeCache) {

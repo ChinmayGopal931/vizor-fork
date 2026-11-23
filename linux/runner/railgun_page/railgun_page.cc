@@ -49,6 +49,9 @@ constexpr char kProbeScript[] =
 // The link's descriptor, for the fatal path, where nothing else may run.
 int g_link_fd = -1;
 bool g_probing = false;
+// The page said it was ready from inside WebKit's sandbox: a fatal error after that is not a sandbox that did not
+// start, and must not read as one (Veylor would take this page as unable to run here).
+bool g_page_ran = false;
 
 void WriteAll(int fd, const char* data, size_t length) {
   while (length > 0) {
@@ -59,11 +62,30 @@ void WriteAll(int fd, const char* data, size_t length) {
   }
 }
 
+// Ends the process after a fatal error once the page ran inside the sandbox: a stop, as a crash would be, said as one.
+[[noreturn]] void ExitFatal() {
+  static const char kLine[] = "veylor-railgun-page: a fatal error stopped the page\n";
+  WriteAll(STDERR_FILENO, kLine, sizeof(kLine) - 1);
+  if (g_link_fd >= 0) {
+    static const char kReason[] = "the page's host process stopped";
+    const uint32_t length = sizeof(kReason) - 1 + 2;
+    std::string frame = {static_cast<char>((length >> 24) & 0xFF), static_cast<char>((length >> 16) & 0xFF),
+                         static_cast<char>((length >> 8) & 0xFF), static_cast<char>(length & 0xFF),
+                         railgun_frames::kClosed, railgun_frames::kClosedDisconnected};
+    frame += kReason;
+    send(g_link_fd, frame.data(), frame.size(), MSG_NOSIGNAL);
+  }
+  _exit(kExitFatal);
+}
+
 // GLib's messages could quote what WebKit loaded, so none is printed; this process's own lines are `Log`'s. An error
 // is fatal: WebKit raises one for a sandbox that can't start (bubblewrap or its D-Bus proxy refused), and GLib would
-// then abort the process, leaving a crash report. It becomes `kExitSandbox` instead, after telling Veylor.
+// then abort the process, leaving a crash report. Before the page ran inside the sandbox (and always in the check),
+// it becomes `kExitSandbox` instead, after telling Veylor; after, the sandbox had started, and it is a stop
+// (`ExitFatal`), which Veylor answers by reopening the page on its next use.
 GLogWriterOutput WriteLog(GLogLevelFlags level, const GLogField* fields, gsize count, gpointer) {
   if ((level & G_LOG_LEVEL_ERROR) == 0) return G_LOG_WRITER_HANDLED;
+  if (g_page_ran && !g_probing) ExitFatal();
   std::string line = "veylor-railgun-page: the WebKit sandbox did not start";
   if (g_probing) {
     for (gsize i = 0; i < count; ++i) {
@@ -451,6 +473,8 @@ void Page::Received(WebKitJavascriptResult* result) {
     // The page ran script, so its web process is up: it must be inside the sandbox, or the page goes.
     if (CheckSandbox() != Sandbox::kInside) {
       CloseWith(railgun_frames::kClosedUnavailable, "the page ran outside WebKit's sandbox", kExitSandbox);
+    } else {
+      g_page_ran = true;
     }
   }
   link_->Send(railgun_frames::kMessage, text);

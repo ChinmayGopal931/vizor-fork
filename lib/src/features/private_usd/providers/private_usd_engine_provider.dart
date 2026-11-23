@@ -81,19 +81,53 @@ String? privateUsdDepositAccountOf(Ref ref) {
   return account.uuid;
 }
 
-/// [privateUsdEngineEnabledFor] for this build.
+/// [privateUsdEngineEnabledFor] for this build, or, where the page does not
+/// run here (its host says no), while bridges are under way: every step of a
+/// bridge but the reverse funding's proof is Rust's, so the engine drives
+/// them without the page (review, 2026-11-22).
 final privateUsdEngineEnabledProvider = Provider<bool>((ref) {
   // Const, so builds without the define drop the rest.
   if (!kPrivateUsdBuildEnabled) return false;
-  return privateUsdEngineEnabledFor(
+  final hasDeployment = ref.watch(privateUsdCurrentDeploymentProvider) != null;
+  final hostsPage = privateUsdEngineEnabledFor(
     enabled: true,
     formFactor: kAppFormFactor,
     // Which OS hosts the Railgun page is an OS behaviour, not a layout choice.
     platform: defaultTargetPlatform,
     hostSupported: ref.watch(railgunHostSupportedProvider),
-    hasDeployment: ref.watch(privateUsdCurrentDeploymentProvider) != null,
+    hasDeployment: hasDeployment,
   );
+  if (hostsPage) return true;
+  return hasDeployment && ref.watch(privateUsdBridgesUnderWayProvider);
 });
+
+/// Whether `swaps.db` holds a bridge under way for any account, read once:
+/// where the page does not run here, [privateUsdEngineEnabledProvider] runs
+/// the engine for them. Reading it needs no key, so a locked wallet reads it
+/// too. False until read, and when the store does not read.
+final privateUsdBridgesUnderWayProvider =
+    NotifierProvider<PrivateUsdBridgesUnderWayNotifier, bool>(
+      PrivateUsdBridgesUnderWayNotifier.new,
+    );
+
+class PrivateUsdBridgesUnderWayNotifier extends Notifier<bool> {
+  @override
+  bool build() {
+    unawaited(_read());
+    return false;
+  }
+
+  Future<void> _read() async {
+    try {
+      final accounts = await ref
+          .read(privateUsdSwapBackendProvider)
+          .accountsWithUnfinished();
+      if (ref.mounted && accounts.isNotEmpty) state = true;
+    } catch (error) {
+      privateUsdLog('no bridges under way read (${error.runtimeType})');
+    }
+  }
+}
 
 /// The foreground swap loop, kept alive outside the widget tree once
 /// `PrivateUsdEngineHost` builds it. Gift Card's shape: a lock or the
@@ -104,9 +138,13 @@ final privateUsdEngineEnabledProvider = Provider<bool>((ref) {
 final privateUsdEngineProvider = Provider<PrivateUsdEngine>((ref) {
   final lifecycle = ref.watch(privateUsdLifecycleProvider);
   final state = WidgetsBinding.instance.lifecycleState;
-  // Stricter than `appInForegroundProvider`: an app that starts inactive
-  // runs no key-using step until it is resumed.
-  var foreground = state == null || state == AppLifecycleState.resumed;
+  // On the phones stricter than `appInForegroundProvider`: an app that
+  // starts inactive runs no key-using step until it is resumed. On desktop
+  // the foreground is a shown window, focused or not.
+  var foreground =
+      state == null ||
+      state == AppLifecycleState.resumed ||
+      (kDesktopFormFactor && state == AppLifecycleState.inactive);
   final depositsEnabled = ref.read(privateUsdDepositsEnabledProvider);
   // The Privacy Pass token store an earlier build kept is no longer read.
   unawaited(_deleteLegacyTokenStores());
@@ -216,6 +254,15 @@ final privateUsdEngineProvider = Provider<PrivateUsdEngine>((ref) {
       foreground = true;
       engine.start(resuming: true);
     },
+    // On desktop a window shown again is the foreground, focused or not
+    // (docs/private-usd.md, "On the Mac"): the engine resumes without
+    // waiting for focus. The phones resume on `onResume` alone.
+    onShow: kDesktopFormFactor
+        ? () {
+            foreground = true;
+            engine.start(resuming: true);
+          }
+        : null,
   );
   ref.onDispose(() {
     listener.dispose();

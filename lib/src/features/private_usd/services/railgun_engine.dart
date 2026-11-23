@@ -248,8 +248,8 @@ class RailgunEngineState {
 /// - After [idleClose] without a use, the page closes by itself.
 /// - Built once per process, it first closes whatever page and bridge an
 ///   earlier Flutter engine left running.
-/// - On iOS, back from the background, a bridge that stopped accepting takes
-///   the page down with it ([replaceDeadBridge]).
+/// - Back from the background, a bridge that stopped accepting takes the
+///   page down with it ([replaceDeadBridge]), on every platform.
 /// - A bridge starts only once every close under way has stopped its own, so
 ///   no close stops the bridge a newer page goes through.
 /// - [deleteWallet] deletes a deleted account's wallet on a page of its own.
@@ -506,7 +506,8 @@ class RailgunEngine {
     if (_pauseDepth > 0) _pauseDepth--;
   }
 
-  /// iOS may reclaim a suspended app's listening socket. Back from the
+  /// iOS may reclaim a suspended app's listening socket, and a listener that
+  /// keeps failing to accept ends its bridge on any platform. Back from the
   /// background with a page open, a bridge that no longer accepts
   /// connections leaves the page without its route, so the page closes and
   /// stops the bridge, and the next use reopens it on a new one.

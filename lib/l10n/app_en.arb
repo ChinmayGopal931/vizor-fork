@@ -11335,6 +11335,18 @@
   "@privateUsdConvertErrorBelowFee": {
     "description": "Error on the bridge screens when the amount is too small to pay the relayer's fee."
   },
+  "privateUsdConvertErrorClock": "Your phone's clock is off. Set it to the right time, then try again.",
+  "@privateUsdConvertErrorClock": {
+    "description": "Error on the bridge screens when a step was refused because the phone's clock runs minutes ahead of Ethereum's; nothing was sent."
+  },
+  "privateUsdConvertErrorClockDesktop": "Your Mac's clock is off. Set it to the right time, then try again.",
+  "@privateUsdConvertErrorClockDesktop": {
+    "description": "In the Mac app: the error on the bridge screens when a step was refused because the Mac's clock runs minutes ahead of Ethereum's; nothing was sent."
+  },
+  "privateUsdConvertErrorClockLinux": "Your computer's clock is off. Set it to the right time, then try again.",
+  "@privateUsdConvertErrorClockLinux": {
+    "description": "In the Linux app: the error on the bridge screens when a step was refused because the computer's clock runs minutes ahead of Ethereum's; nothing was sent."
+  },
   "privateUsdConvertErrorEthereum": "Veylor can't reach Ethereum right now. Try again in a moment.",
   "@privateUsdConvertErrorEthereum": {
     "description": "Error on the bridge screens when Veylor cannot reach Ethereum (or its node is behind); nothing was sent."
@@ -11495,6 +11507,18 @@
   "privateUsdConvertOpeningSlow": "The market maker hasn't opened the swap yet. Nothing has been sent.",
   "@privateUsdConvertOpeningSlow": {
     "description": "Note on the bridge progress screen when the market maker is slow to open the swap: no ZEC has been sent yet."
+  },
+  "privateUsdConvertProblemClock": "Your phone's clock is off, so the bridge can't go on. Set it to the right time. Veylor keeps trying while it's open.",
+  "@privateUsdConvertProblemClock": {
+    "description": "Problem card message: the bridge's next step waits because the phone's clock runs minutes ahead of Ethereum's; Veylor retries while the app is open."
+  },
+  "privateUsdConvertProblemClockDesktop": "Your Mac's clock is off, so the bridge can't go on. Set it to the right time. Veylor keeps trying while it's open.",
+  "@privateUsdConvertProblemClockDesktop": {
+    "description": "In the Mac app: the problem card message when the bridge's next step waits because the Mac's clock runs minutes ahead of Ethereum's; Veylor retries while it is open."
+  },
+  "privateUsdConvertProblemClockLinux": "Your computer's clock is off, so the bridge can't go on. Set it to the right time. Veylor keeps trying while it's open.",
+  "@privateUsdConvertProblemClockLinux": {
+    "description": "In the Linux app: the problem card message when the bridge's next step waits because the computer's clock runs minutes ahead of Ethereum's; Veylor retries while it is open."
   },
   "privateUsdConvertProblemEthereum": "Veylor can't reach Ethereum right now. It keeps trying while it's open.",
   "@privateUsdConvertProblemEthereum": {

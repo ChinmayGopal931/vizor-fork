@@ -71,6 +71,47 @@ impl Harness {
     }
 }
 
+/// A funding refused after a post whose answer was lost stays kept: that
+/// post may have gone, and a second proof could land beside it. The kept
+/// bytes go again as a lost answer's do, and the chain ends it. Only a
+/// refusal of the first post leaves the user to pay again.
+#[tokio::test]
+async fn a_funding_refused_after_a_lost_answer_is_never_proved_again() {
+    let h = Harness::new();
+    h.prepared().await;
+    h.world.set().unreachable = Some("/v1/reverse/fund");
+    assert!(h.fund().await.is_err());
+    let kept = h.reverse_record(0).funding.unwrap();
+    h.world.set().unreachable = None;
+    h.world.set().fund_refusal = Some((400, "rejected"));
+
+    // Resent and refused, by the loop or by paying again: still kept, and
+    // nothing is proved again.
+    let _ = h.advance_reverse().await;
+    let _ = h.fund().await;
+    let record = h.reverse_record(0);
+    assert_eq!(record.funding, Some(kept));
+    assert_eq!(record.phase, ReversePhase::SendingUsdc);
+    assert_eq!(h.world.get().proofs, 1, "the funding is never proved again");
+    assert_eq!(h.world.get().fundings.len(), 3);
+    // Long past the funding deadline with no escrow, nothing can land: it
+    // ends with nothing paid.
+    let to_deadline = FUNDING - h.world.get().chain_now;
+    h.world.set().pass(to_deadline + 10 * 60 + 1);
+    let ended = h.advance_reverse().await.unwrap();
+    assert_eq!(ended.phase, ReversePhase::Cancelled);
+    assert_eq!(h.world.get().proofs, 1);
+
+    // The first post refused: nothing of it went, so the user may pay again.
+    let h = Harness::new();
+    h.prepared().await;
+    h.world.set().fund_refusal = Some((400, "rejected"));
+    assert!(h.fund().await.is_err());
+    let record = h.reverse_record(0);
+    assert_eq!(record.funding, None);
+    assert_eq!(record.phase, ReversePhase::AwaitingFunding);
+}
+
 /// A funding whose answer was lost is never proved again: the kept bytes go
 /// again only while the node does not know them, before the funding deadline
 /// and while the user has not called the conversion off, and the hash a

@@ -34,6 +34,10 @@ const MAKER_API_VERSION: u32 = 1;
 /// A reveal is refused on a head this much older than the device's clock:
 /// a node minutes behind shows windows that have moved on.
 const MAX_HEAD_LAG_SECONDS: u64 = 3 * 60;
+/// A device clock this far ahead of the node's, as the node's answers date
+/// them, is the clock's fault, not the node's: well above an answer's
+/// travel time over Tor and the `Date` header's one-second steps.
+const MAX_CLOCK_AHEAD_SECONDS: i64 = 2 * 60;
 /// The only contract kind a relayer's terms may name.
 const WINDOWS_CONTRACT_KIND: &str = "windows";
 /// The loop looks again no sooner than this, so a step that keeps answering
@@ -48,16 +52,74 @@ const ZCASH_NAP: Duration = Duration::from_secs(10);
 // ---- the windows ----
 
 /// `head`, the latest block's time, unless it trails this device's clock by
-/// minutes.
-pub(crate) fn fresh_head(head: u64, device_now: u64) -> Result<u64> {
+/// minutes: `ClockOff` when the device's clock runs ahead of the node's
+/// (`clock_ahead`, from the node's answers), else `ChainLagging`. Either way
+/// nothing is revealed on it.
+pub(crate) fn fresh_head(head: u64, device_now: u64, clock_ahead: Option<i64>) -> Result<u64> {
     let lag = device_now.saturating_sub(head);
     if lag > MAX_HEAD_LAG_SECONDS {
+        if let Some(ahead) = clock_ahead.filter(|ahead| *ahead > MAX_CLOCK_AHEAD_SECONDS) {
+            return fail(
+                ErrorCode::ClockOff,
+                format!("this device's clock is {ahead}s ahead of the Ethereum node's"),
+            );
+        }
         return fail(
             ErrorCode::ChainLagging,
             format!("the chain's head is {lag}s old"),
         );
     }
     Ok(head)
+}
+
+/// Unix seconds of an HTTP-date in RFC 9110's preferred format
+/// (`Sun, 06 Nov 1994 08:49:37 GMT`), the one servers send; `None` for
+/// anything else.
+pub(crate) fn http_date(text: &str) -> Option<u64> {
+    let mut parts = text.trim().split(' ');
+    let (_weekday, day, month, year, clock, zone) = (
+        parts.next()?,
+        parts.next()?,
+        parts.next()?,
+        parts.next()?,
+        parts.next()?,
+        parts.next()?,
+    );
+    if parts.next().is_some() || zone != "GMT" || day.len() != 2 || year.len() != 4 {
+        return None;
+    }
+    let number = |digits: &str| -> Option<u64> {
+        digits
+            .bytes()
+            .all(|b| b.is_ascii_digit())
+            .then(|| digits.parse().ok())?
+    };
+    const MONTHS: [&str; 12] = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
+    let month = MONTHS.iter().position(|name| *name == month)? as u64 + 1;
+    let (day, year) = (number(day)?, number(year)?);
+    let mut hms = clock.split(':');
+    let (hours, minutes, seconds) = (hms.next()?, hms.next()?, hms.next()?);
+    if hms.next().is_some() || [hours, minutes, seconds].iter().any(|part| part.len() != 2) {
+        return None;
+    }
+    let (hours, minutes, seconds) = (number(hours)?, number(minutes)?, number(seconds)?);
+    if !(1..=31).contains(&day) || year < 1970 || hours > 23 || minutes > 59 || seconds > 60 {
+        return None;
+    }
+    // Days from 1970-01-01 to the date, by the proleptic Gregorian calendar.
+    let (y, m) = if month <= 2 {
+        (year - 1, month + 9)
+    } else {
+        (year, month - 3)
+    };
+    let era = y / 400;
+    let year_of_era = y - era * 400;
+    let day_of_year = (153 * m + 2) / 5 + day - 1;
+    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    let days = (era * 146_097 + day_of_era).checked_sub(719_468)?;
+    Some(days * 86_400 + hours * 3_600 + minutes * 60 + seconds)
 }
 
 /// A swap as one consistent read shows it: its stage as of the newest block,
@@ -632,10 +694,11 @@ impl<'s> SwapCall<'s> {
 mod tests {
     use std::time::Duration;
 
-    use super::{nap, transport, Wake};
+    use super::{fresh_head, http_date, nap, transport, Wake};
     use crate::network_privacy::test_route_policy::lock_route_policy;
     use crate::wallet::private_usd::engine::{self, OpHandle};
     use crate::wallet::private_usd::evm_rpc::{Head, SeenHead};
+    use crate::wallet::private_usd::ErrorCode;
     use crate::wallet::routed_http::RoutedRequest;
 
     /// An accept's requests (`SwapCall::forward_accepting`) run on
@@ -700,5 +763,45 @@ mod tests {
         assert_eq!(ethereum(seen(1_000, 1_600), 1_601), seconds(11));
         // A slot past that read, the next block is looked for at once.
         assert_eq!(ethereum(seen(1_000, 1_025), 1_040), seconds(3));
+    }
+
+    /// Review finding (2026-11-22): a head minutes behind this device's clock
+    /// is the clock's fault when the node's own answers, by their HTTP `Date`,
+    /// put the device as far ahead: `ClockOff`, not `ChainLagging`, which
+    /// reads as Ethereum out of reach. Nothing is revealed either way.
+    #[test]
+    fn a_device_clock_ahead_of_the_nodes_is_told_from_a_lagging_node() {
+        assert_eq!(
+            http_date("Sun, 06 Nov 1994 08:49:37 GMT"),
+            Some(784_111_777)
+        );
+        assert_eq!(http_date("Thu, 01 Jan 1970 00:00:00 GMT"), Some(0));
+        assert_eq!(
+            http_date("Sat, 29 Feb 2028 23:59:59 GMT"),
+            Some(1_835_481_599)
+        );
+        for other in [
+            "",
+            "Sunday, 06-Nov-94 08:49:37 GMT",
+            "Sun Nov  6 08:49:37 1994",
+            "Sun, 06 Nov 1994 08:49:37 UTC",
+            "Sun, 6 Nov 1994 08:49:37 GMT",
+            "Sun, 06 Foo 1994 08:49:37 GMT",
+            "Sun, 06 Nov 1994 24:00:00 GMT",
+        ] {
+            assert_eq!(http_date(other), None, "{other:?}");
+        }
+
+        let code = |clock_ahead| {
+            fresh_head(1_000, 1_000 + 181, clock_ahead)
+                .unwrap_err()
+                .code
+        };
+        assert_eq!(fresh_head(1_000, 1_180, Some(170)), Ok(1_000));
+        assert_eq!(code(Some(170)), ErrorCode::ClockOff);
+        assert_eq!(code(Some(121)), ErrorCode::ClockOff);
+        assert_eq!(code(Some(120)), ErrorCode::ChainLagging, "within the slack");
+        assert_eq!(code(Some(-30)), ErrorCode::ChainLagging);
+        assert_eq!(code(None), ErrorCode::ChainLagging, "no Date: the node");
     }
 }

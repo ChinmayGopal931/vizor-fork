@@ -85,6 +85,14 @@ pub(crate) const CENT_UNITS: u32 = 10_000;
 /// How long the engine loop naps while a conversion waits on the user.
 const USER_NAP: Duration = Duration::from_secs(15);
 
+/// Which post of a kept funding this is: its first, made right after it was
+/// kept, or one after that, whose earlier post's answer may have been lost.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Post {
+    First,
+    Again,
+}
+
 /// What the Railgun page's `reverseCost` prices a funding at: the escrow
 /// `amount` and the relayer's funding `fee` on Railgun's `railgun_proxy`.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -176,8 +184,10 @@ pub(crate) trait ReverseZcash {
         confirmations: u32,
     ) -> Result<ReverseReceiveEstimate>;
     /// The sweep home with the combined `key`, paying at most
-    /// `max_fee_zatoshi`: an earlier one that may still land, else a new one
-    /// once every note is spendable; `None` until then.
+    /// `max_fee_zatoshi`, or ZIP 317's fee for the joint account's notes
+    /// where that is more (`joint::sweep_fee_limit`): an earlier one that may
+    /// still land, else a new one once every note is spendable; `None` until
+    /// then.
     async fn prepare_receive(
         &self,
         index: u32,
@@ -408,7 +418,7 @@ where
         sending.funding = Some(transaction.clone());
         sending.phase = ReversePhase::SendingUsdc;
         update(store, self.account, &sending)?;
-        match self.submit(store, &sending, &transaction).await {
+        match self.submit(store, &sending, &transaction, Post::First).await {
             Ok(()) => load(store, self.account, index),
             Err(PostError::Refused(refusal)) => {
                 self.reprice(store, index, &transaction, refusal).await
@@ -426,12 +436,16 @@ where
 
     /// Posts a kept funding: never anything but the bytes kept, with the
     /// swap's ticket. Its hash is merged into the record as it is now, so a
-    /// cancel that came meanwhile stays.
+    /// cancel that came meanwhile stays. A refusal of its first post drops
+    /// it, since nothing of it went; one of a later post keeps it, since an
+    /// earlier post whose answer was lost may still land, and the chain
+    /// decides (`await_escrow`).
     async fn submit(
         &self,
         store: &mut SwapStore,
         record: &ReverseRecord,
         transaction: &ReverseFundingTransaction,
+        post: Post,
     ) -> std::result::Result<(), PostError> {
         let request = &transaction.request;
         if request.swap_id != record.swap_id || request.chain_id != self.pins.chain_id {
@@ -463,9 +477,14 @@ where
         {
             Ok(sent) => sent,
             Err(SwapHttpError::Refused(refusal)) => {
-                // A funding the relayer refused was never sent: it waits for
-                // the user to pay again.
-                if refusal.code == Some(SwapErrorCode::Rejected) && transaction.tx_id.is_none() {
+                // A funding the relayer refused on its first post was never
+                // sent: it waits for the user to pay again. Once it was
+                // posted, an answer may have been lost, and a second proof
+                // could land beside the first: it stays kept.
+                if refusal.code == Some(SwapErrorCode::Rejected)
+                    && transaction.tx_id.is_none()
+                    && post == Post::First
+                {
                     self.drop_funding(store, record.index, transaction)
                         .map_err(PostError::Failed)?;
                 }
@@ -1025,7 +1044,8 @@ where
         let Some(fee) = self.view.rescue_fee(&record).await? else {
             return Ok(record);
         };
-        let now = swap::fresh_head(self.state(&record).await?.head.timestamp, self.clock.now())?;
+        let head = self.state(&record).await?.head.timestamp;
+        let now = swap::fresh_head(head, self.clock.now(), self.chain.clock_ahead())?;
         let deadline = now + SIGNATURE_TTL_SECONDS;
         let note = self.keys.note(index)?;
         let digest = self.pins.domain()?.rescue(
@@ -1330,7 +1350,7 @@ where
         }
         if !record.cancel_requested && now < record.quote.funding_deadline {
             engine::check_cancelled(self.op)?;
-            self.view.submit(store, record, funding).await?;
+            self.view.submit(store, record, funding, Post::Again).await?;
         }
         Ok(())
     }
@@ -1392,9 +1412,10 @@ where
         update(store, self.account, &current)
     }
 
-    /// The sweep home with `key`, `e + z`, capped at the reviewed fee, kept
-    /// and sent again until it has its confirmations; then the conversion is
-    /// complete and its joint account goes.
+    /// The sweep home with `key`, `e + z`, capped at the reviewed fee, or at
+    /// ZIP 317's for the joint account's notes when the review fell short,
+    /// kept and sent again until it has its confirmations; then the
+    /// conversion is complete and its joint account goes.
     async fn receive(
         &self,
         store: &mut SwapStore,
@@ -1582,7 +1603,7 @@ where
         let device_now = self.clock.now();
         Ok(WindowView {
             stage: read.swap.as_ref().map(|swap| swap.stage),
-            head: swap::fresh_head(read.head.timestamp, device_now)?,
+            head: swap::fresh_head(read.head.timestamp, device_now, self.chain.clock_ahead())?,
             head_number: read.head.number,
             device_now,
             t0: record.quote.ready_deadline,

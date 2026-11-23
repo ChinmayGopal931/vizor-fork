@@ -23,8 +23,15 @@ abstract final class PrivateUsdBalanceTiming {
   static const refreshTimeout = Duration(minutes: 5);
 
   /// ...or after this while nothing has been shown yet: it may be the
-  /// wallet's first sync, which reads all of Railgun's history.
+  /// wallet's first sync, which reads all of Railgun's history. A catch-up
+  /// from a balance older than [longCatchUpAge] gets it too.
   static const firstSyncTimeout = Duration(hours: 2);
+
+  /// A balance last synced this long ago catches up as a first sync does: the
+  /// long timeout, and the screen kept on until it shows. Months behind, a
+  /// phone's notes scan outlasts [refreshTimeout], and a screen that sleeps
+  /// puts the app in the background, where iOS suspends the page.
+  static const longCatchUpAge = Duration(days: 7);
 
   /// How often the first-sync percentage creeps between engine reports.
   static const firstSyncTick = Duration(seconds: 3);

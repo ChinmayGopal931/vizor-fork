@@ -748,6 +748,81 @@ fn a_joint_sweep_over_its_fee_limit_is_refused_and_locks_nothing() {
     assert_eq!(proposal_locks(&wallet.path), 0);
 }
 
+/// Review finding (2026-11-22): a sweep whose reviewed fee falls short of
+/// ZIP 317's for the joint account's notes is not refused for good. A reverse
+/// sweep reviewed for one note that holds three by its sweep, and a forward
+/// refund holding more notes than its 64 actions pay for, each get ZIP 317's
+/// fee for the notes there, which the real proposal fits; one from Orchard
+/// into Ironwood pays both bundles' padding. The limit stays within four
+/// actions of the notes', and short of the whole balance.
+#[test]
+fn a_sweep_fee_above_its_reviewed_cap_is_raised_to_zip_317s_for_its_notes() {
+    let joint = joint_account(0);
+    // A note crossing from Orchard into Ironwood pays both bundles' two
+    // actions: twice the review's estimate for one note.
+    assert_eq!(joint::sweep_fee_bound(5_000, 1, 0), 20_000);
+    assert_eq!(
+        joint::sweep_fee_bound(5_000, 0, 0),
+        10_000,
+        "ZIP 317's least"
+    );
+
+    for (notes, reviewed) in [(3, Some(10_000)), (70, None)] {
+        let mut chain = Chain::new();
+        let wallet = joint_wallet(&chain, &joint);
+        for _ in 0..notes {
+            chain.pay(joint.deposit_address(), 100_000);
+        }
+        chain.grow(9);
+        chain.scan(&wallet.path, chain.start, chain.tip());
+        let receipts = joint::joint_receipts(
+            &wallet.path,
+            NETWORK,
+            &wallet.account,
+            crate::wallet::JOINT_SWEEP_CONFIRMATIONS,
+        )
+        .unwrap();
+        assert_eq!(
+            (receipts.orchard_notes, receipts.ironwood_notes),
+            (0, notes)
+        );
+        assert_eq!(receipts.spendable_zatoshi, u64::from(notes) * 100_000);
+        let marginal = joint::sweep_marginal_fee(&wallet.path, NETWORK).unwrap();
+        let propose = |max_fee: u64| {
+            sync::propose_joint_sweep(
+                &wallet.path,
+                NETWORK,
+                &wallet.account,
+                "sweep",
+                &home_ua(),
+                max_fee,
+            )
+        };
+
+        // The old cap: the review's fee, or a forward refund's 64 actions.
+        let old_cap = reviewed.unwrap_or(64 * marginal);
+        let refused = propose(old_cap).err().unwrap();
+        assert!(
+            refused.contains("exceeds its limit"),
+            "{notes} notes: {refused}"
+        );
+        assert_eq!(proposal_locks(&wallet.path), 0);
+
+        let limit = joint::sweep_fee_limit(reviewed, marginal, &receipts);
+        assert!(limit > old_cap);
+        assert!(limit <= marginal * (u64::from(notes) + 4), "never absurd");
+        let sweep = propose(limit).unwrap();
+        assert!(sweep.fee_zatoshi <= limit);
+        assert_eq!(
+            sweep.amount_zatoshi + sweep.fee_zatoshi,
+            receipts.spendable_zatoshi,
+            "{notes} notes: all of it comes home"
+        );
+        sync::discard_proposal(sweep.proposal_id, "sweep").unwrap();
+        assert_eq!(proposal_locks(&wallet.path), 0);
+    }
+}
+
 /// Whether `path` has the table only a newer schema adds.
 fn has_spend_journal(path: &str) -> bool {
     rusqlite::Connection::open(path)

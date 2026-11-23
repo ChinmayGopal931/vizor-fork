@@ -100,9 +100,19 @@ void main() {
     );
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     expect(
+      await starts(
+        containerWith(
+          store: MemoryArchiveSyncStore(),
+          railgunHostSupported: true,
+        ),
+      ),
+      isTrue,
+      reason: "the iOS host fetches it for the page, with the Mac's code",
+    );
+    expect(
       await starts(containerWith(store: MemoryArchiveSyncStore())),
       isFalse,
-      reason: "the iOS host doesn't fetch it for the page",
+      reason: 'below iOS 17 no host runs the page',
     );
   });
 

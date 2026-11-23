@@ -199,6 +199,7 @@ enum PrivateUsdFailureReason {
     r'header not found',
     r'\bunknown_error\b',
   ]),
+  rpcLagging('rpc_lagging', [r'ethereum rpc is behind']),
   stillProving('still_proving', [r'still proving']),
   gasAboveCap('gas_above_cap', [r'gas price is above']),
   noteKeysFailed('note_keys_failed', [r'note keys worker']),

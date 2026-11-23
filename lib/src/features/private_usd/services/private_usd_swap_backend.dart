@@ -250,6 +250,7 @@ abstract interface class PrivateUsdSwapBackend {
   Future<rust.ApiReverseRecord> reverseAuthorizeReady(
     String accountUuid,
     PrivateUsdSecretReader secret, {
+    required int opId,
     required int index,
   });
 
@@ -257,6 +258,7 @@ abstract interface class PrivateUsdSwapBackend {
   Future<rust.ApiReverseRecord> reverseCancel(
     String accountUuid,
     PrivateUsdSecretReader secret, {
+    required int opId,
     required int index,
   });
 
@@ -268,6 +270,7 @@ abstract interface class PrivateUsdSwapBackend {
   Future<rust.ApiReverseRecord> reverseRescue(
     String accountUuid,
     PrivateUsdSecretReader secret, {
+    required int opId,
     required int index,
   });
 
@@ -628,6 +631,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
   Future<rust.ApiReverseRecord> reverseAuthorizeReady(
     String accountUuid,
     PrivateUsdSecretReader secret, {
+    required int opId,
     required int index,
   }) async {
     final context = _context();
@@ -645,6 +649,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
         mnemonicBytes: mnemonic,
         lightwalletdUrl: lightwalletdUrl,
         ethRpcUrl: ethRpcUrl,
+        opId: opId,
         index: index,
       ),
     );
@@ -654,6 +659,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
   Future<rust.ApiReverseRecord> reverseCancel(
     String accountUuid,
     PrivateUsdSecretReader secret, {
+    required int opId,
     required int index,
   }) async {
     final context = _context();
@@ -671,6 +677,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
         mnemonicBytes: mnemonic,
         lightwalletdUrl: lightwalletdUrl,
         ethRpcUrl: ethRpcUrl,
+        opId: opId,
         index: index,
       ),
     );
@@ -697,6 +704,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
   Future<rust.ApiReverseRecord> reverseRescue(
     String accountUuid,
     PrivateUsdSecretReader secret, {
+    required int opId,
     required int index,
   }) async {
     final context = _context();
@@ -712,6 +720,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
         storeDir: storeDir,
         mnemonicBytes: mnemonic,
         ethRpcUrl: ethRpcUrl,
+        opId: opId,
         index: index,
       ),
     );

@@ -33,7 +33,11 @@ Prefixes below: `kt/` is the Android host's directory, `rw/` is
     WebView2 Runtime, 120 or later, read without starting it. Register the handler
     before Dart's bootstrap asks (`queryRailgunHostSupported` in
     `lib/src/features/private_usd/services/railgun_host_channel.dart`): a
-    missing handler reads as no host, except on iOS.
+    missing handler reads as no host, except on iOS. An answer that takes a
+    check of its own (Linux's sandbox) answers `timeout` when the check runs
+    out of time, never `false`, and checks again on the next ask; Dart asks
+    again a few times. Where the answer is no, bridges under way still
+    advance: the engine runs for them without the page.
   - `load {proxyPort, debug}`: close any page, load a fresh one whose every
     connection goes through the bridge at `proxyPort`, answer once the page
     said `ready` (30 s, else close it and fail). A port outside 1 to 65535
@@ -52,7 +56,14 @@ Prefixes below: `kt/` is the Android host's directory, `rw/` is
   `deleteWallet` 1 min, `transfer` and `unshield` 10 min, `broadcasterFee`
   2 min, `reverseCost` 30 s, `prepareReverse` 10 min. Kotlin's
   `RailgunMethod` (`kt/RailgunProtocol.kt`) and Swift's
-  (`ios/RailgunProtocol.swift`) are the same table.
+  (`ios/RailgunProtocol.swift`) are the same table. A deadline counts the
+  time the page could run: Android's `Handler` counts uptime, which stops
+  while the phone sleeps, and its page runs on in the background. **(WebKit)**
+  WebKit suspends the page with the app (iOS) or its window out of sight
+  (the Mac), so iOS and the Mac count uptime less that time
+  (`RailgunPageClock`: iOS from the app's background to its foreground, the
+  Mac from the page's window's occlusion), since 2026-11-22: a page
+  suspended through a call's deadline was closed as it came back.
 - **H3. Events.** Forward the page's unasked messages as their raw JSON:
   `scan`, `proof`, `screening`, `refresh`, `synced`, and `log` only from a
   page loaded with `debug`. Drop any other name. Keep up to 256 while nobody
@@ -64,9 +75,13 @@ Prefixes below: `kt/` is the Android host's directory, `rw/` is
   `privateUsdPlatformHostsPage` (`private_usd_available_provider.dart`),
   `privateUsdArchiveAvailableProvider` (`private_usd_archive_sync_provider.dart`,
   which also decides whether Settings shows "Sync history from Anon's
-  archive"), and anything gated on `TargetPlatform.iOS` that the platform
-  shares (only `replaceDeadBridge`, for iOS's reclaimed sockets). Add the
-  platform to `test/features/private_usd/private_usd_archive_sync_test.dart`.
+  archive"). Add the platform to
+  `test/features/private_usd/private_usd_archive_sync_test.dart`. The
+  dead-bridge check on a return to the foreground (`replaceDeadBridge`) runs
+  on every platform since 2026-11-22: iOS reclaims a suspended app's sockets,
+  and the bridge's listener gives up after 20 failed accepts in a row on any
+  of them, waiting 50 ms to 1 s between (a listener out of descriptors
+  takes the next connection once some are free).
 
 ## 2. The page and its transport
 
@@ -142,9 +157,10 @@ Prefixes below: `kt/` is the Android host's directory, `rw/` is
   the rest of a sync runs with no call waiting, so a page that looks idle may
   be the one syncing. The Mac closed an idle page on a memory-pressure
   warning (carried over from iOS) until 2026-11-20; warnings are routine
-  beside a 500 to 800 MB page. Only iOS, whose memory warning comes before
-  the system ends the app, closes it. Dart closes a page nobody uses after
-  ten minutes.
+  beside a 500 to 800 MB page. iOS closed one on a memory warning until
+  2026-11-22, which cut off the rest of a sync; under real pressure iOS ends
+  WebKit's content process first, which closes the page (H8). Dart closes a
+  page nobody uses after ten minutes.
 - **H12. Workers.** The page works a notes scan's keys out in up to six Web
   Workers (`rw/src/note-keys.js`, one per core but two,
   `navigator.hardwareConcurrency`). They need `worker-src blob:` (the CSP
@@ -209,14 +225,25 @@ Prefixes below: `kt/` is the Android host's directory, `rw/` is
   (`RailgunRequests.USER_AGENT`, `kt/RailgunWebViewHost.kt`, since
   2026-11-20), which every host the page reaches answers (section 8). WebKit's
   on the Mac freezes the OS version (`Macintosh; Intel Mac OS X 10_15_7`) and
-  names no model, and the Mac keeps it. **(Chromium)** set the page's
+  names no model, and the Mac keeps it. WebKit's on iOS names the device's
+  kind and its iOS version, so iOS sets the page's to the same `Mozilla/5.0`
+  (`RailgunPage.userAgent`, `customUserAgent`, since 2026-11-22). **(Chromium)** set the page's
   User-Agent before it loads; check what it names on a host whose engine's
   own isn't frozen, and check the User-Agent client hints too (`Sec-CH-UA*`,
   `navigator.userAgentData`): WebView2's `put_UserAgent` fixes the string but
   keeps the hints, which name the platform and the runtime's version, so
   Windows's host also overrides the string through DevTools with no metadata,
   which turns them off, as Android's WebView turns them off for a page whose
-  User-Agent its host set.
+  User-Agent its host set. The page's own requests also name the same
+  language on every device and every host, `Accept-Language: en-US,en;q=0.9`,
+  which the page sets itself on every `fetch` and `XMLHttpRequest`
+  (`rw/src/accept-language.js`, run first from `shims.js`; a host's archive
+  prelude wraps the `fetch` it leaves): the engine's own names the device's
+  languages, and WebKit and Android's WebView have no setting for it (review,
+  2026-11-22). Windows's host also sets its environment's language to en-US
+  (`put_Language`), for which Chromium's own header is that same value, so
+  the page names one language there whichever sets it; Windows's check
+  program holds every request on the wire to it.
 
 ## 4. Anon's archive: whether the page reads it
 
@@ -234,7 +261,7 @@ the page (section 5).
 - **H20. The page's own rules** (`rw/src/wallet.js`, `archive-sync.js`,
   `archive-txids.js`, `tree-recovery.js`): it builds an archive reader only
   when `start` asks and `globalThis.webkit?.messageHandlers?.railgunHost` is
-  undefined, the check that keeps iOS off it; it asks the archive only for a
+  undefined, the check that each WebKit host's prelude satisfies (H21); it asks the archive only for a
   quick sync more than 28,800 blocks (about four days) behind the newest
   block (the RPC's, else the clock and the shipped block table), so a fresh
   store does; and never while the archive is off for a week after a tree
@@ -242,8 +269,8 @@ the page (section 5).
 - **H21. (WebKit) The prelude.** A WebKit host's page sees its own
   `railgunHost`, so before every `start` that reads the archive the host runs
   a fixed script in the page world (`RailgunArchive.prelude` in
-  `mac/RailgunArchive.swift`, through `callAsyncJavaScript`, nothing spliced
-  in) that:
+  `mac/RailgunArchive.swift`, which the iOS target compiles unchanged since
+  2026-11-22, through `callAsyncJavaScript`, nothing spliced in) that:
   1. routes the page's GETs of `https://digest.anon.inc/…` (a string URL) to
      `/anon-archive/…` on the page's own origin, where the host answers
      them; everything else is untouched;
@@ -396,8 +423,9 @@ Shared Dart and the shared page do all of this; a host must only let it run.
   `SetThreadExecutionState` with the display and the system required.
 - **H36. `rpc_failed`.** A sync that fails while the RPC doesn't answer, or
   answers 403 or 429, and a screening node does, fails as `RPC_FAILED`
-  (`rw/src/rpc-probe.js`); map it to `rpc_failed`, and Dart offers another
-  RPC.
+  (`rw/src/rpc-probe.js`), and so does a `start` whose provider load fails or
+  has no answer in 75 s; map it to `rpc_failed` whatever the method, and Dart
+  offers another RPC.
 - **H37. Failure codes (desktop).** On the Mac, Linux and Windows, Dart keeps a short
   coded record of what failed (`private_usd_diagnostics.dart`, docs/private-usd.md,
   "Failure codes"): for a failed call, the host's code and a reason matched

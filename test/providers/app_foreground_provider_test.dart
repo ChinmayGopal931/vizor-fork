@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zcash_wallet/src/core/layout/app_form_factor.dart';
 import 'package:zcash_wallet/src/providers/app_foreground_provider.dart';
 
 void main() {
@@ -25,11 +26,12 @@ void main() {
     binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
     expect(container.read(appInForegroundProvider), isFalse);
 
-    // Coming back is foreground only once the app is resumed, not while it is
-    // merely becoming visible again.
+    // Coming back: on the phones foreground only once the app is resumed,
+    // not while it is merely becoming visible again; on desktop a window
+    // shown again is the foreground at once, focused or not.
     binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
     binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-    expect(container.read(appInForegroundProvider), isFalse);
+    expect(container.read(appInForegroundProvider), kDesktopFormFactor);
     binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     expect(container.read(appInForegroundProvider), isTrue);
   });

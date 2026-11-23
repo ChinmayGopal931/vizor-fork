@@ -158,7 +158,7 @@ New on both platforms:
   - `inactive` (Face ID, Control Center, the app switcher): nothing changes.
   - `background`: Dart pauses the engine and polling (D9). The page stays, and iOS suspends its process along with the app.
   - Return: the page resumes, or reports its termination. Then the bridge check of plan XI14 runs (§6.8).
-  - A memory warning while no call is pending closes the page, which reopens on next use.
+  - A memory warning closes nothing (since 2026-11-22, as on Android: the rest of a sync runs with no call pending). Under real pressure iOS ends the content process, which closes the page as above.
 - **Lock, account switch, route change, idle close, account delete and reset** are all driven from Dart and unchanged (A-ref §6.3, §8.4). Each host `close()` is followed by `stopRailgunBridge()` (`railgun_engine.dart:395-410`).
 
 ### 6.4 Host security on iOS

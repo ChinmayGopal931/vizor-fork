@@ -53,8 +53,12 @@ const JOINT_DB_FILE: &str = "joint.db";
 /// The name and key source a joint account is imported under.
 const JOINT_ACCOUNT_NAME: &str = "Private USD joint";
 const JOINT_KEY_SOURCE: &str = "vizor-private-usd-joint";
-/// A forward refund's sweep pays at most 64 ZIP 317 marginal fees.
+/// A forward refund's sweep pays at most 64 ZIP 317 marginal fees, unless
+/// ZIP 317 asks more for the joint account's notes ([`sweep_fee_limit`]).
 const MAX_SWEEP_FEE_ACTIONS: u64 = 64;
+/// The transaction builder pads an Orchard or Ironwood bundle it builds to
+/// at least two actions (`BundleType::DEFAULT`).
+const BUNDLE_LEAST_ACTIONS: u64 = 2;
 /// How long a scan of a `joint.db` waits for the one running before it.
 const SCAN_WAIT: Duration = Duration::from_secs(30);
 
@@ -241,6 +245,10 @@ pub(crate) struct JointReceipts {
     /// The notes those transactions carry. A sweep pays for an action per
     /// note, and one for its output.
     pub confirmed_notes: u32,
+    /// Every note received, at any depth, in each pool: a sweep spends them
+    /// all.
+    pub orchard_notes: u32,
+    pub ironwood_notes: u32,
     /// Everything received, at any depth.
     pub received_zatoshi: u64,
     /// Spendable now under the sweep's two-confirmation policy.
@@ -271,6 +279,8 @@ pub(crate) fn joint_receipts(
     let mut receipts = JointReceipts {
         confirmed_zatoshi: 0,
         confirmed_notes: 0,
+        orchard_notes: 0,
+        ironwood_notes: 0,
         received_zatoshi: 0,
         spendable_zatoshi: 0,
         pending_zatoshi: 0,
@@ -278,7 +288,7 @@ pub(crate) fn joint_receipts(
     };
     let mut query = snapshot
         .prepare(
-            "SELECT ro.value, t.mined_height
+            "SELECT ro.value, t.mined_height, ro.pool
              FROM v_received_outputs ro
              JOIN transactions t ON t.id_tx = ro.transaction_id
              JOIN accounts a ON a.id = ro.account_id
@@ -287,13 +297,23 @@ pub(crate) fn joint_receipts(
         .map_err(sql_error)?;
     let received = query
         .query_map([account.expose_uuid().as_bytes().as_slice()], |row| {
-            Ok((row.get::<_, u64>(0)?, row.get::<_, Option<u32>>(1)?))
+            Ok((
+                row.get::<_, u64>(0)?,
+                row.get::<_, Option<u32>>(1)?,
+                row.get::<_, i64>(2)?,
+            ))
         })
         .map_err(sql_error)?
         .collect::<rusqlite::Result<Vec<_>>>()
         .map_err(sql_error)?;
-    for (value, mined_height) in received {
+    for (value, mined_height, pool) in received {
         receipts.received_zatoshi = receipts.received_zatoshi.saturating_add(value);
+        // 3 is Orchard and 4 Ironwood, as the wallet DB codes its pools.
+        if pool == 4 {
+            receipts.ironwood_notes += 1;
+        } else {
+            receipts.orchard_notes += 1;
+        }
         let deep_enough = mined_height
             .zip(fully_scanned_height)
             .is_some_and(|(mined, scanned)| {
@@ -861,7 +881,8 @@ impl WalletZcash<'_> {
     /// and Discard OVK: an earlier sweep that may still land is returned
     /// again, never built twice; `None` until every note is spendable. The
     /// sweep pays at most `max_fee_zatoshi` (a forward refund's default when
-    /// `None`), and at least ZIP 317's least fee.
+    /// `None`) or ZIP 317's fee for the account's notes, whichever is more
+    /// ([`sweep_fee_limit`]), and at least ZIP 317's least fee.
     async fn sweep_home(
         &self,
         direction: Direction,
@@ -893,9 +914,7 @@ impl WalletZcash<'_> {
             return Ok(None);
         }
         let marginal_fee = sweep_marginal_fee(&joint_db, self.network)?;
-        let fee_limit = max_fee_zatoshi
-            .unwrap_or(MAX_SWEEP_FEE_ACTIONS * marginal_fee)
-            .min(receipts.spendable_zatoshi - 1);
+        let fee_limit = sweep_fee_limit(max_fee_zatoshi, marginal_fee, &receipts);
         if fee_limit < marginal_fee * zip317::GRACE_ACTIONS as u64 {
             return fail(
                 ErrorCode::ZcashWallet,
@@ -1277,9 +1296,51 @@ impl ReverseZcash for WalletZcash<'_> {
     }
 }
 
+/// The most a sweep of the joint account `receipts` describes may pay: the
+/// fee reviewed for it (a reverse sweep's estimate, approved with the
+/// settlement), else a forward refund's 64 actions, or ZIP 317's fee for the
+/// sweep its notes make ([`sweep_fee_bound`]) where that is more, so a fee the
+/// review fell short of (notes paid in since, a sweep from one pool into the
+/// other, the builder's padding) is paid and the funds come home rather than
+/// wait for good. The sweep pays what ZIP 317 asks for its actions; this only
+/// bounds it. Never the whole balance.
+pub(crate) fn sweep_fee_limit(
+    reviewed: Option<u64>,
+    marginal_fee: u64,
+    receipts: &JointReceipts,
+) -> u64 {
+    reviewed
+        .unwrap_or(MAX_SWEEP_FEE_ACTIONS * marginal_fee)
+        .max(sweep_fee_bound(
+            marginal_fee,
+            receipts.orchard_notes,
+            receipts.ironwood_notes,
+        ))
+        .min(receipts.spendable_zatoshi.saturating_sub(1))
+}
+
+/// ZIP 317's fee for sweeping `orchard_notes` and `ironwood_notes` home in
+/// one transaction: each pool's bundle an action per note it spends, the
+/// output one in whichever pool it goes to, and every bundle there at least
+/// the builder's two; the transaction at least ZIP 317's grace actions. The
+/// wallet picks the output's pool, so this is the dearer of the two: at most
+/// four actions above the notes'.
+pub(crate) fn sweep_fee_bound(marginal_fee: u64, orchard_notes: u32, ironwood_notes: u32) -> u64 {
+    let bundle = |spends: u32, outputs: u32| match u64::from(spends.max(outputs)) {
+        0 => 0,
+        actions => actions.max(BUNDLE_LEAST_ACTIONS),
+    };
+    let to_orchard = bundle(orchard_notes, 1) + bundle(ironwood_notes, 0);
+    let to_ironwood = bundle(orchard_notes, 0) + bundle(ironwood_notes, 1);
+    let actions = to_orchard
+        .max(to_ironwood)
+        .max(zip317::GRACE_ACTIONS as u64);
+    marginal_fee.saturating_mul(actions)
+}
+
 /// ZIP 317's marginal fee at the target a sweep from `joint_db` is built
 /// for, which NU7 lowers.
-fn sweep_marginal_fee(joint_db: &str, network: WalletNetwork) -> Result<u64> {
+pub(crate) fn sweep_marginal_fee(joint_db: &str, network: WalletNetwork) -> Result<u64> {
     let target = sync::fee_policy_target(joint_db, network).map_err(wallet_error)?;
     Ok(crate::wallet::fees::marginal_fee(
         &network,

@@ -8198,6 +8198,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get privateUsdConvertErrorBelowFee => '此金额不足以支付中继者手续费。请尝试更大的金额。';
 
   @override
+  String get privateUsdConvertErrorClock => '手机时间不准确。请将其调整为正确时间，然后重试。';
+
+  @override
+  String get privateUsdConvertErrorClockDesktop =>
+      'Mac 的时间不准确。请将其调整为正确时间，然后重试。';
+
+  @override
+  String get privateUsdConvertErrorClockLinux => '电脑的时间不准确。请将其调整为正确时间，然后重试。';
+
+  @override
   String get privateUsdConvertErrorEthereum => 'Veylor 目前无法连接 Ethereum，请稍后重试。';
 
   @override
@@ -8308,6 +8318,18 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get privateUsdConvertOpeningSlow => '做市商还没有开启兑换，目前未发送任何资金。';
+
+  @override
+  String get privateUsdConvertProblemClock =>
+      '手机时间不准确，跨链无法继续。请将其调整为正确时间。Veylor 打开期间会持续重试。';
+
+  @override
+  String get privateUsdConvertProblemClockDesktop =>
+      'Mac 的时间不准确，跨链无法继续。请将其调整为正确时间。Veylor 打开期间会持续重试。';
+
+  @override
+  String get privateUsdConvertProblemClockLinux =>
+      '电脑的时间不准确，跨链无法继续。请将其调整为正确时间。Veylor 打开期间会持续重试。';
 
   @override
   String get privateUsdConvertProblemEthereum =>

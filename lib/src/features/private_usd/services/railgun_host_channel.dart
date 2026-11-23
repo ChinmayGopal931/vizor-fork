@@ -100,8 +100,9 @@ String redactRailgunMessage(
 /// check has run), and Windows where the Evergreen WebView2 Runtime is
 /// installed. No handler means no host, except on iOS, where it can only mean
 /// the handler was not registered yet: the answer is then unknown (`null`),
-/// and the caller asks again after the first frame. Any other failure means
-/// no.
+/// and the caller asks again after the first frame. Linux's check that took
+/// too long (`timeout`) is unknown too: its host runs it again when asked.
+/// Any other failure means no.
 Future<bool?> queryRailgunHostSupported({
   MethodChannel channel = const MethodChannel(
     RailgunHostChannel.methodChannelName,
@@ -114,6 +115,8 @@ Future<bool?> queryRailgunHostSupported({
     return (platform ?? defaultTargetPlatform) == TargetPlatform.iOS
         ? null
         : false;
+  } on PlatformException catch (error) {
+    return error.code == 'timeout' ? null : false;
   } catch (_) {
     return false;
   }

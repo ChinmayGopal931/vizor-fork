@@ -209,7 +209,9 @@ Future<Directory> _privateUsdDirectory(
 /// network: `<support>/private_usd_<walletDbName>_<network>`.
 ///
 /// The swap records hold relayer tickets, so on iOS the directory stays out
-/// of iCloud and device backups, marked before anything is written in it.
+/// of iCloud and device backups, and on macOS out of Time Machine, marked
+/// before anything is written in it (Android leaves every app file out of a
+/// device transfer, `data_extraction_rules.xml`).
 /// The mark goes with the directory, so it is set whenever the directory is
 /// made, and once per process for one made earlier.
 /// A failed mark is tried again on the next call: a weaker backup posture must

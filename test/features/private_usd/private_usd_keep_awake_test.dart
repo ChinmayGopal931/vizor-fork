@@ -29,7 +29,10 @@ void main() {
   late _Page page;
   late _Security security;
 
-  ProviderContainer containerWith({CachedPrivateUsdBalances? cached}) {
+  ProviderContainer containerWith({
+    CachedPrivateUsdBalances? cached,
+    DateTime Function()? now,
+  }) {
     page = _Page();
     final engine = RailgunEngine(
       host: page,
@@ -43,6 +46,7 @@ void main() {
         railgunEngineProvider.overrideWithValue(engine),
         privateUsdBalanceCacheProvider.overrideWithValue(_Cache(cached)),
         privateUsdCurrentDeploymentProvider.overrideWithValue(null),
+        if (now != null) privateUsdBalanceClockProvider.overrideWithValue(now),
       ],
     );
     addTearDown(() async {
@@ -107,22 +111,44 @@ void main() {
     expect(keepAwake(container), isFalse);
   });
 
-  test('a refresh of a wallet that synced before keeps nothing on', () async {
+  test(
+    'a refresh of a wallet that synced this week keeps nothing on',
+    () async {
+      final container = containerWith(
+        cached: CachedPrivateUsdBalances(
+          address: '0zk1account',
+          updatedAt: DateTime(2026, 10, 17),
+          balances: RailgunBalances.parse(jsonDecode(_balancesJson)),
+        ),
+        now: () => DateTime(2026, 10, 23),
+      );
+
+      await startRefresh(container);
+      expect(
+        container.read(privateUsdBalanceProvider(_account)).isRefreshing,
+        isTrue,
+      );
+      expect(keepAwake(container), isFalse);
+      page.refreshing!.complete(_refreshJson);
+    },
+  );
+
+  test('a wallet last synced over a week ago catches up as a first sync '
+      'does, screen on until its balance shows', () async {
     final container = containerWith(
       cached: CachedPrivateUsdBalances(
         address: '0zk1account',
         updatedAt: DateTime(2026, 10, 17),
         balances: RailgunBalances.parse(jsonDecode(_balancesJson)),
       ),
+      now: () => DateTime(2026, 10, 25),
     );
 
     await startRefresh(container);
-    expect(
-      container.read(privateUsdBalanceProvider(_account)).isRefreshing,
-      isTrue,
-    );
-    expect(keepAwake(container), isFalse);
+    expect(keepAwake(container), isTrue);
     page.refreshing!.complete(_refreshJson);
+    await pumpEventQueue();
+    expect(keepAwake(container), isFalse, reason: 'its balance shows');
   });
 
   test('a bridge that needs Veylor keeps the screen on, whichever screen '

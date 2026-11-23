@@ -159,7 +159,10 @@ final class RailgunPageHost {
   /// In the window's content view, 1×1 and below the Flutter view, which covers it: WebKit treats a web view outside
   /// a window as hidden and throttles it. With no window yet, it waits for one (`window`'s `didSet`).
   private func place(_ view: NSView) {
-    guard let content = (window ?? Self.flutterWindow())?.contentView else { return }
+    let host = window ?? Self.flutterWindow()
+    // The page's calls count time only while this window is in sight, as WebKit runs the page (`RailgunPageClock`).
+    RailgunPageClock.shared.follow(host)
+    guard let content = host?.contentView else { return }
     guard view.superview !== content else { return }
     view.removeFromSuperview()
     view.frame = NSRect(x: 0, y: 0, width: 1, height: 1)

@@ -34,19 +34,19 @@ import { archive } from './archive.js';
 import { ARCHIVES, installArchiveSync } from './archive-sync.js';
 import { installArchiveTxids, misrecordedTransaction, relistIfMisrecorded } from './archive-txids.js';
 import { setArtifactProgressListener } from './artifact-mirror.js';
-import { artifactStore } from './artifacts.js';
+import { artifactStore, withKeysDroppedOnRefusal } from './artifacts.js';
 import { mainnetBlockAt, mainnetBlockTime } from './block-times.js';
 import { creationBlock } from './creation-block.js';
 import { badRequest } from './errors.js';
 import { pauseMark, pausedSince } from './page-clock.js';
-import { formatUnshields, installQuickSync, squidPages } from './quick-sync.js';
-import { hasUndatedReceipts, hasUndatedShields, pendingShields, receivedSends } from './received.js';
+import { formatUnshields, guardQuickSync, installQuickSync, squidPages, takeQuickSyncStop } from './quick-sync.js';
+import { pendingShields, receivedSends } from './received.js';
 import { refreshProgress } from './refresh-progress.js';
 import { syncFailure } from './rpc-probe.js';
 import { screeningActivity } from './screening-activity.js';
 import { squidQueries } from './squid.js';
 import { syncFinisher } from './sync-finish.js';
-import { archiveOff, localStore, rebuildTrees, takeRefusedRoot, treeRecovery } from './tree-recovery.js';
+import { archiveOff, localStore, rebuildTrees, rpcBehindLeaf, takeRefusedRoot, treeRecovery } from './tree-recovery.js';
 import { TxidListStopped, catchUpTxids } from './txid-catch-up.js';
 import { changeTxidList, forgettingStops, takeListStop, txidRepair } from './txid-repair.js';
 import { walletNamespaces } from './wallet-namespaces.js';
@@ -58,6 +58,9 @@ const NETWORKS = { sepolia: NetworkName.EthereumSepolia, mainnet: NetworkName.Et
 const WALLET_SOURCE = 'vizor';
 // The engine's listener catches spends a scan misses, as it reads nullifiers from the latest commitment's block on.
 const POLLING_INTERVAL_MS = 15_000;
+// How long a start waits for the RPC to load the engine's provider before it asks whether the RPC is down: well inside
+// the host's two minutes for a start, with time left for the probe (rpc-probe.js, 10 s for each of its two asks).
+const PROVIDER_LOAD_MS = 75_000;
 const NOTES_SCAN_ATTEMPTS = 20;
 const NOTES_SCAN_RETRY_MS = 3_000;
 // A notes scan reports 3% as it starts, 1% on a full rescan; one the engine skips reports nothing.
@@ -206,7 +209,7 @@ async function startEngine(networkName, database, rpcUrls, poiNodeUrls, history,
   if (debug) setLoggers((message) => emit('log', String(message)), (error) => emit('log', String(error?.stack ?? error)));
   setEngineTxidSyncBatchSize(TXID_SYNC_BATCH_SIZES.squid);
   await startRailgunEngine(WALLET_SOURCE, new LevelJS(database), debug, artifactStore, false, false, poiNodeUrls);
-  getProver().setSnarkJSGroth16(groth16);
+  getProver().setSnarkJSGroth16(withKeysDroppedOnRefusal(groth16));
   const engine = getEngine();
   const queries = squidQueries(networkName);
   indexerQueries = queries;
@@ -237,6 +240,12 @@ async function startEngine(networkName, database, rpcUrls, poiNodeUrls, history,
       useArchive,
     });
   }
+  // Last of the quick sync's changes: it watches the one the engine calls.
+  guardQuickSync(engine, {
+    txidVersion: TXID_VERSION,
+    chain: NETWORK_CONFIG[networkName].chain,
+    head: async () => (await readNewestBlock(networkName)).blockNumber,
+  });
   // Without the archive too: a list an archive sync left goes on from rail-squid.
   installArchiveTxids(engine, {
     reader,
@@ -285,12 +294,36 @@ async function startEngine(networkName, database, rpcUrls, poiNodeUrls, history,
   });
   const providers = rpcUrls.map((url, index) => ({ provider: url, priority: index + 1, weight: 2 }));
   const config = { chainId: NETWORK_CONFIG[networkName].chain.id, providers };
-  const { feesSerialized } = await loadProvider(config, networkName, POLLING_INTERVAL_MS);
+  const { feesSerialized } = await loadingProvider(
+    loadProvider(config, networkName, POLLING_INTERVAL_MS),
+    { rpcUrls, poiNodeUrls },
+  );
   fees = { shield: Number(feesSerialized.shieldFeeV2), unshield: Number(feesSerialized.unshieldFeeV2) };
   network = networkName;
   providerUrls = rpcUrls;
   screeningUrls = poiNodeUrls;
   return { fees };
+}
+
+/**
+ * `loading`, the engine's provider loading, which reads Railgun's fees from the RPC: a failure, or no answer within
+ * `PROVIDER_LOAD_MS`, is told apart as a sync's is (`rpc-probe.js`), so a page that opens while the RPC is down fails
+ * its start as `RPC_FAILED` and the host offers another RPC. The time limit sits inside the host's two minutes for a
+ * start, which would otherwise fail it as a plain timeout.
+ */
+async function loadingProvider(loading, { rpcUrls, poiNodeUrls }) {
+  let timer;
+  const late = new Promise((_, reject) => {
+    const slow = () => reject(new Error('the Ethereum RPC does not answer: the engine did not load in time'));
+    timer = setTimeout(slow, PROVIDER_LOAD_MS);
+  });
+  try {
+    return await Promise.race([loading, late]);
+  } catch (error) {
+    throw await syncFailure(error, { rpcUrls, poiNodeUrls });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**
@@ -535,7 +568,10 @@ async function proveSends(walletId) {
       );
       return (await misrecordedTransaction(getEngine().getTXIDMerkletree(TXID_VERSION, chain()), sends)) !== undefined;
     },
-    clear: () => getEngine().clearTXIDMerkletreeData(TXID_VERSION, chain()),
+    clear: () =>
+      changeTxidList(getEngine().getTXIDMerkletree(TXID_VERSION, chain()), () =>
+        getEngine().clearTXIDMerkletreeData(TXID_VERSION, chain()),
+      ),
     catchUp: catchUpTxidList,
     store: recoveryStore,
   });
@@ -562,15 +598,20 @@ async function scanNotesNow(walletId) {
     notesScan = scan;
     // A root the last rebuild's own scan refused is left out: this scan shows whether the rebuild took.
     takeRefusedRoot();
+    takeQuickSyncStop();
     try {
       await getEngine().scanUTXOHistory(TXID_VERSION, chain(), [walletId]);
     } finally {
       notesScan = undefined;
     }
     if (scan.incomplete) {
-      // A tree whose root the contract has never had fails every scan until it is rebuilt (tree-recovery.js).
-      if (await recovery(walletId).broke(takeRefusedRoot())) continue;
-      throw new Error('the notes scan broke off, so the balances may be stale');
+      // A tree whose root the contract has never had fails every scan until it is rebuilt (tree-recovery.js), unless the
+      // RPC that refused it hasn't reached its newest leaf: that refusal counts for nothing.
+      const refusal = takeRefusedRoot();
+      const lag = refusal === undefined ? undefined : await rpcLag(refusal);
+      if (await recovery(walletId).broke(lag === undefined ? refusal : undefined)) continue;
+      // A quick sync that left the scan to hours of reads from the RPC, or left the trees short, says so.
+      throw new Error(takeQuickSyncStop() ?? lag ?? 'the notes scan broke off, so the balances may be stale');
     }
     if (scan.started) {
       recovery(walletId).passed();
@@ -582,37 +623,49 @@ async function scanNotesNow(walletId) {
 }
 
 /**
+ * Why `refusal`, a root the end-of-scan check refused (`takeRefusedRoot`), may be the RPC's lag rather than the trees':
+ * a message saying so where the RPC's newest block hasn't passed the tree's newest leaf (`rpcBehindLeaf`), undefined
+ * otherwise, and where either block can't be read. The newest block is the same request every wallet makes.
+ */
+async function rpcLag({ tree, index }) {
+  try {
+    const leaf = await getEngine().getUTXOMerkletree(TXID_VERSION, chain()).getCommitmentSafe(tree, index);
+    const leafBlock = Number(leaf?.blockNumber);
+    const { blockNumber: head } = await readNewestBlock(network);
+    if (!rpcBehindLeaf(leafBlock, head)) return undefined;
+    return `the Ethereum RPC is behind the notes trees: tree ${tree}'s newest leaf is in block ${leafBlock}, the RPC at ${head}`;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * The private sends this wallet received (`receivedSends`) and the shields screening still holds (`pendingShields`),
- * from the notes its scans already decrypted. Only where the engine has no time for one is the newest block read, to
- * date it from. `null` when the history can't be read: the balances stand without it.
+ * from the notes its scans already decrypted. One the engine has no time for is dated from the newest block the page
+ * last read, which every notes scan reads as its quick sync starts: the history asks nothing of its own, so a wallet
+ * with a fresh receipt sends the RPC what every other wallet does. `null` when the history can't be read: the balances
+ * stand without it.
  */
 async function walletHistory(emit) {
   try {
     const history = await getWalletTransactionHistory(chain(), session().walletId, undefined);
-    const undated = hasUndatedReceipts(history) || hasUndatedShields(history);
-    const head = undated ? await newestBlock(emit) : undefined;
-    return { received: receivedSends(history, head), shielding: pendingShields(history, head) };
+    return { received: receivedSends(history, newest), shielding: pendingShields(history, newest) };
   } catch (error) {
     emit('log', `wallet history not read: ${error?.message ?? error}`);
     return null;
   }
 }
 
-/** The newest block's number and time; undefined when it can't be read, and the sends it would date go undated. */
-async function newestBlock(emit) {
-  try {
-    return await readNewestBlock(network);
-  } catch (error) {
-    emit('log', `newest block not read: ${error?.message ?? error}`);
-    return undefined;
-  }
-}
+// The newest block the page last read from its RPC, `{blockNumber, timestamp}`, for dating what the engine has no time
+// for; undefined until a read succeeds, and the sends it would date go undated.
+let newest;
 
 /** The newest block of `networkName`, `{blockNumber, timestamp}`, from its RPC: the same request for every wallet. */
 async function readNewestBlock(networkName) {
   const block = await getFallbackProviderForNetwork(networkName).getBlock('latest');
   if (!block) throw new Error('the RPC has no newest block');
-  return { blockNumber: block.number, timestamp: block.timestamp };
+  newest = { blockNumber: block.number, timestamp: block.timestamp };
+  return newest;
 }
 
 /** Balances by screening status: `Spendable`, `ShieldPending`, `ShieldBlocked`, … */

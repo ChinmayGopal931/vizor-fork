@@ -1354,6 +1354,7 @@ abstract class RustLibApi extends BaseApi {
     required String storeDir,
     required List<int> mnemonicBytes,
     required String ethRpcUrl,
+    required int opId,
     required int index,
   });
 
@@ -1420,6 +1421,7 @@ abstract class RustLibApi extends BaseApi {
     required String storeDir,
     required List<int> mnemonicBytes,
     required String ethRpcUrl,
+    required int opId,
     required int index,
   });
 
@@ -1495,6 +1497,7 @@ abstract class RustLibApi extends BaseApi {
     required List<int> mnemonicBytes,
     required String lightwalletdUrl,
     required String ethRpcUrl,
+    required int opId,
     required int index,
   });
 
@@ -1514,6 +1517,7 @@ abstract class RustLibApi extends BaseApi {
     required List<int> mnemonicBytes,
     required String lightwalletdUrl,
     required String ethRpcUrl,
+    required int opId,
     required int index,
   });
 
@@ -1567,6 +1571,7 @@ abstract class RustLibApi extends BaseApi {
     required String storeDir,
     required List<int> mnemonicBytes,
     required String ethRpcUrl,
+    required int opId,
     required int index,
   });
 
@@ -10588,6 +10593,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required String storeDir,
     required List<int> mnemonicBytes,
     required String ethRpcUrl,
+    required int opId,
     required int index,
   }) {
     return handler.executeNormal(
@@ -10600,6 +10606,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(storeDir, serializer);
           sse_encode_list_prim_u_8_loose(mnemonicBytes, serializer);
           sse_encode_String(ethRpcUrl, serializer);
+          sse_encode_u_32(opId, serializer);
           sse_encode_u_32(index, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
@@ -10620,6 +10627,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           storeDir,
           mnemonicBytes,
           ethRpcUrl,
+          opId,
           index,
         ],
         apiImpl: this,
@@ -10637,6 +10645,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           "storeDir",
           "mnemonicBytes",
           "ethRpcUrl",
+          "opId",
           "index",
         ],
       );
@@ -10973,6 +10982,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required String storeDir,
     required List<int> mnemonicBytes,
     required String ethRpcUrl,
+    required int opId,
     required int index,
   }) {
     return handler.executeNormal(
@@ -10985,6 +10995,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(storeDir, serializer);
           sse_encode_list_prim_u_8_loose(mnemonicBytes, serializer);
           sse_encode_String(ethRpcUrl, serializer);
+          sse_encode_u_32(opId, serializer);
           sse_encode_u_32(index, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
@@ -11005,6 +11016,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           storeDir,
           mnemonicBytes,
           ethRpcUrl,
+          opId,
           index,
         ],
         apiImpl: this,
@@ -11022,6 +11034,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           "storeDir",
           "mnemonicBytes",
           "ethRpcUrl",
+          "opId",
           "index",
         ],
       );
@@ -11426,6 +11439,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required List<int> mnemonicBytes,
     required String lightwalletdUrl,
     required String ethRpcUrl,
+    required int opId,
     required int index,
   }) {
     return handler.executeNormal(
@@ -11439,6 +11453,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_list_prim_u_8_loose(mnemonicBytes, serializer);
           sse_encode_String(lightwalletdUrl, serializer);
           sse_encode_String(ethRpcUrl, serializer);
+          sse_encode_u_32(opId, serializer);
           sse_encode_u_32(index, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
@@ -11460,6 +11475,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           mnemonicBytes,
           lightwalletdUrl,
           ethRpcUrl,
+          opId,
           index,
         ],
         apiImpl: this,
@@ -11479,6 +11495,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           "mnemonicBytes",
           "lightwalletdUrl",
           "ethRpcUrl",
+          "opId",
           "index",
         ],
       );
@@ -11533,6 +11550,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required List<int> mnemonicBytes,
     required String lightwalletdUrl,
     required String ethRpcUrl,
+    required int opId,
     required int index,
   }) {
     return handler.executeNormal(
@@ -11546,6 +11564,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_list_prim_u_8_loose(mnemonicBytes, serializer);
           sse_encode_String(lightwalletdUrl, serializer);
           sse_encode_String(ethRpcUrl, serializer);
+          sse_encode_u_32(opId, serializer);
           sse_encode_u_32(index, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
@@ -11567,6 +11586,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           mnemonicBytes,
           lightwalletdUrl,
           ethRpcUrl,
+          opId,
           index,
         ],
         apiImpl: this,
@@ -11585,6 +11605,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           "mnemonicBytes",
           "lightwalletdUrl",
           "ethRpcUrl",
+          "opId",
           "index",
         ],
       );
@@ -11847,6 +11868,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required String storeDir,
     required List<int> mnemonicBytes,
     required String ethRpcUrl,
+    required int opId,
     required int index,
   }) {
     return handler.executeNormal(
@@ -11859,6 +11881,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(storeDir, serializer);
           sse_encode_list_prim_u_8_loose(mnemonicBytes, serializer);
           sse_encode_String(ethRpcUrl, serializer);
+          sse_encode_u_32(opId, serializer);
           sse_encode_u_32(index, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
@@ -11879,6 +11902,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           storeDir,
           mnemonicBytes,
           ethRpcUrl,
+          opId,
           index,
         ],
         apiImpl: this,
@@ -11896,6 +11920,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           "storeDir",
           "mnemonicBytes",
           "ethRpcUrl",
+          "opId",
           "index",
         ],
       );

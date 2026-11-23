@@ -86,6 +86,11 @@ class _Backend implements PrivateUsdSendBackend {
     transactions: ['0xfeed'],
   );
 
+  /// A refused post keeps its row, as Rust keeps a send a settlement pass
+  /// posted first; otherwise the refusal drops it, as Rust drops a send
+  /// whose first post was refused.
+  var keptOnRefusal = false;
+
   @override
   Future<ApiRailgunSendsTerms> terms() async => ApiRailgunSendsTerms(
     chainId: 11155111,
@@ -129,6 +134,12 @@ class _Backend implements PrivateUsdSendBackend {
   @override
   Future<ApiTransactResult> transact(String accountUuid, String sendId) async {
     events.add('transact ${sendId == puts.last.sendId ? 'kept' : sendId}');
+    if (answer.kind == ApiTransactKind.refused && !keptOnRefusal) {
+      rows = [
+        for (final row in rows)
+          if (row.sendId != sendId) row,
+      ];
+    }
     return answer;
   }
 
@@ -299,6 +310,24 @@ void main() {
       ),
     );
     expect(h.backend.events, ['put', 'transact kept']);
+
+    // A refusal Rust kept the send through (a settlement pass posted it
+    // first, so it may land): unconfirmed, never priced or proved again.
+    final kept = _Harness();
+    kept.backend
+      ..answer = const ApiTransactResult(
+        kind: ApiTransactKind.refused,
+        transactions: [],
+      )
+      ..keptOnRefusal = true;
+    kept.page.fee = BigInt.from(800000);
+    expect(
+      await kept.sender.send(_account, kept.request, kept.cost()),
+      isA<PrivateUsdSendUnconfirmed>(),
+    );
+    expect(kept.page.proofs, 1);
+    expect(kept.backend.events, ['put', 'transact kept']);
+    await kept.engine.dispose();
 
     final retried = _Harness();
     retried.backend.answer = const ApiTransactResult(

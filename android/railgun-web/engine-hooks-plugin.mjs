@@ -286,7 +286,7 @@ export function throughRootRefusals(source) {
     source,
     END_OF_SCAN_ROOT_CHECK,
     `                if (!isValid) {
-                    throw require(${pageModule('tree-recovery.js')}).rootRefused(treeIndex, root, new Error(\`Invalid merkleroot: \${root}. Tree: \${treeIndex}. Index: \${index}.\`));
+                    throw require(${pageModule('tree-recovery.js')}).rootRefused(treeIndex, root, new Error(\`Invalid merkleroot: \${root}. Tree: \${treeIndex}. Index: \${index}.\`), index);
                 }
 `,
     'RailgunEngine.scanUTXOHistory',

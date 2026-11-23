@@ -181,6 +181,59 @@ final class NativeLanguageChannel {
   }
 }
 
+/// Keeps a directory out of Time Machine, as iOS keeps it out of iCloud and
+/// device backups (`excludeFromDeviceBackup` in Dart): Private USD's swap
+/// records and joint accounts, and Arti's guard state. The directory is made
+/// when it does not exist yet, so the mark is set before anything is written
+/// in it; the mark goes with the directory.
+final class DeviceBackupChannel {
+  private static var channel: FlutterMethodChannel?
+
+  static func register(messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(
+      name: "com.zcash.wallet/network_privacy",
+      binaryMessenger: messenger
+    )
+    self.channel = channel
+    channel.setMethodCallHandler { call, result in
+      guard call.method == "excludeFromBackup" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      guard
+        let arguments = call.arguments as? [String: Any],
+        let path = arguments["path"] as? String,
+        !path.isEmpty
+      else {
+        result(
+          FlutterError(
+            code: "invalid_arguments",
+            message: "excludeFromBackup requires a path.",
+            details: nil
+          )
+        )
+        return
+      }
+      var url = URL(fileURLWithPath: path, isDirectory: true)
+      do {
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try url.setResourceValues(values)
+        result(true)
+      } catch {
+        result(
+          FlutterError(
+            code: "exclude_failed",
+            message: error.localizedDescription,
+            details: nil
+          )
+        )
+      }
+    }
+  }
+}
+
 /// Exit-only hiding needs to be synchronous and must suppress AppKit's
 /// last-window auto-quit until Flutter has replied to its termination request.
 final class DesktopExitChannel {
@@ -1246,6 +1299,9 @@ class MainFlutterWindow: NSWindow {
       messenger: flutterViewController.engine.binaryMessenger
     )
     NativeLanguageChannel.register(
+      messenger: flutterViewController.engine.binaryMessenger
+    )
+    DeviceBackupChannel.register(
       messenger: flutterViewController.engine.binaryMessenger
     )
     WindowAppearanceChannel.register(

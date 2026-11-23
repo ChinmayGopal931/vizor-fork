@@ -484,6 +484,89 @@ async fn a_swap_whose_accept_answer_was_lost_goes_on_from_the_chains_opened() {
     assert_eq!(h.world.get().deposits.len(), 1);
 }
 
+/// Review finding (2026-11-22): after an accept whose answer was lost, the
+/// maker's unknown quote, `400` or `404` on the next post may follow that
+/// post's open, so it ends nothing: the bridge waits for the quote's end and
+/// goes on from the chain's `Opened`, across a restart too (the record says
+/// an accept was posted). A quote without a fee, accepted again, the same.
+/// A first post's refusal still ends the bridge at once.
+#[tokio::test]
+async fn a_refusal_after_an_unanswered_accept_waits_for_the_chain() {
+    for (status, code) in [
+        (404, Some("unknownQuote")),
+        (400, Some("rejected")),
+        (404, None),
+    ] {
+        for restart in [false, true] {
+            let h = asking(FEE, fee_address());
+            {
+                let mut state = h.world.set();
+                state.accept_answer_lost = true;
+                state.refused_after_open = Some((status, code));
+            }
+            let quoted = h.quote().await.unwrap();
+            accept(&h, quoted.index).await.unwrap();
+            mine(&h, "openfee1");
+            assert_eq!(
+                h.advance().await.unwrap(),
+                waiting(ForwardWait::FeeAccepting)
+            );
+            assert!(h.world.get().opened, "the maker opened it, unanswered");
+            assert!(h.record().accept_posted);
+            if restart {
+                engine::remove_fee_pace(&h.account, quoted.index);
+            }
+            h.world.set().pass(30);
+            assert_eq!(
+                h.advance().await.unwrap(),
+                waiting(ForwardWait::FeeAccepting),
+                "{status} {code:?}: refused, and nothing ends"
+            );
+            assert_eq!(accepts(&h), 2);
+            assert_eq!(h.record().outcome, None);
+
+            h.world.set().pass(300);
+            assert_eq!(h.advance().await.unwrap(), waiting(ForwardWait::Opening));
+            assert_eq!(h.record().t0, Some(h.world.get().t0), "from the chain");
+            assert_eq!(h.advance().await.unwrap(), h.confirming());
+            assert_eq!(h.world.get().deposits.len(), 1);
+        }
+    }
+
+    // Without a fee: the second accept's refusal ends nothing either.
+    let h = Harness::new();
+    {
+        let mut state = h.world.set();
+        state.accept_answer_lost = true;
+        state.refused_after_open = Some((404, Some("unknownQuote")));
+    }
+    let quoted = h.quote().await.unwrap();
+    assert!(accept(&h, quoted.index).await.is_err(), "maybe opened");
+    assert!(
+        accept(&h, quoted.index).await.is_err(),
+        "still maybe opened"
+    );
+    assert_eq!(h.record().outcome, None);
+    h.world.set().pass(300);
+    assert_eq!(h.advance().await.unwrap(), waiting(ForwardWait::Opening));
+    assert!(h.record().t0.is_some());
+
+    // A first post's refusal: nothing can have opened.
+    let h = asking(FEE, fee_address());
+    {
+        let mut state = h.world.set();
+        state.accept_status = 404;
+        state.accept_code = Some("unknownQuote");
+    }
+    let quoted = h.quote().await.unwrap();
+    accept(&h, quoted.index).await.unwrap();
+    mine(&h, "openfee1");
+    assert_eq!(
+        h.advance().await.unwrap(),
+        nothing_sent(NothingSentCause::QuoteExpired)
+    );
+}
+
 /// Finding 4: "Call it off" refuses a bridge whose fee was started, kept or
 /// sent: the swap goes on, its accept following the fee.
 #[tokio::test]

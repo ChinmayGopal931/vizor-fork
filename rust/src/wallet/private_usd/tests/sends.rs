@@ -487,3 +487,105 @@ async fn notes_the_relayer_calls_spent_settle_from_the_chain() {
         "every post was a kept proof"
     );
 }
+
+/// Review finding (2026-11-22): once a send was posted, a refusal never
+/// forgets it. An earlier post may still land, so only the chain ends it: its
+/// transaction in a block, every nullifier spent, or some spent by another
+/// proof. Until then the next payment waits, and the same bytes go again
+/// after a while. Only a first post's refusal forgets a send (above).
+#[tokio::test]
+async fn a_send_refused_after_it_was_posted_stays_until_the_chain_settles_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut store = SwapStore::open(dir.path()).unwrap();
+    let answer = Answer::new();
+    let transport = ScriptedTransport::new(|_: &RoutedRequest| answer.respond());
+    let clock = TestClock(Cell::new(NOW));
+    let chain = FakeSendChain::default();
+    let refusal = r#"{"code":"rejected","error":"the fee is below the floor"}"#;
+
+    // Named, then refused when asked about again: kept, the next payment
+    // waiting, posted again only after the recheck, and landed once every
+    // nullifier is spent.
+    let named = "sends-refused-named";
+    keep(
+        &mut store,
+        named,
+        "send-1",
+        &page_proof(&[word(1), word(2)]),
+    )
+    .unwrap();
+    answer.sent(word(0x41));
+    let relay = Sends::new(&transport, RELAYER, &clock, named);
+    relay.transact(&mut store, "send-1").await.unwrap();
+    answer.set(422, refusal, None);
+    clock.set(NOW + 180);
+    let kept = relay.settle_all(&mut store, &chain).await.unwrap();
+    assert!(!kept[0].confirmed(), "refused after a post: still out");
+    assert_eq!(kept[0].relay.as_ref().unwrap().refused_at, Some(NOW + 180));
+    let error = keep(&mut store, named, "send-2", &page_proof(&[word(3)])).unwrap_err();
+    assert_eq!(error.code, ErrorCode::Busy);
+    clock.set(NOW + 180 + 899);
+    relay.settle_all(&mut store, &chain).await.unwrap();
+    assert_eq!(bodies(&transport).len(), 2);
+    clock.set(NOW + 180 + 900);
+    let again = relay.settle_all(&mut store, &chain).await.unwrap();
+    assert_eq!(bodies(&transport).len(), 3, "the same bytes, again");
+    assert!(!again[0].confirmed());
+    // A post with no answer counts as one: the next waits its 15 minutes.
+    answer.set(0, "", None);
+    clock.set(NOW + 180 + 1_800);
+    relay.settle_all(&mut store, &chain).await.unwrap();
+    clock.set(NOW + 180 + 1_801);
+    relay.settle_all(&mut store, &chain).await.unwrap();
+    assert_eq!(bodies(&transport).len(), 4);
+    chain.spend(word(1));
+    chain.spend(word(2));
+    let landed = relay.settle_all(&mut store, &chain).await.unwrap();
+    assert!(landed[0].confirmed(), "the chain shows it landed");
+
+    // Unanswered, then refused: kept until another proof spends part of its
+    // notes, when it never can land.
+    let unanswered = "sends-refused-unanswered";
+    keep(
+        &mut store,
+        unanswered,
+        "send-3",
+        &page_proof(&[word(5), word(6)]),
+    )
+    .unwrap();
+    answer.set(0, "", None);
+    let relay = Sends::new(&transport, RELAYER, &clock, unanswered);
+    assert_eq!(
+        relay.transact(&mut store, "send-3").await.unwrap(),
+        RailgunBroadcast::Retry {
+            retry_after_secs: None
+        }
+    );
+    answer.set(400, refusal, None);
+    let kept = relay.settle_all(&mut store, &chain).await.unwrap();
+    assert_eq!(kept.len(), 1, "refused after an unanswered post: kept");
+    assert!(kept[0].relay.as_ref().unwrap().refused_at.is_some());
+    chain.spend(word(5));
+    assert!(relay
+        .settle_all(&mut store, &chain)
+        .await
+        .unwrap()
+        .is_empty());
+
+    // The relayer's transaction reverted, and the same proof landed in
+    // another: landed, not forgotten.
+    let reverted = "sends-reverted-landed";
+    keep(&mut store, reverted, "send-4", &page_proof(&[word(7)])).unwrap();
+    answer.sent(word(0x42));
+    let relay = Sends::new(&transport, RELAYER, &clock, reverted);
+    relay.transact(&mut store, "send-4").await.unwrap();
+    chain.status(word(0x42), TransactionStatus::Reverted);
+    chain.spend(word(7));
+    let landed = relay.settle_all(&mut store, &chain).await.unwrap();
+    assert!(landed[0].confirmed());
+    assert_eq!(
+        bodies(&transport),
+        vec![kept_body(); 7],
+        "every post was a kept proof"
+    );
+}

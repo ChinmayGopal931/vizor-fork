@@ -2,6 +2,7 @@
 // each scan, and every scan after the leaf fails there while the store keeps it. The archive is a second source of
 // leaves, on by default, so once the engine has refused one tree's root for a while the page rebuilds the trees from
 // the start with the archive off.
+import { changeTxidList } from './txid-list.js';
 
 /** How long, and over how many refusals in a row, one tree's root must fail before the trees are rebuilt. */
 export const REBUILD_AFTER_MS = 10 * 60_000;
@@ -11,17 +12,30 @@ export const REBUILD_EVERY_MS = 24 * 60 * 60_000;
 /** How long the archive stays off after a rebuild, or after it listed one of a wallet's sends wrong. */
 export const ARCHIVE_OFF_MS = 7 * 24 * 60 * 60_000;
 
-// The root the engine's end-of-scan check refused last, `{tree, root}`, until it is taken.
+// The root the engine's end-of-scan check refused last, `{tree, root, index}`, until it is taken.
 let refused;
 
 /**
- * The engine's end-of-scan check refusing `tree`'s `root`, which the build has it report (engine-hooks-plugin.mjs).
- * Answers `error`, for the engine to throw.
+ * The engine's end-of-scan check refusing `tree`'s `root`, the tree's root after its leaf `index`, which the build has
+ * it report (engine-hooks-plugin.mjs). Answers `error`, for the engine to throw.
  */
-export function rootRefused(tree, root, error) {
-  refused = { tree, root };
+export function rootRefused(tree, root, error, index) {
+  refused = { tree, root, index };
   return error;
 }
+
+/** How many blocks past a tree's newest leaf the RPC's newest block must be before its refusal of the tree counts. */
+export const RPC_LAG_BLOCKS = 5;
+
+/**
+ * Whether the RPC that refused a tree's root may not have reached the tree's newest leaf yet: its newest block
+ * (`head`) is not `RPC_LAG_BLOCKS` past the leaf's block (`leafBlock`). The contract records a tree's root in the block
+ * of its newest leaf, and rail-squid's lists, which the trees come from, can be ahead of an RPC that lags: such a
+ * refusal says nothing about the leaves, and counting it would have a lagging RPC rebuild the trees once a day. Unknown
+ * blocks count the refusal, as before.
+ */
+export const rpcBehindLeaf = (leafBlock, head) =>
+  Number.isSafeInteger(leafBlock) && Number.isSafeInteger(head) && head < leafBlock + RPC_LAG_BLOCKS;
 
 /** The root the engine's end-of-scan check refused since this was last asked, if it did. */
 export function takeRefusedRoot() {
@@ -120,7 +134,8 @@ export async function rebuildTrees(
   if (utxo.isScanning || engine.getTXIDMerkletree(txidVersion, chain).isScanning || busy()) return false;
   started();
   engine.emitUTXOMerkletreeScanUpdateEvent(txidVersion, chain, 0.01);
-  await engine.clearTXIDMerkletreeData(txidVersion, chain);
+  const list = engine.getTXIDMerkletree(txidVersion, chain);
+  await changeTxidList(list, () => engine.clearTXIDMerkletreeData(txidVersion, chain));
   // No scan while the leaves go, as in the engine's rescan.
   utxo.isScanning = true;
   try {

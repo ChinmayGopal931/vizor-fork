@@ -19,6 +19,8 @@ inline constexpr int kExitSandbox = 3;
 inline constexpr int kExitPageFailed = 4;
 // No display to run on.
 inline constexpr int kExitNoDisplay = 5;
+// A fatal error after the page ran inside WebKit's sandbox: the page stopped, its sandbox had started.
+inline constexpr int kExitFatal = 6;
 
 struct PageOptions {
   int link_fd = -1;

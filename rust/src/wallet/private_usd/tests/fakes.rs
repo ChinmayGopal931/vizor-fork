@@ -228,6 +228,9 @@ pub(super) struct State {
     pub fee_retry_after: Option<u64>,
     /// The maker opens the swap on an accept, and its answer is lost.
     pub accept_answer_lost: bool,
+    /// Once the swap is open, a later accept is turned down so, status and
+    /// code, as a maker that took the quote may answer.
+    pub refused_after_open: Option<(u16, Option<&'static str>)>,
     /// Whether a confirmed `Opened` shows the swap's open; `false`: no
     /// confirmed block has it yet.
     pub opened_event_visible: bool,
@@ -267,6 +270,8 @@ pub(super) struct State {
     pub fund_hash: Option<[u8; 32]>,
     /// Holds the funding's answer until notified.
     pub hold_fund: Option<Arc<Notify>>,
+    /// `/v1/reverse/fund` turns every funding down so, status and code.
+    pub fund_refusal: Option<(u16, &'static str)>,
     /// Every funding posted, answered or not, in order.
     pub fundings: Vec<Value>,
     /// Runs once at the next `/v1/terms` read.
@@ -402,6 +407,7 @@ impl State {
             fee_unseen_accepts: 0,
             fee_retry_after: None,
             accept_answer_lost: false,
+            refused_after_open: None,
             opened_event_visible: true,
             opened_event_reads: 0,
             relayer: pins.relayer,
@@ -422,6 +428,7 @@ impl State {
             funding_fee: Some(FUNDING_FEE),
             fund_hash: Some(word(8)),
             hold_fund: None,
+            fund_refusal: None,
             fundings: Vec::new(),
             on_terms: None,
             paths: Vec::new(),
@@ -995,6 +1002,9 @@ impl FakeServices {
                         .unwrap(),
                     });
                 }
+                if let (true, Some((status, code))) = (state.opened, state.refused_after_open) {
+                    return answer(status, json!({ "code": code, "error": "turned down" }));
+                }
                 if let Some(refused) = refused_accept(&state) {
                     return refused;
                 }
@@ -1096,6 +1106,9 @@ impl FakeServices {
             }
             (&Method::POST, "/v1/reverse/fund") => {
                 let state = self.0.get();
+                if let Some((status, code)) = state.fund_refusal {
+                    return answer(status, json!({ "code": code, "error": "turned down" }));
+                }
                 let sent: Vec<String> = state.fund_hash.iter().map(|hash| hex0x(hash)).collect();
                 answer(200, json!({ "transactions": sent }))
             }

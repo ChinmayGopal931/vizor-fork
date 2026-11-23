@@ -7,6 +7,8 @@ import '../../../rust/api/private_usd.dart'
 import '../private_usd_copy.dart';
 import '../services/private_usd_spend_guard.dart' show PrivateUsdSpendStatus;
 import '../../../core/l10n/l10n.dart';
+import '../../../core/layout/app_form_factor.dart';
+import 'private_usd_desktop_wording.dart';
 
 /// Why Send, Withdraw or a new conversion cannot start now; null when they
 /// can.
@@ -34,6 +36,23 @@ String privateUsdSendErrorMessage(
   _ => l10n.privateUsdSendNotSent,
 };
 
+/// That this device's clock runs ahead of Ethereum's, naming the phone, the
+/// Mac or the computer: a step was refused, nothing sent.
+String privateUsdClockErrorMessage(AppLocalizations l10n) => kDesktopFormFactor
+    ? (privateUsdComputerWording
+          ? l10n.privateUsdConvertErrorClockLinux
+          : l10n.privateUsdConvertErrorClockDesktop)
+    : l10n.privateUsdConvertErrorClock;
+
+/// [privateUsdClockErrorMessage] on the problem card: the bridge's next step
+/// waits for the clock.
+String privateUsdClockProblemMessage(AppLocalizations l10n) =>
+    kDesktopFormFactor
+    ? (privateUsdComputerWording
+          ? l10n.privateUsdConvertProblemClockLinux
+          : l10n.privateUsdConvertProblemClockDesktop)
+    : l10n.privateUsdConvertProblemClock;
+
 /// What to say when a quote or an accept fails before anything was sent;
 /// null for a cancelled call, which is never a failure. Dart never branches
 /// on an error's message text.
@@ -52,6 +71,7 @@ String? privateUsdErrorMessage(
   ApiPrivateUsdErrorCode.relayerFee => l10n.privateUsdConvertErrorFeeCap,
   ApiPrivateUsdErrorCode.ethereumUnreachable ||
   ApiPrivateUsdErrorCode.chainLagging => l10n.privateUsdConvertErrorEthereum,
+  ApiPrivateUsdErrorCode.clockOff => privateUsdClockErrorMessage(l10n),
   ApiPrivateUsdErrorCode.zcashWallet => l10n.privateUsdConvertErrorWallet,
   ApiPrivateUsdErrorCode.depositUnpayable =>
     l10n.privateUsdConvertErrorUnpayable,
@@ -100,6 +120,7 @@ String privateUsdProblemMessage(
   ApiPrivateUsdErrorCode.relayerFee => l10n.privateUsdConvertProblemRelayerFee,
   ApiPrivateUsdErrorCode.ethereumUnreachable ||
   ApiPrivateUsdErrorCode.chainLagging => l10n.privateUsdConvertProblemEthereum,
+  ApiPrivateUsdErrorCode.clockOff => privateUsdClockProblemMessage(l10n),
   ApiPrivateUsdErrorCode.railgunClosed => l10n.privateUsdConvertProblemRailgun,
   ApiPrivateUsdErrorCode.zcashWallet => l10n.privateUsdConvertProblemWallet,
   ApiPrivateUsdErrorCode.depositUnpayable =>
@@ -194,9 +215,10 @@ String privateUsdReverseStepMessage(
   ApiPrivateUsdErrorCode.unavailable =>
     l10n.privateUsdReverseErrorFundingUnavailable,
   // Settlement is signed only on a fresh head: a node minutes behind is
-  // as good as unreachable.
+  // as good as unreachable, and a clock minutes ahead is the clock's to fix.
   ApiPrivateUsdErrorCode.ethereumUnreachable ||
   ApiPrivateUsdErrorCode.chainLagging => l10n.privateUsdConvertErrorEthereum,
+  ApiPrivateUsdErrorCode.clockOff => privateUsdClockErrorMessage(l10n),
   ApiPrivateUsdErrorCode.relayerFee => l10n.privateUsdConvertErrorFeeCap,
   ApiPrivateUsdErrorCode.routeBlocked => l10n.privateUsdConvertProblemRoute,
   ApiPrivateUsdErrorCode.storeUnreadable => l10n.privateUsdConvertErrorStore,
@@ -215,6 +237,7 @@ String privateUsdReverseProblemMessage(
   ApiPrivateUsdErrorCode.relayerFee ||
   ApiPrivateUsdErrorCode.ethereumUnreachable ||
   ApiPrivateUsdErrorCode.chainLagging ||
+  ApiPrivateUsdErrorCode.clockOff ||
   ApiPrivateUsdErrorCode.zcashWallet ||
   ApiPrivateUsdErrorCode.zcashRejected ||
   ApiPrivateUsdErrorCode.mismatch ||

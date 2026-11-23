@@ -3,6 +3,71 @@ import Foundation
 import Network
 import WebKit
 
+/// The time a page can run: the Mac's uptime, which stops while it sleeps, less the time the page's window was out of
+/// sight, where WebKit suspends the page (a window covered, minimised, on another Space, the app hidden, the screen
+/// locked). Every call's deadline counts this time, as Android's do (its `Handler` counts uptime, and its page runs
+/// on in the background): a page suspended through a call's deadline did nothing wrong, and closing it as the window
+/// came back would cut off a sync, a start or a send's proof.
+@MainActor
+final class RailgunPageClock {
+  static let shared = RailgunPageClock()
+
+  private var suspendedSince: TimeInterval?
+  private var suspendedFor: TimeInterval = 0
+  private weak var window: NSWindow?
+  private var observer: NSObjectProtocol?
+
+  /// Follows `window`, the one the page sits in: its time passes while the window is in sight, as WebKit runs it.
+  func follow(_ window: NSWindow?) {
+    guard window !== self.window else { return }
+    self.window = window
+    if let observer { NotificationCenter.default.removeObserver(observer) }
+    observer = nil
+    guard let window else {
+      resume()
+      return
+    }
+    observer = NotificationCenter.default.addObserver(
+      forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated { self?.followOcclusion() }
+    }
+    followOcclusion()
+  }
+
+  private func followOcclusion() {
+    guard let window else { return }
+    if window.occlusionState.contains(.visible) { resume() } else { suspend() }
+  }
+
+  /// Seconds of the page's time, from an arbitrary start.
+  func now() -> TimeInterval {
+    let uptime = ProcessInfo.processInfo.systemUptime
+    return uptime - suspendedFor - (suspendedSince.map { uptime - $0 } ?? 0)
+  }
+
+  /// The page stands still from now until `resume()`: its time doesn't pass.
+  func suspend() {
+    if suspendedSince == nil { suspendedSince = ProcessInfo.processInfo.systemUptime }
+  }
+
+  func resume() {
+    guard let since = suspendedSince else { return }
+    suspendedFor += ProcessInfo.processInfo.systemUptime - since
+    suspendedSince = nil
+  }
+
+  /// Returns once `seconds` of the page's time have passed, or the task is cancelled.
+  func sleep(_ seconds: TimeInterval) async {
+    let end = now() + seconds
+    while !Task.isCancelled {
+      let left = end - now()
+      if left <= 0 { return }
+      try? await Task.sleep(nanoseconds: UInt64(left * 1_000_000_000))
+    }
+  }
+}
+
 /// One page's end of the transport: requests out, replies matched back to them, events to their listener. Every
 /// call is answered exactly once, by its reply, its failure, its timeout or the close, and everything fails once the
 /// channel closes. Params, results and events stay raw JSON text, as in Kotlin's `RailgunChannel`; nothing here logs
@@ -21,6 +86,8 @@ final class RailgunChannel {
   private let deliver: Deliver
   private let onEvent: @MainActor (_ name: String, _ rawJSON: String) -> Void
   private let timeout: (RailgunMethod) -> TimeInterval
+  /// What every deadline counts: the page's time, not the time it stood suspended.
+  private let clock: RailgunPageClock
   private var lastID: Int64 = 0
   private var pending: [Int64: Pending] = [:]
   private var ready = false
@@ -31,11 +98,13 @@ final class RailgunChannel {
   init(
     deliver: @escaping Deliver,
     onEvent: @escaping @MainActor (_ name: String, _ rawJSON: String) -> Void,
-    timeout: @escaping (RailgunMethod) -> TimeInterval = { $0.timeout }
+    timeout: @escaping (RailgunMethod) -> TimeInterval = { $0.timeout },
+    clock: RailgunPageClock? = nil
   ) {
     self.deliver = deliver
     self.onEvent = onEvent
     self.timeout = timeout
+    self.clock = clock ?? .shared
   }
 
   var isOpen: Bool { closedBy == nil }
@@ -49,8 +118,8 @@ final class RailgunChannel {
     if readyWaiter != nil { throw RailgunError.protocol("the page is already loading") }
     try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
       readyWaiter = continuation
-      readyDeadline = Task { [weak self] in
-        try? await Task.sleep(nanoseconds: Self.nanoseconds(timeout))
+      readyDeadline = Task { [weak self, clock] in
+        await clock.sleep(timeout)
         guard !Task.isCancelled else { return }
         self?.settleReady(.failure(RailgunError.timeout("loading the page")))
       }
@@ -64,8 +133,8 @@ final class RailgunChannel {
     let request = try RailgunProtocol.request(id: id, method: method, paramsJSON: paramsJSON)
     let seconds = timeout(method)
     return try await withCheckedThrowingContinuation { continuation in
-      let deadline = Task { [weak self] in
-        try? await Task.sleep(nanoseconds: Self.nanoseconds(seconds))
+      let deadline = Task { [weak self, clock] in
+        await clock.sleep(seconds)
         guard !Task.isCancelled else { return }
         self?.settle(id, .failure(.timeout(method.rawValue)))
       }
@@ -121,9 +190,6 @@ final class RailgunChannel {
     waiter.resume(with: outcome)
   }
 
-  private nonisolated static func nanoseconds(_ seconds: TimeInterval) -> UInt64 {
-    UInt64(max(0, seconds) * 1_000_000_000)
-  }
 }
 
 /// The page's web view: never a responder, never hit by the pointer and never read by VoiceOver, so it can't take
