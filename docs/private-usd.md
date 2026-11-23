@@ -155,9 +155,11 @@ Code:
   whose advance stops (review, 2026-11-22).
 - Screen-off means background, so while unlocked the screen stays on
   through a bridge with a key step to come, whichever screen shows (not
-  once the relayer holds the claim), and through a Railgun first sync
+  once the relayer holds the claim), and through a Railgun first sync or
+  the catch-up of a balance last synced more than a week ago, which also
+  gets the first sync's two hours rather than a refresh's five minutes
   (`privateUsdKeepAwakeProvider`, through `SyncKeepAwakeNativeHost`'s one
-  native flag, foreground only). A bridge's progress says so in a card that
+  native flag, foreground only; review, 2026-11-22). A bridge's progress says so in a card that
   slides in while the bridge needs Veylor (`PrivateUsdKeepOpenCard`, either
   direction; a ZEC → USD bridge the relayer is to claim says instead to stay
   until the market maker confirms the deposit), with "Keep screen on": on
