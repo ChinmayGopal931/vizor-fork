@@ -194,8 +194,8 @@ Code:
 - While unlocked, the engine (`PrivateUsdEngineHost` in `lib/app.dart`)
   advances the conversions of every software account, not only the active
   one (D14). It runs where the page runs, and also where the host says it
-  can't (a Linux sandbox check that failed, macOS below 14) while `swaps.db`
-  holds a bridge under way (`privateUsdBridgesUnderWayProvider`): every step
+  can't (a Linux sandbox check that failed, macOS below 14, Windows without
+  the WebView2 Runtime) while `swaps.db` holds a bridge under way (`privateUsdBridgesUnderWayProvider`): every step
   but the reverse funding's proof is Rust's, so those bridges still finish or
   come back (review, 2026-11-22).
 - Hardware accounts, accounts without ZIP-32 metadata, and regtest hide the
@@ -753,7 +753,8 @@ stay, unused.
   the host's, run before the page's own, hands the page Android's
   `MessagePort` bridged to `chrome.webview`, so the page is unchanged. Its
   User-Agent is `Mozilla/5.0` with no client hints (DevTools' override), its
-  `Accept-Language` `en-US`, SmartScreen is off, and its 1×1 window sits
+  environment's language en-US, whose header is the one the page sets itself
+  (`en-US,en;q=0.9`), SmartScreen is off, and its 1×1 window sits
   under the Flutter view, disabled, with no accessibility tree. Where the
   Evergreen WebView2 Runtime is missing, `supported` is false.
 - The page's traffic leaves only through the Rust loopback SOCKS5 bridge

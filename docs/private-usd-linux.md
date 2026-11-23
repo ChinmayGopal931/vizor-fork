@@ -308,7 +308,9 @@ item. Items not named here hold as on Android and the Mac.
   than before it (kept: the check runs a process of its own).
 - **H4.** Linux joins `privateUsdPlatformHostsPage` and
   `privateUsdArchiveAvailableProvider`, and `private_usd_archive_sync_test.dart`
-  covers it. `replaceDeadBridge` stays iOS's: Linux keeps its sockets.
+  covers it. The dead-bridge check on a return (`replaceDeadBridge`) runs here
+  too since 2026-11-22: Linux keeps its sockets, but a bridge whose listener
+  kept failing to accept ends, and the check replaces it.
 - **H6.** The scheme is registered secure. The sandbox check loads its page on
   that scheme and requires a secure context, `crypto.subtle`, WebAssembly,
   IndexedDB, `localStorage` and workers (fixed 2026-11-20).

@@ -97,8 +97,10 @@ asks it before the first frame, as on the Mac.
   turns off the User-Agent client hints WebView2 would still send
   (`Sec-CH-UA*`, which name Windows and the runtime's version), as Android's
   WebView turns them off for a page whose User-Agent its host set. Every
-  computer sends `Accept-Language: en-US` (the environment's language).
-  SmartScreen is off, so no URL goes to Microsoft.
+  computer names one language: the page sets `Accept-Language:
+  en-US,en;q=0.9` on its own requests on every host (`accept-language.js`,
+  since 2026-11-22), and the environment's language, en-US, gives Chromium's
+  own header that same value. SmartScreen is off, so no URL goes to Microsoft.
 - **Out of sight.** The page's window is 1×1 at the top left of Veylor's
   window, beneath the Flutter view, which covers it, and disabled, so neither
   the pointer nor the keyboard reaches it; focus that does goes back to the
@@ -161,7 +163,9 @@ wherever the host runs the page.
 - **The window.** Flutter's embedder reports `hidden` for a minimised or hidden
   window, `inactive` for one without focus and `resumed` otherwise
   (`windows_lifecycle_manager.cc`). A covered window is not detected, so
-  Shielded USD runs on behind other windows, as on Linux.
+  Shielded USD runs on behind other windows, as on Linux. A window shown
+  again resumes Shielded USD at once (`onShow`), focused or not, as on every
+  desktop since 2026-11-22.
 - **The session away.** `session_lifecycle.cpp` says `hidden` on
   `flutter/lifecycle` while the user is away, as `MacSessionLifecycle` and
   Linux's do, reacting to changes only:
@@ -264,7 +268,12 @@ headers, limits and connection rules against a local stand-in.
 - **The page's window** sits beneath the Flutter view in Veylor's window, as
   the Mac's web view does; Linux's is an offscreen window in another process.
 - **Backups**: the store is in local app data, which neither roaming profiles
-  nor File History carry; there is no exclusion flag to set.
+  nor File History carry; there is no exclusion flag to set. The
+  `private_usd_*` directory is in `<support>`, the roaming app data
+  (path_provider's, beside the wallet's own database), which File History and
+  Windows Backup leave out too but a domain's roaming profile would carry;
+  Windows has no mark for it, where the Mac's is Time Machine's
+  (`excludeFromDeviceBackup`).
 - **Accessibility**: the renderer builds no accessibility tree, where the Mac's
   view refuses VoiceOver and Linux's process runs without the bridge.
 
@@ -274,10 +283,16 @@ headers, limits and connection rules against a local stand-in.
 item. Items not named here hold as on Android.
 
 - **H1.** The same contract. `supported` is the runtime's registration, read
-  without starting it (stable channel, version 120 or later).
+  without starting it (stable channel, version 120 or later), so it answers at
+  once and never `timeout`. Where it says no, bridges under way still advance
+  without the page, as on every host.
+- **H2.** The call deadlines are `SetTimer`'s, on the UI thread. WebView2
+  throttles a hidden page and runs it on, never suspending it as WebKit does,
+  so they need no clock of the Mac's and iOS's kind (`RailgunPageClock`).
 - **H4.** Windows joins `privateUsdPlatformHostsPage` and
   `privateUsdArchiveAvailableProvider`, and `private_usd_archive_sync_test.dart`
-  covers it. `replaceDeadBridge` stays iOS's.
+  covers it. The dead-bridge check on a return (`replaceDeadBridge`, on
+  `onShow`) runs here too, as on every platform since 2026-11-22.
 - **H5, H6.** The page's own origin, registered secure, served by the host with
   its types and the CSP header; the check program checks a secure context,
   `crypto.subtle`, WebAssembly, IndexedDB, `localStorage` and a module worker
@@ -302,7 +317,10 @@ item. Items not named here hold as on Android.
 - **H15.** The filter, `kHosts` and the page's CSP; a host the CSP allows but
   the filter refuses gets a 403 and is never dialled (the check program).
 - **H17.** A new environment per page, after the last one's browser has exited.
-- **H18.** A fixed `Mozilla/5.0`, no client hints, and `Accept-Language: en-US`.
+- **H18.** A fixed `Mozilla/5.0`, no client hints, and the page's one
+  language, `en-US,en;q=0.9`, which the environment's language gives
+  Chromium's own header too; the check program holds every request on the wire
+  to it.
 - **H21.** Not Windows's: no WebKit.
 - **H22–H31.** The host's fetch is the wallet library's (above).
 - **H28.** WebView2 doesn't say when the page aborts a request: the fetch runs to
