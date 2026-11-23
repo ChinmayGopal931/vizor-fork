@@ -204,6 +204,11 @@ Number them VI-1, VI-2, and so on. Each entry says what the plan said, what real
   - **Tests.** The bundle's Node tests 17 passed, 9 of them new (the reroute, the gateway's stall wait, and the SDK's hash checks through the rewritten downloader); `check.mjs` passed in headless Chrome, and now fetches a file from the mirror through the built page's CSP; Rust `railgun_bridge` 11 passed, 1 ignored; Kotlin's Railgun tests 22 passed; `RailgunHostTests` 24 passed on the iPhone 17 Pro simulator (the CSP header, the content rules with the new host, and the v2 list compiling); `fvm flutter analyze` clean. The run needed `Podfile.lock`'s CocoaPods line to match the local 1.15.2 install; it was restored after. Not yet run on the iPhone.
 
   Reference §6.1, §6.4 and §6.5, the plan's host counts (§3.6 and MI2), and the Android reference's §6.4, §6.5 and §7.1 updated.
+- **VI-21 (review, 2026-11-22): the archive, a fixed User-Agent and suspension-proof deadlines.** The plan started the iOS page without Anon's archive and left WebKit's User-Agent and wall-clock call deadlines as they were. The review's second batch had the iOS host match Android and the Mac:
+  - **The archive.** The iOS target compiles the Mac's `RailgunArchive.swift` unchanged (its availability names iOS 17), so the iOS page runs the Mac's prelude before a start that reads the archive and fetches it through its bridge as the Mac does; `privateUsdArchiveAvailableProvider` offers it on iOS where the host runs the page.
+  - **The User-Agent.** The page's is Android's `Mozilla/5.0` (`customUserAgent`); WebKit's named the device's kind and its iOS version.
+  - **Deadlines.** A call's deadline counts uptime less the time the app spent in the background (`RailgunPageClock`), so a page suspended through a call's deadline is no longer closed as the app comes back.
+  - Typechecked for the iOS 17 simulator with Flutter stubbed; not yet run on the simulator or the iPhone. `docs/private-usd-railgun-hosts.md` (H2, H18, H21) and `docs/private-usd.md` updated.
 
 ## Blocked
 

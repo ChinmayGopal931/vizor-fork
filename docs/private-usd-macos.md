@@ -133,9 +133,10 @@ Railgun's sync reads history from Anon's archive before rail-squid, as on
 Android: mainnet only, behind Settings' "Sync history from Anon's archive"
 (`privateUsdArchiveSyncProvider`, on by default, the phone's setting and
 storage), which `privateUsdArchiveAvailableProvider` offers on the Mac wherever
-its host runs the page (macOS 14 and later). iOS still starts the page without
-it. The page and its rules are Android's, unchanged (docs/private-usd.md, "Anon's
-archive"); only the host is new (`macos/Runner/Railgun/RailgunArchive.swift`).
+its host runs the page (macOS 14 and later). iOS compiles the same file and
+reads the archive the same way since 2026-11-22. The page and its rules are
+Android's, unchanged (docs/private-usd.md, "Anon's archive"); only the host is
+new (`macos/Runner/Railgun/RailgunArchive.swift`).
 What every host must do for the archive, and for the page as a whole, item by
 item against Android's, is in `docs/private-usd-railgun-hosts.md`.
 
