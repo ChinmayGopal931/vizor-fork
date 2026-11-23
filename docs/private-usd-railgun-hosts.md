@@ -388,8 +388,9 @@ Shared Dart and the shared page do all of this; a host must only let it run.
   `ScreenSaver.Inhibit`), released when Dart says so.
 - **H36. `rpc_failed`.** A sync that fails while the RPC doesn't answer, or
   answers 403 or 429, and a screening node does, fails as `RPC_FAILED`
-  (`rw/src/rpc-probe.js`); map it to `rpc_failed`, and Dart offers another
-  RPC.
+  (`rw/src/rpc-probe.js`), and so does a `start` whose provider load fails or
+  has no answer in 75 s; map it to `rpc_failed` whatever the method, and Dart
+  offers another RPC.
 - **H37. Failure codes (desktop).** On the Mac and Linux, Dart keeps a short
   coded record of what failed (`private_usd_diagnostics.dart`, docs/private-usd.md,
   "Failure codes"): for a failed call, the host's code and a reason matched

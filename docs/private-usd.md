@@ -109,7 +109,10 @@ Code:
   Railgun sync that fails while the RPC does not answer, or answers 403 or
   429, and a screening node still answers, fails as `rpc_failed` (the page
   asks both as the sync fails, `rpc-probe.js`), and the balance offers
-  another RPC; a connection that is down is never put on the RPC.
+  another RPC; a connection that is down is never put on the RPC. A page's
+  `start` is told apart the same way: its provider load (Railgun's fees,
+  read from the RPC) that fails, or has no answer in 75 s, inside the host's
+  two minutes (review, 2026-11-22).
 - `VIZOR_PRIVATE_USD_FLAG_URL` is the kill switch. Only an explicit `false`
   hides the feature. A missing key or a failed fetch keeps the last value,
   which defaults to available. Even `false` never stops conversions already

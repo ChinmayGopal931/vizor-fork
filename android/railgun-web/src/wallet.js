@@ -58,6 +58,9 @@ const NETWORKS = { sepolia: NetworkName.EthereumSepolia, mainnet: NetworkName.Et
 const WALLET_SOURCE = 'vizor';
 // The engine's listener catches spends a scan misses, as it reads nullifiers from the latest commitment's block on.
 const POLLING_INTERVAL_MS = 15_000;
+// How long a start waits for the RPC to load the engine's provider before it asks whether the RPC is down: well inside
+// the host's two minutes for a start, with time left for the probe (rpc-probe.js, 10 s for each of its two asks).
+const PROVIDER_LOAD_MS = 75_000;
 const NOTES_SCAN_ATTEMPTS = 20;
 const NOTES_SCAN_RETRY_MS = 3_000;
 // A notes scan reports 3% as it starts, 1% on a full rescan; one the engine skips reports nothing.
@@ -285,12 +288,36 @@ async function startEngine(networkName, database, rpcUrls, poiNodeUrls, history,
   });
   const providers = rpcUrls.map((url, index) => ({ provider: url, priority: index + 1, weight: 2 }));
   const config = { chainId: NETWORK_CONFIG[networkName].chain.id, providers };
-  const { feesSerialized } = await loadProvider(config, networkName, POLLING_INTERVAL_MS);
+  const { feesSerialized } = await loadingProvider(
+    loadProvider(config, networkName, POLLING_INTERVAL_MS),
+    { rpcUrls, poiNodeUrls },
+  );
   fees = { shield: Number(feesSerialized.shieldFeeV2), unshield: Number(feesSerialized.unshieldFeeV2) };
   network = networkName;
   providerUrls = rpcUrls;
   screeningUrls = poiNodeUrls;
   return { fees };
+}
+
+/**
+ * `loading`, the engine's provider loading, which reads Railgun's fees from the RPC: a failure, or no answer within
+ * `PROVIDER_LOAD_MS`, is told apart as a sync's is (`rpc-probe.js`), so a page that opens while the RPC is down fails
+ * its start as `RPC_FAILED` and the host offers another RPC. The time limit sits inside the host's two minutes for a
+ * start, which would otherwise fail it as a plain timeout.
+ */
+async function loadingProvider(loading, { rpcUrls, poiNodeUrls }) {
+  let timer;
+  const late = new Promise((_, reject) => {
+    const slow = () => reject(new Error('the Ethereum RPC does not answer: the engine did not load in time'));
+    timer = setTimeout(slow, PROVIDER_LOAD_MS);
+  });
+  try {
+    return await Promise.race([loading, late]);
+  } catch (error) {
+    throw await syncFailure(error, { rpcUrls, poiNodeUrls });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**
