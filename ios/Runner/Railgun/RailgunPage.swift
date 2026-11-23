@@ -1,4 +1,5 @@
 import Foundation
+import Network
 import UIKit
 import WebKit
 
@@ -186,7 +187,8 @@ final class RailgunChannel {
 /// One hidden page: a `WKWebView` of its own, configured once before it exists (WebKit copies the configuration),
 /// loading the bundle over the custom scheme and talking to the host through `railgunHost` and
 /// `__railgunHostDeliver`. It never takes touches, is hidden from accessibility and is inspectable only in a debug
-/// build loaded with `debug`.
+/// build loaded with `debug`. It fetches Anon's archive for the page through its bridge (`RailgunArchive`, the Mac's,
+/// compiled here unchanged), as Android's and the Mac's hosts do.
 @MainActor
 final class RailgunPage: NSObject, WKNavigationDelegate, WKUIDelegate {
   static let loadTimeout: TimeInterval = 30
@@ -203,10 +205,13 @@ final class RailgunPage: NSObject, WKNavigationDelegate, WKUIDelegate {
   private var channel: RailgunChannel!
   private let debug: Bool
   private let onClosed: @MainActor (RailgunPage) -> Void
+  /// The page's archive requests, through the bridge at `bridgePort`, the one `store`'s proxy names.
+  private let archive: RailgunArchiveFetch
 
-  /// `store` must already carry the bridge's proxy.
+  /// `store` must already carry the proxy of the bridge at `bridgePort`.
   init(
     store: WKWebsiteDataStore,
+    bridgePort: NWEndpoint.Port,
     rules: WKContentRuleList,
     debug: Bool,
     onEvent: @escaping @MainActor (String) -> Void,
@@ -214,6 +219,7 @@ final class RailgunPage: NSObject, WKNavigationDelegate, WKUIDelegate {
   ) {
     self.debug = debug
     self.onClosed = onClosed
+    archive = RailgunArchiveFetch(bridgePort: bridgePort)
     super.init()
     channel = RailgunChannel(
       deliver: { [weak self] request, failed in self?.deliver(request, failed: failed) },
@@ -226,13 +232,17 @@ final class RailgunPage: NSObject, WKNavigationDelegate, WKUIDelegate {
     let files = RailgunSchemeHandler()
     files.onRefused = { [weak self] in self?.ownFileRefused() }
     let content = WKUserContentController()
-    // No WKUserScript: nothing is injected into the page.
+    // No WKUserScript: nothing is injected into the page as it loads. Only a start that reads Anon's archive runs
+    // `RailgunArchive.prelude` first.
     content.add(MessageRelay(self), contentWorld: .page, name: Self.messageHandlerName)
     content.add(rules)
 
     let configuration = WKWebViewConfiguration()
     configuration.websiteDataStore = store
-    configuration.setURLSchemeHandler(files, forURLScheme: RailgunSchemeHandler.scheme)
+    configuration.setURLSchemeHandler(
+      RailgunPageSchemeHandler(files: files, archive: archive),
+      forURLScheme: RailgunSchemeHandler.scheme
+    )
     configuration.userContentController = content
     configuration.defaultWebpagePreferences.allowsContentJavaScript = true
     configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
@@ -277,8 +287,12 @@ final class RailgunPage: NSObject, WKNavigationDelegate, WKUIDelegate {
     }
   }
 
-  /// A call that times out closes the page, as on Android: the engine may be stuck.
+  /// A call that times out closes the page, as on Android: the engine may be stuck. A `start` that reads Anon's
+  /// archive gets the page ready for it first.
   func call(_ method: RailgunMethod, paramsJSON: String) async throws -> String {
+    if method == .start, RailgunArchive.startsWithArchive(paramsJSON) {
+      await prepareArchive()
+    }
     do {
       return try await channel.call(method, paramsJSON: paramsJSON)
     } catch let error as RailgunError {
@@ -287,10 +301,24 @@ final class RailgunPage: NSObject, WKNavigationDelegate, WKUIDelegate {
     }
   }
 
+  /// Runs `RailgunArchive.prelude` in the page and lets its archive requests through once it took. One that did not
+  /// leaves the page as it was: it starts without the archive and syncs from rail-squid alone, as iOS did before.
+  private func prepareArchive() async {
+    guard let webView, isLoaded, channel.isOpen else { return }
+    let reads = try? await webView.callAsyncJavaScript(
+      RailgunArchive.prelude,
+      arguments: [:],
+      in: nil,
+      contentWorld: .page
+    )
+    if (reads as? Bool) == true, channel.isOpen { archive.enabled = true }
+  }
+
   /// Fails every call still waiting and takes the web view down. Idempotent.
   func close(_ reason: RailgunError) {
     guard channel.isOpen else { return }
     channel.close(reason)
+    archive.close()
     if let webView {
       webView.stopLoading()
       webView.navigationDelegate = nil

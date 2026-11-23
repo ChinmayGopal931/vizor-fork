@@ -246,7 +246,7 @@ the page (section 5).
 - **H20. The page's own rules** (`rw/src/wallet.js`, `archive-sync.js`,
   `archive-txids.js`, `tree-recovery.js`): it builds an archive reader only
   when `start` asks and `globalThis.webkit?.messageHandlers?.railgunHost` is
-  undefined, the check that keeps iOS off it; it asks the archive only for a
+  undefined, the check that each WebKit host's prelude satisfies (H21); it asks the archive only for a
   quick sync more than 28,800 blocks (about four days) behind the newest
   block (the RPC's, else the clock and the shipped block table), so a fresh
   store does; and never while the archive is off for a week after a tree
@@ -254,8 +254,8 @@ the page (section 5).
 - **H21. (WebKit) The prelude.** A WebKit host's page sees its own
   `railgunHost`, so before every `start` that reads the archive the host runs
   a fixed script in the page world (`RailgunArchive.prelude` in
-  `mac/RailgunArchive.swift`, through `callAsyncJavaScript`, nothing spliced
-  in) that:
+  `mac/RailgunArchive.swift`, which the iOS target compiles unchanged since
+  2026-11-22, through `callAsyncJavaScript`, nothing spliced in) that:
   1. routes the page's GETs of `https://digest.anon.inc/…` (a string URL) to
      `/anon-archive/…` on the page's own origin, where the host answers
      them; everything else is untouched;

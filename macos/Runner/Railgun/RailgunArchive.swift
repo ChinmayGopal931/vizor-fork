@@ -11,8 +11,8 @@ import WebKit
 /// wallet's route (Tor when that is on) and checks it against its allowlist, as it does the page's own connections;
 /// never directly.
 ///
-/// The Mac's alone: the iOS host starts the page without the archive. A Rust test (`railgun_bridge.rs`) reads [host]
-/// below, so keep it literal.
+/// The Mac's, and iOS's since 2026-11-22: the iOS target compiles this file unchanged, so keep it free of AppKit and
+/// UIKit. A Rust test (`railgun_bridge.rs`) reads [host] below, so keep it literal.
 enum RailgunArchive {
   /// Anon's archive: the host the page's `ARCHIVES` names, which the bridge's allowlist and the page's CSP list.
   static let host = "digest.anon.inc"
@@ -245,7 +245,7 @@ final class RailgunArchiveFetch: NSObject, URLSessionDataDelegate {
       Self.answer(task, status: 404)
       return
     }
-    guard #available(macOS 14.0, *) else {
+    guard #available(macOS 14.0, iOS 17.0, *) else {
       Self.answer(task, status: 502)
       return
     }
@@ -279,7 +279,7 @@ final class RailgunArchiveFetch: NSObject, URLSessionDataDelegate {
   // MARK: Connections, as Android's pool keeps them
 
   /// The connection a request goes out on: one kept idle, else a new one.
-  @available(macOS 14.0, *)
+  @available(macOS 14.0, iOS 17.0, *)
   private func take() -> Connection {
     dropExpired()
     if !idle.isEmpty { return idle.removeFirst() }
@@ -347,7 +347,7 @@ final class RailgunArchiveFetch: NSObject, URLSessionDataDelegate {
 
   /// A session for one connection: through the bridge alone (no failover to a direct connection), with no cache,
   /// cookie or credential store, a stalled connection or read failing after 20 s and any answer after a minute.
-  @available(macOS 14.0, *)
+  @available(macOS 14.0, iOS 17.0, *)
   private func makeSession() -> URLSession {
     let configuration = URLSessionConfiguration.ephemeral
     var proxy = ProxyConfiguration(socksv5Proxy: .hostPort(host: "127.0.0.1", port: bridgePort))
