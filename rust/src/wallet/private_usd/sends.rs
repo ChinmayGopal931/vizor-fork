@@ -370,14 +370,16 @@ impl<'a, T: HttpTransport, K: Clock> Sends<'a, T, K> {
                 self.settle_spent(store, chain, &send.id, relay, now.saturating_sub(spent_at))
                     .await
             }
+            // Paced from the last post, the refusal's or a later one's.
             (None, Some(refused_at), transaction) => {
+                let posted_at = relay.posted_at.unwrap_or(refused_at);
                 self.settle_refused(
                     store,
                     chain,
                     &send.id,
                     transaction,
                     relay,
-                    now.saturating_sub(refused_at),
+                    now.saturating_sub(posted_at),
                 )
                 .await
             }

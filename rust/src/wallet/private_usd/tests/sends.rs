@@ -531,6 +531,13 @@ async fn a_send_refused_after_it_was_posted_stays_until_the_chain_settles_it() {
     let again = relay.settle_all(&mut store, &chain).await.unwrap();
     assert_eq!(bodies(&transport).len(), 3, "the same bytes, again");
     assert!(!again[0].confirmed());
+    // A post with no answer counts as one: the next waits its 15 minutes.
+    answer.set(0, "", None);
+    clock.set(NOW + 180 + 1_800);
+    relay.settle_all(&mut store, &chain).await.unwrap();
+    clock.set(NOW + 180 + 1_801);
+    relay.settle_all(&mut store, &chain).await.unwrap();
+    assert_eq!(bodies(&transport).len(), 4);
     chain.spend(word(1));
     chain.spend(word(2));
     let landed = relay.settle_all(&mut store, &chain).await.unwrap();
@@ -578,7 +585,7 @@ async fn a_send_refused_after_it_was_posted_stays_until_the_chain_settles_it() {
     assert!(landed[0].confirmed());
     assert_eq!(
         bodies(&transport),
-        vec![kept_body(); 6],
+        vec![kept_body(); 7],
         "every post was a kept proof"
     );
 }
