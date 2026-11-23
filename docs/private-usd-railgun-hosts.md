@@ -64,6 +64,8 @@ Prefixes below: `kt/` is the Android host's directory, `rw/` is
   (`RailgunPageClock`: iOS from the app's background to its foreground, the
   Mac from the page's window's occlusion), since 2026-11-22: a page
   suspended through a call's deadline was closed as it came back.
+  **(Windows)** WebView2 throttles a hidden page and runs it on, never
+  suspending it, so Windows's deadlines (`SetTimer`) need no such clock.
 - **H3. Events.** Forward the page's unasked messages as their raw JSON:
   `scan`, `proof`, `screening`, `refresh`, `synced`, and `log` only from a
   page loaded with `debug`. Drop any other name. Keep up to 256 while nobody
