@@ -65,9 +65,13 @@ Prefixes below: `kt/` is the Android host's directory, `rw/` is
   `privateUsdPlatformHostsPage` (`private_usd_available_provider.dart`),
   `privateUsdArchiveAvailableProvider` (`private_usd_archive_sync_provider.dart`,
   which also decides whether Settings shows "Sync history from Anon's
-  archive"), and anything gated on `TargetPlatform.iOS` that the platform
-  shares (only `replaceDeadBridge`, for iOS's reclaimed sockets). Add the
-  platform to `test/features/private_usd/private_usd_archive_sync_test.dart`.
+  archive"). Add the platform to
+  `test/features/private_usd/private_usd_archive_sync_test.dart`. The
+  dead-bridge check on a return to the foreground (`replaceDeadBridge`) runs
+  on every platform since 2026-11-22: iOS reclaims a suspended app's sockets,
+  and the bridge's listener gives up after 20 failed accepts in a row on any
+  of them, waiting 50 ms to 1 s between (a listener out of descriptors
+  takes the next connection once some are free).
 
 ## 2. The page and its transport
 

@@ -115,16 +115,15 @@ final railgunEngineProvider = Provider<RailgunEngine>((ref) {
     if (previous == null || !previous.hasValue || !next.hasValue) return;
     if (previous.value != next.value) unawaited(engine.close());
   });
-  // iOS may reclaim a suspended app's listening socket, so back from the
-  // background the bridge is checked. An OS behaviour, not a layout choice;
-  // Android's bridge is never reclaimed.
-  final returns = defaultTargetPlatform == TargetPlatform.iOS
-      ? AppLifecycleListener(
-          onShow: () => unawaited(engine.replaceDeadBridge()),
-        )
-      : null;
+  // Back from the background, or a window shown again, the bridge is
+  // checked on every platform: iOS may reclaim a suspended app's listening
+  // socket, and a listener that kept failing to accept on any of them ends
+  // its bridge (`railgun_bridge.rs`).
+  final returns = AppLifecycleListener(
+    onShow: () => unawaited(engine.replaceDeadBridge()),
+  );
   ref.onDispose(() {
-    returns?.dispose();
+    returns.dispose();
     lifecycle.unregister(engine);
     unawaited(engine.dispose());
   });
