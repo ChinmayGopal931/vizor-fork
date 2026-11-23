@@ -40,7 +40,7 @@ import { creationBlock } from './creation-block.js';
 import { badRequest } from './errors.js';
 import { pauseMark, pausedSince } from './page-clock.js';
 import { formatUnshields, installQuickSync, squidPages } from './quick-sync.js';
-import { hasUndatedReceipts, hasUndatedShields, pendingShields, receivedSends } from './received.js';
+import { pendingShields, receivedSends } from './received.js';
 import { refreshProgress } from './refresh-progress.js';
 import { syncFailure } from './rpc-probe.js';
 import { screeningActivity } from './screening-activity.js';
@@ -610,36 +610,31 @@ async function scanNotesNow(walletId) {
 
 /**
  * The private sends this wallet received (`receivedSends`) and the shields screening still holds (`pendingShields`),
- * from the notes its scans already decrypted. Only where the engine has no time for one is the newest block read, to
- * date it from. `null` when the history can't be read: the balances stand without it.
+ * from the notes its scans already decrypted. One the engine has no time for is dated from the newest block the page
+ * last read, which every notes scan reads as its quick sync starts: the history asks nothing of its own, so a wallet
+ * with a fresh receipt sends the RPC what every other wallet does. `null` when the history can't be read: the balances
+ * stand without it.
  */
 async function walletHistory(emit) {
   try {
     const history = await getWalletTransactionHistory(chain(), session().walletId, undefined);
-    const undated = hasUndatedReceipts(history) || hasUndatedShields(history);
-    const head = undated ? await newestBlock(emit) : undefined;
-    return { received: receivedSends(history, head), shielding: pendingShields(history, head) };
+    return { received: receivedSends(history, newest), shielding: pendingShields(history, newest) };
   } catch (error) {
     emit('log', `wallet history not read: ${error?.message ?? error}`);
     return null;
   }
 }
 
-/** The newest block's number and time; undefined when it can't be read, and the sends it would date go undated. */
-async function newestBlock(emit) {
-  try {
-    return await readNewestBlock(network);
-  } catch (error) {
-    emit('log', `newest block not read: ${error?.message ?? error}`);
-    return undefined;
-  }
-}
+// The newest block the page last read from its RPC, `{blockNumber, timestamp}`, for dating what the engine has no time
+// for; undefined until a read succeeds, and the sends it would date go undated.
+let newest;
 
 /** The newest block of `networkName`, `{blockNumber, timestamp}`, from its RPC: the same request for every wallet. */
 async function readNewestBlock(networkName) {
   const block = await getFallbackProviderForNetwork(networkName).getBlock('latest');
   if (!block) throw new Error('the RPC has no newest block');
-  return { blockNumber: block.number, timestamp: block.timestamp };
+  newest = { blockNumber: block.number, timestamp: block.timestamp };
+  return newest;
 }
 
 /** Balances by screening status: `Spendable`, `ShieldPending`, `ShieldBlocked`, … */
