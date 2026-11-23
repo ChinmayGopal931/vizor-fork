@@ -395,6 +395,9 @@ Linux's rules hold, in `veylor-windows.yml`'s own `publish` job:
   architecture's or imports a runtime DLL that the app's folder or the package
   lacks, and the installed testnet app must have loaded the runtime from its
   own folder.
+- **Windows 11**, x64 or ARM64, is what the notes ask for: Veylor has run on
+  Windows 11 (a VM, CI's ARM64 runner) and CI's x64 Windows Server 2025, never
+  on Windows 10, so they don't claim it.
 - **Windows N and KN editions** lack Media Foundation until the Media Feature
   Pack is added, and `mobile_scanner_plugin.dll` (which the executable
   imports) imports `MF.dll`, `MFPlat.DLL` and `MFReadWrite.dll`, so Veylor

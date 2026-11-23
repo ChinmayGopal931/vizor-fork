@@ -5,7 +5,7 @@ Shielded USD: USDC held privately on Railgun and bridged to and from shielded
 ZEC through zecSwap. Flutter with Rust through `flutter_rust_bridge` v2: all
 Zcash cryptography and sync run in Rust (librustzcash crates); Dart holds the UI
 (Riverpod) and secure storage. It ships on Android, iOS, macOS and Linux;
-Windows is in progress.
+Windows is in beta.
 
 This file holds what every task needs. Before changing an area, read its doc.
 

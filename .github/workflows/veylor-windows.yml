@@ -46,7 +46,7 @@ concurrency:
 env:
   # The version a CI build carries: <version>-internal.<run number>, or
   # <version> for a run dispatched with public_release.
-  VEYLOR_VERSION: 0.9.3
+  VEYLOR_VERSION: 0.9.4
   # Flutter comes from .fvmrc through fvm and is checked against
   # scripts/release-config/flutter-sdk.json. The tools below are pinned by
   # version here and by SHA-256 in the matrix; vpk is the Velopack CLI that

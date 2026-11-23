@@ -1,10 +1,10 @@
-# Veylor Wallet v0.9.3 for Windows (beta)
+# Veylor Wallet v0.9.4 for Windows (beta)
 
-The first public release of Veylor for Windows, in beta. Veylor is a private
-Zcash wallet, a fork of Vizor, with a new neon look and Shielded USD: a
-private dollar balance you can bridge to and from shielded ZEC. Every file is
-built and published by GitHub Actions from the release's commit, with a signed
-record of that build.
+The first public release of Veylor for Windows, in beta, with everything in
+Veylor 0.9.4 for Linux. Veylor is a private Zcash wallet, a fork of Vizor,
+with a new neon look and Shielded USD: a private dollar balance you can bridge
+to and from shielded ZEC. Every file is built and published by GitHub Actions
+from the release's commit, with a signed record of that build.
 
 ## What's New
 
@@ -18,6 +18,11 @@ record of that build.
   your deposit address. Veylor shields deposits while it's open and unlocked.
 - Shielded USD payments and bridges appear in Home's recent activity and in
   Activity.
+- If an answer gets lost on the way, Veylor keeps a Shielded USD send or
+  bridge until Ethereum shows what happened, instead of calling it failed
+  while it could still go through. Your next payment waits for a send it
+  keeps.
+- Shielded USD doesn't tell the servers it talks to your computer's language.
 - A new look: true black and neon red, with your balance as a lit sign and
   sync progress as a line of light.
 
@@ -52,17 +57,18 @@ record of that build.
 ## Notes
 
 - This is a beta. Start with small amounts.
+- Veylor needs Windows 11, on an x64 or ARM64 PC.
 - Veylor on Windows doesn't update itself yet: download new versions from
   veylor.cash.
-- Shielded USD runs in Microsoft's WebView2, which Windows 11 includes. On
-  Windows 10 you may need to install the WebView2 Runtime from Microsoft;
-  without it, Veylor runs without Shielded USD.
+- Shielded USD runs in Microsoft's WebView2, which comes with Windows 11.
 - Shielded USD isn't available for Ledger or Keystone accounts.
 - Keep Veylor open, unlocked and in view while a bridge needs it: if it's
   minimised, or your computer locks or sleeps, the bridge pauses until you're
   back. The bridge tells you when you can leave: with "Let the relayer claim
   for me" on, the default, you can leave a bridge to Shielded USD once the
   market maker confirms your deposit.
+- If your computer's clock is off, Shielded USD says so: set it to the right
+  time.
 - Shielded USD uses a public Ethereum RPC. To use your own, set it in
   Settings under Ethereum RPC.
 - Shielded USD's first sync can take a while. "Sync history from Anon's
