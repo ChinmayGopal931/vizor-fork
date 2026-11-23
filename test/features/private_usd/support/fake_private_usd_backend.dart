@@ -313,6 +313,7 @@ class FakePrivateUsdBackend implements PrivateUsdSwapBackend {
   Future<ApiReverseRecord> reverseAuthorizeReady(
     String accountUuid,
     PrivateUsdSecretReader secret, {
+    required int opId,
     required int index,
   }) => throw UnimplementedError();
 
@@ -320,6 +321,7 @@ class FakePrivateUsdBackend implements PrivateUsdSwapBackend {
   Future<ApiReverseRecord> reverseCancel(
     String accountUuid,
     PrivateUsdSecretReader secret, {
+    required int opId,
     required int index,
   }) => throw UnimplementedError();
 
@@ -331,6 +333,7 @@ class FakePrivateUsdBackend implements PrivateUsdSwapBackend {
   Future<ApiReverseRecord> reverseRescue(
     String accountUuid,
     PrivateUsdSecretReader secret, {
+    required int opId,
     required int index,
   }) => throw UnimplementedError();
 

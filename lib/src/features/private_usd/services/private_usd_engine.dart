@@ -1196,25 +1196,36 @@ class PrivateUsdEngine {
     }
   }
 
-  /// "Authorize settlement": signs and sends `ready` for [index].
+  /// "Authorize settlement": signs and sends `ready` for [index], under an op
+  /// id that a lock or the background cancels, as every key step's.
   Future<rust.ApiReverseRecord> reverseAuthorizeReady(
     String accountUuid, {
     required int index,
   }) => _reverseStep(
     accountUuid,
-    (_, secret) =>
-        _backend.reverseAuthorizeReady(accountUuid, secret, index: index),
+    (opId, secret) => _backend.reverseAuthorizeReady(
+      accountUuid,
+      secret,
+      opId: opId,
+      index: index,
+    ),
     nudges: true,
   );
 
   /// "Cancel conversion" / "Request refund" for [index]. A cancel that
-  /// finished in Rust is shown even after a pause.
+  /// finished in Rust is shown even after a pause. Its op id stops the
+  /// advance after the request, which Rust keeps whatever comes.
   Future<rust.ApiReverseRecord> reverseCancel(
     String accountUuid, {
     required int index,
   }) => _reverseStep(
     accountUuid,
-    (_, secret) => _backend.reverseCancel(accountUuid, secret, index: index),
+    (opId, secret) => _backend.reverseCancel(
+      accountUuid,
+      secret,
+      opId: opId,
+      index: index,
+    ),
     nudges: true,
   );
 
@@ -1227,13 +1238,19 @@ class PrivateUsdEngine {
     return _backend.reverseCanRescue(accountUuid, index: index);
   }
 
-  /// "Recover refund" for [index]: a user action only, never the loop's.
+  /// "Recover refund" for [index]: a user action only, never the loop's,
+  /// under an op id that a lock cancels.
   Future<rust.ApiReverseRecord> reverseRescue(
     String accountUuid, {
     required int index,
   }) => _reverseStep(
     accountUuid,
-    (_, secret) => _backend.reverseRescue(accountUuid, secret, index: index),
+    (opId, secret) => _backend.reverseRescue(
+      accountUuid,
+      secret,
+      opId: opId,
+      index: index,
+    ),
   );
 
   Future<rust.ApiReverseRecord> _reverseStep(
@@ -1433,7 +1450,8 @@ class PrivateUsdEngine {
       return await _queue(
         accountUuid,
         _epoch,
-        (_, secret) => backend.rescue(accountUuid, secret, index: index),
+        (opId, secret) =>
+            backend.rescue(accountUuid, secret, opId: opId, index: index),
         dropLateResult: false,
         lane: _depositLane(accountUuid),
       );

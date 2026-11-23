@@ -147,7 +147,12 @@ Code:
 - There is no worker, alarm or notification, and no per-swap key is stored.
 - Background cancels the Rust step and stops polling, but leaves the
   Railgun page open.
-- Lock cancels the step, closes the page and drops Dart-held secrets.
+- Lock cancels the step, closes the page and drops Dart-held secrets. The
+  user's own steps run under an op id too, so a lock stops them as it stops
+  an advance: "Authorize settlement" (before it signs, or after the `ready`
+  is kept, which the loop then sends), the rescues of a refund, a payout or
+  a deposit, and a reverse "Cancel", whose request is kept whatever comes and
+  whose advance stops (review, 2026-11-22).
 - Screen-off means background, so while unlocked the screen stays on
   through a bridge with a key step to come, whichever screen shows (not
   once the relayer holds the claim), and through a Railgun first sync
@@ -563,7 +568,7 @@ stay, unused.
   SDK's rescan still calls it). Each names the exact source of the pinned
   engine and fails the build against any other: re-check them when
   bumping it.
-- **Anon's archive** (Android, the Mac and Linux, mainnet, Settings, on by
+- **Anon's archive** (Android, iOS, the Mac and Linux, mainnet, Settings, on by
   default; `archive*.js`):
   - It gives commitments and the transaction list only. Unshields and
     nullifiers come from rail-squid: the archive drops a nullifier spent
@@ -651,7 +656,9 @@ stay, unused.
     archive. Linux's page process does the same (`railgun_archive.cc`: the
     prelude defines `messageHandlers` on the page's `webkit` object and holds
     that object; libsoup through the bridge, with the same limits and
-    headers). iOS starts the page without it. Every archive request depends
+    headers). iOS compiles the Mac's `RailgunArchive.swift` unchanged and
+    runs its prelude and fetch the same way (since 2026-11-22; until then
+    iOS started the page without the archive). Every archive request depends
     on the chain's state alone. What every host must do:
     `docs/private-usd-railgun-hosts.md`.
   - A host keeps the archive's connections as Android's `HttpURLConnection`

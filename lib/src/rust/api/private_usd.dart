@@ -273,7 +273,7 @@ Future<List<ApiForwardReturnedPayout>> privateUsdForwardReturnedPayouts({
 /// it, and asks the relayer to shield the returned payout again into this
 /// account's note. The record stays `Paid`. Nothing happens when the vault
 /// holds no more than the fee (check `private_usd_forward_returned_payouts`
-/// again).
+/// again). Registered as `op_id`, which a lock cancels at its next request.
 Future<ApiForwardRecord> privateUsdForwardRescue({
   required String dbPath,
   required String network,
@@ -281,6 +281,7 @@ Future<ApiForwardRecord> privateUsdForwardRescue({
   required String storeDir,
   required List<int> mnemonicBytes,
   required String ethRpcUrl,
+  required int opId,
   required int index,
 }) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdForwardRescue(
   dbPath: dbPath,
@@ -289,6 +290,7 @@ Future<ApiForwardRecord> privateUsdForwardRescue({
   storeDir: storeDir,
   mnemonicBytes: mnemonicBytes,
   ethRpcUrl: ethRpcUrl,
+  opId: opId,
   index: index,
 );
 
@@ -507,6 +509,8 @@ Future<ApiReverseAdvance> privateUsdReverseAdvance({
 /// `DepositUnconfirmed` before the deposit or the escrow is confirmed,
 /// `TooLate` past the deadline. A kept `ready` is only sent again; an error
 /// after the keep leaves it kept, and the loop sends it until its deadline.
+/// Registered as `op_id`: `private_usd_cancel(op_id)` (a lock) stops it with
+/// `Cancelled` at its next request, before the signature or after the keep.
 Future<ApiReverseRecord> privateUsdReverseAuthorizeReady({
   required String dbPath,
   required String network,
@@ -515,6 +519,7 @@ Future<ApiReverseRecord> privateUsdReverseAuthorizeReady({
   required List<int> mnemonicBytes,
   required String lightwalletdUrl,
   required String ethRpcUrl,
+  required int opId,
   required int index,
 }) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdReverseAuthorizeReady(
   dbPath: dbPath,
@@ -524,6 +529,7 @@ Future<ApiReverseRecord> privateUsdReverseAuthorizeReady({
   mnemonicBytes: mnemonicBytes,
   lightwalletdUrl: lightwalletdUrl,
   ethRpcUrl: ethRpcUrl,
+  opId: opId,
   index: index,
 );
 
@@ -532,7 +538,9 @@ Future<ApiReverseRecord> privateUsdReverseAuthorizeReady({
 /// escrow, its refund starts (`RefundWait`, then `Refunding`). `TooLate`
 /// once settled ("already settled, can no longer be refunded"), also when it
 /// settled during this call. An error after the keep leaves the request
-/// kept: read the record.
+/// kept: read the record. Registered as `op_id`, which a lock cancels: the
+/// request is kept all the same, and the advance after it stops at its next
+/// safe point, for the loop to go on with once the wallet is unlocked.
 Future<ApiReverseRecord> privateUsdReverseCancel({
   required String dbPath,
   required String network,
@@ -541,6 +549,7 @@ Future<ApiReverseRecord> privateUsdReverseCancel({
   required List<int> mnemonicBytes,
   required String lightwalletdUrl,
   required String ethRpcUrl,
+  required int opId,
   required int index,
 }) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdReverseCancel(
   dbPath: dbPath,
@@ -550,6 +559,7 @@ Future<ApiReverseRecord> privateUsdReverseCancel({
   mnemonicBytes: mnemonicBytes,
   lightwalletdUrl: lightwalletdUrl,
   ethRpcUrl: ethRpcUrl,
+  opId: opId,
   index: index,
 );
 
@@ -573,7 +583,8 @@ Future<bool> privateUsdReverseCanRescue({
 /// "Recover refund": signs a rescue with a fresh nonce and deadline, keeps
 /// it, and asks the relayer to shield the refund again into this account's
 /// note. The record stays `Refunded`. Nothing happens when nothing is
-/// rescuable now (check `private_usd_reverse_can_rescue` again).
+/// rescuable now (check `private_usd_reverse_can_rescue` again). Registered
+/// as `op_id`, which a lock cancels at its next request.
 Future<ApiReverseRecord> privateUsdReverseRescue({
   required String dbPath,
   required String network,
@@ -581,6 +592,7 @@ Future<ApiReverseRecord> privateUsdReverseRescue({
   required String storeDir,
   required List<int> mnemonicBytes,
   required String ethRpcUrl,
+  required int opId,
   required int index,
 }) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdReverseRescue(
   dbPath: dbPath,
@@ -589,6 +601,7 @@ Future<ApiReverseRecord> privateUsdReverseRescue({
   storeDir: storeDir,
   mnemonicBytes: mnemonicBytes,
   ethRpcUrl: ethRpcUrl,
+  opId: opId,
   index: index,
 );
 
@@ -764,7 +777,8 @@ Future<List<ApiDepositRecord>> privateUsdDepositRecords({
 /// a rescue with the vault's next nonce, keeps it and posts it. It pays the
 /// relayer's `fee` alone, at most 2 USDC. `Unavailable` when
 /// the vault holds no more than the fee, `Busy` while a rescue of the
-/// address or a pass runs.
+/// address or a pass runs. Registered as `op_id`, which a lock cancels at
+/// its next request.
 Future<ApiDepositRecord> privateUsdDepositRescue({
   required String dbPath,
   required String network,
@@ -772,6 +786,7 @@ Future<ApiDepositRecord> privateUsdDepositRescue({
   required String storeDir,
   required List<int> mnemonicBytes,
   required String ethRpcUrl,
+  required int opId,
   required int index,
 }) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdDepositRescue(
   dbPath: dbPath,
@@ -780,6 +795,7 @@ Future<ApiDepositRecord> privateUsdDepositRescue({
   storeDir: storeDir,
   mnemonicBytes: mnemonicBytes,
   ethRpcUrl: ethRpcUrl,
+  opId: opId,
   index: index,
 );
 

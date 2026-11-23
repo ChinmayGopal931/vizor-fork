@@ -72,10 +72,12 @@ class PrivateUsdDepositBackend {
     );
   }
 
-  /// "Recover": shields again what came back to address [index]'s vault.
+  /// "Recover": shields again what came back to address [index]'s vault,
+  /// under call [opId], which a lock cancels.
   Future<rust.ApiDepositRecord> rescue(
     String accountUuid,
     PrivateUsdSecretReader secret, {
+    required int opId,
     required int index,
   }) async {
     final context = _context();
@@ -91,6 +93,7 @@ class PrivateUsdDepositBackend {
         storeDir: storeDir,
         mnemonicBytes: mnemonic,
         ethRpcUrl: ethRpcUrl,
+        opId: opId,
         index: index,
       ),
     );
