@@ -131,6 +131,9 @@ final class RailgunChannel {
 @MainActor
 final class RailgunPage: NSObject, WKNavigationDelegate, WKUIDelegate {
   static let loadTimeout: TimeInterval = 30
+  /// The page's User-Agent: Android's (`RailgunRequests.USER_AGENT`) and the archive fetch's. WebKit's own on iOS
+  /// names the device's kind and its iOS version to every host the page reaches.
+  static let userAgent = "Mozilla/5.0"
   static let messageHandlerName = "railgunHost"
   /// Delivers one message as a `callAsyncJavaScript` argument, never spliced into the script; it returns at once.
   static let deliveryScript = "__railgunHostDeliver(m); return true;"
@@ -181,6 +184,8 @@ final class RailgunPage: NSObject, WKNavigationDelegate, WKUIDelegate {
     let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 1, height: 1), configuration: configuration)
     webView.navigationDelegate = self
     webView.uiDelegate = self
+    // Before the first load, so every request the page makes carries it.
+    webView.customUserAgent = Self.userAgent
     webView.isUserInteractionEnabled = false
     webView.accessibilityElementsHidden = true
     webView.isAccessibilityElement = false

@@ -661,7 +661,8 @@ stay, unused.
 - On iOS a Swift `WKWebView` host behind the same channel serves the page
   from `veylor-railgun://app/`, in a data store of its own whose SOCKS5
   proxy is the bridge (no failover), with a `WKContentRuleList` allowlist
-  (iOS reference §6). The macOS host is the same on AppKit (macOS 14 and
+  (iOS reference §6) and Android's `Mozilla/5.0` as the page's User-Agent:
+  WebKit's own on iOS names the device's kind and its iOS version. The macOS host is the same on AppKit (macOS 14 and
   later): the same files serve the page, the same store identifier, proxy and
   rule list, and the 1×1 web view sits in the window's content view below the
   Flutter view, refusing the pointer, the keyboard and VoiceOver. Because the

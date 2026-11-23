@@ -207,7 +207,9 @@ Prefixes below: `kt/` is the Android host's directory, `rw/` is
   (`RailgunRequests.USER_AGENT`, `kt/RailgunWebViewHost.kt`, since
   2026-11-20), which every host the page reaches answers (section 8). WebKit's
   on the Mac freezes the OS version (`Macintosh; Intel Mac OS X 10_15_7`) and
-  names no model, and the Mac keeps it. **(Chromium)** set the page's
+  names no model, and the Mac keeps it. WebKit's on iOS names the device's
+  kind and its iOS version, so iOS sets the page's to the same `Mozilla/5.0`
+  (`RailgunPage.userAgent`, `customUserAgent`, since 2026-11-22). **(Chromium)** set the page's
   User-Agent before it loads; check what it names on a host whose engine's
   own isn't frozen. The page's own requests also name the same language on
   every device and every host, `Accept-Language: en-US,en;q=0.9`, which the
