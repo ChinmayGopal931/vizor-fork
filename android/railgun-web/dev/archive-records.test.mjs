@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { test } from 'node:test';
+import { getNoteHash, serializeTokenData } from '@railgun-community/engine';
 import { commitmentBatches, transaction } from '../src/archive-records.js';
 import { formatCommitments } from '../src/quick-sync.js';
 import { blockTime, history, word } from './history-fixture.mjs';
@@ -30,11 +31,15 @@ test('commitments from before the sync starts are left out', () => {
   );
 });
 
+const NPK = word('npk', 31);
+// A shield's leaf is its note's hash: a record whose note hashes to anything else is refused (commitment-check.js).
+const SHIELD_HASH = getNoteHash(NPK, serializeTokenData(TOKEN, 0, '0x00'), 1000n);
+
 /** A shield commitment as rail-squid lists it and as the archive records it, with `fee` as each gives it. */
 function shield(block, { squidFee, archiveFee }) {
   const common = { treeNumber: 0, blockNumber: block, utxoIndex: 7 };
   const preimage = {
-    npk: word('npk'),
+    npk: NPK,
     value: '1000',
     token: { tokenType: 'ERC20', tokenSubID: '0x00', tokenAddress: TOKEN },
   };
@@ -48,7 +53,7 @@ function shield(block, { squidFee, archiveFee }) {
       transactionHash: word('shield-tx'),
       blockTimestamp: String(blockTime(block)),
       commitmentType: 'ShieldCommitment',
-      hash: BigInt(`0x${word('shield', 31)}`).toString(),
+      hash: SHIELD_HASH.toString(),
       preimage,
       encryptedBundle: [`0x${word('e0')}`, `0x${word('e1')}`, `0x${word('e2')}`],
       shieldKey: `0x${word('key')}`,
@@ -65,9 +70,9 @@ function shield(block, { squidFee, archiveFee }) {
           commitmentType: 'ShieldCommitment',
           txid: word('shield-tx'),
           timestamp: 1,
-          hash: word('shield', 31),
+          hash: SHIELD_HASH.toString(16),
           utxoTree: 0,
-          preImage: { npk: word('npk'), value: '1000', token: { tokenType: 0, tokenSubID: '0', tokenAddress: TOKEN } },
+          preImage: { npk: NPK, value: '1000', token: { tokenType: 0, tokenSubID: '0', tokenAddress: TOKEN } },
           encryptedBundle: [word('e0'), word('e1'), word('e2')],
           shieldKey: word('key'),
           ...(archiveFee === undefined ? {} : { fee: archiveFee }),

@@ -344,6 +344,69 @@ export function throughNoteKeyBatches(source) {
   );
 }
 
+// abstract-wallet.js: a shield's note is kept only if it hashes to its leaf. A quick sync's source gives a shield's
+// note (its key, token and amount) beside the leaf's hash, and the trees' root check vouches for the hash alone, so
+// the engine kept whatever amount the source gave, on any leaf whose ciphertext the wallet could open. Engine 9.9.1
+// checks it, as 9.8.0 already checks a transfer's note; these are its lines, and a build against it fails here, where
+// this rewrite is to be dropped.
+const noteKept = (addressedTo) => `                    noteReceive = await transact_note_1.TransactNote.deserialize(txidVersion, chain, serialized, viewingPrivateKey, this.tokenDataGetter);
+                    serializedNoteReceive = serialized;
+                }
+                catch (err) {
+                    // Expect error if leaf not addressed to ${addressedTo}.
+                }
+`;
+const noteKeptIfItHashes = (addressedTo, what) => `                    noteReceive = await transact_note_1.TransactNote.deserialize(txidVersion, chain, serialized, viewingPrivateKey, this.tokenDataGetter);
+                    // SECURITY: the preImage is served by the sync source, not proven by the hash.
+                    if (!decryptedNoteMatchesCommitment(noteReceive)) {
+                        debugger_1.default.log('Discarding ${what} note: preImage hash does not match commitment.');
+                        noteReceive = undefined;
+                    }
+                    else {
+                        serializedNoteReceive = serialized;
+                    }
+                }
+                catch (err) {
+                    // Expect error if leaf not addressed to ${addressedTo}.
+                }
+`;
+
+/**
+ * abstract-wallet.js with a shield's note, and a legacy shield's, kept only when it hashes to its leaf: engine 9.9.1's
+ * check, in its own words.
+ */
+export function throughShieldHashChecks(source) {
+  const what = 'AbstractWallet.createScannedDBCommitments';
+  const shields = replaceOnce(source, noteKept('this wallet'), noteKeptIfItHashes('this wallet', 'shield'), what);
+  return replaceOnce(shields, noteKept('us'), noteKeptIfItHashes('us', 'legacy shield'), what);
+}
+
+// abstract-wallet.js: a wallet that loads holds the shield notes it kept before that check to their leaves, once
+// (src/kept-notes.js).
+const WALLET_TREES_LOADED = `        this.utxoMerkletrees.set(txidVersion, utxoMerkletree.chain, utxoMerkletree);
+    }
+`;
+
+/**
+ * abstract-wallet.js with `loadUTXOMerkletree` handing the wallet to src/kept-notes.js before it takes its trees: where
+ * the engine migrates a wallet's notes itself, with nothing of the engine's reading or writing them yet.
+ */
+export function throughKeptNotes(source) {
+  return replaceOnce(
+    source,
+    WALLET_TREES_LOADED,
+    `        await require(${pageModule('kept-notes.js')}).holdShieldNotesToLeaves(this, utxoMerkletree, txidVersion);
+        this.utxoMerkletrees.set(txidVersion, utxoMerkletree.chain, utxoMerkletree);
+    }
+`,
+    'AbstractWallet.loadUTXOMerkletree',
+  );
+}
+
+/** abstract-wallet.js as the build has it. */
+export const throughAbstractWalletHooks = (source) =>
+  throughKeptNotes(throughShieldHashChecks(throughNoteKeyBatches(source)));
+
 // keys-utils.js and keys-utils-legacy.js: a key a scan prepared is taken as it is (src/note-keys.js).
 const SHARED_KEY = `async function getSharedSymmetricKey(privateKeyPairA, blindedPublicKeyPairB) {
     try {
@@ -404,7 +467,7 @@ export const engineHooks = {
     rewrite(MERKLETREE, 'merkletree', throughAcceptedLeaves);
     rewrite(TXID_MERKLETREE, 'txid-merkletree', throughTxidRootRefusals);
     rewrite(RAILGUN_ENGINE, 'railgun-engine', throughRailgunEngineHooks);
-    rewrite(ABSTRACT_WALLET, 'abstract-wallet', throughNoteKeyBatches);
+    rewrite(ABSTRACT_WALLET, 'abstract-wallet', throughAbstractWalletHooks);
     rewrite(KEYS_UTILS, 'keys-utils', throughPreparedKeys);
     rewrite(KEYS_UTILS_LEGACY, 'keys-utils-legacy', throughPreparedLegacyKeys);
     // A bundle with an engine module this didn't reach would run the engine's own code.

@@ -2,15 +2,16 @@
 // streamed chunk by chunk. Unshields and nullifiers come from rail-squid's whole lists. The archive keeps one event per
 // nullifier, where Railgun keys them by tree and nullifier, and so drops the second when one nullifier is spent in two
 // trees, which would count that note unspent; and an unshield missing from the store stops the txid sync at its
-// transaction for good. The archive's commitments must run on from those stored, and are stored only as far as
-// rail-squid's lists have shown it has come. On anything unexpected the quick sync goes on from rail-squid at the block
-// after the archive's last good one; what the archive gave stays stored. A failure of rail-squid's own lists, or the
-// archive out of reach, says nothing against the archive's data: the lists and the archive are asked again, a few
-// times, from where they were stored.
+// transaction for good. The archive's commitments must run on from those stored, each must be the chain's as far as a
+// record shows it (commitment-check.js), and they are stored only as far as rail-squid's lists have shown it has come.
+// On anything unexpected the quick sync goes on from rail-squid at the block after the archive's last good one; what
+// the archive gave stays stored. A failure of rail-squid's own lists, or the archive out of reach, says nothing against
+// the archive's data: the lists and the archive are asked again, a few times, from where they were stored.
 import { Merkletree } from '@railgun-community/engine';
 import { TXIDVersion } from '@railgun-community/shared-models';
 import { ArchiveUnavailable, ArchiveUnreachable, archiveRange } from './archive.js';
 import { commitmentBatches } from './archive-records.js';
+import { refusedRecord } from './commitment-check.js';
 import { pauseMark, pausedSince } from './page-clock.js';
 import {
   formatNullifiers,
@@ -74,7 +75,8 @@ const placement = (tree, index) =>
  * the engine places them: a batch starts where the last one ended, or at the start of the next tree, and its notes
  * follow its start within one tree. A batch the store ends inside goes on from it too: a cut-off write or a rail-squid
  * page can end a store partway through a batch, and the engine queues only the leaves it doesn't have. Rail-squid and
- * the archive both number the first leaf of mainnet's tree 1 as tree 0's leaf 65,536.
+ * the archive both number the first leaf of mainnet's tree 1 as tree 0's leaf 65,536. A chunk with a record that isn't
+ * the chain's (commitment-check.js) is not given: the archive is left before it.
  */
 export async function* archiveCommitments(reader, since, next, { time, chainId }) {
   let { tree, position } = next;
@@ -106,6 +108,10 @@ export async function* archiveCommitments(reader, since, next, { time, chainId }
       events.push(batch);
       tree = start.tree;
       position = end;
+    }
+    const refused = refusedRecord(events);
+    if (refused !== undefined) {
+      throw new ArchiveUnavailable(`the archive's record at ${refused.tree}:${refused.index} ${refused.why}`);
     }
     yield { events, through: chunk.endBlock };
   }

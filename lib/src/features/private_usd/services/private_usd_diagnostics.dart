@@ -210,6 +210,12 @@ enum PrivateUsdFailureReason {
     r'no indexer for',
     r'has no \w+ indexer',
   ]),
+  // A record of the indexer's that is not the chain's: a shield's note that
+  // does not hash to its leaf, or keys the engine cannot read.
+  recordRefused('record_refused', [
+    r'does not hash to its leaf',
+    r'not one the engine can read',
+  ]),
   treesShort('trees_short', [r'trees stopped short']),
   sendRecordMismatch('send_record_mismatch', [r'hash to its railguntxid']),
   rootRefused('root_refused', [r'merkle ?root']),

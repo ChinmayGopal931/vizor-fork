@@ -4,14 +4,13 @@ import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { after, test } from 'node:test';
 import { ByteLength, ByteUtils, CommitmentType } from '@railgun-community/engine';
-import { throughNoteKeyBatches, throughPreparedKeys, throughPreparedLegacyKeys } from '../engine-hooks-plugin.mjs';
 import { prepareKeys, preparedKey, preparedLegacyKey, useKeyPool, workerPool } from '../src/note-keys.js';
 import { multiplyAll } from '../src/note-keys-worker.js';
 import { notePause, stopWatchingPauses } from '../src/page-clock.js';
 import { installQuickSync } from '../src/quick-sync.js';
-import { CHAIN, ENGINE, V2, builtEngineModule, wholeEngine } from './engine-harness.mjs';
+import { CHAIN, ENGINE, V2, wholeEngine } from './engine-harness.mjs';
 import { history, indexer } from './history-fixture.mjs';
-import { ENCRYPTION_KEY, mnemonicOf, transfer, walletOn, withNotes } from './notes-fixture.mjs';
+import { builtWalletOn, transfer, walletOn, withNotes } from './notes-fixture.mjs';
 
 const require = createRequire(import.meta.url);
 const load = (module) => require(path.join(ENGINE, module));
@@ -281,20 +280,6 @@ test('a pool whose workers keep a batch past its time fails it, and stops them w
   assert.ok(pool.every(({ terminated }) => terminated));
 });
 
-// A whole engine whose wallets scan through the build's note keys: its keys, wallets and their scans rewritten.
-const keysUtils = builtEngineModule('utils/keys-utils.js', throughPreparedKeys);
-const keysUtilsLegacy = builtEngineModule('utils/keys-utils-legacy.js', throughPreparedLegacyKeys, {
-  './keys-utils': keysUtils,
-});
-const abstractWallet = builtEngineModule('wallet/abstract-wallet.js', throughNoteKeyBatches, {
-  '../utils/keys-utils': keysUtils,
-  '../utils/keys-utils-legacy': keysUtilsLegacy,
-});
-const { RailgunWallet: KeyedWallet } = builtEngineModule('wallet/railgun-wallet.js', (source) => source, {
-  './abstract-wallet': abstractWallet,
-  '../utils/keys-utils': keysUtils,
-});
-
 const PAGE = 40;
 const fixture = history();
 const at = (offset) =>
@@ -305,7 +290,7 @@ const contract = {
   getHistoricalEvents: async (_from, to, _next, _commitments, _nullifiers, _unshields, synced) => synced(to),
 };
 
-/** What `seed`'s wallet finds scanning `lists`, its scans through the build's note keys when `keyed`. */
+/** What `seed`'s wallet finds scanning `lists`: the build's wallet, its scans through its note keys, when `keyed`. */
 async function scanned(lists, seed, { keyed }) {
   const built = await wholeEngine({ contract, deploymentBlock: fixture.from });
   installQuickSync(built.engine, {
@@ -313,17 +298,7 @@ async function scanned(lists, seed, { keyed }) {
     head: async () => fixture.to,
     pages: { pageSize: PAGE, gapMs: 0, retryMs: 0 },
   });
-  const wallet = keyed
-    ? await KeyedWallet.fromMnemonic(
-        built.engine.db,
-        ENCRYPTION_KEY,
-        mnemonicOf(seed),
-        0,
-        undefined,
-        built.engine.prover,
-      )
-    : await walletOn(built.engine, CHAIN, seed);
-  if (keyed) await built.engine.loadWallet(wallet);
+  const wallet = keyed ? await builtWalletOn(built.engine, seed) : await walletOn(built.engine, CHAIN, seed);
   await built.engine.scanUTXOHistory(V2, CHAIN, [wallet.id]);
   const txos = await wallet.TXOs(V2, CHAIN);
   return txos.map(({ note, position, spendtxid }) => `${position}:${note.value}:${spendtxid ?? '-'}`).sort();

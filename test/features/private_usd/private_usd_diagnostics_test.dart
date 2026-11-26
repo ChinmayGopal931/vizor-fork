@@ -27,6 +27,12 @@ void main() {
             'notes_scan_broke_off',
         'no notes scan started for a minute: one may be stuck':
             'notes_scan_stuck',
+        "the indexer's record at 0:1204 does not hash to its leaf, and 250000 "
+                'blocks are too many to read from the RPC':
+            'record_refused',
+        "the indexer's record at 4:77 is not one the engine can read, and "
+                '250000 blocks are too many to read from the RPC':
+            'record_refused',
         'the txid list stopped at 1204 of 1500 after 4 syncs':
             'txid_list_stopped',
         "the validated txid index can't be read: Failed to fetch":

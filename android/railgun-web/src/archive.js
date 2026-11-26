@@ -36,7 +36,10 @@ class ChecksumMismatch extends ArchiveUnavailable {
 const KNOWN = { version: 5, rootFormat: 2, chunkFormat: 3, tipFormat: 3, txidVersion: 'V2_PoseidonMerkle' };
 // A format this reader takes: the one it knows (`least`), or a later one. The archive moves to a new path for a format
 // that breaks its readers (`v4` today) and raises a number where it is, as it has the tip's, for one that doesn't.
-// Nothing rests on the number: what a file holds is checked against the chain and the screening nodes whatever it says.
+// Nothing rests on the number. What a file holds is checked whatever it says: each leaf's hash by the trees' roots,
+// against the chain; a shield's note against its leaf, and the keys the engine reads, before a record is stored
+// (commitment-check.js); and each transaction by the screening nodes' roots. A transfer's ciphertext is checked by the
+// wallet it opens for alone, which keeps the note only if it hashes to its leaf.
 const reads = (format, least) => Number.isSafeInteger(format) && format >= least;
 const TIP_ATTEMPTS = 3;
 const TIMEOUT_MS = 60_000;

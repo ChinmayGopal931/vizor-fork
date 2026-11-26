@@ -8,6 +8,7 @@ import { formatCommitments, formatNullifiers, formatUnshields, installQuickSync 
 import { CHAIN, V2, contents, engineHarness } from './engine-harness.mjs';
 import { ARCHIVE_BASE, archiveServer, blockTime, gz, hashOf, history, indexer, word } from './history-fixture.mjs';
 import { memoryDatabase } from './memory-store.mjs';
+import { shield, someone, withAmount, withNotes } from './notes-fixture.mjs';
 
 const PAGE = 40;
 const pages = { pageSize: PAGE, gapMs: 0, retryMs: 0 };
@@ -696,4 +697,35 @@ test("the archive's own data failing leaves it at once, never asked again", asyn
   assert.equal(left.length, 1);
   assert.match(left[0], /^the archive was left at block \d+: meta\.json is not JSON$/);
   assert.deepEqual(stored, await storedBySquid());
+});
+
+// A leaf in the archive's second sealed chunk.
+const SHIELDED = fixture.squid.commitments.find(
+  ({ blockNumber }) => Number(blockNumber) >= sealedAt[0] + 5,
+).treePosition;
+
+test("a shield the archive records as its event has it is read as any leaf, and stored as rail-squid's", async () => {
+  const shielded = withNotes(fixture, [SHIELDED], [await shield(await someone('a receiver'), 1_000n)]);
+  const { stored, left } = await storedByArchive(archiveServer(shielded, { sealedAt }), { lists: shielded.squid });
+  assert.deepEqual(left, []);
+  assert.deepEqual(stored, await storedBySquid(shielded.squid));
+});
+
+test("a shield the archive gives another amount, or a key that is no key, hands the rest to rail-squid before its chunk", async () => {
+  const real = await shield(await someone('a receiver'), 1_000n);
+  for (const [served, why] of [
+    [(note) => withAmount(note, 1_000_000_000_000n), 'does not hash to its leaf'],
+    [(note) => ({ ...note, shieldKey: 'no key at all' }), 'is not one the engine can read'],
+  ]) {
+    // Rail-squid lists the shield as its event has it; the archive's record of the same leaf, checksum and all,
+    // differs.
+    const shielded = withNotes(fixture, [SHIELDED], [real], served);
+    const server = archiveServer(shielded, { sealedAt });
+    const { stored, asked, left } = await storedByArchive(server, { lists: shielded.squid });
+    const refused = `the archive's record at 0:${SHIELDED} ${why}`;
+    assert.deepEqual(left, [`the archive was left at block ${sealedAt[0] - 1}: ${refused}`]);
+    assert.equal(squidFrom(asked, 'commitments'), sealedAt[0]);
+    // Nothing of the chunk was stored: what the trees and a wallet read of that leaf is rail-squid's.
+    assert.deepEqual(stored, await storedBySquid(shielded.squid));
+  }
 });
