@@ -8,6 +8,11 @@
 // every leaf the trees hold (engine-hooks-plugin.mjs). One that didn't fails the scan, as a root the contract refuses
 // does: the engine reports it incomplete, and the page's refresh fails rather than answer a balance. The build has the
 // catch-all say what it caught, too, so the failure names its cause.
+//
+// A leaf the engine can't read stops every scan there for as long as the store keeps it, so the build has the engine
+// mark what it fails on reading a leaf, and a decryption such a failure stopped counts its tree toward building the
+// trees again, as a refused root does (tree-recovery.js). A write the store refused is no fault of the trees'.
+import { treeFailed } from './tree-recovery.js';
 
 /** How long a scan waits on a decryption that began outside it, and how often it looks. */
 export const DECRYPT_WAIT_MS = 10 * 60_000;
@@ -18,6 +23,18 @@ let stopped;
 // What the engine's catch-all last caught decrypting each wallet's notes, by wallet id, until a scan finds the wallet
 // through its trees or reports it short of them, or the page asks why a scan fell short.
 const caught = new Map();
+
+// What the engine threw reading a leaf, before anything of its batch was written.
+const unread = new WeakSet();
+
+/**
+ * The engine failing to read a leaf as it decrypts (`AbstractWallet.scanLeaves`), which the build has it report: marks
+ * `error`, and throws it on to the engine's catch-all.
+ */
+export function leafUnread(error) {
+  if (Object(error) === error) unread.add(error);
+  throw error;
+}
 
 /** The engine's decryption of wallet `id`'s notes stopping on `error`, which the build has it report. */
 export function decryptionStopped(id, error) {
@@ -83,6 +100,7 @@ export async function notesDecrypted(
     const cause = caught.get(wallet.id);
     caught.delete(wallet.id);
     if (short !== undefined) {
+      if (unread.has(cause)) treeFailed(short.tree);
       const through = `through ${short.scanned} of tree ${short.tree}'s ${short.length} leaves`;
       stop(`the wallet's notes were decrypted ${through}${cause === undefined ? '' : `: ${cause?.message ?? cause}`}`);
     }

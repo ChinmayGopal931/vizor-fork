@@ -449,9 +449,31 @@ export function throughDecryptionStops(source) {
   );
 }
 
+// abstract-wallet.js: what the engine fails on reading a leaf is told from a write its store refused
+// (src/notes-decrypted.js).
+const LEAF_READ = `                const scanned = await this.createScannedDBCommitments(txidVersion, leaf, vpk, tree, chain, position, leaves.length);
+`;
+
+/**
+ * abstract-wallet.js with `scanLeaves` handing what the engine throws reading a leaf to src/notes-decrypted.js, which
+ * marks it and throws it on: a decryption a leaf stopped then counts toward building the trees again, and one a
+ * refused write stopped doesn't.
+ */
+export function throughUnreadLeaves(source) {
+  return replaceOnce(
+    source,
+    LEAF_READ,
+    `                const scanned = await this.createScannedDBCommitments(txidVersion, leaf, vpk, tree, chain, position, leaves.length).catch(require(${pageModule('notes-decrypted.js')}).leafUnread);
+`,
+    'AbstractWallet.scanLeaves',
+  );
+}
+
 /** abstract-wallet.js as the build has it. */
 export const throughAbstractWalletHooks = (source) =>
-  throughDecryptionStops(throughKeptNotes(throughShieldHashChecks(throughNoteKeyBatches(source))));
+  throughUnreadLeaves(
+    throughDecryptionStops(throughKeptNotes(throughShieldHashChecks(throughNoteKeyBatches(source)))),
+  );
 
 // keys-utils.js and keys-utils-legacy.js: a key a scan prepared is taken as it is (src/note-keys.js).
 const SHARED_KEY = `async function getSharedSymmetricKey(privateKeyPairA, blindedPublicKeyPairB) {
