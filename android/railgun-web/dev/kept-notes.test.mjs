@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
+import { TXIDVersion } from '@railgun-community/shared-models';
 import { throughKeptNotes, throughShieldHashChecks } from '../engine-hooks-plugin.mjs';
 import { holdShieldNotesToLeaves } from '../src/kept-notes.js';
 import { CHAIN, ENGINE, V2 } from './engine-harness.mjs';
@@ -16,6 +17,7 @@ import {
   withNotes,
 } from './notes-fixture.mjs';
 
+const V3 = TXIDVersion.V3_PoseidonMerkle;
 const fixture = history();
 const AT = { mine: 10, small: 70, strangers: 200, transfer: 300 };
 const UNITS = 1_000_000n;
@@ -122,7 +124,41 @@ test('a kept note whose leaf the trees do not hold is left, and the wallet is lo
   };
   assert.equal(await holdShieldNotesToLeaves(wallet, rebuilding, V2), 1);
   assert.deepEqual(await notes(wallet), FORGED.filter((kept) => kept !== note(AT.small, 1_000_000n * UNITS)));
+  // The engine loads a wallet its V3 trees next, where it keeps no notes: that says nothing of the V2 ones.
+  const v3 = { chain: CHAIN, getCommitmentSafe: async () => undefined };
+  assert.equal(await holdShieldNotesToLeaves(wallet, v3, V3), 0);
   assert.equal(await holdShieldNotesToLeaves(wallet, utxo, V2), 1);
+  assert.deepEqual(await notes(wallet), KEPT);
+});
+
+test('a shield made up on a leaf that is a transfer is dropped too, once honest trees hold the transfer there', async () => {
+  const keys = await engineTaking(fixture, []);
+  const madeUp = await shield(await walletOn(keys.engine, CHAIN, 'the wallet'), 5_000_000n * UNITS);
+  const honest = fixture.squid.commitments;
+  // The transfer's leaf, its hash as the chain has it, served as a shield to the wallet.
+  const forged = honest.map((leaf) =>
+    leaf.treePosition === AT.strangers ? { ...leaf, ...madeUp, hash: leaf.hash, ciphertext: undefined } : leaf,
+  );
+  const { wallet, kept } = await scanned(forged, { built: false });
+  assert.deepEqual(kept, [note(AT.strangers, 5_000_000n * UNITS)]);
+  // Trees built again from an honest source while the wallet was not loaded: it finds a transfer's leaf under its note.
+  const rebuilt = (await scanned(honest, { built: false })).engine.getUTXOMerkletree(V2, CHAIN);
+  assert.equal((await rebuilt.getCommitment(0, AT.strangers)).commitmentType, 'TransactCommitmentV2');
+  assert.equal(await holdShieldNotesToLeaves(wallet, rebuilt, V2), 1);
+  assert.deepEqual(await wallet.queryAllStoredReceiveCommitments(V2, CHAIN), []);
+});
+
+test('a store that fails under it keeps no wallet from loading, and the wallet is looked at again when it next loads', async () => {
+  const { engine, wallet } = await scanned((await listed()).forged, { built: false });
+  const closed = {
+    chain: CHAIN,
+    getCommitmentSafe: async () => {
+      throw new Error('the store is closed');
+    },
+  };
+  assert.equal(await holdShieldNotesToLeaves(wallet, closed, V2), 0);
+  assert.deepEqual(await notes(wallet), FORGED);
+  assert.equal(await holdShieldNotesToLeaves(wallet, engine.getUTXOMerkletree(V2, CHAIN), V2), 2);
   assert.deepEqual(await notes(wallet), KEPT);
 });
 
