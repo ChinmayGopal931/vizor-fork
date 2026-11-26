@@ -3239,24 +3239,47 @@ M8 status (2026-10-14): the non-device parts are done.
     the next load. And a scan could name a cause the engine caught before it
     began: what was caught is now forgotten as each scan starts.
 
-  It also found what the change does not cover. All of it is older than the
-  change, and all of it stays open:
-  - **The block a leaf is dated at is the source's word**, and the engine
-    starts every later sync from the newest stored leaf's block. A source
-    that dates the newest leaf it serves far ahead has every later quick
-    sync ask for nothing and the engine's own read begin past the chain's
-    newest block. The stale root is one the contract had, so scans end
-    complete with the notes after it missing. Reproduced over the engine
-    with the page's quick sync and guard (no device): three scans complete,
-    the trees at 240 of 480 leaves. Holding the trees' leaf count to the
-    contract's after each scan would close it.
+  It also found what the change did not cover, all of it older than the
+  change. The owner had two of them added to it (2026-11-26):
+  - **The trees are held to the contract's leaf count.** The block a leaf
+    is dated at is the source's word, and the engine starts every later
+    sync from the newest stored leaf's block. A source that dated the
+    newest leaf it served far ahead had every later quick sync ask for
+    nothing and the engine's own read begin past the chain's newest block.
+    The stale root is one the contract had, so scans ended complete with
+    the notes after it missing (reproduced over the engine with the page's
+    quick sync and guard: three scans complete, the trees at 240 of 480
+    leaves). Once the engine's own read of the chain is done, the guard now
+    reads the contract's newest tree and its leaf count (`treeNumber`,
+    `nextLeafIndex`), five blocks behind the block the read went to, and
+    stops a scan whose trees are not as far. The two agreed with the trees'
+    shape on both networks that day (mainnet: tree 4 with 54,302 leaves at
+    block 26,501,406; Sepolia: tree 0 with 13,166). An RPC that doesn't
+    answer for the count stops the scan too, and counts nothing against
+    the trees.
+  - **A tree that keeps failing with its roots accepted is built again.**
+    Trees short of the contract, and a leaf the engine can't read as it
+    decrypts, outlast every scan: the first because the engine goes on
+    starting after the leaves left out, the second because the store keeps
+    the leaf. Both now count for their tree as a refused root does (three
+    scans over ten minutes, at most a rebuild a day, the archive off for a
+    week after). A decryption a refused write stopped counts nothing: the
+    build has the engine mark what it fails on reading a leaf, to tell the
+    two apart. On `main` the unreadable leaf left balances stale without a
+    word; with the change as first reviewed, every refresh failed for good.
+
+  Still open from the review:
   - **Rail-squid's list of spent notes is taken as served** (read, not
     reproduced): one it leaves out shows a spent note as unspent.
-  - **A decryption that keeps stopping has no way out.** A stored leaf the
-    engine can't read fails every refresh, and the roots were accepted, so
-    nothing rebuilds the trees. Before this change the same leaf left the
-    balances stale without a word. Counting such a stop for its tree, as a
-    refused root counts, would rebuild it.
+  - **A leaf's date is still the source's word where a new wallet's
+    decryption starts.** The engine starts a wallet that has a creation
+    block at the newest leaf dated at or before it, so a source that dates
+    a recent leaf early has such a wallet skip its own notes before that
+    leaf: one more way a source can hide a note, as garbling its ciphertext
+    is.
+  - A rebuild is from rail-squid, the archive off. Trees that rail-squid
+    itself leaves short, or a leaf of its own the engine can't read, fail
+    every scan until it serves the chain's, with a rebuild a day.
   - A store error that the engine's own second try gets over still fails
     the one refresh.
 
@@ -3265,14 +3288,16 @@ M8 status (2026-10-14): the non-device parts are done.
   numbers, the rule this check now holds every record to. Nothing in it
   reads the contract's leaf count.
 
-  Run on 2026-11-26, on the fixes: the check again over every record both
-  networks have (mainnet's 316,325 from the archive and 316,329 from
-  rail-squid, Sepolia's 13,165), none refused; the page's tests (267, the
-  new ones failing on the change as it stood); the reviewer's repros, each
-  now coming out right; and the rebuilt bundle in headless Chrome on
-  Sepolia (`npm run check`, passed at its first run). That check's wallet
-  holds no notes, so no run yet has a wallet with shields of its own go
-  from an older build to this one: the device round is still to come.
+  Run on 2026-11-26, on the fixes and the two additions: the check again
+  over every record both networks have (mainnet's 316,325 from the archive
+  and 316,329 from rail-squid, Sepolia's 13,165), none refused; the page's
+  tests (271, the new ones failing on the change as it stood); the
+  reviewer's repros, each now coming out right; and the rebuilt bundle in
+  headless Chrome on Sepolia (`npm run check`, passed at its first run,
+  each of its scans reading the contract's leaf count and finding the trees
+  as far, the rebuilt trees too). That check's wallet holds no notes, so no
+  run yet has a wallet with shields of its own go from an older build to
+  this one: the device round is still to come.
 
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's

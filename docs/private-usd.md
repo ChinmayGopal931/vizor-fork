@@ -478,9 +478,10 @@ keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
   the trees: a source could otherwise show a balance the chain doesn't hold,
   or leave a note no payment can spend. Never turn to another source over a
   wallet's own note alone, which would show the source whose note it is.
-  Two things are still a source's word (progress D-164, open): the block a
-  leaf is dated at, which is where the next sync starts, and the list of
-  spent notes.
+  Never answer a balance from trees short of the leaves Railgun's contract
+  holds, either. Two things are still a source's word (progress D-164,
+  open): the list of spent notes, and the block a leaf is dated at where a
+  wallet with a creation block starts its decryption.
 - A Railgun wallet decrypts from a creation block only when Veylor generated
   its seed (`AccountInfo.generatedSeed`): the seed's birthday, rounded down
   on both chains' block tables, a day early. Its mnemonic is the standard
@@ -592,7 +593,17 @@ stay, unused.
   check would pass the trees short of them. Not sooner: the engine's
   listener queues the newest blocks' leaves as they come, and rail-squid,
   behind the RPC, can leave a stretch that only the engine's read fills
-  (review, 2026-11-22).
+  (review, 2026-11-22). Trees short of the leaves Railgun's contract holds
+  once that read is done fail the scan as well: the page reads the
+  contract's newest tree and its leaf count five blocks behind the block
+  the read went to (an RPC's log reads can trail its calls; two calls, the
+  same for every wallet), and the trees must be as far. The engine starts
+  every sync at the block of its newest stored leaf, which is its source's
+  word: a leaf dated past leaves the source left out (far ahead, say) had
+  every later quick sync, and the engine's own read, start after them. The
+  stale root is one the contract had, so scans ended complete with every
+  note since missing, and no later scan fetched them. Such a tree counts
+  toward building the trees again (review, 2026-11-26).
 - No commitment record is stored before it is checked
   (`commitment-check.js`), rail-squid's and the archive's alike, whoever's
   note it is. The trees' root check vouches for a leaf's hash alone, and a
@@ -648,8 +659,10 @@ stay, unused.
   balance, with every note after that batch missing. The scan now fails,
   saying how far the wallet came and what stopped it, and the refresh with
   it; a decryption the engine's listener began mid-scan is waited for.
-  Nothing rebuilds the trees for a decryption that keeps stopping: the
-  roots were accepted (D-164, open).
+  A decryption stopped by a leaf the engine can't read counts its tree
+  toward building the trees again, since the store keeps the leaf and every
+  scan stops there: the build has the engine mark what it fails on reading
+  a leaf. One a refused write stopped counts nothing against the trees.
 - `engine-hooks-plugin.mjs` holds every rewrite of the engine's code: the
   unshield watermark (`unshield-events.js`), the archive's leaf hashing
   (`archive-txids.js`), the txid sync's record updates
@@ -661,7 +674,8 @@ stay, unused.
   SDK's rescan still calls it), the wallet's check of a shield's note and
   its kept notes held to their leaves as it loads (`kept-notes.js`), and the
   scan's check of how far its decryption came, with the decryption's
-  catch-all saying what it caught (`notes-decrypted.js`). Each names the
+  catch-all saying what it caught and a leaf's read marking what it fails
+  on (`notes-decrypted.js`). Each names the
   exact source of the pinned engine and fails the build against any other:
   re-check them when bumping it. The shield check is 9.9.1's own lines, so a
   build against 9.9.1 fails there: drop that rewrite then, and keep the
@@ -714,9 +728,12 @@ stay, unused.
     blocks past the refused tree's newest leaf counts for nothing (the scan
     fails, saying the RPC is behind): rail-squid's lists can run ahead of an
     RPC that lags, which would otherwise rebuild the trees once a day
-    (review, 2026-11-22). A scan that broke before that check counts for
-    nothing: its store can end inside an on-chain batch, at a root the
-    contract never had. The rebuild clears the transaction list first
+    (review, 2026-11-22). Two failures that leave every root accepted count
+    for their tree the same way, since only trees built again get over
+    them: the trees short of the leaves the contract holds, and a leaf the
+    engine can't read as it decrypts (review, 2026-11-26). A scan that
+    broke otherwise counts for nothing: its store can end inside an
+    on-chain batch, at a root the contract never had. The rebuild clears the transaction list first
     (rebuilt notes lack the railgunTxids its sync gave them, which proofs
     need), never begins while the engine syncs either or while the rest
     of a sync runs (which would read and hand on the balances it clears),
