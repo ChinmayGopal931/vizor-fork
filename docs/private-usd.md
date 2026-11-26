@@ -479,8 +479,8 @@ keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
   or leave a note no payment can spend. Never turn to another source over a
   wallet's own note alone, which would show the source whose note it is.
   Two things are still a source's word (progress D-164, open): the block a
-  leaf is dated at, which is where the next sync starts, and the list of
-  spent notes.
+  leaf is dated at, which is where the next sync starts and where a wallet
+  with a creation block starts its decryption, and the list of spent notes.
 - A Railgun wallet decrypts from a creation block only when Veylor generated
   its seed (`AccountInfo.generatedSeed`): the seed's birthday, rounded down
   on both chains' block tables, a day early. Its mnemonic is the standard

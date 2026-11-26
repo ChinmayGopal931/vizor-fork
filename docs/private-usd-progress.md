@@ -3243,7 +3243,10 @@ M8 status (2026-10-14): the non-device parts are done.
     complete with the notes after it missing. Reproduced over the engine
     with the page's quick sync and guard (no device): three scans complete,
     the trees at 240 of 480 leaves. Holding the trees' leaf count to the
-    contract's after each scan would close it.
+    contract's after each scan would close it. The engine also starts a
+    wallet that has a creation block at the newest leaf dated at or before
+    it, so a recent leaf dated early has such a wallet skip its own notes
+    before that leaf.
   - **Rail-squid's list of spent notes is taken as served** (read, not
     reproduced): one it leaves out shows a spent note as unspent.
   - **A decryption that keeps stopping has no way out.** A stored leaf the
