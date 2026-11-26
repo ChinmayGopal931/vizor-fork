@@ -47,15 +47,7 @@ import { syncFailure } from './rpc-probe.js';
 import { screeningActivity } from './screening-activity.js';
 import { squidQueries } from './squid.js';
 import { syncFinisher } from './sync-finish.js';
-import {
-  archiveOff,
-  localStore,
-  rebuildTrees,
-  rpcBehindLeaf,
-  takeFailedTree,
-  takeRefusedRoot,
-  treeRecovery,
-} from './tree-recovery.js';
+import { archiveOff, localStore, rebuildTrees, rpcBehindLeaf, takeRefusedRoot, treeRecovery } from './tree-recovery.js';
 import { TxidListStopped, catchUpTxids } from './txid-catch-up.js';
 import { changeTxidList, forgettingStops, takeListStop, txidRepair } from './txid-repair.js';
 import { walletNamespaces } from './wallet-namespaces.js';
@@ -607,7 +599,6 @@ async function scanNotesNow(walletId) {
     notesScan = scan;
     // A root the last rebuild's own scan refused is left out: this scan shows whether the rebuild took.
     takeRefusedRoot();
-    takeFailedTree();
     takeQuickSyncStop();
     takeDecryptStop();
     try {
@@ -616,21 +607,18 @@ async function scanNotesNow(walletId) {
       notesScan = undefined;
     }
     if (scan.incomplete) {
-      // A tree short of the contract's leaves, or holding a leaf the engine can't read, fails every scan until the
-      // trees are built again, as one whose root the contract has never had does (tree-recovery.js).
-      const failed = takeFailedTree();
       // The trees stand, their roots accepted, but the wallet's notes were not decrypted through them
-      // (notes-decrypted.js): no balance is answered. A write the store refused leaves the trees passed all the same.
+      // (notes-decrypted.js): no balance is answered, and the trees passed all the same.
       const undecrypted = takeDecryptStop();
       if (undecrypted !== undefined) {
-        if (failed === undefined) recovery(walletId).passed();
-        else if (await recovery(walletId).broke(failed)) continue;
+        recovery(walletId).passed();
         throw new Error(undecrypted);
       }
-      // A root refused by an RPC that hasn't reached the tree's newest leaf counts for nothing.
+      // A tree whose root the contract has never had fails every scan until it is rebuilt (tree-recovery.js), unless the
+      // RPC that refused it hasn't reached its newest leaf: that refusal counts for nothing.
       const refusal = takeRefusedRoot();
       const lag = refusal === undefined ? undefined : await rpcLag(refusal);
-      if (await recovery(walletId).broke(lag === undefined ? (refusal ?? failed) : undefined)) continue;
+      if (await recovery(walletId).broke(lag === undefined ? refusal : undefined)) continue;
       // A quick sync that left the scan to hours of reads from the RPC, or left the trees short, says so.
       throw new Error(takeQuickSyncStop() ?? lag ?? 'the notes scan broke off, so the balances may be stale');
     }

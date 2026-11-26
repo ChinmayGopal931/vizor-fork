@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { EngineEvent, MerkletreeScanStatus, RailgunEngine } from '@railgun-community/engine';
 import { decryptionStopped, notesDecrypted, takeDecryptStop, undecrypted } from '../src/notes-decrypted.js';
-import { takeFailedTree } from '../src/tree-recovery.js';
 import { CHAIN, V2 } from './engine-harness.mjs';
 import { history } from './history-fixture.mjs';
 import { builtWalletOn, engineTaking, shield, walletOn, withNotes } from './notes-fixture.mjs';
@@ -47,7 +46,6 @@ test("a leaf the engine can't read ended every scan complete with the wallet's n
   assert.deepEqual(await undecrypted(own.wallet, own.utxo, V2, CHAIN), { tree: 0, scanned: 0, length: fixture.leaves });
 
   const built = await scanning(commitments);
-  takeFailedTree();
   for (let scan = 0; scan < 3; scan += 1) {
     await built.scan();
     // How far the wallet came, and what the engine's catch-all caught: its own reading of the key.
@@ -55,8 +53,6 @@ test("a leaf the engine can't read ended every scan complete with the wallet's n
       takeDecryptStop(),
       new RegExp(`^the wallet's notes were decrypted through 0 of tree 0's ${fixture.leaves} leaves: .*hex`, 'i'),
     );
-    // A leaf it can't read: only trees built again get a wallet past it, so its tree counts toward that.
-    assert.deepEqual(takeFailedTree(), { tree: 0 });
   }
   assert.deepEqual(built.ends, ['incomplete', 'incomplete', 'incomplete']);
 });
@@ -79,8 +75,6 @@ test('a decryption a write that failed stopped fails its scan, and the next scan
     takeDecryptStop(),
     `the wallet's notes were decrypted through 0 of tree 0's ${fixture.leaves} leaves: QuotaExceededError`,
   );
-  // No fault of the trees': building them again would write as much to the same store.
-  assert.equal(takeFailedTree(), undefined);
   assert.equal(await found(), 0);
   await scan();
   assert.deepEqual(ends, ['incomplete', 'complete']);

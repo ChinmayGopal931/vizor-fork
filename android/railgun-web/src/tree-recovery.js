@@ -2,13 +2,6 @@
 // each scan, and every scan after the leaf fails there while the store keeps it. The archive is a second source of
 // leaves, on by default, so once the engine has refused one tree's root for a while the page rebuilds the trees from
 // the start with the archive off.
-//
-// Two more failures outlast every scan the same way, with every root accepted, and count as a refused root does:
-// - The trees short of the leaves Railgun's contract holds, once the engine's own read of the chain is done
-//   (quick-sync.js). The engine starts each sync at the block of its newest stored leaf, which is its source's word: a
-//   leaf dated past leaves the source left out has every later sync start after them.
-// - A leaf the engine can't read as it decrypts (notes-decrypted.js), which stops a wallet's decryption there at
-//   every scan.
 import { changeTxidList } from './txid-list.js';
 
 /** How long, and over how many refusals in a row, one tree's root must fail before the trees are rebuilt. */
@@ -51,38 +44,16 @@ export function takeRefusedRoot() {
   return taken;
 }
 
-// The tree a scan failed on with its roots accepted, in a way only trees built again get over, until it is taken.
-let failedTree;
-
-/**
- * A scan failing on `tree` so: a leaf of it the engine can't read, or the trees short of the contract's leaves with
- * `leaves` in it, which `broke` counts only while the tree stands still.
- */
-export function treeFailed(tree, leaves) {
-  failedTree = leaves === undefined ? { tree } : { tree, leaves };
-}
-
-/** The tree such a failure named since this was last asked, as `broke` takes a refused root's. */
-export function takeFailedTree() {
-  const taken = failedTree;
-  failedTree = undefined;
-  return taken;
-}
-
 /**
  * What the page does around each notes scan: `resume()` before it, `passed()` after one that completed, and
- * `broke(failed)` after one that broke off, `resume()` and `broke()` answering whether they rebuilt the trees.
+ * `broke(refusedRoot)` after one that broke off, `resume()` and `broke()` answering whether they rebuilt the trees.
  *
- * - Only a tree a scan failed on counts (`failed`): one whose root the engine's end-of-scan check refused
- *   (`takeRefusedRoot()`), or one short of the contract's leaves or holding a leaf the engine can't read
- *   (`takeFailedTree()`). A scan that broke otherwise, its lists failing or a write cut off, may have left a tree
- *   partway through an on-chain batch, at a root the contract never had.
+ * - Only a root the engine's end-of-scan check refused counts (`refusedRoot`, from `takeRefusedRoot()`): a scan that
+ *   broke before that check, its lists failing or a write cut off, may have left a tree partway through an on-chain
+ *   batch, at a root the contract never had.
  * - Refusals count for the tree, whatever its root: new notes move a tree's root on with the leaf stored wrong still
  *   under it. A root an RPC hasn't caught up to is refused for a moment, and the scan that completes after it starts
  *   the count again.
- * - A tree short of the contract's leaves counts while it stands still (`failed.leaves`, how many it has). Trees that
- *   only trail the chain, behind an RPC whose log reads lag its calls, take leaves between scans, and each start the
- *   count again: building them again would get them no further.
  * - `rebuild({started, cleared})` rebuilds every tree from the start (`rebuildTrees`), and answers false when it can't
  *   begin. The rebuild is kept unfinished from `started()` until it completes, so a page closed during it goes on with
  *   it when it reopens: a clearing cut off is done again (`resume()`, or the next refusal), and trees being built again
@@ -117,19 +88,19 @@ export function treeRecovery({ rebuild, store, now = Date.now }) {
       if (state.rebuilding?.cleared === true) ended();
       else if (state.failing !== undefined) store.write({ ...state, failing: undefined });
     },
-    async broke(failed) {
-      if (failed === undefined) return false;
+    async broke(refusedRoot) {
+      if (refusedRoot === undefined) return false;
       const state = store.read();
       // The trees built again are refused all the same: the rebuild has ended, and the count starts with this one.
       if (state.rebuilding?.cleared === true) {
         ended();
-        store.write({ ...store.read(), failing: { ...failed, since: now(), checks: 1 } });
+        store.write({ ...store.read(), failing: { ...refusedRoot, since: now(), checks: 1 } });
         return false;
       }
-      const same = state.failing?.tree === failed.tree && state.failing.leaves === failed.leaves;
-      const failing = same
-        ? { ...state.failing, root: failed.root, checks: state.failing.checks + 1 }
-        : { ...failed, since: now(), checks: 1 };
+      const failing =
+        state.failing?.tree === refusedRoot.tree
+          ? { ...state.failing, root: refusedRoot.root, checks: state.failing.checks + 1 }
+          : { ...refusedRoot, since: now(), checks: 1 };
       store.write({ ...state, failing });
       const due =
         state.rebuilding !== undefined ||

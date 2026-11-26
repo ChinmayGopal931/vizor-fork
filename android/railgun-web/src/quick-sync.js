@@ -13,11 +13,8 @@ import {
   createGraphCommitmentBatches,
   sortByTreeNumberAndStartPosition,
 } from '../node_modules/@railgun-community/wallet/dist/services/railgun/quick-sync/V2/quick-sync-events-graph-v2.js';
-// The engine's package doesn't export its contract store either: the contract its own read of the chain uses.
-import { ContractStore } from '../node_modules/@railgun-community/engine/dist/contracts/contract-store.js';
 import { RecordRefused, refusedRecord } from './commitment-check.js';
 import { pauseMark, pausedSince } from './page-clock.js';
-import { RPC_LAG_BLOCKS, treeFailed } from './tree-recovery.js';
 
 /** The most events the indexer answers at once. */
 export const SQUID_PAGE_SIZE = 10_000;
@@ -315,13 +312,6 @@ export function takeQuickSyncStop() {
  *   stop the scan: it would end with the trees short of them, at a root the contract recorded, so the check would
  *   pass with notes missing. Not sooner: the engine's listener queues the newest blocks' leaves as they come, and
  *   rail-squid, behind the RPC, can leave a stretch between them that only the engine's read fills.
- * - Trees short of the leaves Railgun's contract holds, once that read is done, stop the scan too (`shortOf`),
- *   whether or not leaves are left in the queue. The engine starts every sync at the block of its newest stored leaf,
- *   which is its source's word: a source that dates a leaf past leaves it left out (far ahead, say) has every later
- *   quick sync, and the engine's own read, start after them. The stale root is one the contract had, so the scan
- *   would end complete with every note since missing, and no later scan would fetch them. Such a tree counts toward
- *   building the trees again while it stands still (tree-recovery.js), unless the quick sync failed: then no source
- *   was there to fill it, and trees built again would have none either.
  *
  * Install it after every other change to the quick sync: it watches the one the engine calls.
  */
@@ -346,9 +336,6 @@ export function guardQuickSync(
     stopped = reason;
     throw new Error(reason);
   };
-  // The contract's leaves a little behind the newest block the read went to: an RPC's log reads can trail its calls.
-  // Undefined where the RPC doesn't answer: what its error says, its address among it, goes into no message.
-  const heldBehind = (newest) => contractLeaves(chain, newest - RPC_LAG_BLOCKS).catch(() => undefined);
   const quickSync = engine.performQuickSync;
   // The engine tries a failed quick sync once more through this same method, so the try that ends it judges.
   engine.performQuickSync = async function performQuickSync(version, ...rest) {
@@ -367,48 +354,11 @@ export function guardQuickSync(
   engine.slowSyncV2 = async function slowSyncV2(...args) {
     await chainRead.call(this, ...args);
     const merkletree = engine.getUTXOMerkletree(txidVersion, chain);
-    let left = leavesLeft(merkletree);
-    if (left) {
-      await delay(writeRetryMs);
-      await merkletree.updateTreesFromWriteQueue(true);
-      left = leavesLeft(merkletree);
-    }
-    const given = 'the trees stopped short of the leaves they were given';
-    // The newest block the engine's read went to (`latestBlock`).
-    const held = await heldBehind(args[3]);
-    const unanswered = "the Ethereum RPC does not answer for the leaves Railgun's contract holds";
-    if (held === undefined) stop(left ? given : unanswered);
-    const short = await shortOf(merkletree, held);
-    if (short !== undefined) {
-      // Not while the quick sync failed: no source was there to give the trees their leaves.
-      if (failure === undefined) treeFailed(short.tree, short.leaves);
-      const contract = `Railgun's contract ${held.leaves} in tree ${held.tree}`;
-      stop(`the trees stopped short of the chain: tree ${short.tree} has ${short.leaves} leaves, and ${contract}`);
-    }
-    if (left) stop(given);
+    if (!leavesLeft(merkletree)) return;
+    await delay(writeRetryMs);
+    await merkletree.updateTreesFromWriteQueue(true);
+    if (leavesLeft(merkletree)) stop('the trees stopped short of the leaves they were given');
   };
-}
-
-/**
- * The leaves Railgun's contract held at `block`, as `{tree, leaves}`: its newest tree, and how many leaves are in it.
- * Two calls at one block of the contract the engine's own read uses, the same for every wallet.
- */
-export async function contractLeaves(chain, block) {
-  const { contract } = ContractStore.railgunSmartWalletContracts.get(null, chain);
-  const at = { blockTag: block };
-  const [treeNumber, nextLeafIndex] = await Promise.all([contract.treeNumber(at), contract.nextLeafIndex(at)]);
-  return { tree: Number(treeNumber), leaves: Number(nextLeafIndex) };
-}
-
-/**
- * Where `merkletree` is short of the leaves the contract `held` (`contractLeaves`), as `{tree, leaves}`: its newest
- * tree and the leaves in it; undefined when it holds them all. The trees hold them when they are as far in the
- * contract's newest tree, or in a later one: the engine's listener adds the blocks after as they come.
- */
-export async function shortOf(merkletree, held) {
-  const tree = await merkletree.latestTree();
-  const leaves = await merkletree.getTreeLength(tree);
-  return tree > held.tree || (tree === held.tree && leaves >= held.leaves) ? undefined : { tree, leaves };
 }
 
 /** The indexer's three lists from `startingBlock` on. */
