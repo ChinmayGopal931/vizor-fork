@@ -634,13 +634,9 @@ stay, unused.
   0.001 USDC shield as a million, spendable (or as dust, which every payment
   then picked first and failed to prove), and put a shield it made up for a
   0zk address it knows on someone else's leaf. The engine decrypts a leaf
-  once, so a wallet that synced before the check holds the shield notes it
-  kept to their leaves once, as the engine loads it (`kept-notes.js`), from
-  the page's own store alone. A note counts as a shield's by the kind of
-  leaf it was decrypted from, which the engine keeps with it, whatever the
-  trees hold there now. The once is for each txid version: the engine loads
-  a wallet its V2 trees and then its V3 ones. A store that fails under it
-  keeps no wallet from loading.
+  once, and nothing looks again at the notes a wallet already keeps: a
+  shield note kept wrong before the check stays (D-164). No source serves a
+  record today that would have left one.
 - A notes scan completes only with its wallet's notes decrypted through
   every leaf (`notes-decrypted.js`). The engine's decryption logs whatever
   stops it (a leaf it can't read, a write its store refused) and returns as
@@ -658,9 +654,8 @@ stay, unused.
   `Merkletree.insertLeaves`, for `tree-recovery.js`, the end-of-scan
   root check reporting the root it refuses and a full rescan without its
   txid list reset (the page's rebuild runs the rescan's steps itself; the
-  SDK's rescan still calls it), the wallet's check of a shield's note and
-  its kept notes held to their leaves as it loads (`kept-notes.js`), and the
-  scan's check of how far its decryption came, with the decryption's
+  SDK's rescan still calls it), the wallet's check of a shield's note, and
+  the scan's check of how far its decryption came, with the decryption's
   catch-all saying what it caught (`notes-decrypted.js`). Each names the
   exact source of the pinned engine and fails the build against any other:
   re-check them when bumping it. The shield check is 9.9.1's own lines, so a

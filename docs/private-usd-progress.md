@@ -3184,16 +3184,15 @@ M8 status (2026-10-14): the non-device parts are done.
     caught. Compared after the scan instead, the engine's own listener,
     which adds a new block's leaves between scans, could fail a refresh for
     leaves its own decryption was about to try.
-  - **Notes already kept** are held to their leaves once, as the engine
-    loads a wallet (`kept-notes.js`): the review asked for one local
-    re-decryption, which is what Anon's "repair balances" does (clear the
-    wallet's notes, scan again). Dropping the shield notes that fail the
-    engine's test leaves the same notes (a test holds the two equal) without
-    minutes of decryption on a restored wallet or every note's screening
-    asked for again. It runs where the engine migrates a wallet's notes
-    itself, before the wallet has its trees: tried first after a scan, the
-    engine's screening refresh, still holding the note, could write a
-    dropped note back.
+  - **Notes already kept are left as they are.** The review asked for one
+    local re-decryption in wallets that had already synced, which is what
+    Anon's "repair balances" does by hand (clear the wallet's notes, scan
+    again). A pass that dropped, as the engine loads a wallet, the shield
+    notes failing the engine's test was written and reviewed, and the owner
+    left it out (2026-11-26, below). A wallet that kept a shield note wrong
+    before the check keeps it: a balance the chain doesn't hold, in a note
+    no payment can spend. No source serves a record today that would have
+    left one.
 
   Run on 2026-11-25: the check over every record both networks have, as the
   page stores them (mainnet's 315,858 from the archive and again from
@@ -3225,19 +3224,14 @@ M8 status (2026-10-14): the non-device parts are done.
     reads. The garbling test had missed it by running a stranger's wallet
     alone; it now runs the wallet a note is addressed to and the one that
     sent it as well, over more kinds of wrong value.
-  - **The kept notes' mark was one for both txid versions.** The engine
-    loads a wallet its V2 trees and then its V3 ones, on every chain. With
-    the V2 notes' leaves not there to hold them to (trees being built
-    again), the V3 load, which finds no notes, set the mark, and the V2
-    notes were never looked at again. Each version now has its own.
-  - **A kept note was judged by the leaf the trees hold now.** A shield made
-    up on a leaf that is a transfer's stayed once honest trees held the
-    transfer there. A note now counts as a shield's by the kind of leaf it
-    was decrypted from, which the engine keeps with it.
-  - **Two smaller ones.** A store failing under the kept notes' pass could
-    keep a wallet from opening: it now ends the pass, which runs again at
-    the next load. And a scan could name a cause the engine caught before it
-    began: what was caught is now forgotten as each scan starts.
+  - **Two were in the pass over kept notes**, since left out: its mark was
+    one for both txid versions, so the engine's V3 load of a wallet set it
+    with the V2 notes unlooked at; and it judged a note by the leaf the
+    trees hold now, so a shield made up on a transfer's leaf stayed once
+    honest trees held the transfer there. Both were fixed on the parked
+    branch, with a store failure that could keep a wallet from opening.
+  - **A scan could name a cause the engine caught before it began.** What
+    was caught is now forgotten as each scan starts.
 
   It also found what the change does not cover. All of it is older than the
   change, and all of it stays open:
@@ -3265,14 +3259,28 @@ M8 status (2026-10-14): the non-device parts are done.
   numbers, the rule this check now holds every record to. Nothing in it
   reads the contract's leaf count.
 
-  Run on 2026-11-26, on the fixes: the check again over every record both
-  networks have (mainnet's 316,325 from the archive and 316,329 from
-  rail-squid, Sepolia's 13,165), none refused; the page's tests (267, the
-  new ones failing on the change as it stood); the reviewer's repros, each
-  now coming out right; and the rebuilt bundle in headless Chrome on
-  Sepolia (`npm run check`, passed at its first run). That check's wallet
-  holds no notes, so no run yet has a wallet with shields of its own go
-  from an older build to this one: the device round is still to come.
+  **Left out on 2026-11-26, the owner's call.** Three things written for
+  this change are not in it, and stay on the branch
+  `parked/railgun-kept-notes-leaf-count-rebuilds`: the pass over a wallet's
+  kept notes, and two additions made after the review to close its first
+  and third open items above (the trees held to the leaves Railgun's
+  contract holds once the engine's own read is done; and trees short of
+  them, or holding a leaf the engine can't read, counted toward a rebuild
+  as a refused root is). None is what Anon's wallet does. The pass is the
+  one part that deletes what a wallet stores, against a note no source is
+  known to have left; the two additions had no review of their own, cost
+  two more RPC calls a scan, and add ways for a refresh to fail or the
+  trees to be rebuilt. What stays in is Anon's own check in the wallet, the
+  check before a record is stored and the scan's check of its decryption.
+
+  Run on 2026-11-26, on what stays in: the check again over every record
+  both networks have (mainnet's 316,325 from the archive and 316,329 from
+  rail-squid, Sepolia's 13,165), none refused; the page's tests (263, the
+  ones added for the review's fixes failing on the change as it stood);
+  the reviewer's repros of what stays in, each now coming out right; and
+  the rebuilt bundle in headless Chrome on Sepolia (`npm run check`, passed
+  at its first run). That check's wallet holds no notes, and no device has
+  run this: the device round is still to come.
 
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's
