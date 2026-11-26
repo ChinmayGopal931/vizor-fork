@@ -293,6 +293,29 @@ export function throughRootRefusals(source) {
   );
 }
 
+// railgun-engine.js: a notes scan ends complete only with its wallets' notes decrypted through every leaf
+// (src/notes-decrypted.js).
+const SCAN_DECRYPTED = `            }, true);
+            this.emitUTXOMerkletreeScanUpdateEvent(txidVersion, chain, 0.97); // 97%
+`;
+
+/**
+ * railgun-engine.js with a notes scan checking, once its balance decryption returns, that the decryption got through
+ * every leaf (src/notes-decrypted.js). The engine's decryption logs whatever stops it and returns as if it had
+ * finished; the check throws instead, into the scan's own handling of a scan that broke off.
+ */
+export function throughDecryptedNotes(source) {
+  return replaceOnce(
+    source,
+    SCAN_DECRYPTED,
+    `            }, true);
+            await require(${pageModule('notes-decrypted.js')}).notesDecrypted(this, txidVersion, chain, walletIdFilter);
+            this.emitUTXOMerkletreeScanUpdateEvent(txidVersion, chain, 0.97); // 97%
+`,
+    'RailgunEngine.scanUTXOHistory',
+  );
+}
+
 // railgun-engine.js: a full rescan ends by resetting the V2 txid list, which src/tree-recovery.js does instead.
 const RESCAN_TXID_RESET = `            if (txidVersion === poi_types_1.TXIDVersion.V2_PoseidonMerkle) {
                 // Must reset txid merkletree which is mapped to UTXO commitments in V2.
@@ -403,9 +426,32 @@ export function throughKeptNotes(source) {
   );
 }
 
+// abstract-wallet.js: what stops a wallet's balance decryption is reported (src/notes-decrypted.js).
+const DECRYPTION_STOPPED = `            // Reset decryptBalancesKeyForChain
+            this.decryptBalancesKeyForChain.del(null, chain);
+            if (err instanceof Error) {
+`;
+
+/**
+ * abstract-wallet.js with `decryptBalances` handing whatever stopped it to src/notes-decrypted.js, beside logging it
+ * and returning as if it had finished: the scan's check of how far the decryption came then says why it fell short.
+ */
+export function throughDecryptionStops(source) {
+  return replaceOnce(
+    source,
+    DECRYPTION_STOPPED,
+    `            // Reset decryptBalancesKeyForChain
+            this.decryptBalancesKeyForChain.del(null, chain);
+            require(${pageModule('notes-decrypted.js')}).decryptionStopped(this.id, err);
+            if (err instanceof Error) {
+`,
+    'AbstractWallet.decryptBalances',
+  );
+}
+
 /** abstract-wallet.js as the build has it. */
 export const throughAbstractWalletHooks = (source) =>
-  throughKeptNotes(throughShieldHashChecks(throughNoteKeyBatches(source)));
+  throughDecryptionStops(throughKeptNotes(throughShieldHashChecks(throughNoteKeyBatches(source))));
 
 // keys-utils.js and keys-utils-legacy.js: a key a scan prepared is taken as it is (src/note-keys.js).
 const SHARED_KEY = `async function getSharedSymmetricKey(privateKeyPairA, blindedPublicKeyPairB) {
@@ -438,8 +484,10 @@ export const throughPreparedLegacyKeys = (source) =>
 /** railgun-engine.js as the build has it. */
 export const throughRailgunEngineHooks = (source) =>
   withoutRescanTxidReset(
-    throughRootRefusals(
-      throughTxidStops(throughBatchedTxidReads(throughBatchedTxidUpdates(throughArchiveTxids(source)))),
+    throughDecryptedNotes(
+      throughRootRefusals(
+        throughTxidStops(throughBatchedTxidReads(throughBatchedTxidUpdates(throughArchiveTxids(source)))),
+      ),
     ),
   );
 

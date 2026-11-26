@@ -186,6 +186,12 @@ enum PrivateUsdFailureReason {
   // The page's own failures (android/railgun-web/src/).
   notesScanBrokeOff('notes_scan_broke_off', [r'notes scan broke off']),
   notesScanStuck('notes_scan_stuck', [r'no notes scan started']),
+  // A scan whose trees stand but whose wallet's notes were not decrypted
+  // through them; what stopped the decryption follows as the cause.
+  notesNotDecrypted('notes_not_decrypted', [
+    r'notes were decrypted through',
+    r'notes are still being decrypted',
+  ]),
   txidListStopped('txid_list_stopped', [r'txid list stopped']),
   txidIndexUnread('txid_index_unread', [r'validated txid index can.t be read']),
   rpcUnreachable('rpc_unreachable', [r'ethereum rpc does not answer']),
