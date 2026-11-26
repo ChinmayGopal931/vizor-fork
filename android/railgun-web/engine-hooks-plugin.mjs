@@ -404,28 +404,6 @@ export function throughShieldHashChecks(source) {
   return replaceOnce(shields, noteKept('us'), noteKeptIfItHashes('us', 'legacy shield'), what);
 }
 
-// abstract-wallet.js: a wallet that loads holds the shield notes it kept before that check to their leaves, once
-// (src/kept-notes.js).
-const WALLET_TREES_LOADED = `        this.utxoMerkletrees.set(txidVersion, utxoMerkletree.chain, utxoMerkletree);
-    }
-`;
-
-/**
- * abstract-wallet.js with `loadUTXOMerkletree` handing the wallet to src/kept-notes.js before it takes its trees: where
- * the engine migrates a wallet's notes itself, with nothing of the engine's reading or writing them yet.
- */
-export function throughKeptNotes(source) {
-  return replaceOnce(
-    source,
-    WALLET_TREES_LOADED,
-    `        await require(${pageModule('kept-notes.js')}).holdShieldNotesToLeaves(this, utxoMerkletree, txidVersion);
-        this.utxoMerkletrees.set(txidVersion, utxoMerkletree.chain, utxoMerkletree);
-    }
-`,
-    'AbstractWallet.loadUTXOMerkletree',
-  );
-}
-
 // abstract-wallet.js: what stops a wallet's balance decryption is reported (src/notes-decrypted.js).
 const DECRYPTION_STOPPED = `            // Reset decryptBalancesKeyForChain
             this.decryptBalancesKeyForChain.del(null, chain);
@@ -451,7 +429,7 @@ export function throughDecryptionStops(source) {
 
 /** abstract-wallet.js as the build has it. */
 export const throughAbstractWalletHooks = (source) =>
-  throughDecryptionStops(throughKeptNotes(throughShieldHashChecks(throughNoteKeyBatches(source))));
+  throughDecryptionStops(throughShieldHashChecks(throughNoteKeyBatches(source)));
 
 // keys-utils.js and keys-utils-legacy.js: a key a scan prepared is taken as it is (src/note-keys.js).
 const SHARED_KEY = `async function getSharedSymmetricKey(privateKeyPairA, blindedPublicKeyPairB) {

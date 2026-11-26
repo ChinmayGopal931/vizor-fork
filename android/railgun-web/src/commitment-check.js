@@ -22,9 +22,6 @@ export class RecordRefused extends Error {}
 // The commitments whose note is public: a shield's, and one from before shields were encrypted to a viewing key.
 const PUBLIC_NOTE = new Set([CommitmentType.ShieldCommitment, CommitmentType.LegacyGeneratedCommitment]);
 
-/** Whether a commitment of `type` carries its note in the open, beside its hash. */
-export const hasPublicNote = (type) => PUBLIC_NOTE.has(type);
-
 // Whether `commitment`'s note hashes to its leaf, as the engine hashes a shield it reads from the chain.
 function hashesToLeaf({ hash, preImage }) {
   try {
@@ -67,7 +64,7 @@ export function refusedRecord(events) {
       const type = AbstractWallet.getCommitmentType(commitment);
       const why = !engineReads(commitment, type)
         ? 'is not one the engine can read'
-        : hasPublicNote(type) && !hashesToLeaf(commitment)
+        : PUBLIC_NOTE.has(type) && !hashesToLeaf(commitment)
           ? 'does not hash to its leaf'
           : undefined;
       if (why !== undefined) {

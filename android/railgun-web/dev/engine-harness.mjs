@@ -16,7 +16,6 @@ import {
   throughUnshieldWatermark,
 } from '../engine-hooks-plugin.mjs';
 import * as archiveTxids from '../src/archive-txids.js';
-import * as keptNotes from '../src/kept-notes.js';
 import * as noteKeys from '../src/note-keys.js';
 import * as notesDecrypted from '../src/notes-decrypted.js';
 import * as treeRecovery from '../src/tree-recovery.js';
@@ -35,7 +34,6 @@ const PAGE_MODULES = new Map([
   [fileURLToPath(new URL('../src/unshield-events.js', import.meta.url)), unshieldEvents],
   [fileURLToPath(new URL('../src/txid-updates.js', import.meta.url)), txidUpdates],
   [fileURLToPath(new URL('../src/archive-txids.js', import.meta.url)), archiveTxids],
-  [fileURLToPath(new URL('../src/kept-notes.js', import.meta.url)), keptNotes],
   [fileURLToPath(new URL('../src/note-keys.js', import.meta.url)), noteKeys],
   [fileURLToPath(new URL('../src/notes-decrypted.js', import.meta.url)), notesDecrypted],
   [fileURLToPath(new URL('../src/tree-recovery.js', import.meta.url)), treeRecovery],
