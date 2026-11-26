@@ -150,5 +150,9 @@ test('what the engine caught is said once: a wallet through its trees, or report
   await notesDecrypted(engine, V2, CHAIN, ['the wallet']);
   scanned = [32];
   await assert.rejects(notesDecrypted(engine, V2, CHAIN, ['the wallet']), /leaves$/);
+  // Nor is one caught before the page last asked, as it does before each scan: a scan's cause is caught while it runs.
+  decryptionStopped('the wallet', new Error('the store refused the write'));
+  takeDecryptStop();
+  await assert.rejects(notesDecrypted(engine, V2, CHAIN, ['the wallet']), /leaves$/);
   takeDecryptStop();
 });

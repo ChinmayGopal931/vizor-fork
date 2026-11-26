@@ -16,7 +16,7 @@ const DECRYPT_POLL_MS = 250;
 // Why the last notes scan's decryption fell short, until it is taken.
 let stopped;
 // What the engine's catch-all last caught decrypting each wallet's notes, by wallet id, until a scan finds the wallet
-// through its trees or reports it short of them.
+// through its trees or reports it short of them, or the page asks why a scan fell short.
 const caught = new Map();
 
 /** The engine's decryption of wallet `id`'s notes stopping on `error`, which the build has it report. */
@@ -24,10 +24,15 @@ export function decryptionStopped(id, error) {
   caught.set(id, error);
 }
 
-/** Why a notes scan's decryption fell short since this was last asked, if it did. */
+/**
+ * Why a notes scan's decryption fell short since this was last asked, if it did. What the engine caught until now is
+ * forgotten with it: the page asks before each scan, so the cause a scan gives is one caught while it ran, not one
+ * from a decryption before it (the engine's listener's, or a wallet's that was still loading).
+ */
 export function takeDecryptStop() {
   const taken = stopped;
   stopped = undefined;
+  caught.clear();
   return taken;
 }
 
