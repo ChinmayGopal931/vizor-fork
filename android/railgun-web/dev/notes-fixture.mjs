@@ -129,6 +129,27 @@ export async function shield(receiver, value) {
   };
 }
 
+/**
+ * A shield of `value` to `receiver` (an engine wallet) from before shields were encrypted to a viewing key, as
+ * rail-squid lists a legacy commitment: the note in the open, and its random encrypted to the wallet's own key.
+ */
+export function legacyShield(receiver, value) {
+  const token = getTokenDataERC20(TOKEN);
+  const note = new TransactNote(receiver.addressKeys, undefined, ByteUtils.randomHex(16), value, token);
+  const { encryptedRandom } = note.serializeLegacy(receiver.getViewingKeyPair().privateKey);
+  return {
+    commitmentType: 'LegacyGeneratedCommitment',
+    hash: note.hash.toString(),
+    preimage: {
+      npk: ByteUtils.nToHex(note.notePublicKey, 32, true),
+      value: value.toString(),
+      token: { tokenType: 'ERC20', tokenSubID: '0x00', tokenAddress: TOKEN },
+    },
+    encryptedRandom: encryptedRandom.map((part) => `0x${part}`),
+    ciphertext: undefined,
+  };
+}
+
 /** `listed` (a `shield`) with its amount given as `value`, its leaf's hash as it was: what a source could serve. */
 export const withAmount = (listed, value) => ({ ...listed, preimage: { ...listed.preimage, value: value.toString() } });
 

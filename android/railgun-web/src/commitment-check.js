@@ -8,6 +8,9 @@
 // - The engine reads a leaf's keys, and a legacy transfer's memo, before it tries to decrypt the leaf, outside the try
 //   that expects a leaf of someone else's. A leaf it can't read there stops every wallet's decryption at that leaf's
 //   batch, for good.
+// - Of a note a wallet opened, the engine reads the leaf's hash and numbers the note by the record's own tree and
+//   index, outside that try too. A record numbered by anything but whole numbers would stop the decryption of the
+//   wallets whose note it is, and of no other: the record's source would see whose it is.
 // Every record is checked, whoever's it is: a wallet that turned to another source over its own notes alone would show
 // the source which notes are its. What a record's ciphertext holds only its wallet can check, and it does.
 import { AbstractWallet, ByteLength, ByteUtils, CommitmentType, getNoteHash } from '@railgun-community/engine';
@@ -35,13 +38,19 @@ function hashesToLeaf({ hash, preImage }) {
   }
 }
 
-// Whether the engine's decryption gets as far as trying `commitment` (`AbstractWallet.createScannedDBCommitments`): it
-// reads the leaf's keys first (note-keys.js), and joins a legacy transfer's memo.
+// Whether `n` numbers a tree, or a leaf in one.
+const isCount = (n) => Number.isSafeInteger(n) && n >= 0;
+
+// Whether the engine's decryption gets through `commitment`, whoever's it is
+// (`AbstractWallet.createScannedDBCommitments`): it reads the leaf's keys first (note-keys.js) and joins a legacy
+// transfer's memo, and of a note it opened it reads the leaf's hash and numbers the note by the record's tree and index
+// (`getGlobalTreePosition`, which adds them: a string joins on instead, and nothing but a whole number makes a BigInt).
 function engineReads(commitment, type) {
   try {
     leafPoints(commitment, type);
     if (type === CommitmentType.LegacyEncryptedCommitment) ByteUtils.combine(commitment.ciphertext.memo.slice());
-    return true;
+    ByteUtils.formatToByteLength(commitment.hash, ByteLength.UINT_256);
+    return isCount(commitment.utxoTree) && isCount(commitment.utxoIndex);
   } catch {
     return false;
   }
@@ -50,6 +59,7 @@ function engineReads(commitment, type) {
 /**
  * The first of `events`' records (commitment batches as the engine's listener takes them) that isn't the chain's, as
  * `{tree, index, why}`, or undefined when every one is. A record's type is read as the engine's decryption reads it.
+ * A tree or an index that is no number is given as '?': what a source put there goes into no message.
  */
 export function refusedRecord(events) {
   for (const { commitments } of events) {
@@ -60,7 +70,10 @@ export function refusedRecord(events) {
         : hasPublicNote(type) && !hashesToLeaf(commitment)
           ? 'does not hash to its leaf'
           : undefined;
-      if (why !== undefined) return { tree: commitment.utxoTree, index: commitment.utxoIndex, why };
+      if (why !== undefined) {
+        const numbered = (n) => (isCount(n) ? n : '?');
+        return { tree: numbered(commitment.utxoTree), index: numbered(commitment.utxoIndex), why };
+      }
     }
   }
   return undefined;
