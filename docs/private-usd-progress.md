@@ -3265,8 +3265,16 @@ M8 status (2026-10-14): the non-device parts are done.
     scans over ten minutes, at most a rebuild a day, the archive off for a
     week after). A decryption a refused write stopped counts nothing: the
     build has the engine mark what it fails on reading a leaf, to tell the
-    two apart. On `main` the unreadable leaf left balances stale without a
-    word; with the change as first reviewed, every refresh failed for good.
+    two apart. Short trees count only while their leaf count stands still:
+    behind an RPC whose log reads lag its calls the trees merely trail the
+    chain and take leaves between scans, and counting those would have a
+    lagging RPC rebuild the trees once a day, as a lagging root check once
+    did. Nor do they count in a scan whose quick sync failed: with
+    rail-squid out of reach nothing was there to fill them, and a rebuild
+    would clear trees it could not build again. Leaves left queued behind a
+    stretch a source left out for good are short of the contract as well,
+    and now count. On `main` the unreadable leaf left balances stale without
+    a word; with the change as first reviewed, every refresh failed for good.
 
   Still open from the review:
   - **Rail-squid's list of spent notes is taken as served** (read, not
@@ -3291,7 +3299,7 @@ M8 status (2026-10-14): the non-device parts are done.
   Run on 2026-11-26, on the fixes and the two additions: the check again
   over every record both networks have (mainnet's 316,325 from the archive
   and 316,329 from rail-squid, Sepolia's 13,165), none refused; the page's
-  tests (271, the new ones failing on the change as it stood); the
+  tests (273, the new ones failing on the change as it stood); the
   reviewer's repros, each now coming out right; and the rebuilt bundle in
   headless Chrome on Sepolia (`npm run check`, passed at its first run,
   each of its scans reading the contract's leaf count and finding the trees

@@ -603,7 +603,13 @@ stay, unused.
   every later quick sync, and the engine's own read, start after them. The
   stale root is one the contract had, so scans ended complete with every
   note since missing, and no later scan fetched them. Such a tree counts
-  toward building the trees again (review, 2026-11-26).
+  toward building the trees again while its leaf count stands still: trees
+  that only trail the chain, behind an RPC whose log reads lag its calls,
+  take leaves between scans, and each starts the count again. It counts
+  for nothing in a scan whose quick sync failed: no source was there to
+  fill the trees, and trees built again would find none either. Leaves
+  left in the queue behind a stretch a source left out for good are short
+  of the contract too, and count the same (review, 2026-11-26).
 - No commitment record is stored before it is checked
   (`commitment-check.js`), rail-squid's and the archive's alike, whoever's
   note it is. The trees' root check vouches for a leaf's hash alone, and a
@@ -730,10 +736,12 @@ stay, unused.
     RPC that lags, which would otherwise rebuild the trees once a day
     (review, 2026-11-22). Two failures that leave every root accepted count
     for their tree the same way, since only trees built again get over
-    them: the trees short of the leaves the contract holds, and a leaf the
-    engine can't read as it decrypts (review, 2026-11-26). A scan that
+    them: the trees short of the leaves the contract holds, for as long as
+    they take no leaf between scans and the quick sync answers, and a leaf
+    the engine can't read as it decrypts (review, 2026-11-26). A scan that
     broke otherwise counts for nothing: its store can end inside an
-    on-chain batch, at a root the contract never had. The rebuild clears the transaction list first
+    on-chain batch, at a root the contract never had. The rebuild clears
+    the transaction list first
     (rebuilt notes lack the railgunTxids its sync gave them, which proofs
     need), never begins while the engine syncs either or while the rest
     of a sync runs (which would read and hand on the balances it clears),

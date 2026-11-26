@@ -54,9 +54,12 @@ export function takeRefusedRoot() {
 // The tree a scan failed on with its roots accepted, in a way only trees built again get over, until it is taken.
 let failedTree;
 
-/** A scan failing on `tree` so: the trees short of the contract's leaves, or a leaf of it the engine can't read. */
-export function treeFailed(tree) {
-  failedTree = { tree };
+/**
+ * A scan failing on `tree` so: a leaf of it the engine can't read, or the trees short of the contract's leaves with
+ * `leaves` in it, which `broke` counts only while the tree stands still.
+ */
+export function treeFailed(tree, leaves) {
+  failedTree = leaves === undefined ? { tree } : { tree, leaves };
 }
 
 /** The tree such a failure named since this was last asked, as `broke` takes a refused root's. */
@@ -77,6 +80,9 @@ export function takeFailedTree() {
  * - Refusals count for the tree, whatever its root: new notes move a tree's root on with the leaf stored wrong still
  *   under it. A root an RPC hasn't caught up to is refused for a moment, and the scan that completes after it starts
  *   the count again.
+ * - A tree short of the contract's leaves counts while it stands still (`failed.leaves`, how many it has). Trees that
+ *   only trail the chain, behind an RPC whose log reads lag its calls, take leaves between scans, and each start the
+ *   count again: building them again would get them no further.
  * - `rebuild({started, cleared})` rebuilds every tree from the start (`rebuildTrees`), and answers false when it can't
  *   begin. The rebuild is kept unfinished from `started()` until it completes, so a page closed during it goes on with
  *   it when it reopens: a clearing cut off is done again (`resume()`, or the next refusal), and trees being built again
@@ -120,10 +126,10 @@ export function treeRecovery({ rebuild, store, now = Date.now }) {
         store.write({ ...store.read(), failing: { ...failed, since: now(), checks: 1 } });
         return false;
       }
-      const failing =
-        state.failing?.tree === failed.tree
-          ? { ...state.failing, root: failed.root, checks: state.failing.checks + 1 }
-          : { ...failed, since: now(), checks: 1 };
+      const same = state.failing?.tree === failed.tree && state.failing.leaves === failed.leaves;
+      const failing = same
+        ? { ...state.failing, root: failed.root, checks: state.failing.checks + 1 }
+        : { ...failed, since: now(), checks: 1 };
       store.write({ ...state, failing });
       const due =
         state.rebuilding !== undefined ||

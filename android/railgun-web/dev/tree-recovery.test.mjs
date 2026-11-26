@@ -122,12 +122,27 @@ test('a tree whose root moves on with new notes, the leaf stored wrong still und
   assert.equal(r.rebuilds.length, 1);
 });
 
-test('a tree short of the contract, or holding a leaf the engine can not read, counts as its refused root does', async () => {
+test('a tree holding a leaf the engine can not read counts as its refused root does', async () => {
   const r = recovery();
   assert.equal(await r.broke(0, { tree: wrong.tree }), false);
   assert.equal(await r.broke(5, wrong), false);
   assert.equal(await r.broke(5, { tree: wrong.tree }), true);
   assert.equal(r.rebuilds.length, 1);
+});
+
+test('a tree short of the contract counts while it stands still; one that only trails the chain never rebuilds', async () => {
+  // Behind an RPC whose log reads lag its calls, the trees take leaves between scans: each starts the count again.
+  const trailing = recovery();
+  for (const [i, leaves] of [100, 104, 108, 112, 116, 120].entries()) {
+    assert.equal(await trailing.broke(i === 0 ? 0 : 6, { tree: 0, leaves }), false, `${leaves} leaves`);
+  }
+  assert.equal(trailing.rebuilds.length, 0);
+  // Trees a source left short take none: no later sync fetches the leaves it left out.
+  const still = recovery();
+  assert.equal(await still.broke(0, { tree: 0, leaves: 100 }), false);
+  assert.equal(await still.broke(5, { tree: 0, leaves: 100 }), false);
+  assert.equal(await still.broke(5, { tree: 0, leaves: 100 }), true);
+  assert.equal(still.rebuilds.length, 1);
 });
 
 test('another tree starts the count again', async () => {
@@ -608,7 +623,7 @@ test('a source that dates its newest leaf past leaves it left out stops the scan
   const has = `tree 0 has ${leavesAt(half)} leaves`;
   const held = `Railgun's contract ${leavesAt(fixture.to - RPC_LAG_BLOCKS)} in tree 0`;
   assert.equal(takeQuickSyncStop(), `the trees stopped short of the chain: ${has}, and ${held}`);
-  assert.deepEqual(takeFailedTree(), { tree: 0 });
+  assert.deepEqual(takeFailedTree(), { tree: 0, leaves: leavesAt(half) });
 
   // Dated as the chain has it, the engine reads the rest from the chain itself, and the trees hold every leaf.
   const rest = fixture.squid.commitments.filter(({ blockNumber }) => Number(blockNumber) > half);
@@ -642,7 +657,33 @@ test("the contract's leaves are counted a few blocks behind the newest: an RPC's
   await past.scan();
   assert.deepEqual(past.ends, ['incomplete']);
   assert.match(takeQuickSyncStop(), /^the trees stopped short of the chain/);
-  assert.deepEqual(takeFailedTree(), { tree: 0 });
+  assert.deepEqual(takeFailedTree(), { tree: 0, leaves: leavesAt(fixture.to - RPC_LAG_BLOCKS - 1) });
+});
+
+test('trees short of the contract count for nothing while the quick sync fails, and count though leaves are left queued', async () => {
+  // Rail-squid out of reach, close enough for the engine's own read, which an RPC with lagging logs leaves short:
+  // nothing was there to fill the trees, and trees built again would find nothing either.
+  const unreached = await guardedEngineOn({ queries: unanswered, newest: fixture.to, leaves: leavesAt });
+  takeFailedTree();
+  await unreached.scan();
+  assert.deepEqual(unreached.ends, ['incomplete']);
+  assert.match(takeQuickSyncStop(), /^the trees stopped short of the chain: tree 0 has 0 leaves/);
+  assert.equal(takeFailedTree(), undefined);
+
+  // A stretch a source left out for good, the leaves after it queued: short of the contract, and counted.
+  const dropped = formatCommitments(fixture.squid.commitments)[3];
+  const commitments = fixture.squid.commitments.filter(
+    ({ batchStartTreePosition }) => Number(batchStartTreePosition) !== dropped.startPosition,
+  );
+  const gapped = await guardedEngineOn({
+    queries: indexer({ ...fixture.squid, commitments }, PAGE).queries,
+    newest: fixture.to,
+    leaves: leavesAt,
+  });
+  await gapped.scan();
+  assert.deepEqual(gapped.ends, ['incomplete']);
+  assert.match(takeQuickSyncStop(), /^the trees stopped short of the chain/);
+  assert.deepEqual(takeFailedTree(), { tree: 0, leaves: dropped.startPosition });
 });
 
 test("an RPC that doesn't answer for the contract's leaves stops the scan, and counts nothing against the trees", async () => {

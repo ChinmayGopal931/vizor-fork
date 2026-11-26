@@ -316,10 +316,12 @@ export function takeQuickSyncStop() {
  *   pass with notes missing. Not sooner: the engine's listener queues the newest blocks' leaves as they come, and
  *   rail-squid, behind the RPC, can leave a stretch between them that only the engine's read fills.
  * - Trees short of the leaves Railgun's contract holds, once that read is done, stop the scan too (`shortOf`),
- *   and count toward building the trees again (tree-recovery.js). The engine starts every sync at the block of its
- *   newest stored leaf, which is its source's word: a source that dates a leaf past leaves it left out (far ahead,
- *   say) has every later quick sync, and the engine's own read, start after them. The stale root is one the contract
- *   had, so the scan would end complete with every note since missing, and no later scan would fetch them.
+ *   whether or not leaves are left in the queue. The engine starts every sync at the block of its newest stored leaf,
+ *   which is its source's word: a source that dates a leaf past leaves it left out (far ahead, say) has every later
+ *   quick sync, and the engine's own read, start after them. The stale root is one the contract had, so the scan
+ *   would end complete with every note since missing, and no later scan would fetch them. Such a tree counts toward
+ *   building the trees again while it stands still (tree-recovery.js), unless the quick sync failed: then no source
+ *   was there to fill it, and trees built again would have none either.
  *
  * Install it after every other change to the quick sync: it watches the one the engine calls.
  */
@@ -345,11 +347,8 @@ export function guardQuickSync(
     throw new Error(reason);
   };
   // The contract's leaves a little behind the newest block the read went to: an RPC's log reads can trail its calls.
-  // What the RPC's error says, its address among it, goes into no message.
-  const heldBehind = (newest) =>
-    contractLeaves(chain, newest - RPC_LAG_BLOCKS).catch(() =>
-      stop("the Ethereum RPC does not answer for the leaves Railgun's contract holds"),
-    );
+  // Undefined where the RPC doesn't answer: what its error says, its address among it, goes into no message.
+  const heldBehind = (newest) => contractLeaves(chain, newest - RPC_LAG_BLOCKS).catch(() => undefined);
   const quickSync = engine.performQuickSync;
   // The engine tries a failed quick sync once more through this same method, so the try that ends it judges.
   engine.performQuickSync = async function performQuickSync(version, ...rest) {
@@ -368,18 +367,25 @@ export function guardQuickSync(
   engine.slowSyncV2 = async function slowSyncV2(...args) {
     await chainRead.call(this, ...args);
     const merkletree = engine.getUTXOMerkletree(txidVersion, chain);
-    if (leavesLeft(merkletree)) {
+    let left = leavesLeft(merkletree);
+    if (left) {
       await delay(writeRetryMs);
       await merkletree.updateTreesFromWriteQueue(true);
-      if (leavesLeft(merkletree)) stop('the trees stopped short of the leaves they were given');
+      left = leavesLeft(merkletree);
     }
+    const given = 'the trees stopped short of the leaves they were given';
     // The newest block the engine's read went to (`latestBlock`).
     const held = await heldBehind(args[3]);
+    const unanswered = "the Ethereum RPC does not answer for the leaves Railgun's contract holds";
+    if (held === undefined) stop(left ? given : unanswered);
     const short = await shortOf(merkletree, held);
-    if (short === undefined) return;
-    treeFailed(short.tree);
-    const contract = `Railgun's contract ${held.leaves} in tree ${held.tree}`;
-    stop(`the trees stopped short of the chain: tree ${short.tree} has ${short.leaves} leaves, and ${contract}`);
+    if (short !== undefined) {
+      // Not while the quick sync failed: no source was there to give the trees their leaves.
+      if (failure === undefined) treeFailed(short.tree, short.leaves);
+      const contract = `Railgun's contract ${held.leaves} in tree ${held.tree}`;
+      stop(`the trees stopped short of the chain: tree ${short.tree} has ${short.leaves} leaves, and ${contract}`);
+    }
+    if (left) stop(given);
   };
 }
 
