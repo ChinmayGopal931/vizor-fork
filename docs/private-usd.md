@@ -478,6 +478,9 @@ keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
   the trees: a source could otherwise show a balance the chain doesn't hold,
   or leave a note no payment can spend. Never turn to another source over a
   wallet's own note alone, which would show the source whose note it is.
+  Two things are still a source's word (progress D-164, open): the block a
+  leaf is dated at, which is where the next sync starts, and the list of
+  spent notes.
 - A Railgun wallet decrypts from a creation block only when Veylor generated
   its seed (`AccountInfo.generatedSeed`): the seed's birthday, rounded down
   on both chains' block tables, a day early. Its mnemonic is the standard
@@ -602,6 +605,17 @@ stay, unused.
     legacy transfer's memo, must be ones it can read: it reads them outside
     the try that expects someone else's leaf, so one it can't read stops
     every wallet's decryption at that leaf's batch for good.
+  - The record's tree and index must be whole numbers, and its hash one the
+    engine reads: of a note a wallet opened the engine reads the hash and
+    numbers the note by the two, outside that try as well. An index of
+    `"137e0"` puts the leaf in the trees where 137 would and then stops the
+    decryption of the wallets whose note it is, and of no other: its source
+    would see whose it is.
+
+  A test garbles every field of every kind of record and holds the check to
+  the engine's own decryption, for the wallet a note is addressed to, the
+  one that sent it and a stranger: a field the engine throws on that the
+  check takes fails it.
 
   An archive chunk with such a record is not stored, and the archive is left
   before it. A page of rail-squid's with one is not stored either: the quick
@@ -609,9 +623,10 @@ stay, unused.
   hashes each leaf from its event; past the 100,000 blocks the scan fails,
   naming the record. Never check a wallet's own notes alone, or turn to
   another source over one: the source would learn whose note it is. The
-  check passed every record both networks have (2026-11-25: mainnet's
-  315,858 from the archive and again from rail-squid, Sepolia's 13,116), and
-  costs about 0.14 ms a shield (Node on a Mac): 11 s of a cold mainnet sync.
+  check passed every record both networks have (2026-11-26: mainnet's
+  316,325 from the archive and 316,329 from rail-squid, Sepolia's 13,165),
+  and costs about 0.14 ms a shield (Node on a Mac): 11 s of a cold mainnet
+  sync.
 - A wallet keeps a shield's note only if it hashes to its leaf: what a
   record's ciphertext holds only its wallet can check. Engine 9.8.0 checks a
   transfer's note so and a shield's not at all; the build gives it 9.9.1's
@@ -621,7 +636,11 @@ stay, unused.
   0zk address it knows on someone else's leaf. The engine decrypts a leaf
   once, so a wallet that synced before the check holds the shield notes it
   kept to their leaves once, as the engine loads it (`kept-notes.js`), from
-  the page's own store alone.
+  the page's own store alone. A note counts as a shield's by the kind of
+  leaf it was decrypted from, which the engine keeps with it, whatever the
+  trees hold there now. The once is for each txid version: the engine loads
+  a wallet its V2 trees and then its V3 ones. A store that fails under it
+  keeps no wallet from loading.
 - A notes scan completes only with its wallet's notes decrypted through
   every leaf (`notes-decrypted.js`). The engine's decryption logs whatever
   stops it (a leaf it can't read, a write its store refused) and returns as
@@ -629,6 +648,8 @@ stay, unused.
   balance, with every note after that batch missing. The scan now fails,
   saying how far the wallet came and what stopped it, and the refresh with
   it; a decryption the engine's listener began mid-scan is waited for.
+  Nothing rebuilds the trees for a decryption that keeps stopping: the
+  roots were accepted (D-164, open).
 - `engine-hooks-plugin.mjs` holds every rewrite of the engine's code: the
   unshield watermark (`unshield-events.js`), the archive's leaf hashing
   (`archive-txids.js`), the txid sync's record updates

@@ -3133,9 +3133,10 @@ M8 status (2026-10-14): the non-device parts are done.
     maker a fresh payout address, so an unattended amount step no longer
     asks one every 100 s.
 
-- **D-164 (owner, 2026-11-25): a quick sync's source is trusted for the
-  trees' roots alone.** A review found two things in the page, both
-  reproduced on the pinned engine (9.8.0) before anything changed:
+- **D-164 (owner, 2026-11-25): what a wallet reads of a commitment is held
+  to the chain, not to a quick sync's source.** A review found two things in
+  the page, both reproduced on the pinned engine (9.8.0) before anything
+  changed:
   - **A shield's note was never held to its leaf.** A quick sync's record
     gives a leaf's hash and, beside it, the shield's key, token and amount;
     the root check covers the hash alone, and the engine kept whatever
@@ -3209,6 +3210,69 @@ M8 status (2026-10-14): the non-device parts are done.
   honest source would bring it back; nothing either network serves today is
   such a record), and a source can still hide a note by garbling its
   ciphertext, which nothing but the chain's own events can show.
+
+  **Reviewed on 2026-11-26** by a fresh agent, given the change and the two
+  engines and none of the reasoning above. It found four things wrong in the
+  change, each reproduced before it was fixed:
+  - **A record numbered by a string stopped its own wallet alone.** The
+    engine puts a leaf in the trees by the record's own tree and index, and
+    numbers a note a wallet opened by the same two (`getGlobalTreePosition`),
+    outside its try. An index of `"137e0"` reads as 137 where the leaf is
+    placed and makes no BigInt where the note is numbered: the leaf was
+    stored, every other wallet read past it, and the wallet whose shield it
+    was failed every scan from then on. The check now takes a record only if
+    its tree and index are whole numbers and its hash is one the engine
+    reads. The garbling test had missed it by running a stranger's wallet
+    alone; it now runs the wallet a note is addressed to and the one that
+    sent it as well, over more kinds of wrong value.
+  - **The kept notes' mark was one for both txid versions.** The engine
+    loads a wallet its V2 trees and then its V3 ones, on every chain. With
+    the V2 notes' leaves not there to hold them to (trees being built
+    again), the V3 load, which finds no notes, set the mark, and the V2
+    notes were never looked at again. Each version now has its own.
+  - **A kept note was judged by the leaf the trees hold now.** A shield made
+    up on a leaf that is a transfer's stayed once honest trees held the
+    transfer there. A note now counts as a shield's by the kind of leaf it
+    was decrypted from, which the engine keeps with it.
+  - **Two smaller ones.** A store failing under the kept notes' pass could
+    keep a wallet from opening: it now ends the pass, which runs again at
+    the next load. And a scan could name a cause the engine caught before it
+    began: what was caught is now forgotten as each scan starts.
+
+  It also found what the change does not cover. All of it is older than the
+  change, and all of it stays open:
+  - **The block a leaf is dated at is the source's word**, and the engine
+    starts every later sync from the newest stored leaf's block. A source
+    that dates the newest leaf it serves far ahead has every later quick
+    sync ask for nothing and the engine's own read begin past the chain's
+    newest block. The stale root is one the contract had, so scans end
+    complete with the notes after it missing. Reproduced over the engine
+    with the page's quick sync and guard (no device): three scans complete,
+    the trees at 240 of 480 leaves. Holding the trees' leaf count to the
+    contract's after each scan would close it.
+  - **Rail-squid's list of spent notes is taken as served** (read, not
+    reproduced): one it leaves out shows a spent note as unspent.
+  - **A decryption that keeps stopping has no way out.** A stored leaf the
+    engine can't read fails every refresh, and the roots were accepted, so
+    nothing rebuilds the trees. Before this change the same leaf left the
+    balances stale without a word. Counting such a stop for its tree, as a
+    refused root counts, would rebuild it.
+  - A store error that the engine's own second try gets over still fails
+    the one refresh.
+
+  Against Anon's wallet (0.14.5): its archive's tree, index and block number
+  reach its engine as served, and its live feed takes them only as whole
+  numbers, the rule this check now holds every record to. Nothing in it
+  reads the contract's leaf count.
+
+  Run on 2026-11-26, on the fixes: the check again over every record both
+  networks have (mainnet's 316,325 from the archive and 316,329 from
+  rail-squid, Sepolia's 13,165), none refused; the page's tests (267, the
+  new ones failing on the change as it stood); the reviewer's repros, each
+  now coming out right; and the rebuilt bundle in headless Chrome on
+  Sepolia (`npm run check`, passed at its first run). That check's wallet
+  holds no notes, so no run yet has a wallet with shields of its own go
+  from an older build to this one: the device round is still to come.
 
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's
