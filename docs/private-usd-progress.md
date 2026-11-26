@@ -3133,6 +3133,83 @@ M8 status (2026-10-14): the non-device parts are done.
     maker a fresh payout address, so an unattended amount step no longer
     asks one every 100 s.
 
+- **D-164 (owner, 2026-11-25): a quick sync's source is trusted for the
+  trees' roots alone.** A review found two things in the page, both
+  reproduced on the pinned engine (9.8.0) before anything changed:
+  - **A shield's note was never held to its leaf.** A quick sync's record
+    gives a leaf's hash and, beside it, the shield's key, token and amount;
+    the root check covers the hash alone, and the engine kept whatever
+    amount the source gave for any shield the wallet could open. Run against
+    the engine, a 0.001 USDC shield read as 1,000,000 USDC, and a shield
+    made up for the wallet on a stranger's leaf read as the wallet's, the
+    tree's root unchanged both times. Rail-squid, the Sepolia list and
+    Anon's archive could each do it; the RPC could not, since the engine
+    hashes a leaf it reads from the chain from its event.
+  - **A decryption that stopped ended its scan complete.** The engine's
+    balance decryption logs whatever stops it and returns as if it had
+    finished. With a shield whose key is no hex five leaves after the
+    wallet's note, three scans in a row ended complete, the note never
+    found and nothing marked as tried: every wallet on the device would stop
+    at that record, at every refresh, with its balance read as synced.
+
+  What changed, in the page alone (no host, and nothing in Rust):
+  - **The wallet's own check** is engine 9.9.1's, in its own lines, through
+    the build's rewrites: a shield's note, and a legacy shield's, is kept
+    only if it hashes to its leaf. Anon's wallet (0.14.5, read for this
+    only) ships the same check; its archive's records reach its engine
+    formatted but unchecked, and only its live feed of pending events has
+    its fields validated. The engine was not bumped: 9.9.1 also validates
+    every tree write, which the page's quick sync writes around, a change of
+    its own.
+  - **A check before a record is stored** (`commitment-check.js`), which
+    the review asked for beyond Anon's: every shield's note must hash to its
+    leaf, and every record must be one the engine's decryption can read.
+    Without it the wallet's check alone turns a raised amount into a hidden
+    note, and an unreadable record still stops every wallet. Which fields
+    the engine reads outside its try is not listed by hand alone: a test
+    garbles every field of every record type and holds the check to the
+    engine's own decryption, which is how a legacy transfer's memo was
+    found beside the keys. The archive is left before such a chunk; a page
+    of rail-squid's fails the quick sync and the engine reads from the RPC.
+    Every record is checked, whoever's: a wallet that left a source over its
+    own note would show the source whose it is. The review's "shields of a
+    token we count" would have cost less (the hash is 0.14 ms a shield in
+    Node on a Mac, 11 s of a cold mainnet sync for all 79,593), but the page
+    knows no token, and every shield is the plainer rule.
+  - **A scan checks how far its decryption came**
+    (`notes-decrypted.js`), inside the scan, where the trees can't grow
+    under it: short of any tree, the engine reports the scan incomplete and
+    the refresh fails, saying how far the wallet came and what the engine
+    caught. Compared after the scan instead, the engine's own listener,
+    which adds a new block's leaves between scans, could fail a refresh for
+    leaves its own decryption was about to try.
+  - **Notes already kept** are held to their leaves once, as the engine
+    loads a wallet (`kept-notes.js`): the review asked for one local
+    re-decryption, which is what Anon's "repair balances" does (clear the
+    wallet's notes, scan again). Dropping the shield notes that fail the
+    engine's test leaves the same notes (a test holds the two equal) without
+    minutes of decryption on a restored wallet or every note's screening
+    asked for again. It runs where the engine migrates a wallet's notes
+    itself, before the wallet has its trees: tried first after a scan, the
+    engine's screening refresh, still holding the note, could write a
+    dropped note back.
+
+  Run on 2026-11-25: the check over every record both networks have, as the
+  page stores them (mainnet's 315,858 from the archive and again from
+  rail-squid, 79,593 shields and 795 legacy ones among them; Sepolia's
+  13,116), none refused, so it drops no real note and no store synced from
+  them holds a record it would refuse; the page's tests (264); and the
+  rebuilt bundle in headless Chrome on Sepolia (`npm run check`: first
+  sync, the trees' rebuild, refreshes, the wallet loaded again and its
+  deletion). Two earlier runs of that check stopped where the engine reads
+  the newest blocks from the keyless public RPC ("Failed to scan V2
+  events"), before any of this code. No device run. Still open: a shield
+  whose record a source garbled before this build stays hidden from its
+  wallet (the stored leaf is never read again, and only a rebuild from an
+  honest source would bring it back; nothing either network serves today is
+  such a record), and a source can still hide a note by garbling its
+  ciphertext, which nothing but the chain's own events can show.
+
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's
   `zakura-client-backend` pins `digest =0.11.0-pre.9` (through
