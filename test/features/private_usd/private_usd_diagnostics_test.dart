@@ -39,6 +39,12 @@ void main() {
         "the indexer's record at 4:77 is not one the engine can read, and "
                 '250000 blocks are too many to read from the RPC':
             'record_refused',
+        'the trees stopped short of the chain: tree 4 has 54000 leaves, and '
+                "Railgun's contract 54302 in tree 4":
+            'trees_short',
+        'the Ethereum RPC does not answer for the leaves '
+                "Railgun's contract holds":
+            'rpc_unreachable',
         'the txid list stopped at 1204 of 1500 after 4 syncs':
             'txid_list_stopped',
         "the validated txid index can't be read: Failed to fetch":

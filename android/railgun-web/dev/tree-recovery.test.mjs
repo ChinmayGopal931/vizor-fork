@@ -19,6 +19,7 @@ import {
   localStore,
   rebuildTrees,
   rpcBehindLeaf,
+  takeFailedTree,
   takeRefusedRoot,
   treeRecovery,
 } from '../src/tree-recovery.js';
@@ -118,6 +119,14 @@ test('a tree whose root moves on with new notes, the leaf stored wrong still und
   assert.equal(await r.broke(0, wrong), false);
   assert.equal(await r.broke(5, { tree: 3, root: 'bb' }), false);
   assert.equal(await r.broke(5, { tree: 3, root: 'cc' }), true);
+  assert.equal(r.rebuilds.length, 1);
+});
+
+test('a tree short of the contract, or holding a leaf the engine can not read, counts as its refused root does', async () => {
+  const r = recovery();
+  assert.equal(await r.broke(0, { tree: wrong.tree }), false);
+  assert.equal(await r.broke(5, wrong), false);
+  assert.equal(await r.broke(5, { tree: wrong.tree }), true);
   assert.equal(r.rebuilds.length, 1);
 });
 
@@ -244,11 +253,16 @@ async function contractRoots(commitments = fixture.squid.commitments) {
 const ROOTS = await contractRoots();
 
 /**
- * The contract as a scan reads it: the roots it has had (`roots`, as `tree:root`), and its logs past the quick sync,
- * none unless `logs(commitments)` throws or hands the engine's commitments listener some.
+ * The contract as a scan reads it: the roots it has had (`roots`, as `tree:root`), its logs past the quick sync, none
+ * unless `logs(commitments)` throws or hands the engine's commitments listener some, and the leaves it held in tree 0
+ * at a block (`leaves(block)`), none unless a test is about them.
  */
-const contract = ({ roots = ROOTS, logs = () => {} } = {}) => ({
-  contract: { runner: { provider: { getBlockNumber: async () => fixture.to } } },
+const contract = ({ roots = ROOTS, logs = () => {}, leaves = () => 0 } = {}) => ({
+  contract: {
+    runner: { provider: { getBlockNumber: async () => fixture.to } },
+    treeNumber: async () => 0n,
+    nextLeafIndex: async ({ blockTag }) => BigInt(await leaves(blockTag)),
+  },
   validateMerkleroot: async (tree, root) => roots.has(`${tree}:${root}`),
   getHistoricalEvents: async (_from, to, _next, commitments, _nullifiers, _unshields, synced) => {
     await logs(commitments);
@@ -257,8 +271,16 @@ const contract = ({ roots = ROOTS, logs = () => {} } = {}) => ({
 });
 
 /** A whole engine quick syncing from rail-squid (`queries`, paged by `pageSize`), and how each of its scans ended. */
-async function engineOn({ Engine, queries = indexer(fixture.squid, PAGE).queries, pageSize = PAGE, roots, logs } = {}) {
-  const built = await wholeEngine({ Engine, contract: contract({ roots, logs }), deploymentBlock: fixture.from });
+async function engineOn({
+  Engine,
+  queries = indexer(fixture.squid, PAGE).queries,
+  pageSize = PAGE,
+  roots,
+  logs,
+  leaves,
+} = {}) {
+  const stub = contract({ roots, logs, leaves });
+  const built = await wholeEngine({ Engine, contract: stub, deploymentBlock: fixture.from });
   installQuickSync(built.engine, { queries, head: async () => fixture.to, pages: { ...pages, pageSize } });
   const ends = [];
   built.engine.on(EngineEvent.UTXOScanDecryptBalancesComplete, () => ends.push('complete'));
@@ -554,6 +576,88 @@ test("a stretch rail-squid left out that the engine's own read fills passes, as 
   await scan();
   assert.deepEqual(ends, ['complete']);
   assert.equal(takeQuickSyncStop(), undefined);
+});
+
+/** The leaves the fixture's chain held at `block`. */
+const leavesAt = (block) => fixture.squid.commitments.filter(({ blockNumber }) => Number(blockNumber) <= block).length;
+
+/** Rail-squid's lists as an indexer that has come to `block` gives them, its newest commitment dated `dated` if set. */
+function listsThrough(block, dated) {
+  const lists = Object.fromEntries(
+    Object.entries(fixture.squid).map(([name, events]) => [name, events.filter((e) => Number(e.blockNumber) <= block)]),
+  );
+  if (dated === undefined) return lists;
+  const newest = lists.commitments.at(-1);
+  const commitments = lists.commitments.map((c) => (c === newest ? { ...c, blockNumber: String(dated) } : c));
+  return { ...lists, commitments };
+}
+
+test('a source that dates its newest leaf past leaves it left out stops the scan short of the contract, its tree counted', async () => {
+  // Rail-squid half way through the history, its newest commitment dated a million blocks ahead: the engine starts its
+  // own read of the chain there, past the chain's newest block, and every later quick sync would too.
+  const half = fixture.from + 59;
+  const { utxo, ends, scan } = await guardedEngineOn({
+    queries: indexer(listsThrough(half, half + 1_000_000), PAGE).queries,
+    newest: fixture.to,
+    leaves: leavesAt,
+  });
+  takeFailedTree();
+  await scan();
+  assert.equal(await utxo.getTreeLength(0), leavesAt(half));
+  assert.deepEqual(ends, ['incomplete']);
+  const has = `tree 0 has ${leavesAt(half)} leaves`;
+  const held = `Railgun's contract ${leavesAt(fixture.to - RPC_LAG_BLOCKS)} in tree 0`;
+  assert.equal(takeQuickSyncStop(), `the trees stopped short of the chain: ${has}, and ${held}`);
+  assert.deepEqual(takeFailedTree(), { tree: 0 });
+
+  // Dated as the chain has it, the engine reads the rest from the chain itself, and the trees hold every leaf.
+  const rest = fixture.squid.commitments.filter(({ blockNumber }) => Number(blockNumber) > half);
+  const honest = await guardedEngineOn({
+    queries: indexer(listsThrough(half), PAGE).queries,
+    newest: fixture.to,
+    leaves: leavesAt,
+    chainCommitments: formatCommitments(rest),
+  });
+  await honest.scan();
+  assert.equal(await honest.utxo.getTreeLength(0), fixture.leaves);
+  assert.deepEqual(honest.ends, ['complete']);
+  assert.equal(takeQuickSyncStop(), undefined);
+  assert.equal(takeFailedTree(), undefined);
+});
+
+test("the contract's leaves are counted a few blocks behind the newest: an RPC's log read can trail its calls", async () => {
+  // Trees that end RPC_LAG_BLOCKS before the newest block pass, the last blocks' leaves the next scan's. A block
+  // sooner, they fail.
+  const behind = (blocks) =>
+    guardedEngineOn({
+      queries: indexer(listsThrough(fixture.to - blocks), PAGE).queries,
+      newest: fixture.to,
+      leaves: leavesAt,
+    });
+  const within = await behind(RPC_LAG_BLOCKS);
+  await within.scan();
+  assert.deepEqual(within.ends, ['complete']);
+  assert.equal(takeQuickSyncStop(), undefined);
+  const past = await behind(RPC_LAG_BLOCKS + 1);
+  await past.scan();
+  assert.deepEqual(past.ends, ['incomplete']);
+  assert.match(takeQuickSyncStop(), /^the trees stopped short of the chain/);
+  assert.deepEqual(takeFailedTree(), { tree: 0 });
+});
+
+test("an RPC that doesn't answer for the contract's leaves stops the scan, and counts nothing against the trees", async () => {
+  const { ends, scan } = await guardedEngineOn({
+    newest: fixture.to,
+    leaves: async () => {
+      throw new Error('could not reach https://rpc.example/a-key');
+    },
+  });
+  takeFailedTree();
+  await scan();
+  assert.deepEqual(ends, ['incomplete']);
+  // What the RPC's error says, its address among it, is in no message.
+  assert.equal(takeQuickSyncStop(), "the Ethereum RPC does not answer for the leaves Railgun's contract holds");
+  assert.equal(takeFailedTree(), undefined);
 });
 
 /**
