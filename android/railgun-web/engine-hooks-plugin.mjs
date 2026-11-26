@@ -293,6 +293,29 @@ export function throughRootRefusals(source) {
   );
 }
 
+// railgun-engine.js: a notes scan ends complete only with its wallets' notes decrypted through every leaf
+// (src/notes-decrypted.js).
+const SCAN_DECRYPTED = `            }, true);
+            this.emitUTXOMerkletreeScanUpdateEvent(txidVersion, chain, 0.97); // 97%
+`;
+
+/**
+ * railgun-engine.js with a notes scan checking, once its balance decryption returns, that the decryption got through
+ * every leaf (src/notes-decrypted.js). The engine's decryption logs whatever stops it and returns as if it had
+ * finished; the check throws instead, into the scan's own handling of a scan that broke off.
+ */
+export function throughDecryptedNotes(source) {
+  return replaceOnce(
+    source,
+    SCAN_DECRYPTED,
+    `            }, true);
+            await require(${pageModule('notes-decrypted.js')}).notesDecrypted(this, txidVersion, chain, walletIdFilter);
+            this.emitUTXOMerkletreeScanUpdateEvent(txidVersion, chain, 0.97); // 97%
+`,
+    'RailgunEngine.scanUTXOHistory',
+  );
+}
+
 // railgun-engine.js: a full rescan ends by resetting the V2 txid list, which src/tree-recovery.js does instead.
 const RESCAN_TXID_RESET = `            if (txidVersion === poi_types_1.TXIDVersion.V2_PoseidonMerkle) {
                 // Must reset txid merkletree which is mapped to UTXO commitments in V2.
@@ -344,6 +367,70 @@ export function throughNoteKeyBatches(source) {
   );
 }
 
+// abstract-wallet.js: a shield's note is kept only if it hashes to its leaf. A quick sync's source gives a shield's
+// note (its key, token and amount) beside the leaf's hash, and the trees' root check vouches for the hash alone, so
+// the engine kept whatever amount the source gave, on any leaf whose ciphertext the wallet could open. Engine 9.9.1
+// checks it, as 9.8.0 already checks a transfer's note; these are its lines, and a build against it fails here, where
+// this rewrite is to be dropped.
+const noteKept = (addressedTo) => `                    noteReceive = await transact_note_1.TransactNote.deserialize(txidVersion, chain, serialized, viewingPrivateKey, this.tokenDataGetter);
+                    serializedNoteReceive = serialized;
+                }
+                catch (err) {
+                    // Expect error if leaf not addressed to ${addressedTo}.
+                }
+`;
+const noteKeptIfItHashes = (addressedTo, what) => `                    noteReceive = await transact_note_1.TransactNote.deserialize(txidVersion, chain, serialized, viewingPrivateKey, this.tokenDataGetter);
+                    // SECURITY: the preImage is served by the sync source, not proven by the hash.
+                    if (!decryptedNoteMatchesCommitment(noteReceive)) {
+                        debugger_1.default.log('Discarding ${what} note: preImage hash does not match commitment.');
+                        noteReceive = undefined;
+                    }
+                    else {
+                        serializedNoteReceive = serialized;
+                    }
+                }
+                catch (err) {
+                    // Expect error if leaf not addressed to ${addressedTo}.
+                }
+`;
+
+/**
+ * abstract-wallet.js with a shield's note, and a legacy shield's, kept only when it hashes to its leaf: engine 9.9.1's
+ * check, in its own words.
+ */
+export function throughShieldHashChecks(source) {
+  const what = 'AbstractWallet.createScannedDBCommitments';
+  const shields = replaceOnce(source, noteKept('this wallet'), noteKeptIfItHashes('this wallet', 'shield'), what);
+  return replaceOnce(shields, noteKept('us'), noteKeptIfItHashes('us', 'legacy shield'), what);
+}
+
+// abstract-wallet.js: what stops a wallet's balance decryption is reported (src/notes-decrypted.js).
+const DECRYPTION_STOPPED = `            // Reset decryptBalancesKeyForChain
+            this.decryptBalancesKeyForChain.del(null, chain);
+            if (err instanceof Error) {
+`;
+
+/**
+ * abstract-wallet.js with `decryptBalances` handing whatever stopped it to src/notes-decrypted.js, beside logging it
+ * and returning as if it had finished: the scan's check of how far the decryption came then says why it fell short.
+ */
+export function throughDecryptionStops(source) {
+  return replaceOnce(
+    source,
+    DECRYPTION_STOPPED,
+    `            // Reset decryptBalancesKeyForChain
+            this.decryptBalancesKeyForChain.del(null, chain);
+            require(${pageModule('notes-decrypted.js')}).decryptionStopped(this.id, err);
+            if (err instanceof Error) {
+`,
+    'AbstractWallet.decryptBalances',
+  );
+}
+
+/** abstract-wallet.js as the build has it. */
+export const throughAbstractWalletHooks = (source) =>
+  throughDecryptionStops(throughShieldHashChecks(throughNoteKeyBatches(source)));
+
 // keys-utils.js and keys-utils-legacy.js: a key a scan prepared is taken as it is (src/note-keys.js).
 const SHARED_KEY = `async function getSharedSymmetricKey(privateKeyPairA, blindedPublicKeyPairB) {
     try {
@@ -375,8 +462,10 @@ export const throughPreparedLegacyKeys = (source) =>
 /** railgun-engine.js as the build has it. */
 export const throughRailgunEngineHooks = (source) =>
   withoutRescanTxidReset(
-    throughRootRefusals(
-      throughTxidStops(throughBatchedTxidReads(throughBatchedTxidUpdates(throughArchiveTxids(source)))),
+    throughDecryptedNotes(
+      throughRootRefusals(
+        throughTxidStops(throughBatchedTxidReads(throughBatchedTxidUpdates(throughArchiveTxids(source)))),
+      ),
     ),
   );
 
@@ -404,7 +493,7 @@ export const engineHooks = {
     rewrite(MERKLETREE, 'merkletree', throughAcceptedLeaves);
     rewrite(TXID_MERKLETREE, 'txid-merkletree', throughTxidRootRefusals);
     rewrite(RAILGUN_ENGINE, 'railgun-engine', throughRailgunEngineHooks);
-    rewrite(ABSTRACT_WALLET, 'abstract-wallet', throughNoteKeyBatches);
+    rewrite(ABSTRACT_WALLET, 'abstract-wallet', throughAbstractWalletHooks);
     rewrite(KEYS_UTILS, 'keys-utils', throughPreparedKeys);
     rewrite(KEYS_UTILS_LEGACY, 'keys-utils-legacy', throughPreparedLegacyKeys);
     // A bundle with an engine module this didn't reach would run the engine's own code.

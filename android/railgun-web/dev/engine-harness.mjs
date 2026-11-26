@@ -7,13 +7,17 @@ import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import { TXIDVersion } from '@railgun-community/shared-models';
 import {
+  throughAbstractWalletHooks,
   throughAcceptedLeaves,
+  throughPreparedKeys,
+  throughPreparedLegacyKeys,
   throughRailgunEngineHooks,
   throughTxidRootRefusals,
   throughUnshieldWatermark,
 } from '../engine-hooks-plugin.mjs';
 import * as archiveTxids from '../src/archive-txids.js';
 import * as noteKeys from '../src/note-keys.js';
+import * as notesDecrypted from '../src/notes-decrypted.js';
 import * as treeRecovery from '../src/tree-recovery.js';
 import * as txidReads from '../src/txid-reads.js';
 import * as txidRepair from '../src/txid-repair.js';
@@ -31,6 +35,7 @@ const PAGE_MODULES = new Map([
   [fileURLToPath(new URL('../src/txid-updates.js', import.meta.url)), txidUpdates],
   [fileURLToPath(new URL('../src/archive-txids.js', import.meta.url)), archiveTxids],
   [fileURLToPath(new URL('../src/note-keys.js', import.meta.url)), noteKeys],
+  [fileURLToPath(new URL('../src/notes-decrypted.js', import.meta.url)), notesDecrypted],
   [fileURLToPath(new URL('../src/tree-recovery.js', import.meta.url)), treeRecovery],
   [fileURLToPath(new URL('../src/txid-reads.js', import.meta.url)), txidReads],
   [fileURLToPath(new URL('../src/txid-repair.js', import.meta.url)), txidRepair],
@@ -105,6 +110,21 @@ const { ContractStore } = require(path.join(ENGINE, 'contracts/contract-store'))
 const { CURRENT_UTXO_MERKLETREE_HISTORY_VERSION } = require(path.join(ENGINE, 'utils/constants'));
 /** The engine's own class as the build bundles it, every rewrite applied. */
 export const { RailgunEngine: BuiltEngine } = builtEngineModule('railgun-engine.js', throughRailgunEngineHooks);
+
+// The engine's wallet as the build bundles it: its keys, its scans and what it keeps of them rewritten.
+const keysUtils = builtEngineModule('utils/keys-utils.js', throughPreparedKeys);
+const keysUtilsLegacy = builtEngineModule('utils/keys-utils-legacy.js', throughPreparedLegacyKeys, {
+  './keys-utils': keysUtils,
+});
+const abstractWallet = builtEngineModule('wallet/abstract-wallet.js', throughAbstractWalletHooks, {
+  '../utils/keys-utils': keysUtils,
+  '../utils/keys-utils-legacy': keysUtilsLegacy,
+});
+/** The engine's wallet class as the build bundles it, every rewrite applied. */
+export const { RailgunWallet: BuiltWallet } = builtEngineModule('wallet/railgun-wallet.js', (source) => source, {
+  './abstract-wallet': abstractWallet,
+  '../utils/keys-utils': keysUtils,
+});
 
 /**
  * A whole engine (`Engine`, the build's by default) over `store`, with its UTXO and txid merkletrees for `CHAIN`

@@ -38,6 +38,7 @@ import { artifactStore, withKeysDroppedOnRefusal } from './artifacts.js';
 import { mainnetBlockAt, mainnetBlockTime } from './block-times.js';
 import { creationBlock } from './creation-block.js';
 import { badRequest } from './errors.js';
+import { takeDecryptStop } from './notes-decrypted.js';
 import { pauseMark, pausedSince } from './page-clock.js';
 import { formatUnshields, guardQuickSync, installQuickSync, squidPages, takeQuickSyncStop } from './quick-sync.js';
 import { pendingShields, receivedSends } from './received.js';
@@ -599,12 +600,20 @@ async function scanNotesNow(walletId) {
     // A root the last rebuild's own scan refused is left out: this scan shows whether the rebuild took.
     takeRefusedRoot();
     takeQuickSyncStop();
+    takeDecryptStop();
     try {
       await getEngine().scanUTXOHistory(TXID_VERSION, chain(), [walletId]);
     } finally {
       notesScan = undefined;
     }
     if (scan.incomplete) {
+      // The trees stand, their roots accepted, but the wallet's notes were not decrypted through them
+      // (notes-decrypted.js): no balance is answered, and the trees passed all the same.
+      const undecrypted = takeDecryptStop();
+      if (undecrypted !== undefined) {
+        recovery(walletId).passed();
+        throw new Error(undecrypted);
+      }
       // A tree whose root the contract has never had fails every scan until it is rebuilt (tree-recovery.js), unless the
       // RPC that refused it hasn't reached its newest leaf: that refusal counts for nothing.
       const refusal = takeRefusedRoot();

@@ -186,6 +186,12 @@ enum PrivateUsdFailureReason {
   // The page's own failures (android/railgun-web/src/).
   notesScanBrokeOff('notes_scan_broke_off', [r'notes scan broke off']),
   notesScanStuck('notes_scan_stuck', [r'no notes scan started']),
+  // A scan whose trees stand but whose wallet's notes were not decrypted
+  // through them; what stopped the decryption follows as the cause.
+  notesNotDecrypted('notes_not_decrypted', [
+    r'notes were decrypted through',
+    r'notes are still being decrypted',
+  ]),
   txidListStopped('txid_list_stopped', [r'txid list stopped']),
   txidIndexUnread('txid_index_unread', [r'validated txid index can.t be read']),
   rpcUnreachable('rpc_unreachable', [r'ethereum rpc does not answer']),
@@ -209,6 +215,12 @@ enum PrivateUsdFailureReason {
     r'event list ended before',
     r'no indexer for',
     r'has no \w+ indexer',
+  ]),
+  // A record of the indexer's that is not the chain's: a shield's note that
+  // does not hash to its leaf, or keys the engine cannot read.
+  recordRefused('record_refused', [
+    r'does not hash to its leaf',
+    r'not one the engine can read',
   ]),
   treesShort('trees_short', [r'trees stopped short']),
   sendRecordMismatch('send_record_mismatch', [r'hash to its railguntxid']),

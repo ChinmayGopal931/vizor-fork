@@ -151,36 +151,47 @@ export async function prepareKeys(viewingPrivateKey, leaves, commitmentTypeOf) {
 }
 
 /**
- * The points the engine works keys out for in `leaves`, as it reads them, each once: a transfer's two blinded viewing
- * keys (one point for a note its sender sent back to itself), a shield's key, and a legacy note's two ephemeral keys,
- * whose key is the bare product.
+ * The points the engine works keys out for in `leaf`, of commitment type `type`, read as the engine reads them
+ * (`AbstractWallet.createScannedDBCommitments`): a transfer's two blinded viewing keys, a shield's key, and a legacy
+ * note's two ephemeral keys, `{bytes, isLegacy}` each. Throws where the engine's own read throws. The engine reads them
+ * before it tries to decrypt the leaf, outside the try that expects a leaf of someone else's, so a leaf this throws on
+ * fails the whole batch it is decrypted in (commitment-check.js).
+ */
+export function leafPoints(leaf, type) {
+  const modern = (bytes) => ({ bytes, isLegacy: false });
+  const legacy = (bytes) => ({ bytes, isLegacy: true });
+  switch (type) {
+    case CommitmentType.TransactCommitmentV2:
+    case CommitmentType.TransactCommitmentV3:
+      return [
+        modern(ByteUtils.hexStringToBytes(leaf.ciphertext.blindedSenderViewingKey)),
+        modern(ByteUtils.hexStringToBytes(leaf.ciphertext.blindedReceiverViewingKey)),
+      ];
+    case CommitmentType.ShieldCommitment:
+      return [modern(ByteUtils.hexToBytes(leaf.shieldKey))];
+    case CommitmentType.LegacyEncryptedCommitment:
+      return [
+        legacy(ByteUtils.hexStringToBytes(leaf.ciphertext.ephemeralKeys[0])),
+        legacy(ByteUtils.hexStringToBytes(leaf.ciphertext.ephemeralKeys[1])),
+      ];
+    default:
+      return [];
+  }
+}
+
+/**
+ * The points the engine works keys out for in `leaves`, each once (one point for a note its sender sent back to
+ * itself); a legacy note's key is the bare product.
  */
 function pointsOf(leaves, commitmentTypeOf) {
   const points = new Map();
-  const add = (bytes, isLegacy) => {
-    if (bytes.length !== 32) return;
-    const key = hex(bytes);
-    points.set(`${isLegacy}:${key}`, { bytes, key, isLegacy });
-  };
-  const modern = (bytes) => add(bytes, false);
-  const legacy = (bytes) => add(bytes, true);
   for (const leaf of leaves) {
     if (leaf == null) continue;
     try {
-      switch (commitmentTypeOf(leaf)) {
-        case CommitmentType.TransactCommitmentV2:
-        case CommitmentType.TransactCommitmentV3:
-          modern(ByteUtils.hexStringToBytes(leaf.ciphertext.blindedSenderViewingKey));
-          modern(ByteUtils.hexStringToBytes(leaf.ciphertext.blindedReceiverViewingKey));
-          break;
-        case CommitmentType.ShieldCommitment:
-          modern(ByteUtils.hexToBytes(leaf.shieldKey));
-          break;
-        case CommitmentType.LegacyEncryptedCommitment:
-          legacy(ByteUtils.hexStringToBytes(leaf.ciphertext.ephemeralKeys[0]));
-          legacy(ByteUtils.hexStringToBytes(leaf.ciphertext.ephemeralKeys[1]));
-          break;
-        default:
+      for (const { bytes, isLegacy } of leafPoints(leaf, commitmentTypeOf(leaf))) {
+        if (bytes.length !== 32) continue;
+        const key = hex(bytes);
+        points.set(`${isLegacy}:${key}`, { bytes, key, isLegacy });
       }
     } catch {
       // A leaf the engine can't read either: its keys, if any, are the engine's to work out.

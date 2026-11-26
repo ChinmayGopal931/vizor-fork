@@ -471,6 +471,16 @@ keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
   at a time per wallet (the spend guard).
 - The chain is the only evidence; the maker's status API never is.
 - Never quote per keystroke. Every quote spends a swap index.
+- Trust a quick sync's source for nothing the chain or the wallet's own
+  keys don't prove. Never store a commitment record that fails
+  `commitment-check.js`, never keep a note that doesn't hash to its leaf,
+  and never answer a balance from a scan whose decryption stopped short of
+  the trees: a source could otherwise show a balance the chain doesn't hold,
+  or leave a note no payment can spend. Never turn to another source over a
+  wallet's own note alone, which would show the source whose note it is.
+  Two things are still a source's word (progress D-164, open): the block a
+  leaf is dated at, which is where the next sync starts and where a wallet
+  with a creation block starts its decryption, and the list of spent notes.
 - A Railgun wallet decrypts from a creation block only when Veylor generated
   its seed (`AccountInfo.generatedSeed`): the seed's birthday, rounded down
   on both chains' block tables, a day early. Its mnemonic is the standard
@@ -583,17 +593,74 @@ stay, unused.
   listener queues the newest blocks' leaves as they come, and rail-squid,
   behind the RPC, can leave a stretch that only the engine's read fills
   (review, 2026-11-22).
+- No commitment record is stored before it is checked
+  (`commitment-check.js`), rail-squid's and the archive's alike, whoever's
+  note it is. The trees' root check vouches for a leaf's hash alone, and a
+  record carries more beside it:
+  - A shield's note (its key, token and amount) is public in its event, and
+    must hash to its leaf, as the engine hashes the leaf from the event when
+    it reads the chain itself. A source could otherwise give any shield
+    another amount.
+  - The keys the engine reads before it tries to decrypt a leaf, and a
+    legacy transfer's memo, must be ones it can read: it reads them outside
+    the try that expects someone else's leaf, so one it can't read stops
+    every wallet's decryption at that leaf's batch for good.
+  - The record's tree and index must be whole numbers, and its hash one the
+    engine reads: of a note a wallet opened the engine reads the hash and
+    numbers the note by the two, outside that try as well. An index of
+    `"137e0"` puts the leaf in the trees where 137 would and then stops the
+    decryption of the wallets whose note it is, and of no other: its source
+    would see whose it is.
+
+  A test garbles every field of every kind of record and holds the check to
+  the engine's own decryption, for the wallet a note is addressed to, the
+  one that sent it and a stranger: a field the engine throws on that the
+  check takes fails it.
+
+  An archive chunk with such a record is not stored, and the archive is left
+  before it. A page of rail-squid's with one is not stored either: the quick
+  sync fails there, and the engine reads those blocks from the RPC, which
+  hashes each leaf from its event; past the 100,000 blocks the scan fails,
+  naming the record. Never check a wallet's own notes alone, or turn to
+  another source over one: the source would learn whose note it is. The
+  check passed every record both networks have (2026-11-26: mainnet's
+  316,325 from the archive and 316,329 from rail-squid, Sepolia's 13,165),
+  and costs about 0.14 ms a shield (Node on a Mac): 11 s of a cold mainnet
+  sync.
+- A wallet keeps a shield's note only if it hashes to its leaf: what a
+  record's ciphertext holds only its wallet can check. Engine 9.8.0 checks a
+  transfer's note so and a shield's not at all; the build gives it 9.9.1's
+  check (`engine-hooks-plugin.mjs`). Without it a source could show a
+  0.001 USDC shield as a million, spendable (or as dust, which every payment
+  then picked first and failed to prove), and put a shield it made up for a
+  0zk address it knows on someone else's leaf. The engine decrypts a leaf
+  once, and nothing looks again at the notes a wallet already keeps: a
+  shield note kept wrong before the check stays (D-164). No source serves a
+  record today that would have left one.
+- A notes scan completes only with its wallet's notes decrypted through
+  every leaf (`notes-decrypted.js`). The engine's decryption logs whatever
+  stops it (a leaf it can't read, a write its store refused) and returns as
+  if it had finished, so a scan ended complete, and a refresh answered a
+  balance, with every note after that batch missing. The scan now fails,
+  saying how far the wallet came and what stopped it, and the refresh with
+  it; a decryption the engine's listener began mid-scan is waited for.
+  Nothing rebuilds the trees for a decryption that keeps stopping: the
+  roots were accepted (D-164, open).
 - `engine-hooks-plugin.mjs` holds every rewrite of the engine's code: the
   unshield watermark (`unshield-events.js`), the archive's leaf hashing
   (`archive-txids.js`), the txid sync's record updates
   (`txid-updates.js`), held until the txid tree has a group's root accepted
   and written in one batch just before the group, through a hook in
-  `Merkletree.insertLeaves`, and, for `tree-recovery.js`, the end-of-scan
+  `Merkletree.insertLeaves`, for `tree-recovery.js`, the end-of-scan
   root check reporting the root it refuses and a full rescan without its
   txid list reset (the page's rebuild runs the rescan's steps itself; the
-  SDK's rescan still calls it). Each names the exact source of the pinned
-  engine and fails the build against any other: re-check them when
-  bumping it.
+  SDK's rescan still calls it), the wallet's check of a shield's note, and
+  the scan's check of how far its decryption came, with the decryption's
+  catch-all saying what it caught (`notes-decrypted.js`). Each names the
+  exact source of the pinned engine and fails the build against any other:
+  re-check them when bumping it. The shield check is 9.9.1's own lines, so a
+  build against 9.9.1 fails there: drop that rewrite then, and keep the
+  rest.
 - **Anon's archive** (Android, iOS, the Mac, Linux and Windows, mainnet,
   Settings, on by default; `archive*.js`):
   - It gives commitments and the transaction list only. Unshields and
@@ -602,8 +669,9 @@ stay, unused.
     transaction for good.
   - Every file must match its published SHA-256, and the manifest is read
     again before the tip. Commitments must run on by tree position, each
-    batch within its tree, and are stored only as far as rail-squid's lists
-    show it has come. Positions are read as the engine places notes, by
+    batch within its tree, every record must pass the check above, and they
+    are stored only as far as rail-squid's lists show it has come. Positions
+    are read as the engine places notes, by
     global tree position (tree × 65,536 + index): rail-squid and the archive
     both number the first leaf of mainnet's tree 1 as tree 0's leaf 65,536,
     and records keep that number. Transactions come in sequence, each

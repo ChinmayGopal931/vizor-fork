@@ -13,6 +13,7 @@ import {
   createGraphCommitmentBatches,
   sortByTreeNumberAndStartPosition,
 } from '../node_modules/@railgun-community/wallet/dist/services/railgun/quick-sync/V2/quick-sync-events-graph-v2.js';
+import { RecordRefused, refusedRecord } from './commitment-check.js';
 import { pauseMark, pausedSince } from './page-clock.js';
 
 /** The most events the indexer answers at once. */
@@ -40,9 +41,21 @@ export const NO_EVENTS = Object.freeze({ commitmentEvents: [], unshieldEvents: [
 
 export const formatNullifiers = formatGraphNullifierEventsV2;
 export const formatUnshields = formatGraphUnshieldEventsV2;
-/** A page's commitments as the SDK's quick sync batches them: by tree and batch start, in tree order. */
-export const formatCommitments = (commitments) =>
-  formatGraphCommitmentEventsV2(createGraphCommitmentBatches(commitments).sort(sortByTreeNumberAndStartPosition));
+/**
+ * A page's commitments as the SDK's quick sync batches them: by tree and batch start, in tree order. A page with a
+ * record that isn't the chain's (commitment-check.js) throws `RecordRefused`, and none of it is stored: the quick sync
+ * fails there, and the engine reads those blocks from the RPC itself, which hashes each leaf from its event.
+ */
+export function formatCommitments(commitments) {
+  const events = formatGraphCommitmentEventsV2(
+    createGraphCommitmentBatches(commitments).sort(sortByTreeNumberAndStartPosition),
+  );
+  const refused = refusedRecord(events);
+  if (refused !== undefined) {
+    throw new RecordRefused(`the indexer's record at ${refused.tree}:${refused.index} ${refused.why}`);
+  }
+  return events;
+}
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -292,9 +305,9 @@ export function takeQuickSyncStop() {
  * to its end-of-scan root check of the trees as they stand, whatever leaves they didn't take.
  *
  * - A quick sync that failed with that read more than `maxChainScanBlocks` behind `head()` (the chain's newest block
- *   number) stops the scan, saying the indexer didn't answer: rather than hours of log reads that a first sync, or a
- *   wallet months behind, would make while rail-squid is out of reach. Closer, or with no newest block to judge by,
- *   the engine's read goes on as before.
+ *   number) stops the scan, saying the indexer didn't answer, or which of its records was refused: rather than hours
+ *   of log reads that a first sync, or a wallet months behind, would make while rail-squid is out of reach. Closer, or
+ *   with no newest block to judge by, the engine's read goes on as before.
  * - Leaves still in the trees' write queue once the engine's own read is done, written again after `writeRetryMs`,
  *   stop the scan: it would end with the trees short of them, at a root the contract recorded, so the check would
  *   pass with notes missing. Not sooner: the engine's listener queues the newest blocks' leaves as they come, and
@@ -307,14 +320,15 @@ export function guardQuickSync(
   { txidVersion, chain, head, maxChainScanBlocks = MAX_CHAIN_SCAN_BLOCKS, writeRetryMs = WRITE_RETRY_MS },
 ) {
   const events = engine.quickSyncEvents;
-  let failed = false;
+  // The error the quick sync's last try failed with, if it failed.
+  let failure;
   engine.quickSyncEvents = async (...args) => {
     try {
       const answer = await events(...args);
-      failed = false;
+      failure = undefined;
       return answer;
     } catch (error) {
-      failed = true;
+      failure = { error };
       throw error;
     }
   };
@@ -325,13 +339,14 @@ export function guardQuickSync(
   const quickSync = engine.performQuickSync;
   // The engine tries a failed quick sync once more through this same method, so the try that ends it judges.
   engine.performQuickSync = async function performQuickSync(version, ...rest) {
-    failed = false;
+    failure = undefined;
     await quickSync.call(this, version, ...rest);
-    if (version !== txidVersion || !failed) return;
+    if (version !== txidVersion || failure === undefined) return;
     const from = await engine.getNextStartingBlockSlowScan(txidVersion, chain);
     const newest = await head().catch(() => undefined);
     if (newest !== undefined && newest - from > maxChainScanBlocks) {
-      stop(`the indexer did not answer, and ${newest - from} blocks are too many to read from the RPC`);
+      const why = failure.error instanceof RecordRefused ? failure.error.message : 'the indexer did not answer';
+      stop(`${why}, and ${newest - from} blocks are too many to read from the RPC`);
     }
   };
   // The engine's own read of the chain after the quick sync (V2's: Ethereum's and Sepolia's trees).

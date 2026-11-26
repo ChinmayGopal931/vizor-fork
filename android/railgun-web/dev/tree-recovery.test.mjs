@@ -24,6 +24,7 @@ import {
 } from '../src/tree-recovery.js';
 import { CHAIN, ENGINE, V2, contents, engineHarness, wholeEngine } from './engine-harness.mjs';
 import { history, indexer, word } from './history-fixture.mjs';
+import { shield, someone, withAmount, withNotes } from './notes-fixture.mjs';
 
 const MINUTE = 60_000;
 let stores = 0;
@@ -229,11 +230,11 @@ const fixture = history();
 const PAGE = 40;
 const pages = { pageSize: PAGE, gapMs: 0, retryMs: 0 };
 
-/** The roots the contract records for the fixture, one after each batch, as `tree:root`. */
-async function contractRoots() {
+/** The roots the contract records for the fixture (or for `commitments`), one after each batch, as `tree:root`. */
+async function contractRoots(commitments = fixture.squid.commitments) {
   const { engine, merkletree } = await engineHarness();
   const roots = new Set();
-  for (const batch of formatCommitments(fixture.squid.commitments)) {
+  for (const batch of formatCommitments(commitments)) {
     await engine.commitmentListener(V2, CHAIN, [batch], false, false);
     await merkletree.updateTreesFromWriteQueue(true);
     roots.add(`${batch.treeNumber}:${await merkletree.getRoot(batch.treeNumber)}`);
@@ -553,4 +554,53 @@ test("a stretch rail-squid left out that the engine's own read fills passes, as 
   await scan();
   assert.deepEqual(ends, ['complete']);
   assert.equal(takeQuickSyncStop(), undefined);
+});
+
+/**
+ * Rail-squid listing a shield of 0.001 USDC, three pages in, as a million: `listed`, its lists; `chain`, the
+ * commitments as their events have them; and `roots`, the contract's.
+ */
+async function raisedShield() {
+  const at = 3 * PAGE + 5;
+  const real = await shield(await someone('a receiver'), 1_000n);
+  const honest = withNotes(fixture, [at], [real]).squid;
+  const listed = withNotes(fixture, [at], [withAmount(real, 1_000_000_000_000n)]).squid;
+  return { at, listed, chain: formatCommitments(honest.commitments), roots: await contractRoots(honest.commitments) };
+}
+
+test("a record of rail-squid's that is not the chain's stores nothing of its page, and far behind the newest block stops the scan", async () => {
+  const { at, listed, roots } = await raisedShield();
+  const { utxo, ends, scan, reads } = await guardedEngineOn({
+    queries: indexer(listed, PAGE).queries,
+    roots,
+    newest: fixture.to + 100_001,
+    maxChainScanBlocks: 100_000,
+  });
+  await scan();
+  assert.deepEqual(ends, ['incomplete']);
+  assert.equal(reads(), 0, "the engine read none of Railgun's events from the RPC");
+  assert.match(
+    takeQuickSyncStop(),
+    new RegExp(`^the indexer's record at 0:${at} does not hash to its leaf, and \\d+ blocks are too many to read`),
+  );
+  // The pages before it are in, as after any list that fails; the shield's page is not, a leaf of it.
+  const stored = await utxo.getTreeLength(0);
+  assert.ok(stored > 0 && stored <= at - 5, `${stored} leaves stored, the shield at ${at}`);
+});
+
+test("close to the newest block, the engine reads the blocks of rail-squid's refused record from the chain itself", async () => {
+  const { at, listed, chain, roots } = await raisedShield();
+  const { utxo, ends, scan, reads } = await guardedEngineOn({
+    queries: indexer(listed, PAGE).queries,
+    roots,
+    newest: fixture.to,
+    chainCommitments: chain,
+  });
+  await scan();
+  assert.equal(reads(), 1, 'the engine read the gap from the RPC');
+  assert.deepEqual(ends, ['complete']);
+  assert.equal(takeQuickSyncStop(), undefined);
+  assert.equal(await utxo.getTreeLength(0), fixture.leaves);
+  // The leaf holds the amount its event has, which the engine hashed it from.
+  assert.equal(BigInt(`0x${(await utxo.getCommitment(0, at)).preImage.value}`), 1_000n);
 });

@@ -355,6 +355,7 @@ Each one exists because breaking it loses funds or privacy. Most are enforced in
 17. **The chain is the only evidence.** The maker's status API never is.
 18. **Never quote per keystroke** (X10).
 19. **Check seed and address.** Derive keys only after the seed-fingerprint check (§3.3). Refuse a Railgun session whose address differs from Rust's.
+20. **Trust a Railgun quick sync's source for nothing the chain or the wallet's keys don't prove** (progress D-164). The page stores no commitment record whose shield note doesn't hash to its leaf or that the engine can't read: its keys, a legacy transfer's memo, its hash, and its tree and index as whole numbers (`commitment-check.js`, every record, whoever's), the wallet keeps a note only if it hashes to its leaf (engine 9.9.1's check), and a notes scan whose decryption stopped short of the trees fails rather than complete (`notes-decrypted.js`). Never turn to another source over a wallet's own note alone. *Why:* the trees' root check vouches for a leaf's hash alone. A source (rail-squid, Anon's archive) could show any shield at another amount, as spendable or as dust that every payment picks and fails to prove, plant a shield on someone else's leaf, or serve a record that stops every wallet's decryption while the balance reads as synced; and a wallet that left a source over its own note would show the source which note is its. Still a source's word, and open: the block a leaf is dated at and the list of spent notes (D-164).
 
 ### 3.6 Rust skeleton
 
