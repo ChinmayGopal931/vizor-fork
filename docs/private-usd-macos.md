@@ -37,9 +37,6 @@ for code (`com.zcash.wallet/railgun` and `/events`: `supported`, `load`,
   folder `android/railgun-web/build.mjs` writes for iOS, as a folder reference
   in Copy Bundle Resources. There is no third copy, and the bundle did not
   change.
-- The Privacy Pass attestation channel (`PrivateUsdAttestationHandler.swift`,
-  which answered `unavailable`) went with the token client on 2026-11-21
-  (progress D-161).
 - Registration: `MainFlutterWindow.registerPrivateUsdChannels`, in
   `awakeFromNib`, before Dart's bootstrap asks `supported`.
 

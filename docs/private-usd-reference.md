@@ -13,7 +13,7 @@ Open a section only when a milestone's **Inputs** names it. Line numbers into ve
 
 ## 5. Protocol reference
 
-The Kotlin driver in `of/` is the source of truth. Where `zc/` (the Rust reference client) differs, this section says so. `za/docs/android-reverse-swap.md` is partly stale: it says reverse is testnet-only and names the stores `_v2`/`_v1`. The code supports mainnet too, and uses `_v3` stores (`ua/AtomicSwapDeployment.kt:44-49`, `ua/AtomicSwapStoreImpl.kt:98`, `ua/ReverseSwapStoreImpl.kt:36`). The public docs are `zs/docs/{reverse-flow.md, railgun-sends.md, tokens.md, deployment.md}`.
+The Kotlin driver in `of/` is the source of truth. Where `zc/` (the Rust reference client) differs, this section says so. `za/docs/android-reverse-swap.md` is partly stale: it says reverse is testnet-only and names the stores `_v2`/`_v1`. The code supports mainnet too, and uses `_v3` stores (`ua/AtomicSwapDeployment.kt:44-49`, `ua/AtomicSwapStoreImpl.kt:98`, `ua/ReverseSwapStoreImpl.kt:36`). The public docs are `zs/docs/{reverse-flow.md, railgun-sends.md, deployment.md}`.
 
 ### 5.1 Overview
 
@@ -41,8 +41,6 @@ The Kotlin driver in `of/` is the source of truth. Where `zc/` (the Rust referen
 - **Forward (ZEC → USD):** the maker escrows USDC, the user deposits ZEC, and the user claims the USDC by revealing `z`.
 - **Reverse (USD → ZEC):** the roles are swapped on chain. The user funds the escrow with USDC, and the maker deposits ZEC. After the user's `Ready` signature, the maker claims the USDC by revealing `e`, and the user sweeps the ZEC home with `±(e+z)`. The escrow id is `reverseSwapId = keccak256(abi.encode(userAuthAddress, makerShare, true))`, never a forward id.
 
-**Spam tokens.** zapp spends one Privacy Pass token (RFC 9577 challenge, RFC 9578 blind RSA) on every accept, against walk-aways, from an issuer that signs only Android devices whose Keystore attestation verifies. Veylor removed its token client on 2026-11-21 (§5.9): the open fee stands in, and an accept answered `401` is the maker's refusal.
-
 ### 5.2 Wire format and maker endpoints
 
 **Encoding** (`zapi/lib.rs`, `of/SwapWire.kt`, `of/SwapTypes.kt`). JSON is camelCase.
@@ -62,13 +60,13 @@ The Kotlin driver in `of/` is the source of truth. Where `zc/` (the Rust referen
   - `invalidRequest`, `rejected`, `unknownQuote`, `unknownSwap`
   - `unavailable`, `watchtowerUnavailable`, `internal`
   - `notFound`, `methodNotAllowed`
-  - `tokenRequired` (`401`: Veylor knows no such code since 2026-11-21, and takes any `401` to an accept as a refusal, §5.9), `alreadySpent`
+  - `alreadySpent`
   - `feeRequired` (`402` with `Retry-After`: a forward quote's open fee is in no block the maker has seen yet; zecSwap PR #6)
 
   Branch on `code` and the HTTP status, never on `error` text. A `409 alreadySpent` may add `transactions: [hash]`.
 - **Ticket.** The accept returns `ticket`, which goes in the `ZecSwap-Ticket` header on every relayer POST for that swap. It is never logged. zapp keeps it only if it starts with `"<swapId>."` and is printable ASCII (`of/SwapWire.kt:198-199`).
 - **Timeouts and retries.**
-  - Reads (`GET /v1/info`, `GET /v1/terms`, `GET /v1/swaps/{id}`) and the quote POSTs use 20 s (`of/SwapClients.kt:304-308, 370-374, 438`).
+  - Reads (`GET /v1/info`, `GET /v1/terms`) and the quote POSTs use 20 s (`of/SwapClients.kt:304-308, 370-374, 438`).
   - Accept and relayer POSTs get the client's 180 s.
   - The client never retries at the HTTP level: a quote is single-use, and an accept or relayer request that timed out may have landed (`ProviderModule.kt:557-558`).
   - `zc/api.rs:374-394` resends while the answer is `503` with `Retry-After ≤ 30 s`, up to 90 s in total. That is safe because the gateway answers before the service sees the request. veylor may add it.
@@ -78,15 +76,14 @@ The Kotlin driver in `of/` is the source of truth. Where `zc/` (the Rust referen
 
 | Call | Body | 200 answer |
 |---|---|---|
-| `GET /v1/info` | — | `{apiVersion:1, maker, chainId, contract, token, zcashNetwork:"mainnet"\|"testnet", reverseEnabled, tokenReturnKey?, contractKind?, minWindow?, lateWindow?}`. Windows the info names must be the pinned ones, and a kind must be `windows` (`WrongDeployment`); all three are optional because mainnet's lock-contract services name none. |
+| `GET /v1/info` | — | `{apiVersion:1, maker, chainId, contract, token, zcashNetwork:"mainnet"\|"testnet", reverseEnabled, contractKind?, minWindow?, lateWindow?}`. Windows the info names must be the pinned ones, and a kind must be `windows` (`WrongDeployment`); all three are optional because mainnet's lock-contract services name none. |
 | `POST /v1/quote` | `{units, payout: authAddress, payoutNote}` | `{quoteId, maker, makerShare, makerProof, chainId, contract, token, amount, depositZat, expiresAt, networkCost?, openFee?}`; `openFee: {zat, address}` is what the maker asks before it opens the swap (below) |
-| `POST /v1/quote/{quoteId}/accept` | `{userShare, userProof, viewingKeys}` (zapp adds `tokenRequest` and `Authorization: PrivateToken token=…` on a paid retry; Veylor pays no token, §5.9) | `{swapId, t0, t1, ticket, lateWindow?}`; a `lateWindow` other than the pinned one is another contract's (`NothingSent(MISMATCH)`, nothing paid) |
-| `GET /v1/swaps/{swapId}` | — | `{swapId, tokenReturn?}` (zapp reads it only to collect the token; Veylor never reads it) |
+| `POST /v1/quote/{quoteId}/accept` | `{userShare, userProof, viewingKeys}` | `{swapId, t0, t1, ticket, lateWindow?}`; a `lateWindow` other than the pinned one is another contract's (`NothingSent(MISMATCH)`, nothing paid) |
 | `POST /v1/reverse/quote` | `{units, user: authAddress, refundNote}` | `{terms: <Quote>, user, refundNote, fundingDeadline, readyDeadline, refundAfter}` |
 | `POST /v1/reverse/quote/{quoteId}/accept` | as forward | `{swapId, t0, t1, ticket, lateWindow?}`; another `lateWindow` cancels the conversion, nothing paid |
-| `GET /v1/reverse/swaps/{swapId}` | — | `{swapId, phase, depositTxid?, readyDeadline, refundAfter, tokenReturn?}` (advisory only; Veylor never reads it) |
+| `GET /v1/reverse/swaps/{swapId}` | — | `{swapId, phase, depositTxid?, readyDeadline, refundAfter}` (advisory only; Veylor never reads it) |
 
-- **`/v1/info` checks** (`of/SwapChecks.kt:9-28`): it must equal the pin in `apiVersion`, `maker`, `chainId`, `contract`, `token` and `zcashNetwork`, and a `contractKind`, `minWindow` or `lateWindow` it names must be the pinned contract's, as in the relayer's terms (§5.3; else `WrongDeployment`). Reverse also needs `reverseEnabled`. zapp refuses a `tokenReturnKey` other than its pinned return key (`TOKENS_REFUSED`); Veylor ignores the field (§5.9). Check once per driver.
+- **`/v1/info` checks** (`of/SwapChecks.kt:9-28`): it must equal the pin in `apiVersion`, `maker`, `chainId`, `contract`, `token` and `zcashNetwork`, and a `contractKind`, `minWindow` or `lateWindow` it names must be the pinned contract's, as in the relayer's terms (§5.3; else `WrongDeployment`). Reverse also needs `reverseEnabled`. Check once per driver.
 - **Open fee** (zecSwap PR #6, `docs/open-fee.md`; testnet since 2026-11-21, 20,000 zatoshis; mainnet asks none yet). A forward quote may carry `openFee: {zat, address}`: the maker's gas for the open and, if no deposit follows, the cancel, paid in ZEC before the maker opens the swap and never refunded. Absent, the accept is as before. Present, the accept is answered `402 {code: "feeRequired"}` with `Retry-After` (seconds) until the maker has seen exactly `zat` paid to `address` in a mined transaction; then it opens the swap as always. Veylor's rules are §5.6 step 2a. Reverse quotes ask no fee.
 - **How long a fee quote must live.** A fee is paid only with the deployment's `open_fee_min_quote_life_seconds` (180 s, both networks) of its quote left: the time a Zcash block needs to mine it and the maker to see it before the quote ends, 2.4 blocks at 75 s, a block in time about 91% of the time, and 7.2 at NU7's 25 s, more than 99.9%. The review offers a fee quote until its `openFeePayBy`, which Rust sets 20 s for the tap (`OPEN_FEE_OFFER_MARGIN_SECONDS`) before that, `expiresAt − 200 s`; Dart adds no margin of its own, so the two cannot disagree. A quote that would be offered for less than 30 s (`OPEN_FEE_LEAST_REVIEW_SECONDS`) when it arrives, so living under 230 s, or that lives more than `open_fee_max_quote_life_seconds` (30 minutes), is refused `OPEN_FEE_REFUSED`, nothing paid. The user never bridges on terms they have not seen: past `openFeePayBy` the review asks for a new quote, and on the amount step an expired fee quote is replaced once, then waits for the user (each quote spends a swap index and shows the maker a payout address). Testnet's quotes live 5 minutes, so about 100 s of offer. Mainnet's live 2 minutes today: before mainnet asks a fee, its quotes must live at least 230 s (4 to 30 minutes), or Veylor refuses every fee quote.
 - **Quote well-formedness** (`of/SwapWire.kt:247-253`, `of/ReverseSwapModels.kt:228-234`):
@@ -282,12 +279,11 @@ Terms hashes (amount 150000000, t0 1790003600, t1 1790007200, makerKey E, userKe
    1. Refuse if unfinished, if `fee ≥ amount` (`RELAYER_FEE`), or if `now ≥ expiresAt − 15 s` (`QUOTE_EXPIRED`).
    2. `keys.accept` verifies the maker's share proof and builds `{userShare, userProof, viewingKeys}` (native `accept`, `zs/crates/zecswap-jni/src/ops.rs:164-188`).
    3. **Save the record** with `t0`/`t1` null, `zcashHeight = Zcash tip`, `acceptedAt` and the relayer-claims choice, *before* the share leaves the device.
-   4. `POST accept` (zapp pays a token on a `401`, §5.9; Veylor does not). Then:
+   4. `POST accept`. Then:
 
    | Outcome | Result |
    |---|---|
    | `4xx` | `NothingSent`; the code maps to `MAKER_REFUSED`, `QUOTE_EXPIRED` or `MAKER_UNAVAILABLE` (`:245-270`). `unknownSwap`/`internal` stay open. |
-   | `401` (a token asked for) | zapp: pays one and posts again (§5.9). veylor, since 2026-11-21: the maker's refusal, whatever the code: `NothingSent(MAKER_REFUSED)`, nothing opened, never posted again (progress D-161). |
    | Timeout, transport failure or 5xx | throw. The record stays "maybe opened". |
    | 200 | save `t0`, `t1`, `ticket`. If `answer.swapId ≠ record.swapId`: `NothingSent(MISMATCH)`. |
 2a. **Open fee** (veylor, zecSwap PR #6; `open_fee.rs`, `forward.rs`). Only where the quote carries `openFee`:
@@ -298,7 +294,7 @@ Terms hashes (amount 150000000, t0 1790003600, t1 1790007200, makerKey E, userKe
       - **The crossing exception.** Before NU7, a fee whose proposal is a canonical ZIP 318 crossing keeps the period's rolling expiry the backend sets, since the backend refuses any other. Withholding it from the resubmission near its quote's end is its only guard; from NU7 the wallet requests the expiry, and the fee's applies.
    2c. **A wallet at the tip.** At accept, a fee quote is refused `WALLET_SYNCING` (nothing saved or paid; the offer still held, so the same quote may be bridged once the wallet catches up) while the main wallet's fully scanned height trails the tip just read by more than `OPEN_FEE_MAX_SCAN_LAG_BLOCKS` (3, `require_scanned`): a restored or long-offline wallet would pay the fee, see it mined late (so post the accept late, if at all) and deposit late, perhaps after the deposit window. A fee the engine pays itself (step 3) waits (`Waiting(ZCASH_SYNCING)`) instead, and ends `NothingSent(QUOTE_EXPIRED)`, nothing paid, if the quote's least life runs out first. A quote without a fee is unchanged: its deposit waits for the sync as before. Dart offers no Bridge on a fee quote, and asks for no further quote once the maker asked a fee, while the wallet trails by more than `kPrivateUsdOpenFeeScanLagBlocks` (held to Rust's by a test), and says so ("Bridging waits until your wallet finishes syncing.").
    3. **Each advance until the maker answers**: a started payment is looked for in the wallet (sent to `address`) before anything is built; a record saved with none is paid only while the least life allows, else `NothingSent(QUOTE_EXPIRED)`. While the main wallet shows it in no block: `Waiting(FEE_CONFIRMING)`, sent again every `OPEN_FEE_RESEND_SECONDS` (30) while `OPEN_FEE_MARGIN_SECONDS` (60) of the quote is left; at `expiresAt`, once `swap(id)` shows no swap, `NothingSent(FEE_NOT_HONOURED)` (`QUOTE_EXPIRED` once the payment provably expired); a swap the chain shows (a fee shown unmined may have opened one in a block a reorg took back) goes through step 3's unanswered path, its deadlines from its `Opened`. "Call it off" (`abandon`) refuses a bridge whose fee was started (`TOO_LATE`): it goes on, so its accept follows the fee and its end says what the fee bought.
-   4. **Once mined**, post the accept, unchanged. `402 feeRequired`, a `5xx`, an unreadable answer or none: `Waiting(FEE_ACCEPTING)`, posted again after `Retry-After`, else `FEE_WAIT_SECONDS` (5) or, unanswered, `UNANSWERED_ACCEPT_WAIT_SECONDS` (12), clamped to at least 1 s the first time and `FEE_PACE_SECONDS` (12) after, at most 30 s, never past `expiresAt`. Never posted at or after `expiresAt`: a last answer of `feeRequired` ends `FEE_NOT_HONOURED` at once unless the chain shows the swap; otherwise the swap waits as step 3 below (the maker's open may be on its way), and one that never opened ends `FEE_NOT_HONOURED`. Other answers as step 2.4: a refusal that says nothing opened ends `NothingSent`, the fee lost; one that may follow an open (`unknownSwap`, `internal`, or a code this build cannot read with a status other than `400`, `401`, `404` and `503`) is posted again on the next step until `expiresAt`. The pacing is process memory (`engine::FeePace`): a restart sends the kept payment and posts at once.
+   4. **Once mined**, post the accept, unchanged. `402 feeRequired`, a `5xx`, an unreadable answer or none: `Waiting(FEE_ACCEPTING)`, posted again after `Retry-After`, else `FEE_WAIT_SECONDS` (5) or, unanswered, `UNANSWERED_ACCEPT_WAIT_SECONDS` (12), clamped to at least 1 s the first time and `FEE_PACE_SECONDS` (12) after, at most 30 s, never past `expiresAt`. Never posted at or after `expiresAt`: a last answer of `feeRequired` ends `FEE_NOT_HONOURED` at once unless the chain shows the swap; otherwise the swap waits as step 3 below (the maker's open may be on its way), and one that never opened ends `FEE_NOT_HONOURED`. Other answers as step 2.4: a refusal that says nothing opened ends `NothingSent`, the fee lost; one that may follow an open (`unknownSwap`, `internal`, or a code this build cannot read with a status other than `400`, `404` and `503`) is posted again on the next step until `expiresAt`. The pacing is process memory (`engine::FeePace`): a restart sends the kept payment and posts at once.
    5. **The deposit** of a swap that paid the fee waits (`FUNDS_PENDING`) while no deposit fits the spendable funds and more are pending (the fee's change), never failing as `DEPOSIT_UNPAYABLE` for it.
 3. **No `t0`/`t1` yet, or not confirmed on chain** (`notOnChain`, `:157-171`): `Waiting(OPENING)` until `quote.expiresAt + 300 s`. If the deposit is still `NotStarted` at that point:
    - `swap(id)` (latest) is empty → `NothingSent(NEVER_OPENED)`
@@ -359,8 +355,7 @@ Terms hashes (amount 150000000, t0 1790003600, t1 1790007200, makerKey E, userKe
    - **Fee cap (D11).** zapp has none; `zc/user.rs:339-343` takes a caller `max_fee`. veylor refuses a fee above 2 USDC here and at quote time. At claim time that is the `RELAYER_FEE` problem: the swap waits for the fee to come down, and if it never does before `t1`, the maker refunds and the ZEC is swept home.
 9. **`finishPaid`** (`:227-239`): require a confirmed `PaidOut` event (`CHAIN_LAGGING` until one appears). Check the event's relayer and fee against the pin. `end = Paid`, with `payoutTx` and `receives` recomputed from the event's fee.
 10. **`REFUNDED`**: §5.8.
-11. **Token return.** zapp collects the accept's token back from `GET /v1/swaps/{id}` once the deposit started; Veylor pays no token and reads nothing (§5.9).
-12. **Abandon** (user action, `:126-131`): allowed only while the deposit is `NotStarted` and `swap(id)` is empty → `NothingSent(NEVER_OPENED)`. As built, an unanswered record (no `t0`) ends `NothingSent(MAKER_UNAVAILABLE)` instead (progress D-33); otherwise `TooLate`, as is a record whose open fee was started (§5.6 step 2a). A record of another deployment is `WrongDeployment`: never ended or driven.
+11. **Abandon** (user action, `:126-131`): allowed only while the deposit is `NotStarted` and `swap(id)` is empty → `NothingSent(NEVER_OPENED)`. As built, an unanswered record (no `t0`) ends `NothingSent(MAKER_UNAVAILABLE)` instead (progress D-33); otherwise `TooLate`, as is a record whose open fee was started (§5.6 step 2a). A record of another deployment is `WrongDeployment`: never ended or driven.
 
 The invariants for this machine are §3.5 items 1–8 and 16.
 
@@ -392,10 +387,10 @@ The invariants for this machine are §3.5 items 1–8 and 16.
    9. Save as `QUOTED`. A quoted draft is never written to history.
 2. **Go ahead** (first foreground authorization, `:94-103`): under the lock, require the quote to hold (`now < expiresAt` and `now < fundingDeadline`). Then save `ACCEPTING` with `acceptedAt`.
 3. **Accepted** (`:198-207`, `ReverseSwapOpening.accept`, `:389-419`), once:
-   1. `POST /v1/reverse/quote/{id}/accept` with the saved acceptance (zapp's token loop aside, §5.9).
+   1. `POST /v1/reverse/quote/{id}/accept` with the saved acceptance.
    2. Require `swapId`, `t0 == readyDeadline` and `t1 == refundAfter`.
    3. Save `makerAccepted = true` and the `ticket`.
-   4. A refusal that will not change ends the conversion as `CANCELLED`. The codes `unavailable` and `watchtowerUnavailable` → `MAKER_BUSY`; `unknownQuote` → `QUOTE_EXPIRED`; `tokenRequired` → `TOKENS_REFUSED` (Veylor: any `401` → `MAKER_REFUSED`, since 2026-11-21); `rejected`, `invalidRequest`, `unknownSwap`, `notFound` and `methodNotAllowed` → `MISMATCH`, as do the token blocks. `internal` is tried again (`:575-612`).
+   4. A refusal that will not change ends the conversion as `CANCELLED`. The codes `unavailable` and `watchtowerUnavailable` → `MAKER_BUSY`; `unknownQuote` → `QUOTE_EXPIRED`; `rejected`, `invalidRequest`, `unknownSwap`, `notFound` and `methodNotAllowed` → `MISMATCH`. `internal` is tried again (`:575-612`).
    5. **Import the joint account** at `birthday` and save `account`, then `AWAITING_FUNDING`. This happens **before funding**, per `zs/docs/reverse-flow.md` step 3.
 4. **Fund** (first authorization, continued; foreground; `:122-144`, `ua/ReverseSwapFundingImpl.kt`):
    1. Require: no escrow yet, `now < fundingDeadline`, and `readyDeadline > now + 25 min`.
@@ -439,7 +434,6 @@ The invariants for this machine are §3.5 items 1–8 and 16.
 - **Pricing is split around the page.** Step 1.8's cost is set by `set_cost` after the page's `reverseCost`: the quote returns the request (amount, Railgun proxy, the relayer's funding fee), and `set_cost` re-reads the fee and requires `debit = amount + fee + railgun_fee`. Going ahead and the funding request need a priced record.
 - **Step 4 runs in two calls around the page.** `funding_request` (steps 4.1–4.5; the page's open address must be the account's) holds the request in memory for its lock session; `submit_funding` (4.7–4.11) takes it once and refuses after a cancel, a lock or a restart (`Cancelled`) or a changed record (`TooLate`). The proof must go to the pinned Relay Adapt with no value and cost exactly what the calls pay. After a `400 rejected` at a higher fee, the dropped funding's cost is cleared for the page to price again.
 - **Posts follow their save** under the per-account driver lock, which spans the post: a cancel waits for a funding's post rather than interleaving with it. The funding's answer is merged into the record as it is then.
-- **A `401`** (step 3), to the user's accept or to the loop resuming an interrupted one, ends the conversion `CANCELLED` (`MAKER_REFUSED`), nothing paid: Veylor pays no token (§5.9).
 - **The sweep home** pays at most the reviewed `receiveEstimate.feeZat`; `estimate` is the joint account's confirmed receipts and `5000 × max(2, notes + 1)`.
 
 ### 5.8 Refunds, offline behaviour and user-visible states
@@ -485,18 +479,10 @@ The real hazard is a reveal that lands outside its window: it reverts with the s
 - **Forward stages** (`ua/AtomicSwapStage.kt`): `OPENING`, `DEPOSITING`, `CONFIRMING`, `CLAIMING`, `REFUNDING`. Veylor adds the `UNWINDING` wait (§5.4).
 - **Forward outcomes:** `Paid`, `Refunded(cause)`, `NothingSent(cause)`.
 - **Reverse:** one label per phase (`ua/ReverseSwapStage.kt`). The user's approvals are `FUNDING` in `AWAITING_FUNDING` and `SETTLEMENT` in `AWAITING_READY`. Cancel is shown while `!cancelRequested && !isSettled` and not in `REFUNDING`/`REFUND_PAYOUT`.
-- **Problems** (`ua/SwapLoop.kt:61-95`): `RELAYER_UNREACHABLE`, `RELAYER_REFUSED`, `RELAYER_FEE`, `ETHEREUM_UNREACHABLE`, `RAILGUN_CLOSED`, `ZCASH_WALLET`, `DEPOSIT_UNPAYABLE`, `ZCASH_REJECTED`, `MISMATCH`, `TOKENS_UNREACHABLE`, `UNEXPECTED`. zapp's `CLAIM_TURN` went with the locks.
+- **Problems** (`ua/SwapLoop.kt:61-95`): `RELAYER_UNREACHABLE`, `RELAYER_REFUSED`, `RELAYER_FEE`, `ETHEREUM_UNREACHABLE`, `RAILGUN_CLOSED`, `ZCASH_WALLET`, `DEPOSIT_UNPAYABLE`, `ZCASH_REJECTED`, `MISMATCH`, `UNEXPECTED`. zapp's `CLAIM_TURN` went with the locks.
   - A problem is shown only after 1 min of consecutive failures.
   - `ZcashWait.{SYNCING, CONFIRMATIONS}` is never a problem.
   - The block → hold mapping is at `ua/SwapLoop.kt:424-486`.
-
-### 5.9 Privacy Pass tokens and attestation (removed 2026-11-21)
-
-Veylor's token client (plan M4, progress D-154) is gone: the owner decided on 2026-11-21 that the open fee on ZEC → USD bridges (§5.2, §5.6 step 2a) replaces it (progress D-161). It never ran: both hosted makers' `/v1/info` answer `tokenReturnKey: null`, so no maker asked for a token (their `token` is the USDC contract, unrelated).
-
-- **A `401`** to an accept, whatever its code, is the maker's refusal: nothing opened, nothing paid, and the accept is never posted again (forward `NothingSent(MAKER_REFUSED)`, reverse `CANCELLED` with `MAKER_REFUSED`).
-- **What a device keeps.** `swaps.db` 8 drops the token fields reverse records kept (`deployment.tokenIssuer`, and `acceptance.tokenRequest`, never written in practice). Private USD's start and a full reset delete the token store earlier builds wrote (`<support>/private_usd_tokens_<network>.json`, `deleteLegacyPrivateUsdTokenStores`). Android's Keystore attestation keys (`vizor_privateusd_attest_<issuerName>`) stay, unused: nothing deletes them.
-- **What went.** `tokens.rs` and the `zecswap-tokens` crate; the issuance calls (`private_usd_tokens_issuance_begin`, `…_finish`, `…_status`), `ApiAcceptKind::TokensNeeded` and the token error codes; the attestation channel `com.zcash.wallet/private_usd_attestation` on Android, iOS, the Mac and Linux; the Dart service, prefetches, copy and the review's Tor-off disclosure; the issuer and return-key pins (§7.1). The design as built is in git before this change (`f7c6387bd`).
 
 ### 5.10 The foreground loop (zapp's timing, without the worker)
 
@@ -558,7 +544,6 @@ pub(crate) fn delete_account(store_dir, network, account) -> Result<()>;   // dr
 | F1 | Tap the strip → `/private-usd`; tap Convert. If an unfinished record exists, open its progress route instead. | `MobilePrivateUsdScreen`, `privateUsdUnfinishedProvider` | nothing saved | redirect to `/unlock` |
 | F2 | Type ZEC; after 700 ms the quote search calls `private_usd_forward_quote` 1–4 times. | `privateUsdConvertProvider`, `PrivateUsdZecQuoteSearch` → Rust `forward.rs` | indices already taken stay spent; the offer cache is gone; quote again | `clear_sessions` drops the offers; the screen re-quotes after unlock (new index) |
 | F3 | Review → "Convert" → `private_usd_forward_accept`: Rust saves the record (t0 = None), then POSTs accept. | review screen → Rust | before the save: nothing; after it: the record is "maybe opened"; resume → `OPENING` until `expiresAt + 300 s` → `NEVER_OPENED`/`MAKER_UNAVAILABLE`, or it continues | the FRB call finishes in Rust; Dart drops the result (epoch) and the engine resumes the record after unlock |
-| F3a | A `401`: the maker refused; `NothingSent(MAKER_REFUSED)`, nothing opened, never posted again (no token issuance since 2026-11-21, §5.9). | Rust | ended; nothing to resume | as F3 |
 | F4 | `pushReplacement` to `/private-usd/conversion/forward/:index`; the engine nudges. | router, `PrivateUsdEngine` | — | — |
 | F5 | Advance: confirmed `getSwap`; verify terms; derive the joint UA from the on-chain shares. | Rust `forward.rs` | read-only | cancelled between reads |
 | F6 | Deposit: main wallet scanned to the live tip? else `ZcashSyncing`. Save `Started` → propose (RAII discard) → create (stored in the main DB) → save `Kept{txid, raw, expiry}` → broadcast. | Rust (`propose_swap_deposit`, `create_stored_proposal_transactions`, `broadcast_raw`) | after `Started` and before `Kept`: resume runs `findDeposit` (the stored tx, which the main sync is also rebroadcasting); never a second deposit | cancel is honoured only before `Started` or after `Kept` |
@@ -581,7 +566,7 @@ pub(crate) fn delete_account(store_dir, network, account) -> Result<()>;   // dr
 |---|---|---|---|---|
 | R1 | Convert screen, `?to=zec`. Requires the page READY and the balance known. | convert screen, `RailgunEngine` | — | page closed on lock |
 | R2 | Type dollars; 700 ms → `private_usd_reverse_quote` (saves QUOTED, index spent) → page `reverseCost` → `…_set_cost`. | convert provider → Rust → page → Rust | QUOTED survives; it is not "under way" | the quote stays; cost re-asked after unlock |
-| R3 | Review → "Convert": `…_go_ahead` (ACCEPTING) → `…_accept` (a `401` cancels it, nothing paid; imports the joint account; AWAITING_FUNDING). | review screen, engine queue | resume runs `accepted` again (idempotent) | resume after unlock |
+| R3 | Review → "Convert": `…_go_ahead` (ACCEPTING) → `…_accept` (imports the joint account; AWAITING_FUNDING). | review screen, engine queue | resume runs `accepted` again (idempotent) | resume after unlock |
 | R4 | Spend guard `startConversion`. `…_funding_request` (signs OpenReverse). | Dart guard → Rust | nothing saved | — |
 | R5 | Page `prepareReverse` (≤ 10 min; `proof` events; keep-awake). | `RailgunEngine` | proof lost; nothing paid; "Pay {debit}" proves again | lock closes the page → `closed`; background → the result is dropped unless still foreground, unlocked and same epoch |
 | R6 | `…_submit_funding`: cost changed → saved, `FundingCostChanged`, AWAITING_FUNDING ("Pay {debit}"); else save `funding` + SENDING_USDC, then POST. | Rust | after the save: resume resends the same bytes only while the node does not know the hash and `now < fundingDeadline` | as F3 |
@@ -735,8 +720,6 @@ A call whose coroutine is cancelled is answered `closed`, so every call gets exa
 
 - **Threading.** MethodChannel handlers run on the main thread. Launch each `call` in a `CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)` owned by the process singleton, and reply with `result.success`/`result.error` exactly once (a second reply crashes). EventChannel `success` must be called on the main thread: collect the host's `SharedFlow` with `Dispatchers.Main`.
 - **Method timeouts are enforced in Kotlin** (the table above). A timeout closes the page.
-
-`MethodChannel com.zcash.wallet/private_usd_attestation` (M4's Keystore attestation) was removed with the token client on 2026-11-21 (progress D-161): no host registers it.
 
 **What to port and what to reuse.**
 
@@ -997,8 +980,6 @@ Source: `ui/common/atomicswap/AtomicSwapMainnet.kt:18-79` and `AtomicSwapTestnet
 | Open fee cap (`max_open_fee_zat`, Veylor's) | 500,000 zatoshis, a placeholder: decide it once mainnet's gas-priced fee is known | 500,000 zatoshis |
 | Fee quote life (`open_fee_min_quote_life_seconds` with the offer margin and review floor, `open_fee_max_quote_life_seconds`, Veylor's) | 230 s to 30 min (the fee paid with 180 s left); quotes live 2 min today, too short for a fee quote | 230 s to 30 min (the fee paid with 180 s left); quotes live 5 min |
 
-**Token keys and issuer registration.** Veylor pinned the token issuer's URL, name and key and the makers' return keys until its token client went on 2026-11-21 (§5.9); it pins none now.
-
 ### 7.2 Driver constants (both networks)
 
 - `SIGNATURE_TTL_SECONDS` = 120 (`of/SwapTypes.kt:33`): a `ready` or rescue holds this long
@@ -1034,7 +1015,7 @@ Every knob is a Dart define, read once with `String.fromEnvironment`/`bool.fromE
 
 **The keyed RPC URLs.**
 
-- They are the only secrets. The issuer keys, addresses and URLs are public pins.
+- They are the only secrets. The addresses and URLs are public pins.
 - **Their host must be one of the network's RPC providers** (`Deployment::rpc_hosts`; since D-155 the seventeen of §6.4, `*.quiknode.pro` and `*.p2pify.com` included). The page allowlist and CSP admit only those (§6.4); any other provider needs a bundle rebuild and the Kotlin, Swift and Rust allowlist changes, and must serve `eth_getLogs` over the engine's 5,000-block window.
 - Read them with `String.fromEnvironment` in one place (`private_usd_feature_config.dart`) and treat `''` as unset.
 - Pass them with `--dart-define-from-file=<gitignored json>`, so they stay out of shell history and CI logs.
@@ -1126,7 +1107,7 @@ Each row is a step zapp performs, and the veylor seam that performs it. "New" me
 
 ### 8.2 FRB API conventions
 
-- **Registration.** Add `pub mod private_usd;` to `rust/src/api/mod.rs`. `flutter_rust_bridge.yaml` has `rust_input: crate::api,zcash_voting::wire` and `dart_output: lib/src/rust`, so the new file is picked up automatically and generates `lib/src/rust/api/private_usd.dart`. Regenerate with `scripts/generate-rust-bridge.sh` (FRB `=2.11.1`, `rust/Cargo.toml:13`; Dart `flutter_rust_bridge: 2.11.1`). Logic lives in `rust/src/wallet/private_usd/{mod,keys,railgun_keys,evm_rpc,maker_client,relayer_client,tokens,forward,reverse,joint,store}.rs`; `api/` stays thin.
+- **Registration.** Add `pub mod private_usd;` to `rust/src/api/mod.rs`. `flutter_rust_bridge.yaml` has `rust_input: crate::api,zcash_voting::wire` and `dart_output: lib/src/rust`, so the new file is picked up automatically and generates `lib/src/rust/api/private_usd.dart`. Regenerate with `scripts/generate-rust-bridge.sh` (FRB `=2.11.1`, `rust/Cargo.toml:13`; Dart `flutter_rust_bridge: 2.11.1`). Logic lives in `rust/src/wallet/private_usd/{mod,keys,railgun_keys,evm_rpc,maker_client,relayer_client,forward,reverse,joint,store}.rs`; `api/` stays thin.
 - **Signatures.** Only primitives, `String`, `Vec<u8>` and flat structs (docs/architecture.md "Rust API Design Constraint").
   - Per-account calls take `db_path: String, network: String, account_uuid: String`. Key-using calls take `mnemonic_bytes: Vec<u8>`, wrapped at once in `zeroize::Zeroizing` (`api/gift_card_tracking.rs:6-23`; `api/sync.rs:1656-1663`).
   - Calls that sync or broadcast also take `lightwalletd_url: String`, from `rpcEndpointFailoverProvider.current.normalizedLightwalletdUrl`.
@@ -1163,13 +1144,13 @@ Each row is a step zapp performs, and the veylor seam that performs it. "New" me
 | `private_usd_forward_quote(ctx, secret, lwd, rpc, units) -> ApiForwardQuote` | async | M5 | takes an index; includes the deposit-fee estimate and `max_total_zat` |
 | `private_usd_forward_accept(ctx, secret, lwd, rpc, index, max_total_zat) -> ApiAcceptResult` | async | M5 | flat struct: `kind` ∈ `Accepted`, `NothingSent`, plus `cause: Option<…>` |
 | `private_usd_forward_advance(ctx, secret, lwd, rpc, op_id, index) -> ApiForwardAdvance` | async | M5 | `{record, wait?, next_poll_ms, problem?}` |
-| `private_usd_forward_abandon(network, account_uuid, store_dir, rpc, index)` | async | M5 | §5.6 step 12; no `db_path` (as built, D-32) |
+| `private_usd_forward_abandon(network, account_uuid, store_dir, rpc, index)` | async | M5 | §5.6 step 11; no `db_path` (as built, D-32) |
 | `private_usd_forward_records(ctx) -> Vec<ApiForwardRecord>` | async | M5 | history and activity |
 | `private_usd_unfinished_count(store_dir, account_uuid) -> u32`, `…_accounts_with_unfinished(store_dir)`, `…_delete_account(store_dir, network, account_uuid)`, `private_usd_activity(op_id)` (sync) | async | M5 | the deletion and reset warning; the D14 loop; cleanup; the in-flight step label |
 | `private_usd_reverse_quote`, `…_set_cost`, `…_go_ahead`, `…_accept`, `…_funding_request`, `…_submit_funding`, `…_advance`, `…_authorize_ready`, `…_cancel`, `…_can_rescue`, `…_rescue`, `…_records` | async | M6 | §5.7, §5.8 |
 | `private_usd_railgun_sends_terms(network)`, `private_usd_relayer_transact(...)`, `private_usd_send_log_{put,list}`, `private_usd_send_settle_all(...)` | async | M7 | §6.7; as built, D-90 |
 
-**Exact M1–M4 signatures.** The M5–M7 block follows below.
+**Exact M1–M3 signatures.** The M5–M7 block follows below.
 
 ```rust
 // rust/src/api/private_usd.rs
@@ -1226,7 +1207,7 @@ pub async fn stop_railgun_bridge();                          // idempotent
 - Dart reads `db_path` and `network` the way the Gift Card provider does (`ref.read(rpcEndpointFailoverProvider).current.networkName`, `gift_card_tracking_provider.dart:82`; the wallet DB path from `getWalletDbPath()`), and `lightwalletd_url` from `rpcEndpointFailoverProvider.current.normalizedLightwalletdUrl` (the provider is `lib/src/providers/rpc_endpoint_failover_provider.dart:716`; the getter is `lib/src/core/config/rpc_endpoint_config.dart:25`, used at `gift_card_tracking_provider.dart:184`).
 - **Three copies of the host allowlist** (§6.4): Rust `deployment::RAILGUN_PAGE_HOSTS` (the 10 hosts, both networks; the bridge uses it), Kotlin `RailgunEndpoints.hosts`, and the CSP in the bundle's `index.html`. The ported `RailgunBoundaryTest` pins Kotlin against the CSP. The Rust unit test `railgun_bridge::tests::the_page_hosts_match_the_kotlin_filter_and_the_page_csp` (M3) pins all three: it reads the string literals of `RailgunEndpoints.kt`'s `setOf(…)` and the `connect-src` of both `android/app/src/main/assets/railgun/index.html` and `android/railgun-web/src/index.html`, so keep the Kotlin hosts literal. Dart refuses a keyed RPC URL whose host is not in `ApiDeployment.allowed_hosts`.
 
-**Exact M5–M7 signatures** (same conventions as M1–M4; every call is `catch` + inner runtime unless marked `sync`). `ctx` expands to `db_path: String, network: String, account_uuid: String, store_dir: String`; `secret` to `mnemonic_bytes: Vec<u8>`; `lwd` to `lightwalletd_url: String`; `rpc` to `eth_rpc_url: String`; `op_id: u32` is allocated by Dart per call (`private_usd_cancel(op_id)` sets its flag). The shorthand is for this doc only; write the parameters out in code. Zatoshi are `u64` (Dart `BigInt`, as `estimate_fee` already is), token amounts decimal `String`, unix seconds `i64` (Dart `int`).
+**Exact M5–M7 signatures** (same conventions as M1–M3; every call is `catch` + inner runtime unless marked `sync`). `ctx` expands to `db_path: String, network: String, account_uuid: String, store_dir: String`; `secret` to `mnemonic_bytes: Vec<u8>`; `lwd` to `lightwalletd_url: String`; `rpc` to `eth_rpc_url: String`; `op_id: u32` is allocated by Dart per call (`private_usd_cancel(op_id)` sets its flag). The shorthand is for this doc only; write the parameters out in code. Zatoshi are `u64` (Dart `BigInt`, as `estimate_fee` already is), token amounts decimal `String`, unix seconds `i64` (Dart `int`).
 
 ```rust
 // ---- shared (M5) ----
@@ -1294,7 +1275,7 @@ pub struct ApiForwardAdvance {
 /// One look at the chain, then at most one key-using step (deposit, claim, payout, sweep). Reloads the record
 /// from swaps.db; never trusts a Dart copy. Holds the per-account driver lock for its whole duration (`Busy` if taken).
 pub fn private_usd_forward_advance(ctx, secret, lwd, rpc, op_id: u32, index: u32) -> Result<ApiForwardAdvance, ApiPrivateUsdError>;
-pub fn private_usd_forward_abandon(network: String, account_uuid: String, store_dir: String, eth_rpc_url: String, index: u32) -> Result<ApiForwardRecord, ApiPrivateUsdError>; // §5.6 step 12; `TooLate` if it opened
+pub fn private_usd_forward_abandon(network: String, account_uuid: String, store_dir: String, eth_rpc_url: String, index: u32) -> Result<ApiForwardRecord, ApiPrivateUsdError>; // §5.6 step 11; `TooLate` if it opened
 pub fn private_usd_forward_records(ctx) -> Result<Vec<ApiForwardRecord>, ApiPrivateUsdError>;   // active first, then history newest first
 
 // ---- reverse (M6) ----
@@ -1490,7 +1471,6 @@ pub fn private_usd_send_settle_all(store_dir: String, network: String, eth_rpc_u
   - `deletePrivateUsdDirectories()`: a sibling of `deleteGiftCardTrackingDirectories` that removes every `private_usd_*` directory (`swaps.db` and `joint.db`)
   - `railgunHost.wipe()`, which is `WebStorage.deleteOrigin` plus closing the page
   - `deleteAll()` already removes the secure-storage keys
-  - delete the token store files builds before 2026-11-21 kept (Private USD's start deletes them too, §5.9). Never delete the Keystore attestation keys.
 
 **Mutation guard.** `runWithSyncPausedForAccountMutation` (`wallet_mutation_guard.dart:17-45`, body `_runWithSyncPausedForAccountMutation` `:47-165`) pauses foreground sync, Ironwood migration work and optionally voting around imports and deletes. It does **not** pause sends, proposals, claim syncs or the Private USD engine. Joint-DB scans and writes take the process-global `with_wallet_db_write_lock` (§8.1), so they serialize with main-DB writes. The engine still must not start a step while a mutation holds `linuxKeyringCoordinatorProvider.runMutation`. The lifecycle drain covers this.
 
@@ -1552,8 +1532,8 @@ pub fn private_usd_send_settle_all(store_dir: String, network: String, eth_rpc_u
 **`MainActivity.kt`** (`android/app/src/main/kotlin/com/keplr/vizor/MainActivity.kt`) is a `FlutterFragmentActivity`.
 
 - **Registration.** All channels are registered in `configureFlutterEngine` (`:97-242`), as `MethodChannel(binaryMessenger, NAME).setMethodCallHandler { call, result -> handler.handle(call, result) }`, and for streams `EventChannel(...).setStreamHandler(handler)` (`LedgerMobileHandler.EVENT_CHANNEL`).
-- **Naming.** Channel names use the `com.zcash.wallet/…` prefix (`MainActivity.kt:447-451`; `BiometricUnlockHandler.kt:227`; `LedgerMobileHandler.kt:821-822`). Hence X7's names: `com.zcash.wallet/railgun` and `com.zcash.wallet/railgun/events` (and `com.zcash.wallet/private_usd_attestation`, removed with the token client on 2026-11-21, §5.9).
-- **Handler classes.** Each has `fun handle(call, result)` and `companion object { const val CHANNEL }`. `DeviceOwnerAuthHandler.kt` and `BiometricUnlockHandler.kt` (Keystore-bound key) were the templates for the attestation handler (removed, §5.9).
+- **Naming.** Channel names use the `com.zcash.wallet/…` prefix (`MainActivity.kt:447-451`; `BiometricUnlockHandler.kt:227`; `LedgerMobileHandler.kt:821-822`). Hence X7's names: `com.zcash.wallet/railgun` and `com.zcash.wallet/railgun/events`.
+- **Handler classes.** Each has `fun handle(call, result)` and `companion object { const val CHANNEL }`.
 - **Dart wrappers** for channels live in `lib/src/services/*.dart` (for example `biometric_unlock.dart`, `device_owner_auth.dart`) or in `features/<f>/services/` (`ledger_mobile_ble_service.dart`). Put `railgun_host_channel.dart` in `lib/src/features/private_usd/services/`.
 
 **`android/app/build.gradle.kts`.**
@@ -1631,7 +1611,6 @@ printf '\n# Railgun bundle build\n/android/railgun-web/node_modules/\n' >> .giti
 | `$RLT/RailgunProtocolTest.kt` (144) | `$KT/` | copy with edits | delete the two `RailgunAddress` checksum tests; `File("web/src/index.js")` → `File("../railgun-web/src/index.js")` (unit tests run in `android/app`); Robolectric runner for `org.json` |
 | `$RLT/RailgunBoundaryTest.kt` (69) | `$KT/` | copy with edits | `web/src/index.html` → `../railgun-web/src/index.html`; `src/main/assets/railgun/index.html` is unchanged; drop `RailgunNetwork` references |
 | `$RLT/RailgunSessionTest.kt` (162) | Dart tests | translate | its cases test the typed models, which live in Dart |
-| `ua/AtomicSwapAttestation.kt` (157) | `android/app/src/main/kotlin/com/keplr/vizor/PrivateUsdAttestationHandler.kt` | translate (M4) | key code in M4; drop `KeyAttestation`/`AtomicSwapBlockedException` (zapp `offramp-lib` types) |
 | `of/*.kt`, `ua/*.kt` driver and store code | `rust/src/wallet/private_usd/*.rs` | translate | never copy; read only the file a task names |
 | `ui/common/repository/{RailgunEngine,RailgunWalletRepository}.kt`, `ui/common/privateusd/{PrivateUsdBalanceRepository,PrivateUsdBalanceCache}.kt` | `lib/src/features/private_usd/services/` | translate to Dart | drop Koin, `Flow` → Riverpod notifiers/streams, zapp logging → `debugPrint` guarded by `kDebugMode` |
 | `evm-lib/.../hd/{Bip32,Bip85}.kt` | — | do not port | Rust implementation in §3.3 |
@@ -1739,7 +1718,7 @@ Read from zapp at `60bcf0b30` and veylor at `4a859bee0`. **No Figma exists for t
 | 1, 2 | home (no route) | `_MobilePrivateUsdStrip` and the banner via `_MobileHomeEntryCard(emphasized:)` in `features/home/screens/mobile/mobile_home_screen.dart` (§8.3) | `privateUsdAvailableProvider`, `privateUsdBalanceProvider(uuid)`, `privateUsdConversionBannerProvider(uuid)`, `zecHomeUsdUnitPriceProvider`, `privacyModeProvider` | inline |
 | 3 | `/private-usd` | `MobilePrivateUsdScreen` (`mobile_private_usd_screen.dart`) | `privateUsdBalanceProvider(uuid)`, `privateUsdConversionBannerProvider(uuid)`, `privateUsdActivityProvider(uuid)`, `privateUsdSpendStatusProvider(uuid)`, `privateUsdReceiveAddressProvider(uuid)` | full screen |
 | 4, 5 amount | `/private-usd/convert` (`?to=zec` for reverse; the toggle replaces the query in place) | `MobilePrivateUsdConvertScreen` (`mobile_private_usd_convert_screen.dart`), layout modelled on `MobilePayAmountStep` with `MobileKeyboardToolbar` and `DecimalAmountInputFormatter` (reuse table above) | `privateUsdConvertProvider` (a `Notifier`: direction, amount, quote, step, error; debounce; expiry tick), `syncProvider` (shielded spendable, sync %), `privateUsdBalanceProvider(uuid)` | full screen |
-| 4, 5 review | `/private-usd/convert/review` (redirect to `/private-usd/convert` without a ready quote, as `/swap/keystone-sign` does at `mobile_routes.dart:289-297`) | `MobilePrivateUsdConvertReviewScreen`, using `MobileSwapReviewHeader` with a new `SwapAsset`-like `privateUsd` row (the USDC icon plus a private badge asset), `ReviewWrapCard`, `ReviewInfoRow`/`MobileReviewInfoRow`, `ReviewButtonsStack` | `privateUsdConvertProvider`, `networkPrivacyProvider` (Tor-off disclosure) | full screen |
+| 4, 5 review | `/private-usd/convert/review` (redirect to `/private-usd/convert` without a ready quote, as `/swap/keystone-sign` does at `mobile_routes.dart:289-297`) | `MobilePrivateUsdConvertReviewScreen`, using `MobileSwapReviewHeader` with a new `SwapAsset`-like `privateUsd` row (the USDC icon plus a private badge asset), `ReviewWrapCard`, `ReviewInfoRow`/`MobileReviewInfoRow`, `ReviewButtonsStack` | `privateUsdConvertProvider` | full screen |
 | 6, 7 | `/private-usd/conversion/:direction/:index` (`forward`/`reverse`) | `MobilePrivateUsdConversionScreen`, with `MobileSwapStatusContent` and a `privateUsdStatusPresentation(record)` mapper (reuse table above) implementing §9.5 | `privateUsdConversionProvider((uuid, direction, index))`, driven by the foreground engine loop (§8.2 `forward_advance`/`reverse_advance`) | full screen |
 | 8 | `/private-usd/refunds` | `MobilePrivateUsdRefundsScreen` with `MobileListRow` rows | `privateUsdRefundsProvider(uuid)` (15 s re-check loop while visible) | full screen |
 | 9 form | `/private-usd/send`, `/private-usd/withdraw` | `MobilePrivateUsdSendScreen(mode:)`. The address field reuses `MobileTextField` (`core/widgets/mobile_text_field.dart`) with paste, and optionally the `address_scan` QR modal (reuse table above). 0zk validation is a sync FRB call; 0x validation reuses `_isEvmAddress` (`features/address_book/models/address_format_validator.dart:125`) plus a zero-address check. | `privateUsdSendProvider(mode)`, `privateUsdBalanceProvider(uuid)`, `privateUsdSpendStatusProvider(uuid)` | full screen |
@@ -1810,7 +1789,7 @@ models/
 services/
   railgun_host_channel.dart, railgun_engine.dart, railgun_engine_key_store.dart       [M3]
   private_usd_balance_repository.dart, private_usd_balance_cache.dart                 [M3]
-  (no paths wrapper)                        the services call wallet_paths.dart directly: getPrivateUsdDirPath, getExistingPrivateUsdDirPath (never creates a directory or assigns a wallet DB name), deletePrivateUsdDirectories and deleteLegacyPrivateUsdTokenStores (the token stores builds before 2026-11-21 wrote)
+  (no paths wrapper)                        the services call wallet_paths.dart directly: getPrivateUsdDirPath, getExistingPrivateUsdDirPath (never creates a directory or assigns a wallet DB name) and deletePrivateUsdDirectories
   private_usd_swap_backend.dart             [M5] PrivateUsdSwapBackend: the FRB calls with this wallet's context; key-using calls take a PrivateUsdSecretReader (read the seed last, zero it once Rust copied it) (D-51)
   private_usd_account_data.dart             [M3] deletePrivateUsdAccountData(storage, uuid): the engine key and the balance cache
   private_usd_engine.dart                   [M5] class PrivateUsdEngine {   // as built (D-51)
@@ -2014,7 +1993,7 @@ The **review** phase (same screen):
 - **Review** (`PrivateUsdReverseMapper.kt:74-88`):
   - Header: `{$debit}` for about `{ZEC}`.
   - Rows: "Escrow value", "Railgun unshield fee", "Broadcast fee", "Total paid", "Market maker's network cost" (optional), and "Estimated ZEC after sweep fee".
-  - **veylor:** add a "Keep Veylor open" note, the settlement deadline (`readyDeadline`) and the Tor-off disclosure (§9.6).
+  - **veylor:** add the settlement deadline (`readyDeadline`) and a "Keep Veylor open" note (§9.6).
 - **"Convert"** is one authorized step: accept, import the joint account, then fund (`:353-357`). Its default failure is "The conversion couldn't start…". After it, the screen renders progress (S6).
 - **Cost changed.** `FUNDING_COST_CHANGED` → "The fees changed, so nothing was paid. The new total shows above: convert again to pay it, or cancel." The record stays in `AWAITING_FUNDING`, whose primary button is "Convert" again (`PrivateUsdReverseMapper.kt:149-153`). **veylor:** show the new cost rows on the progress screen in `AWAITING_FUNDING`, and label the button "Pay {debit}".
 - **Back** (`:296-317`): from review of a preview → back to the amount. During a look-up (the max calculation) → cancels it. During an authorized step → blocked. Otherwise → leave.
@@ -2027,7 +2006,7 @@ The **review** phase (same screen):
   - a note
   - a problem card, "Taking longer than usual", with "Try now" (`retryNow`)
   - the result header
-  - "Call it off": only while opening has taken more than 90 s and there is no problem (`:89-109`). `abandon` succeeds only before any deposit and with no escrow (§5.6 step 12); otherwise → "The swap opened on Ethereum meanwhile, so it can't be called off. It carries on."
+  - "Call it off": only while opening has taken more than 90 s and there is no problem (`:89-109`). `abandon` succeeds only before any deposit and with no escrow (§5.6 step 11); otherwise → "The swap opened on Ethereum meanwhile, so it can't be called off. It carries on."
   - the background note (**veylor:** keep-open note)
   - the primary button: none while under way; "View private USD" after `Paid` (replaceAll → S2); "Try again" after `Refunded` or `NothingSent` (replace → S3)
 - **Ticks** every 15 s. On open it resumes the loop. If there is no forward record at all, it moves to the reverse conversion or to Convert (`:137-145`).
@@ -2168,7 +2147,7 @@ Flags:
 
 - **B**: branding changed ("Zapp" becomes "Veylor", or the sentence is rephrased)
 - **F**: foreground-only change
-- **T**: Tor or token-route change (D10, D4)
+- **T**: Tor change (D4)
 - **C**: local-currency text removed
 - **N**: new for veylor
 - **S**: sentence case fixed
@@ -2178,8 +2157,6 @@ Flags:
 
 - the notifications block (`str:204-217`) and `convert_notifications_off` (`:113`)
 - `private_usd_info_note_currency` (`:53`), `private_usd_info_switch_currency` (`:56`) and `private_usd_switch_currency` (`:317`), all C
-- `convert_error_tor_off` (`:105`): veylor issued tokens directly when Tor was off (D10), and pays none since 2026-11-21 (§5.9)
-- the token copy, ported and then removed with the token client on 2026-11-21 (§5.9): `convert_error_no_tokens_today`, `convert_error_tokens_unavailable`, `convert_error_device_refused`, `convert_error_keystore`, `convert_problem_tokens` and the review's Tor-off disclosure
 - `private_usd_token_weth` (`:36`): not a dollar
 - `private_usd_home_separator` (`:17`): veylor lays out its own strip
 - `convert_quote_countdown` (`:90`): use veylor's `m:ss` formatter
@@ -2546,7 +2523,7 @@ As built in M6 (D-87): the twelve reverse and refunds rows below plus `mobile-pr
 
 As built for the windows contract (D-137): `mobile-private-usd-{bridge-off,other-deployment}`, `mobile-private-usd-progress-{unwinding,other-deployment}` and `mobile-private-usd-reverse-other-deployment`. The preview forward record carries a late claim time an hour after `t1`.
 
-As built in M5 (D-56): the forward rows, `mobile-home-private-usd-converting` (through `_buildMobileHomeUseCase`'s `privateUsdConversions`), `mobile-private-usd-convert{,-quoting,-insufficient,-syncing}`, `mobile-private-usd-review{,-expired,-tor-off}` and `mobile-private-usd-progress{,-opening-slow,-problem,-paid,-refunding,-refunded,-nothing-sent}`; `mobile-private-usd-default` now has a converted and a called-off row and the Convert button. `mobile-home-private-usd-attention` is a reverse banner and arrives with M6.
+As built in M5 (D-56): the forward rows, `mobile-home-private-usd-converting` (through `_buildMobileHomeUseCase`'s `privateUsdConversions`), `mobile-private-usd-convert{,-quoting,-insufficient,-syncing}`, `mobile-private-usd-review{,-expired}` and `mobile-private-usd-progress{,-opening-slow,-problem,-paid,-refunding,-refunded,-nothing-sent}`; `mobile-private-usd-default` now has a converted and a called-off row and the Convert button. `mobile-home-private-usd-attention` is a reverse banner and arrives with M6.
 
 | Scenario id | State |
 |---|---|
@@ -2573,7 +2550,6 @@ As built in M5 (D-56): the forward rows, `mobile-home-private-usd-converting` (t
 | `mobile-private-usd-convert-reverse` | USD→ZEC amount |
 | `mobile-private-usd-review` | forward review |
 | `mobile-private-usd-review-expired` | "Quote expired", "Refresh quote" |
-| `mobile-private-usd-review-tor-off` | disclosure visible |
 | `mobile-private-usd-review-reverse` | reverse review rows, keep-open note, deadline |
 | `mobile-private-usd-progress` | forward confirming |
 | `mobile-private-usd-progress-opening-slow` | "Call it off" |
@@ -2611,7 +2587,7 @@ Widget tests for these screens are mobile-tagged (`@Tags(['mobile'])`) and compa
 | Reference app | `~/dev/zapp/zapp-android`, branch `release/4.7.0`. PR #79 `feature/private-usd-ui` was merged as `e5f6fc621` (base `a3a3f88b1`). Full feature diff: `git diff a3a3f88b1 HEAD`. Post-merge follow-ups: `5441d95f0` (keyed RPC before publicnode), `f400d24c6` (Infura hosts for the Railgun page), `60bcf0b30` (send/withdraw toggle removed). |
 | Protocol, services, crypto | `~/dev/zapp/zecSwap-mainnet-beta`, branch `feature/mainnet-beta` (`d69e3fb`). The newest branch, holding the mainnet beta records (`deployments/mainnet-beta.json`, `sepolia-terms-hash.json`, `sepolia-tokens.json`). zapp-android pins zecSwap `9b52dfc`. |
 | Internal handoffs (gitignored) | `~/dev/zapp/zecSwap/docs/local/{android.md, plan.md, private-usd.md, PR8-REVIEW.md}`. `android.md` §2, §6 and §6b give the client flow step by step, including the contract selectors and custom errors. |
-| Public protocol docs | `zs/docs/{reverse-flow.md, railgun-sends.md, tokens.md, deployment.md}` and `za/docs/android-reverse-swap.md` (partly stale, §5) |
+| Public protocol docs | `zs/docs/{reverse-flow.md, railgun-sends.md, deployment.md}` and `za/docs/android-reverse-swap.md` (partly stale, §5) |
 | Known-answer vectors | `cargo run -p zecswap-client --example vectors` (in zecSwap) |
 
 **Per component.**
@@ -2623,7 +2599,6 @@ Widget tests for these screens are mobile-tagged (`@Tags(['mobile'])`) and compa
 | HTTP clients | `of/SwapClients.kt`, `RailgunSendsClient.kt`; `zapi/{lib,service,relayer}.rs`; `zc/api.rs` | `maker_client.rs`, `relayer_client.rs` |
 | Chain reads | `of/AtomicSwapChain.kt`, `AtomicSwapSeams.kt`; `zs/contracts/src/ZecSwap.sol` | `evm_rpc.rs` |
 | Index allocation | `of/SwapIndices.kt` | `indices.rs` |
-| Tokens | `of/SwapTokens.kt`; `ua/AtomicSwapTokens.kt`, `ua/AtomicSwapAttestation.kt`; `zs/crates/zecswap-tokens`; `zs/crates/zecswap-jni/src/tokens.rs` (the four calls) | `tokens.rs`; `PrivateUsdAttestationHandler.kt` |
 | Joint account and sweep (behaviour) | `ua/JointAccounts.kt`, `ua/AtomicSwapZcashImpl.kt`, `ua/SwapZcashTransactions.kt`; zecSwap's own wallet `zs/crates/zecswap-chain/src/zcash/wallet.rs` | `joint.rs`, `send.rs`, `pczt.rs` |
 | Native primitives glue | `zs/crates/zecswap-jni/src/ops.rs:160-265` | `keys.rs` |
 | Loop timing and problems | `ua/SwapLoop.kt`, `ua/AtomicSwapRepository.kt`, `ua/ReverseSwapRepository.kt`, `ua/AtomicSwapStage.kt`, `ua/ReverseSwapStage.kt` | `private_usd_engine_loop.dart`, `private_usd_status_presentation.dart` |

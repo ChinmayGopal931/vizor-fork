@@ -253,7 +253,9 @@ Code:
 
 - `swaps.db` holds the swap index counters, the swap records, the
   joint-account index and the Railgun send log. Records decode strictly: an
-  unreadable record is an error, never a reset.
+  unreadable record is an error, never a reset. Schema 8 drops two fields
+  reverse records kept before 2026-11-21, so one an earlier build wrote still
+  decodes (`drop_token_fields`).
 - `joint.db` is a librustzcash DB for the short-lived joint accounts.
 
 The directory stays out of every backup the platform makes: iOS marks it out
@@ -537,16 +539,6 @@ another chain is refused.
   never one under way. `swaps.db` gained deposits at schema 2 and the windows
   contract's records at 3: a build that knows an older schema refuses it as
   newer.
-
-**No Privacy Pass tokens (owner, 2026-11-21).** The open fee replaces the
-token client (plan M4), which is gone; reference §5.9 and progress D-161 say
-what went. A maker that answers an accept `401`, whatever its code, refused
-it: nothing opened or paid, and the accept is never posted again (forward
-`NothingSent(MAKER_REFUSED)`, reverse `CANCELLED`). `swaps.db` 8 dropped the
-token issuer reverse records pinned. Private USD's start and a full reset
-delete the token store earlier builds wrote
-(`deleteLegacyPrivateUsdTokenStores`); Android's Keystore attestation keys
-stay, unused.
 
 **Railgun's sync (the page).**
 

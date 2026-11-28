@@ -54,8 +54,7 @@ channel contract, method for method and code for code
   length-prefixed frames (deliver, visible, quit; message, undelivered,
   closed). Neither end logs a payload.
 - `private_usd_channels.cc`: the keep-awake flag and the settlement reminder
-  (below). The Privacy Pass attestation stub went with the token client on
-  2026-11-21 (progress D-161).
+  (below).
 - `session_lifecycle.cc`: the session away (below).
 
 Registration is `register_private_usd_channels` in `my_application.cc`'s
