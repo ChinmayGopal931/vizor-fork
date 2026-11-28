@@ -253,9 +253,7 @@ Code:
 
 - `swaps.db` holds the swap index counters, the swap records, the
   joint-account index and the Railgun send log. Records decode strictly: an
-  unreadable record is an error, never a reset. Schema 8 drops two fields
-  reverse records kept before 2026-11-21, so one an earlier build wrote still
-  decodes (`drop_token_fields`).
+  unreadable record is an error, never a reset.
 - `joint.db` is a librustzcash DB for the short-lived joint accounts.
 
 The directory stays out of every backup the platform makes: iOS marks it out
