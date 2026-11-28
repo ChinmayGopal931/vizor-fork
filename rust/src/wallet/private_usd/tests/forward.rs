@@ -1,8 +1,8 @@
 //! The forward conversion's fund-safety rules on fakes: the driver, the
 //! claim's windows and settlement, the deposit's crash points and sync gate,
-//! the 2 USDC cap, an accept answered `401`, claims handed to the relayer, the
-//! rescue of a payout Railgun sent back, records of another contract, and one
-//! driver step per account.
+//! the 2 USDC cap, claims handed to the relayer, the rescue of a payout
+//! Railgun sent back, records of another contract, and one driver step per
+//! account.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -328,36 +328,6 @@ async fn an_accept_refusal_ends_only_when_nothing_can_have_opened() {
     let quoted = h.quote().await.unwrap();
     assert!(h.accept(quoted.index).await.is_err());
     assert_eq!(h.record().outcome, None);
-}
-
-/// A maker answering an accept `401`, whatever its code (one asking for a
-/// Privacy Pass token, which this build never pays), refused it: nothing
-/// opened, the conversion ends with nothing sent, and the accept is never
-/// posted again.
-#[tokio::test]
-async fn an_accept_answered_401_is_a_refusal_with_nothing_opened() {
-    for code in [Some("tokenRequired"), None, Some("internal")] {
-        let h = Harness::new();
-        {
-            let mut state = h.world.set();
-            state.accept_status = 401;
-            state.accept_code = code;
-        }
-        let quoted = h.quote().await.unwrap();
-        let refused = AcceptOutcome::NothingSent(NothingSentCause::MakerRefused);
-        assert_eq!(h.accept(quoted.index).await.unwrap(), refused, "{code:?}");
-        let record = h.record();
-        assert_eq!(record.t0, None, "nothing opened");
-        assert_eq!(
-            record.outcome,
-            Some(ForwardOutcome::NothingSent {
-                cause: NothingSentCause::MakerRefused
-            })
-        );
-        assert_eq!(h.accept(quoted.index).await.unwrap(), refused);
-        assert_eq!(h.posted(&accept_path()), 1, "no retry");
-        assert_eq!(h.deposits(), 0);
-    }
 }
 
 // ---- the deposit is never paid twice (AtomicSwapDriverTest) ----

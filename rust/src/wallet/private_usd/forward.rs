@@ -2272,8 +2272,6 @@ fn holding(wait: ForwardWait, terms: &Terms) -> ForwardStep {
     }
 }
 
-/// A maker's refusal of an accept that came before it opened anything, and
-/// what ended; `None` for one that may follow an open.
 /// Whether a refusal that says nothing opened may follow an earlier post's
 /// open, so after a post whose answer is unknown it ends nothing: the quote
 /// unknown, which a maker that took it answers, or a `400` or `404`, which it
@@ -2282,12 +2280,9 @@ fn may_follow_an_open(refusal: &Refusal) -> bool {
     refusal.code == Some(SwapErrorCode::UnknownQuote) || matches!(refusal.status, 400 | 404)
 }
 
+/// A maker's refusal of an accept that came before it opened anything, and
+/// what ended; `None` for one that may follow an open.
 fn accept_refusal(refusal: &Refusal) -> Option<NothingSentCause> {
-    // Unauthorized: the maker acted on nothing, whatever the code (a maker
-    // asking for a Privacy Pass token, which this build never pays).
-    if refusal.status == 401 {
-        return Some(NothingSentCause::MakerRefused);
-    }
     match refusal.code {
         // A fee the quote never asked is a refusal: nothing opened.
         Some(

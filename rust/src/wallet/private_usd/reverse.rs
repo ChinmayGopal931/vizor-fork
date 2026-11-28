@@ -1919,11 +1919,6 @@ fn funding_fee_of(record: &ReverseRecord, debit: Amount, railgun_fee: Amount) ->
 /// A maker's refusal no other accept would change, and how it ended the
 /// conversion; `None` for one that may follow an acceptance.
 fn last_word(refusal: &Refusal) -> Option<NothingSentCause> {
-    // Unauthorized: the maker acted on nothing, whatever the code (a maker
-    // asking for a Privacy Pass token, which this build never pays).
-    if refusal.status == 401 {
-        return Some(NothingSentCause::MakerRefused);
-    }
     match refusal.code? {
         SwapErrorCode::Unavailable | SwapErrorCode::WatchtowerUnavailable => {
             Some(NothingSentCause::MakerUnavailable)
