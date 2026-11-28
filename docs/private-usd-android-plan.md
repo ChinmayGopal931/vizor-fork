@@ -6,9 +6,9 @@
 - conversion both ways between shielded ZEC and private USD, by atomic swap, with refunds and refund recovery ("rescue")
 - private USD send (to a Railgun `0zk` address) and withdraw (to a public `0x` address)
 
-**Scope.** Android, mobile form factor (`--dart-define=VIZOR_FORM_FACTOR=mobile`). iOS and desktop come later, so keep the Rust engine, the Dart models and the JS bundle platform-neutral. iOS then needs only a Swift `WKWebView` host and an attestation channel; the iOS port is planned in `docs/private-usd-ios-plan.md`, which also covers what that sentence missed (the page's Android-only handshake, iOS 17 for the WebView proxy, App Store licensing and review).
+**Scope.** Android, mobile form factor (`--dart-define=VIZOR_FORM_FACTOR=mobile`). iOS and desktop come later, so keep the Rust engine, the Dart models and the JS bundle platform-neutral. iOS then needs only a Swift `WKWebView` host; the iOS port is planned in `docs/private-usd-ios-plan.md`, which also covers what that sentence missed (the page's Android-only handshake, iOS 17 for the WebView proxy, App Store licensing and review).
 
-**Status (2026-10-15).** M0 is done (results in §4). M1 is done except its optional task 10b, which slipped to M8 and is deferred again (progress D-108). M2 is done, including its Ironwood regtest run (M2.7b, passed 2026-10-13 after the fresh-tip fix D-50). M3 is done (tasks 1–13: the native layer, the Dart Railgun side, balance, availability, the home strip, `/private-usd`, lifecycle, copy, Widgetbook and the Kotlin tests) and its device round, M3.14, passed on the Galaxy A35 on 2026-10-14 (progress D-109 to D-111). M4 was built later (progress D-154) and removed on 2026-11-21 (owner, D-161): the open fee on ZEC → USD bridges replaces tokens, so there is no M4 work left. M5–M7 proceed without tokens (D20). M5 is done (tasks 1–7: the Rust engine and its FRB calls, then the Dart engine, lifecycle guards, UI, copy and Widgetbook) except its device round, M5.8, which needs testnet ZEC on the phone's wallet (E8); its opt-in scenario is written (`run_device_round.sh --m5`, progress D-57). A fund-safety review of M5 led to four fixes and one hardening (D-59). M6 is done (tasks 1–5: the Rust reverse engine, refunds, rescue and FRB calls; the Dart reverse flow, funding, Refunds, copy and Widgetbook) except its device round, M6.6. M7 is done (tasks 1–4: the Rust sends, relayer terms and transact, the send log and settlement, then the Dart sender, the full spend guard, the send routes, copy and Widgetbook) and its device round (M7.5) passed on the Galaxy A35 on 2026-10-15: sends, a withdrawal and the kill-and-resend check. M8's non-device parts are done (2026-10-14). The route-change scenario (M8.1, `--m8-route`, D-104) and the keyed RPC check (M8.3, `--keyed-rpc`, D-105) are written but not run: the phone was not attached. The static audit found no leak of the keyed URL (D-105). The kill switch's unit coverage is complete; its live check waits for E7 (M8.2, D-107). The device checklist is `docs/private-usd-device-checklist.md` (M8.5), and AGENTS.md has a Private USD section with the Android worker description corrected (M8.6, D-106). M8.4 waits for the phone, and M8.7 for the owner's sign-off. Progress lives in `docs/private-usd-progress.md`. M3, M5, M6 and M7 have all passed on the device (testnet + Sepolia); M8 has the route round and keyed-RPC check written but not run.
+**Status (2026-10-15).** M0 is done (results in §4). M1 is done except its optional task 10b, which slipped to M8 and is deferred again (progress D-108). M2 is done, including its Ironwood regtest run (M2.7b, passed 2026-10-13 after the fresh-tip fix D-50). M3 is done (tasks 1–13: the native layer, the Dart Railgun side, balance, availability, the home strip, `/private-usd`, lifecycle, copy, Widgetbook and the Kotlin tests) and its device round, M3.14, passed on the Galaxy A35 on 2026-10-14 (progress D-109 to D-111). M5 is done (tasks 1–7: the Rust engine and its FRB calls, then the Dart engine, lifecycle guards, UI, copy and Widgetbook) except its device round, M5.8, which needs testnet ZEC on the phone's wallet (E8); its opt-in scenario is written (`run_device_round.sh --m5`, progress D-57). A fund-safety review of M5 led to four fixes and one hardening (D-59). M6 is done (tasks 1–5: the Rust reverse engine, refunds, rescue and FRB calls; the Dart reverse flow, funding, Refunds, copy and Widgetbook) except its device round, M6.6. M7 is done (tasks 1–4: the Rust sends, relayer terms and transact, the send log and settlement, then the Dart sender, the full spend guard, the send routes, copy and Widgetbook) and its device round (M7.5) passed on the Galaxy A35 on 2026-10-15: sends, a withdrawal and the kill-and-resend check. M8's non-device parts are done (2026-10-14). The route-change scenario (M8.1, `--m8-route`, D-104) and the keyed RPC check (M8.3, `--keyed-rpc`, D-105) are written but not run: the phone was not attached. The static audit found no leak of the keyed URL (D-105). The kill switch's unit coverage is complete; its live check waits for E7 (M8.2, D-107). The device checklist is `docs/private-usd-device-checklist.md` (M8.5), and AGENTS.md has a Private USD section with the Android worker description corrected (M8.6, D-106). M8.4 waits for the phone, and M8.7 for the owner's sign-off. Progress lives in `docs/private-usd-progress.md`. M3, M5, M6 and M7 have all passed on the device (testnet + Sepolia); M8 has the route round and keyed-RPC check written but not run.
 
 **Two files.** This file holds the decisions, the architecture, the work and the test strategy. The reference sections §5–§9 and §12 live in `docs/private-usd-reference.md`, with the same numbers:
 
@@ -86,16 +86,14 @@ A pointer such as "§5.5" means that file. Open a reference section only when a 
 
 | # | Decision | Why, and what follows |
 |---|---|---|
-| D1 | The owner registers veylor's app id and signing-certificate digests with the token issuers. | Without it the issuer refuses veylor's attestation, so no swap can be accepted (E3). |
 | D2 | Networks: mainnet beta, plus Zcash testnet with Sepolia for development and E2E. | Regtest has no deployment, so the feature is hidden there (§7.1). |
-| D3 | Path B. The owner adds a Zakura build of `zecswap-core` to zecSwap under an Apache-2.0-compatible license, and relicenses their zapp code to Apache-2.0. veylor depends on `zecswap-core`, `zecswap-railgun` and `zecswap-tokens` by git rev. The Railgun JS bundle ships as a separately licensed asset, with its GPL-3.0 notices. | One audited source with known-answer vectors. Do **not** depend on `zecswap-client`: it pulls `zecswap-chain` (alloy, rusqlite, the orchard circuit) and its own reqwest, which bypasses veylor's Tor route. Port its driver instead, as zapp did in Kotlin. Shipping `libzecswap.so` (two Zcash stacks in one APK, no iOS path) is rejected. |
+| D3 | Path B. The owner adds a Zakura build of `zecswap-core` to zecSwap under an Apache-2.0-compatible license, and relicenses their zapp code to Apache-2.0. veylor depends on `zecswap-core` and `zecswap-railgun` by git rev. The Railgun JS bundle ships as a separately licensed asset, with its GPL-3.0 notices. | One audited source with known-answer vectors. Do **not** depend on `zecswap-client`: it pulls `zecswap-chain` (alloy, rusqlite, the orchard circuit) and its own reqwest, which bypasses veylor's Tor route. Port its driver instead, as zapp did in Kotlin. Shipping `libzecswap.so` (two Zcash stacks in one APK, no iOS path) is rejected. |
 | D4 | Build a Tor bridge: a loopback SOCKS5 listener in Rust over veylor's in-process arti, with the WebView pointed at it through androidx.webkit `ProxyController`. | Railgun page traffic then follows veylor's route setting. It is **unverified**, so it is spike M0.3. **Fallback if the spike fails:** Private USD is unavailable while Tor is on. |
 | D5 | v1 scope: home balance, convert both ways, refunds and rescue, and private send and withdraw. | |
 | D6 | One Private USD wallet and one swap state per software account, following the active account. Hardware accounts (Keystone, Ledger) hide the feature. | Hardware accounts have no seed on the phone. An account with no ZIP-32 derivation metadata also hides it (D8 needs the index). |
 | D7 | The Railgun BIP-85 input is the account's 64-byte BIP-39 seed **including** its passphrase, the same seed the Zcash keys use. | A passphrase-protected veylor account therefore has a different Railgun wallet from zapp on the same words. |
 | D8 | The BIP-85 index and the swap-key `account` are the veylor account's ZIP-32 account index. | Index 0 matches zapp for the same seed. Two accounts on one seed get separate key spaces. |
 | D9 | Foreground only. Every key-using step (deposit, claim, payout signature, refund, sweep, Railgun proving) runs only while the app is unlocked and in the foreground. No per-swap keys are stored. No worker, alarms or notifications in v1. Relayer claims (owner, 2026-10-21; Settings, on by default): once a ZEC → USD bridge's deposit is out and the swap is ready at its confirmation depth, in the foreground, its claim and kept payout go to the pinned relayer (`/v1/claim/hold`), which sends them when the claim's window opens, so the user can leave once the market maker has confirmed the deposit (D-151). | The hand-over shows `z` to the relayer before the window. Never on an open swap: the maker may cancel one until it is ready, and its cancel reveals `e` on chain, which with `z` spends the deposit, so the relayer alone could sweep it before the app, which sweeps only in the foreground. On a ready swap the relayer alone can take the deposit only by withholding the claim until the maker refunds from `t1` (while the app is away); the owner, who runs the relayer, accepts that. veylor's mnemonic is encrypted under the session password and is unreadable while locked (`lib/src/core/storage/app_secure_store.dart:284-300, 898-915`). veylor has no Android worker: the `IronwoodMigrationPreparationWorker` and `rust/src/android_jni.rs` that AGENTS.md described were removed in `459a8565b` (M8 corrected AGENTS.md, progress D-106), and `pubspec.yaml` has no WorkManager. An absent user cannot lose funds (§5.8), but a conversion may fail or refund. A key-free reminder notification is a later enhancement. |
-| D10 | Privacy Pass token issuance follows the route setting: over Tor when Tor is on, direct otherwise. | zapp requires Tor for issuance; veylor's Tor is opt-in. Disclose, when Tor is off, that the issuer sees the device attestation next to the IP (`tor_off_disclosure`, §9.6). |
 | D11 | Relayer fee cap: **2 USDC** (2,000,000 base units for 6-decimal tokens) per network, enforced at quote, payout, refund payout and Railgun sends. A higher fee is refused with a clear error. | zapp has no cap. X6 extends it to the reverse funding fee and the rescue fee. |
 | D12 | Joint sweeps and refund sweeps use **Discard OVK**. | The maker knows the joint viewing key. A sweep encrypted to the joint OVK would let the maker read the user's home address. The deposit keeps the sender OVK (§8.1.3). |
 | D13 | The ~15-line `connect_stream` patch rides on a vendored copy of the published `zakura-client-backend` (`rust/vendor/`), patched in through `[patch.crates-io]`, until a release carries it (owner, 2026-10-20; it replaced a fork of `zakura-core/wallet-libraries`). | No second arti instance, and nothing outside the repo. |
@@ -104,8 +102,6 @@ A pointer such as "§5.5" means that file. Open a reference section only when a 
 | D16 | Kill switch: an owner-hosted static JSON file, `{"private_usd_available": true}`, at a URL given by a build-time define, fetched over veylor's policy-aware (Tor-aware) route. | `false` hides the feature, but in-flight swaps keep being driven to completion or refund. A failed fetch keeps the last known value, defaulting to available. Do not use `functions.vizor.cash`, which is upstream's. |
 | D17 | Stuck-funds copy says "contact support" with no link. An optional build-time support URL define turns it into a link. | |
 | D18 | Spend authentication follows veylor: no extra passcode prompt once the wallet is unlocked. Add confirmation sheets for cancel, refund request and rescue. | zapp prompts before every spend; veylor's send and swap do not. |
-| D19 | The issuer allowlist and the build use the current applicationId `com.keplr.vizor`, hard-coded for now. | The fork will move to its own id later. When it does, change `applicationId` in `android/app/build.gradle.kts` and the issuer config together. The Kotlin package `com.keplr.vizor` and the channel names (X7) stay. Attestation carries the applicationId, so an id the issuer does not list fails with `403`. |
-| D20 | Makers do not require Privacy Pass tokens today. | M5–M7 device testing does not wait on the issuer allowlist (E3) or a locked-bootloader phone (E9). M4 was built and unit-tested, then removed on 2026-11-21 (progress D-161): the open fee replaces tokens, and a `401` to an accept is the maker's refusal. |
 | D21 | zecSwap is licensed `MIT OR Apache-2.0`. | The usual dual license in the Rust and Zcash ecosystem, and compatible with veylor's Apache-2.0 (E1). |
 | D22 | Routed HTTP is shared, not duplicated. `rust/src/wallet/routed_http.rs` is built for Private USD (M1 task 10), then the Enhance PIR transport and voting's `VizorRoute` move onto it (M1 task 10b, separate PR). Send settlement stays in Rust. | One routed executor to audit for Tor fail-closed behaviour. Settlement in Rust keeps iOS cheap. |
 | D23 | Deposit fee cap (owner, 2026-10-18): a deposit is signed only if `fee ≤ 2_000_000 + ⌈value × 50 / 10000⌉` (`MAX_RELAYER_FEE` plus 50 bps) and `fee < value`. A deposit rescue pays the terms' `fee` alone, capped at `MAX_RELAYER_FEE` (X6). Deposits shield automatically while the app is unlocked and in the foreground (M9). | Extends D11: a deposit's fee has a percentage, so its cap grows with the deposit. Mainnet's gas-priced fee (a first deposit burns about 0.9M gas) may need a higher fixed part before mainnet deposits launch. |
@@ -121,14 +117,12 @@ The research settled these. They are not owner decisions, so the owner may overr
 | X1 | The Railgun host is native Kotlin behind a MethodChannel and an EventChannel, ported from zapp's `railgun-lib`. It is not a Dart WebView plugin. | The host's guarantees need `WebViewAssetLoader`, `shouldInterceptRequest` on every subresource, `createWebMessageChannel` ports (no injected bridge that any frame can call), `onRenderProcessGone` and `WebStorage.deleteOrigin`. `webview_flutter` has no subresource interception and no MessagePort. `flutter_inappwebview` adds a large third-party plugin to a wallet. The engine must also run headless and outside the widget tree. A Swift host can implement the same channel contract later. |
 | X2 | Rebuild the bundle (needed for D15 anyway) with `WALLET_SOURCE = 'vizor'` (`rl/web/src/wallet.js:25`) and the init string `vizor-railgun-init` (`rl/web/src/index.js:7`, plus the Kotlin constant). | The rebuild costs nothing extra, and veylor's transactions stop being tagged as zapp's. The wallet id and the `0zk` address do not depend on it. **Unverified:** where the wallet source surfaces on chain. Fallback: keep `'zapp'`. |
 | X3 | The `≈ ZEC` figure uses the existing CoinGecko price (`zecHomeUsdUnitPriceProvider`, through the Tor-aware `NetworkHttpClient`). Its gate becomes `swapFeatureEnabled || privateUsdAvailable`. | The figure is indicative only. Never use a maker quote for display, because every quote spends a swap index. |
-| X4 | A full reset deletes the device-wide token store. The Keystore attestation key is never deleted; it is regenerated only when a certificate in its chain expires. | The token store's pending returns reference swaps the reset erased. A new attestation key would get a fresh daily allowance, which zapp also avoids. |
-| X5 | Swap records live in plain SQLite in app-private storage, like `zcash_wallet.db`. | The records hold no keys. Their most sensitive fields are the relayer ticket and the token blinding secrets. Never log either. `allowBackup="false"` is already set. |
+| X5 | Swap records live in plain SQLite in app-private storage, like `zcash_wallet.db`. | The records hold no keys. Their most sensitive field is the relayer ticket. Never log it. `allowBackup="false"` is already set. |
 | X6 | The 2 USDC cap (D11) also applies to the reverse funding fee (`reverseFunding.fee`) and the rescue fee. | They are fees to the same relayer, signed by the same user, with the same risk. |
-| X7 | Channel names use veylor's existing prefix: `com.zcash.wallet/railgun`, `com.zcash.wallet/railgun/events` and `com.zcash.wallet/private_usd_attestation`. | `MainActivity.kt:447-451`, `BiometricUnlockHandler.kt:227`, `LedgerMobileHandler.kt:821-822` |
+| X7 | Channel names use veylor's existing prefix: `com.zcash.wallet/railgun` and `com.zcash.wallet/railgun/events`. | `MainActivity.kt:447-451`, `BiometricUnlockHandler.kt:227`, `LedgerMobileHandler.kt:821-822` |
 | X8 | While a conversion progress screen is visible and a key-using step is pending, keep the screen awake by default, through the existing host `SyncKeepAwakeNativeHost` (`lib/src/core/widgets/mobile/sync_keep_awake_native_host.dart`, over `NativeScreenAwakeBridge`, `lib/src/services/native_screen_awake.dart`); it owns the single native flag (M5 pitfalls). It does not follow the opt-in sync keep-awake setting. As built (iOS progress VI-18, owner 2026-10-17): also through a Railgun first sync while unlocked. | Under D9, screen-off means background, and background means pause. |
 | X9 | Add `rust-version = "1.92"` to `rust/Cargo.toml` `[package]`. Do not add a `rust-toolchain.toml`. | zecSwap needs Rust 1.92 and edition 2024; zakura-orchard needs 1.91. The reproducible Android and F-Droid builds pin 1.98.0 (`scripts/release-config/android-reproducible-rust-version.txt`), and a toolchain file would conflict with the policy in `fdroid/README.md:62-68`. Edition-2024 dependencies compile under veylor's edition-2021 root. |
 | X10 | Quotes are debounced 700 ms after typing stops. Never quote per keystroke. | Every quote spends a swap index (§9.1). |
-| X11 | Tokens are issued in two FRB phases around a Kotlin signing call (§5.9). The engine never issues tokens mid-accept by itself. | Rust cannot call the Keystore. A `401` at the token gate sends nothing, so retrying the accept after issuance is safe. |
 | X12 | veylor has no in-app licenses page. Ship `railgun.js.LEGAL.txt` and the GPL-3.0 text beside the bundle, and keep the bundle's JS source and lockfile in the repo. | This satisfies GPL source availability. The owner may also want an in-app notice. |
 
 ## 2. Owner deliverables
@@ -137,18 +131,15 @@ The implementer cannot produce these. Check the row a milestone waits on before 
 
 | # | What | Blocks | Until it arrives | Status |
 |---|---|---|---|---|
-| E1 | **zecSwap Zakura build plus license (D3).** A branch or a second manifest for `zecswap-core` (the 17-line diff is in §12) at a pinned rev, licensed `MIT OR Apache-2.0` (D21): `LICENSE-MIT` and `LICENSE-APACHE` at the root, and `license` in every crate's `Cargo.toml`. A Zakura manifest cannot share a workspace with `zecswap-tokens` (M0). Since M9 it must also carry `feature/deposits`' `zecswap-core` and `zecswap-railgun` (today a local patch on the stand-in, `~/dev/zapp/zecSwap-zakura-deposits.patch`); Veylor then pins a pushed rev and carries no patch, changing only `rust/Cargo.toml`. | Merging anything that imports the zecSwap crates | Develop against the local `[patch]` (How to work); do not merge | open |
+| E1 | **zecSwap Zakura build plus license (D3).** A branch or a second manifest for `zecswap-core` (the 17-line diff is in §12) at a pinned rev, licensed `MIT OR Apache-2.0` (D21): `LICENSE-MIT` and `LICENSE-APACHE` at the root, and `license` in every crate's `Cargo.toml`. Since M9 it must also carry `feature/deposits`' `zecswap-core` and `zecswap-railgun` (today a local patch on the stand-in, `~/dev/zapp/zecSwap-zakura-deposits.patch`); Veylor then pins a pushed rev and carries no patch, changing only `rust/Cargo.toml`. | Merging anything that imports the zecSwap crates | Develop against the local `[patch]` (How to work); do not merge | open |
 | E2 | **zapp relicensed to Apache-2.0 (D3):** `railgun-lib` (Kotlin and JS glue), `evm-lib/.../hd/Bip85.kt`, `common/privateusd`, `offramp-lib`, the UI copy and the ported tests. Headers still say `AGPL-3.0-only`. | Merging anything ported from zapp (M3 onward) | Write it locally; do not merge | **not needed** (owner, 2026-10-14: no relicensing; sign off at the end, then commit and push) |
-| E3 | **Issuer allowlist (D1).** The shipped package and its signing digests: Play lists Veylor as `com.veylor.app` (owner, 2026-10-25), while this tree builds `com.keplr.vizor` (D19; the debug build device tests run), so both the Play id with the upload and Play signing digests and, for device tests, `com.keplr.vizor` with the debug digest, in the mainnet and testnet issuer configs (`zs/deployments/mainnet-beta.json` `issuer.android`); optionally the debug digest on testnet; turn the mainnet issuer on. | M4 device acceptance; release once a maker requires tokens | M4 merges on unit tests; M5–M7 do not wait (D20) | closed (2026-11-21): M4 removed (D-161), nothing needs an issuer |
 | E4 | **A backend release with `connect_stream` (D13).** Until then, the vendored rc9 plus the §6.8 patch. | Dropping the vendored copy | The vendored copy, in the repo (progress D-136). M0 proved the patch on device. | stand-in in the repo |
 | E5 | **Railgun bundle rebuild:** a `deleteWallet` page method (D15) plus X2's identifiers. The implementer can do it from `rl/web` once E2 lands. | M3 account deletion only | Ship zapp's bundle; account deletion then drops only the engine key | page side built in iOS MI1 (`docs/private-usd-ios-progress.md` VI-2); account deletion calls it since iOS VI-17 (BI-3, option (a)) |
 | E6 | **Keyed Ethereum RPC URLs** (paid Alchemy or Infura, mainnet and Sepolia, rate-capped keys). Free tiers fail during Railgun startup. | Realistic device testing; release | publicnode only (M0 synced Sepolia fine on it) | open |
 | E7 | **Kill-switch JSON (D16)** at an owner URL. | Release | With the define empty, the feature is available | open |
-| E8 | **Testnet stack:** the testnet maker, relayer and issuer workers; a Sepolia test-USD faucet; funded testnet ZEC. | M5–M7 device runs; M0.2b | — | open |
-| E9 | **A real Android device with a locked bootloader.** | M4 device runs | — | **done**: Galaxy A35 SM-A356E (Android 16, bootloader locked, verified boot green) |
+| E8 | **Testnet stack:** the testnet maker and relayer workers; a Sepolia test-USD faucet; funded testnet ZEC. | M5–M7 device runs; M0.2b | — | open |
 | E10 | **Artwork:** a Private USD icon and a "private" badge; shared assets, lossless WebP if raster. | M3 polish | An existing `AppIcons` glyph | open |
 | E11 | Optional: a support URL (D17). | Nothing | Generic wording | open |
-| N1 | **The `zecswap-tokens` decision** (M0): (a) E1 also ships a tokens client build on `blind-rsa-signatures 0.15`; (b) vendor the client half into `rust/src/wallet/private_usd/vendor/`; (c) wait for wallet-libraries to drop its RustCrypto pre-release pins. | M4 code | Nothing else depends on it | closed (2026-10-25, D-154): since the Zakura v3 move `digest` is 0.11.3 and the crate resolves beside the stack, so it is a plain git dependency (`zecswap-tokens`, `default-features = false`, the pinned rev), not vendored |
 | N2 | **A funded Sepolia Railgun wallet**: test USDC shielded into a Railgun wallet whose test mnemonic the implementer may use. | The M0.3 transfer proof; M3 and M7 device E2E | Device E2E rounds wait | open |
 
 Nothing is needed on the relayer side: the fee cap is enforced by the client. The toolchain pin is an implementer task (X9).
@@ -157,19 +148,18 @@ Nothing is needed on the relayer side: the fee cap is enforced by the client. Th
 
 ### 3.1 Components and boundaries
 
-Dart owns UI and orchestration only. Rust owns every key, every swap rule and all swap networking. Kotlin owns the WebView and the Keystore. This matches veylor's architecture (AGENTS.md "Architecture"), and it keeps iOS cheap later.
+Dart owns UI and orchestration only. Rust owns every key, every swap rule and all swap networking. Kotlin owns the WebView. This matches veylor's architecture (AGENTS.md "Architecture"), and it keeps iOS cheap later.
 
 | Component | Location | Owns | Talks to |
 |---|---|---|---|
-| zecSwap primitives | git deps `zecswap-core` (Zakura build), `zecswap-railgun`, `zecswap-tokens` at one pinned rev | `derive_user_keys`, share proofs, `JointAccount` (joint UFVK and UA), `spend_key` (`±(e+z)`), `sign_pczt` with `SweepIntent`, EIP-712 and terms hashing, the Railgun payout and refund note, Railgun keys and `0zk` address encoding, RFC 9578 blind-RSA tokens | used by the engine |
-| Swap engine | `rust/src/wallet/private_usd/` | deployments, keys, forward and reverse state machines, index allocation, the store, and the maker, relayer, issuer and Ethereum clients | routed HTTP, the main DB, `joint.db`, `swaps.db` |
+| zecSwap primitives | git deps `zecswap-core` (Zakura build) and `zecswap-railgun` at one pinned rev | `derive_user_keys`, share proofs, `JointAccount` (joint UFVK and UA), `spend_key` (`±(e+z)`), `sign_pczt` with `SweepIntent`, EIP-712 and terms hashing, the Railgun payout and refund note, Railgun keys and `0zk` address encoding | used by the engine |
+| Swap engine | `rust/src/wallet/private_usd/` | deployments, keys, forward and reverse state machines, index allocation, the store, and the maker, relayer and Ethereum clients | routed HTTP, the main DB, `joint.db`, `swaps.db` |
 | FRB API | `rust/src/api/private_usd.rs` | thin, primitives-only wrappers and typed error codes (§8.2) | Dart |
 | Joint-account ops | `rust/src/wallet/private_usd/joint.rs`, plus small changes in `rust/src/wallet/sync/{send,pczt}.rs` | import, scan, receipts, deposit create and broadcast, sweep with the combined key, Discard OVK, tx status (§8.1) | librustzcash |
 | Routed HTTP | `rust/src/wallet/routed_http.rs` (new; generalized from the Enhance PIR transport, `rust/src/wallet/sync_engine/enhancement/transport/mod.rs`) | one HTTP executor that follows the Tor or direct route, fails closed and never retries (§8.5) | arti, or a `DirectRouteLease` socket |
 | Railgun bridge | `rust/src/railgun_bridge.rs` (new; sibling of `rust/src/tor_update_relay.rs`) | a loopback SOCKS5 listener with a host allowlist, tunnelling over arti or a leased direct socket (§6.8) | WebView proxy |
 | Railgun host | `android/app/src/main/kotlin/com/keplr/vizor/railgun/` | a hidden WebView, the asset loader, the request filter, the MessagePort envelope, proxy override, wipe (§6) | JS bundle; Dart over channels |
 | Railgun JS bundle | built assets in `android/app/src/main/assets/railgun/`; source in `android/railgun-web/` | the Railgun engine: scan, balance, proving `transfer`/`unshield`/`prepareReverse`, POI | allowlisted hosts through the bridge |
-| Attestation handler | `android/app/src/main/kotlin/com/keplr/vizor/PrivateUsdAttestationHandler.kt` | the Keystore EC P-256 attested key and its signature (§5.9) | Dart, then Rust |
 | Dart feature | `lib/src/features/private_usd/{models,providers,services,screens/mobile,widgets/mobile}/` | the foreground engine loop, the Railgun engine wrapper, the balance repository and cache, send orchestration, screens, copy | FRB, channels |
 | Lifecycle fence | `lib/src/providers/private_usd_lifecycle_provider.dart` | the drain for account deletion and reset (§8.4) | `account_provider.dart` |
 
@@ -182,14 +172,13 @@ Dart owns UI and orchestration only. Rust owns every key, every swap rule and al
  │ PrivateUsdEngineLoop ── FRB ──► api/private_usd.rs ──► wallet/private_usd/*           │
  │ RailgunEngine ── MethodChannel com.zcash.wallet/railgun ──► Kotlin RailgunWebViewHost │
  │      ▲  EventChannel com.zcash.wallet/railgun/events (scan, proof)  │ WebMessagePort  │
- │ AttestationService ── MethodChannel com.zcash.wallet/private_usd_attestation ─► Keystore
  └──────┼──────────────────────────────────────────────────────────────┼────────────────┘
         │                                                              ▼
         │                                         JS bundle (Railgun engine, hidden WebView)
         │                                                              │ HTTPS, proxied
         ▼                                                              ▼
  wallet/private_usd ──► routed_http ──┬─► Tor (arti, isolated)   railgun_bridge 127.0.0.1 SOCKS5
-   maker / relayer / issuer / EVM RPC  └─► direct (DirectRouteLease) ◄──┘  (same route policy)
+   maker / relayer / EVM RPC           └─► direct (DirectRouteLease) ◄──┘  (same route policy)
    │
    ├─► main DB: deposit = propose → create (stored) → persist bytes → broadcast
    ├─► joint.db: import joint UFVK at the exact birthday, scan, sweep with ±(e+z), Discard OVK
@@ -284,12 +273,10 @@ Dart owns UI and orchestration only. Rust owns every key, every swap rule and al
 |---|---|---|---|
 | Index counter, swap records, active pointers, joint-account index, Railgun send log | `<support>/private_usd_<walletDbName>_<network>/swaps.db` | Rust | account delete (its rows); full reset (the directory) |
 | Joint accounts (librustzcash DB) | `<support>/private_usd_<walletDbName>_<network>/joint.db` | Rust | each joint account is deleted once its sweep is confirmed; account delete; full reset |
-| Privacy Pass token state (device-wide, per network) | `<support>/private_usd_tokens_<network>.json`, written atomically (temp file + rename) | Rust | full reset (X4) |
 | Railgun engine encryption key | flutter_secure_storage `vizor_railgun_encryption_key_{uuid}` (random 32 B), an app-managed secret under the session password (D-20) | Dart | account delete; reset (`deleteAll`) |
 | Balance cache | `AppSecureStore` `vizor_private_usd_balances_v1:<uuid>`: `{address, updatedAt ms, buckets}` | Dart | account delete; reset |
 | Railgun engine data | WebView IndexedDB `railgun-<network>` and `railgun-artifacts`, origin `https://railgun.appassets.androidplatform.net` | JS | `deleteWallet` (account, E5); `WebStorage.deleteOrigin` (reset) |
 | Kill-switch last value | `SharedPreferences` `vizor_private_usd_available_v1` | Dart | none needed |
-| Attestation key | Android Keystore alias `vizor_privateusd_attest_<issuerName>` | Kotlin | never (X4); regenerated only on certificate expiry |
 
 - **Paths.** `<support>` and `walletDbName` are what `getGiftCardTrackingDbPath` uses (`lib/src/core/storage/wallet_paths.dart:157-169`). Add `getPrivateUsdDirPath(network)` and `deletePrivateUsdDirectories()` next to `getGiftCardTrackingDbPath` and `deleteGiftCardTrackingDirectories` (`:171-182`). Dart passes the directory to Rust.
 - **Why `swaps.db` is not inside `joint.db`.** `joint.db` is a librustzcash DB. It gets accounts imported and deleted, it runs migrations, and it may need a delete-and-rescan to recover from corruption. Its loss must never take the index counter or the in-flight records with it.
@@ -328,7 +315,6 @@ CREATE TABLE railgun_sends(       -- zapp PrivateUsdSendLog (`private_usd_sends_
 - **History.** Keep at most 100 finished records per direction. Reverse `REFUNDED` records are kept forever (rescue may still be possible, `ua/ReverseSwapStoreImpl.kt:61-69`). A `QUOTED` reverse draft is never written to history.
 - **Scoping.** Every row is keyed by `account_uuid`. The ZIP-32 index is not part of any key.
 - **The deployment is pinned in each record** (zapp pins the whole deployment in a reverse record). The keyed RPC URL is never in a record.
-- **Token state.** It is the zapp shape `SwapTokenState` (§5.9), with lenient decoding: an unreadable file starts empty. It holds blinding secrets (`pending`), so never log it.
 - **`swaps.state` and "unfinished".** Forward: `phase` = zapp's stage name derived from the record while under way (`OPENING`, `DEPOSITING`, `CONFIRMING`, `CLAIMING`, `REFUNDING`), the outcome once ended (`PAID`, `REFUNDED`, `NOTHING_SENT`); `finished = end != null`. Reverse: `phase` = the `ReversePhase` name, `finished = phase ∈ {COMPLETE, REFUNDED, CANCELLED}`. `unfinished_count` counts forward `finished = 0` plus reverse `finished = 0 AND phase <> 'QUOTED'` (a QUOTED draft is not under way, `of/ReverseSwapModels.kt:151`). A new reverse quote replaces the account's QUOTED draft in `active`.
 - **`railgun_sends.state`** is `unconfirmed` (proved and kept, `record_json` holds the relay request bytes and nullifiers) or `confirmed`. A send still being proved is **not** written (zapp keeps it in an in-memory `live` set and drops it on restart, `PrivateUsdSendLog.kt:146-149, 181-189`): nothing left the wallet. Trim to 100 `confirmed` rows per account; never trim `unconfirmed`.
 
@@ -348,7 +334,7 @@ Each one exists because breaking it loses funds or privacy. Most are enforced in
 10. **`PROPOSAL_STORE` is consume-on-entry.** Discard on every non-consuming exit, for the deposit and sweep proposals alike (AGENTS.md hardware invariant 4).
 11. **Discard OVK on joint sweeps (D12). Sender OVK on the deposit**, so the user's own OVK still recovers it.
 12. **Import joint accounts at the exact birthday** (`make_birthday(network, Some(h))`, `rust/src/wallet/keys.rs:297`), never the rounded mainnet restore birthday. *Why:* rounding rescans up to 10,000 blocks inside a swap's deadline window. The exact birthday reveals swap timing to lightwalletd through `GetTreeState(h−1)`; Gift Card observers already accept this.
-13. **Fail closed on Tor.** All engine HTTP goes through `routed_http`, with no clearnet fallback. Railgun page traffic goes only through the bridge (D4), or the page does not run while Tor is on. Never persist or log the keyed RPC URL, the relayer ticket or token secrets.
+13. **Fail closed on Tor.** All engine HTTP goes through `routed_http`, with no clearnet fallback. Railgun page traffic goes only through the bridge (D4), or the page does not run while Tor is on. Never persist or log the keyed RPC URL or the relayer ticket.
 14. **Foreground and unlocked only (D9).** No step starts while `requiresUnlock` or in the background. Background cancels the Rust step and stops polling, but leaves the Railgun page open: closing it would restart a first sync from zero (§6.3), and the 10-minute idle timer or the lock closes it. Lock cancels the Rust step, closes the page and drops Dart-held secrets. A claim handed to the relayer needs neither: the relayer sends it, and the screen is no longer kept awake for it.
 15. **Guard account deletion and reset.** While an account has an unfinished conversion, show a warning before deleting it or resetting, with the number of unfinished conversions (copy `delete_unfinished_*`, `reset_unfinished_body`, §9.6). Delete only after the user explicitly confirms (owner decision, 2026-10-13: warn and allow, never block, so a user who must reset is never trapped). Drain `privateUsdLifecycle` before deleting. Clean up only after the Rust delete succeeds. *Why:* the funds sit in a joint account or escrow that only that seed and index can recover.
 16. **One conversion at a time per account**, in either direction (zapp `acceptanceLock`). **One outgoing Railgun payment at a time per wallet**, conversions included, across restarts (the spend guard, §6.7).
@@ -385,9 +371,8 @@ rust/src/
         ├── evm_rpc.rs         ChainReader trait + EvmRpc (§5.4, §8.5)
         ├── maker_client.rs    §5.2
         ├── relayer_client.rs  §5.3, §6.7
-        ├── tokens.rs          [M4, removed 2026-11-21: D-161] token state, pay/settle, two-phase issuance (§5.9)
         ├── joint.rs           [M2] joint.db ops (§8.1)
-        ├── engine.rs          [M5] per-account driver locks, the forward offer cache, the op_id cancel + activity registry, the Clock and TokenSource seams, problem mapping, account deletion (§5.10)
+        ├── engine.rs          [M5] per-account driver locks, the forward offer cache, the op_id cancel + activity registry, the Clock seam, problem mapping, account deletion (§5.10)
         ├── forward.rs         [M5] the §5.6 driver and §5.8 forward refund over the seams; WalletZcash (the M2 ops); ForwardCall
         ├── reverse.rs         [M6] the §5.7 driver, reverse refund and rescue: ReverseView (no key) and Reverse; the ReverseZcash seam (WalletZcash); ReverseCall
         ├── funding_calls.rs   [M6] the funding's approve, openReverse and transfer calldata
@@ -493,7 +478,6 @@ Every milestone also follows these rules:
 - **Crates (M0.1).**
   - `zecswap-core` (the Zakura build, through the local `[patch]`) and `zecswap-railgun` build in veylor's graph, with one `zakura-orchard`, one `zakura-pczt` and no upstream Zcash crates.
   - zecSwap's 24 tests pass on the Zakura build. The debug APK builds on all four ABIs, and the Rust `.so` grows by 0.4–0.5 MB while unused.
-  - **`zecswap-tokens` does not resolve.** Its `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, while veylor's `zakura-client-backend` pins `digest =0.11.0-pre.9` (through `bip32 =0.6.0-pre.1` and `hmac =0.13.0-pre.4`). No `blind-rsa-signatures` 0.16+ accepts that pre-release. That leads to N1. Only M4 needs the crate.
 - **Ironwood deposit (M0.2).** A payment to an Orchard-only UA after NU6.3 lands in the Ironwood bundle, and `sent_notes` records it (`output_pool` 4, `to_address` = the UA). Proof: the wallet-libraries test `orchard_payment_routes_to_ironwood_and_builds`, and `rust/src/wallet/sync/send/orchard_receiver_tests.rs`. A testnet confirmation is pending funds (E8), and M2's regtest test covers it for good.
 - **Tor bridge (M0.3, D4): go.** It ran on a Galaxy A35 against Sepolia.
   - The page syncs over Tor: the first sync took 101 s and 136 s (96 s direct).
@@ -523,12 +507,12 @@ Every milestone also follows these rules:
 
 **Tasks** (all under `rust/src/wallet/private_usd/` unless stated):
 
-1. `rust/Cargo.toml`: `zecswap-core` and `zecswap-railgun` (rev `d69e3fb…`, plus the local `[patch]` until E1), `hmac = "0.12"`, `sha3 = "0.10"`, `bech32 = "0.11"`. Not `zecswap-tokens` (N1).
+1. `rust/Cargo.toml`: `zecswap-core` and `zecswap-railgun` (rev `d69e3fb…`, plus the local `[patch]` until E1), `hmac = "0.12"`, `sha3 = "0.10"`, `bech32 = "0.11"`.
 2. `mod.rs`:
    - the module tree (§3.6)
    - `PrivateUsdNetwork::{Mainnet, Testnet}` from `WalletNetwork`; regtest gives `None`
    - register `pub(crate) mod private_usd; pub(crate) mod routed_http;` in `rust/src/wallet/mod.rs`
-3. `deployment.rs`: every §7.1 pin and §7.2 constant, including `MAX_RELAYER_FEE = 2_000_000`. Keep the token keys as strings; their parse test waits for N1.
+3. `deployment.rs`: every §7.1 pin and §7.2 constant, including `MAX_RELAYER_FEE = 2_000_000`.
 4. `railgun_keys.rs`: BIP-85 and the Railgun chain (§3.3).
 5. `keys.rs`:
    - `SwapKeyContext::open(main_db, network, account_uuid, mnemonic_bytes)` parses the seed, reads the ZIP-32 index and checks the seed fingerprint (§3.3)
@@ -548,7 +532,7 @@ Every milestone also follows these rules:
 9. `indices.rs`: take an index, skipping up to 16 used on chain, through a `ChainReader`.
 10. `rust/src/wallet/routed_http.rs` (§8.5), generalized from the Enhance PIR transport:
     - arbitrary request headers
-    - returned response headers (`WWW-Authenticate`, `Retry-After`)
+    - returned response headers (`Retry-After`)
     - non-2xx bodies (the maker's `{code, error}`)
     - a `phase` on errors, classified like `classify_tor_error`
     - a pooled direct client per `RoutedHttp` instance (make one per operation; PIR needs pooling)
@@ -592,7 +576,7 @@ Every milestone also follows these rules:
   - `secret` (word 5) is what `SecretShare::from_be_bytes` takes.
 - **`swaps.db` is a plain `rusqlite::Connection`** (WAL, `busy_timeout`, `user_version`), opened per call. Never use `zcash_client_sqlite`'s helpers on it.
 - **Runtimes.** Wrap every FRB body in `catch` and build its runtime inside it. Never call such a wrapper from async code: a nested runtime panics.
-- **Never log secrets:** the mnemonic, the seed, `z`, the relayer ticket, the token `pending` state or the keyed RPC URL. Give secret-holding structs a redacting `Debug`.
+- **Never log secrets:** the mnemonic, the seed, `z`, the relayer ticket or the keyed RPC URL. Give secret-holding structs a redacting `Debug`.
 
 ### M2. Zcash joint-account operations: done (2026-10-13)
 
@@ -716,7 +700,7 @@ Then, with the owner's go-ahead, run the regtest test once (M2.7b; done 2026-10-
     - a route change closes and reopens the page
     - an account switch closes the page and swaps the cache
     - account delete removes the engine key and the cache (plus `deleteWallet` with E5)
-    - reset runs `wipe()`, `deletePrivateUsdDirectories()` and clears the token store
+    - reset runs `wipe()` and `deletePrivateUsdDirectories()`
 
     All of these go through `privateUsdLifecycleProvider` (§8.4).
 11. **Copy:** `private_usd_copy.dart`, with the Shared, Home, Private USD screen and Activity tables (§9.6).
@@ -742,67 +726,16 @@ Then, with the owner's go-ahead, run the regtest test once (M2.7b; done 2026-10-
 - **The proxy override is process-wide** and outlives a page close until cleared. Clear it in `close` and `wipe`; set it, and wait for it, in every `load`.
 - **The bundle is an Android asset, not a Flutter asset.** Never add it to `pubspec.yaml`. AAPT compression is fine.
 - **Never log `paramsJson`:** the page's `start` params can hold keyed RPC URLs.
-- **Paths.** `getPrivateUsdDirPath(network)` validates the wallet DB name like `getGiftCardTrackingDbPath` and creates `<support>/private_usd_<walletDbName>_<network>`. (M4's `getPrivateUsdTokenStorePath(network)` went with it on 2026-11-21; only the deletion of the old token files remains.)
+- **Paths.** `getPrivateUsdDirPath(network)` validates the wallet DB name like `getGiftCardTrackingDbPath` and creates `<support>/private_usd_<walletDbName>_<network>`.
 - **The engine lives outside the widget tree** (a `keepAlive` provider). Only lock, an account switch, a route change, idle or reset closes the page.
 - **Mask the strip and the `≈ ZEC` figure** with `hideAmountIfPrivacyMode`.
 - **The first sync needs the foreground and the screen on** (U21). On mainnet it takes about 40 min. For UI testing, keep one Sepolia wallet's WebView data between runs.
-
-### M4. Privacy Pass tokens and attestation
-
-**Removed 2026-11-21 (owner, progress D-161).** The open fee on ZEC → USD bridges replaces the token client this milestone built (D-154); it never activated, as no maker asked for tokens. A `401` to an accept is now the maker's refusal. What follows is the plan as it stood.
-
-**Goal.** A device can get and spend issuer tokens through veylor.
-
-**Needs.** N1 before any code. E3 for acceptance (E9 is done).
-
-**Inputs.**
-- Reference: §5.2 (the `401` flow), §5.9, §6.2 (the attestation channel), §8.2 (M4).
-- Sources: `zs/crates/zecswap-tokens/src/lib.rs` (the client API), `zs/crates/zecswap-jni/src/tokens.rs`, `zs/docs/tokens.md` and `BiometricUnlockHandler.kt`.
-- Port from: `of/SwapTokens.kt:161-460` and `SwapTokensTest.kt`.
-
-**Tasks.**
-
-1. `tokens.rs` (§5.9): the state file; `pay` and `settle`; collecting returns; day rollover; the pinned checks; two-phase issuance (X11).
-2. FRB `private_usd_tokens_issuance_begin`, `…_finish` and `…_status` (§8.2). The session lives in memory for at most 5 minutes and is dropped on finish, on expiry and on lock (`private_usd_clear_sessions()`).
-3. Kotlin `PrivateUsdAttestationHandler.kt` on `com.zcash.wallet/private_usd_attestation` (§6.2):
-   - alias `vizor_privateusd_attest_<issuer>`
-   - key challenge `SHA-256("zecswap-issuer-v1" ‖ issuer)`
-   - EC P-256, StrongBox once, then TEE
-   - regenerate only when a certificate has expired
-   - sign with `SHA256withECDSA`; return the chain base64url without padding
-   - Keystore work on `Dispatchers.IO` under a mutex
-4. Dart: `services/private_usd_attestation.dart` and `services/private_usd_tokens_service.dart` (begin in Rust, sign in Kotlin, finish in Rust). Prefetch on the convert screen and after every conversion.
-5. Error codes and copy: `TokensUnreachable`, `TokensRefused`, `TokensDeviceRefused`, `NoTokensToday`, `Keystore`.
-
-**Done when.**
-- The state machine passes against a fake issuer and maker:
-  - the pinned name and key; day checks (±10 min)
-  - issuer tokens are spent before returns
-  - `401` drops the token; `400`, `404` and `503` keep it
-  - `403` retries with a new challenge; `429` means exhausted
-- The attestation message is `"zecswap-issuer-v1" ‖ challenge ‖ SHA-256(blinded…)`.
-- Device E2E (with E3): the testnet issuer returns a batch to the A35.
-
-**Traps.**
-
-- **Two different challenges.**
-  - The token challenge comes from a maker's `401 WWW-Authenticate`; blind for it.
-  - The attestation challenge is a fresh 32 bytes from `GET /v1/challenge`, and only it goes into the signed message. Mixing them up gives a `403` that looks like a device refusal.
-- **A fresh install cannot prefetch.** `begin` returns `None` until a maker has answered one `401`.
-- **The `403` retry needs a second Keystore signature** (`SignAgain` with `next`). Keep the same blinded batch.
-- **Wire encodings** (all base64url, unpadded):
-  - `GET /v1/token-key` → `{issuer, tokenKey, tokensPerDay}`. Refuse it unless it equals the pin.
-  - `POST /v1/tokens` takes `{attestation: {challenge, chain, signature}, blinded}` and returns `{blindSignatures}`.
-  - Fewer signatures than requested exhausts today. More than requested, or zero on a 2xx, is `TokensUnreachable`.
-- **Make each issuance call a fresh, non-pooled routed request.**
-- **The day** is the last 8 bytes of the 32-byte redemption context: big-endian days since the epoch, with ±600 s accepted.
-- **Write the state file atomically** (temp file, `fsync`, rename). Read it leniently: an unreadable file starts empty.
 
 ### M5. Forward conversion (ZEC → USD), the engine loop, lifecycle guards and forward refunds
 
 **Goal.** Convert ZEC to private USD end to end, safely under lock, background, crash, account switch and deletion.
 
-**Needs.** E8 and N2 for the device E2E; not E3 (D20).
+**Needs.** E8 and N2 for the device E2E.
 
 **Inputs.**
 - This file: §3.5.
@@ -1022,7 +955,6 @@ Then, with the owner's go-ahead, run the regtest test once (M2.7b; done 2026-10-
 **Traps.**
 
 - **Build release with all the defines:** `fvm flutter build apk --release --dart-define=VIZOR_FORM_FACTOR=mobile --dart-define=VIZOR_PRIVATE_USD_ENABLED=true --dart-define-from-file=<rpc json>`.
-- **Issuer acceptance is per signing digest** (E3): a differently signed APK gets `TokensDeviceRefused`.
 - **The beta limits are enforced by the server.** Test with more than 50 USDC; never hard-code the limit.
 
 ### M9. Deposits: public USDC into private USD
@@ -1106,7 +1038,7 @@ Skip unit tests for UI glue, provider wiring and copy; the device rounds cover t
 
 | # | Item | How and when to verify | Fallback |
 |---|---|---|---|
-| U1 | The zecSwap crates build inside veylor's own crate graph (the scratch build used the same Zakura versions and patch rev). **M0 (2026-10-13):** `zecswap-core` (Zakura build) and `zecswap-railgun` do; `zecswap-tokens` does not (`digest` conflict, M0.1 result) | M0.1 | Path A vendoring (E1) |
+| U1 | The zecSwap crates build inside veylor's own crate graph (the scratch build used the same Zakura versions and patch rev). **M0 (2026-10-13):** `zecswap-core` (Zakura build) and `zecswap-railgun` do (M0.1 result) | M0.1 | Path A vendoring (E1) |
 | U2 | A V6 deposit to an Orchard-only UA lands as an Ironwood output in veylor. **M0 (2026-10-13):** verified offline (M0.2 result); testnet confirmation pending | M0.2 on testnet; asserted in the M2 regtest test | Escalate: the protocol depends on it (§5.1) |
 | U3 | veylor's main DB keeps `to_address` for the deposit's sent output (`findDeposit`). **M0 (2026-10-13):** verified offline (`orchard_receiver_tests.rs`) | M0.2; M2 unit test | Recover sent outputs with the account's OVK (the deposit uses the sender OVK) |
 | U4 | **Answered by M2.7b (2026-10-13): the Ironwood regtest run passed.** `zecswap_core::sign_pczt` accepts veylor's `bind_pczt` proprietary lock-owner field | M2.7b (the regtest test signs a bound PCZT) | Sign a clone with proprietary fields stripped. They are not covered by the sighash. |
@@ -1116,7 +1048,6 @@ Skip unit tests for UI glue, provider wiring and copy; the device rounds cover t
 | U8 | **Answered by M2.7b (2026-10-13): the Ironwood regtest run passed.** With Discard OVK, the primary store path (`extract_and_store_transaction_from_pczt`) still records the sweep as sent. The fallback `decrypt_and_store_transaction` (`pczt.rs:2056`) cannot recover the outgoing metadata. **M2 (code reading):** the primary path rebuilds each sent output from the PCZT's own fields and recipient metadata and never uses an OVK; `sweep_joint` returns the bytes either way | M2.7b asserts the sent row | Harmless: the joint DB is deleted after the sweep. Persist the bytes in the record regardless. |
 | U9 | **Answered by M2.7b (2026-10-13): the Ironwood regtest run passed.** `create_pczt_from_proposal` works for a `Spending { derivation: None }` account (zapp does the equivalent on the upstream SDK). **M2 (2026-10-13):** PCZT creation verified offline by the M2 unit tests; signing, proving and extraction remain for M2.7b | M2, M2.7b | Investigate: there is no alternative path |
 | U10 | WebView `PROXY_OVERRIDE` support, SOCKS5 behaviour, keep-alive on a route change, IndexedDB and `blob:` workers under the proxy, the cleartext policy for the loopback hop. **M0 (2026-10-13):** the Rust side is verified on a desktop host (SOCKS5 no-auth, allowlist, direct lease aborted by a Tor enable, and a real Tor bootstrap tunnelling to an allowlisted host through the patched `connect_stream`); on a device (Galaxy A35, Android 16, WebView 155): `PROXY_OVERRIDE` works, SOCKS5 through the bridge works, IndexedDB and the engine's workers run under the proxy, and the loopback SOCKS hop needs no `network_security_config` | M0.3 | D4 fallback |
-| U11 | ~~Whether each maker requires tokens today~~ Answered: not today (D20), and moot since M4 was removed (2026-11-21, D-161): the open fee replaces tokens. | — | none needed |
 | U12 | The WebView data directory path for the backup exclusion (`app_webview`). **M0 (2026-10-13):** confirmed as `/data/data/com.keplr.vizor/app_webview` (`Default/IndexedDB` holds the Railgun DB) | M3: inspect `/data/data/com.keplr.vizor/` on a device | Exclude the observed path |
 | U13 | R8 shrinking on the release build breaks nothing the host needs (no reflection; `org.json` is platform code) | M3 release build | Add keep rules |
 | U14 | Memory, proof time, and total artifact download for a typical send (`01x02/zkey.br` 3.53 MB, `01x02.wasm.br` 0.89 MB, `POI_3x3/zkey.br` 7.78 MB; larger variants are bigger). **M0 (2026-10-13, Galaxy A35, Sepolia, debug build):** a first sync downloads about 6.8 MB (almost all from `rail-squid.squids.live`; RPC about 12 KB, POI about 6 KB). Peak PSS is 446 MB for the app and 382 MB for the WebView renderer. Proof time and artifact bytes are pending a funded wallet | M0.3, then M8 | none; record the numbers here |

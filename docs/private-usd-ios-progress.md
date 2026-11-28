@@ -29,7 +29,7 @@ Tracks `docs/private-usd-ios-plan.md` §4. A task is done only when its line is 
   - The Private USD screen's Arriving row shows its screening's progress, "Arriving · 40%": the time since the newest payout the account's conversions made (a paid one's `endedAt`, a refund's `updatedAt`) over `screeningSeconds`, ticking every 10 s, then "Arriving · taking longer than usual". With no such payout, or less arriving than it paid, the row reads "Arriving" as before (`privateUsdArrivingSince`); the home strip and the holdings panel keep their one-line "+$X arriving".
 - **The neon floor** never moved, on Home either. The owner chose on 2026-10-17 that it flows only while something scans, and it now does (VI-19).
 - **The first device session** owes: MI0's checks, MI1.7 (the A35 round with the new bundle), the Swift tests and the simulator drive of MI2, MI3.3 and MI3.6, then MI4 to MI6.
-- **Decisions.** The owner confirmed DI2 (hide below iOS 17), DI6 (exclude from backups) and DI7 (the full rebuild) on 2026-10-17. DI1, DI3–DI5 and DI8 are still proposals; their defaults hold. DI3, the licensing review, blocks only external distribution.
+- **Decisions.** The owner confirmed DI2 (hide below iOS 17), DI6 (exclude from backups) and DI7 (the full rebuild) on 2026-10-17. DI1, DI3, DI4 and DI8 are still proposals; their defaults hold. DI3, the licensing review, blocks only external distribution.
 - **Order (owner, 2026-10-17; VI-1).** Code first: MI1–MI3 without any simulator or device run. The MI0 checks, the device parts of MI1–MI3 and the Swift test runs wait for the first session with a phone connected. If space runs short, the Android Rust cache (`build/rust_lib_zcash_wallet/build/aarch64-linux-android`, about 3.5 GB) may be deleted; nothing else.
 - **Deliverables.** EI1 (a test iPhone) and EI2 (signing for device builds) gate every device step. The simulator covers MI0's function checks.
 - **Simulator.**
@@ -123,13 +123,6 @@ MI3 evidence (2026-10-17, code only):
 - [ ] MI6.1 iOS M7 round
 - [ ] MI6.2 Send and withdraw proof time and memory
 - [ ] MI6 gate
-
-## MI7. Tokens and App Attest (dropped 2026-11-21: Veylor has no token client, progress D-161)
-
-- [ ] MI7.1 Swift attestation handler
-- [ ] MI7.2 The token protocol's iOS form (with EI6)
-- [ ] MI7.3 Dart: the attestation service picks the platform's method
-- [ ] MI7 gate
 
 ## MI8. Hardening and release
 

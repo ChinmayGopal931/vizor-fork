@@ -111,7 +111,7 @@ finish it first, from its banner or with `--m5` or `--m6`.
 | Private send and withdraw | `--m7 --m7-to 0x…` | A send arrives at a second account's `0zk` and stays Processing on Sepolia. The withdrawal reaches the `0x` address. A kill between proving and the post resends the kept bytes, with no new proof and no new row. |
 | Deposits (M9) | `--deposits [--deposits-usd 3] [--deposits-twice]` | The account's shown deposit address (EIP-55) and the relayer's pinned terms read. Private tUSD withdrawn to it through the Withdraw screens shields back on its own: the pass signs, keeps and posts it ("Making it private…"), and it lands, believed from the pinned contract's event. The shown address then moves to the next index. With `--deposits-twice`, a second deposit there shields to a note of its own. The events record each deposit's index, transaction, fee and what arrived. |
 | Route change in each phase (M8.1) | `--m8-route` | Tor turns on at three points: when the claim starts, while the page proves a reverse payment, and while it proves a send. From the flip on, no sample shows a direct Railgun socket. Once Tor is connected, no sample shows anything but loopback and Tor relays. A proof the flip cut off pays and keeps nothing. Each phase then finishes over Tor (Paid, `COMPLETE`, the send landed, exactly one kept proof). |
-| The keyed RPC never leaks (M8.3) | `--keyed-rpc <json>` | No file matches the URL's host and path, or its key. The files scanned: the app's `swaps.db` (with its WAL), `joint.db`, the token state and `shared_prefs`, read with run-as; a final logcat dump; and every log and evidence file of the round. |
+| The keyed RPC never leaks (M8.3) | `--keyed-rpc <json>` | No file matches the URL's host and path, or its key. The files scanned: the app's `swaps.db` (with its WAL), `joint.db` and `shared_prefs`, read with run-as; a final logcat dump; and every log and evidence file of the round. |
 | Memory and timing | every round | `sample_device.sh` samples throughout, and `summary.json` reports the peaks. |
 
 The keyed RPC check reads `swaps.db` only once a conversion has created it,
@@ -150,8 +150,6 @@ the end.
    `fvm flutter build apk --release --dart-define=VIZOR_FORM_FACTOR=mobile --dart-define=VIZOR_PRIVATE_USD_ENABLED=true --dart-define-from-file=<rpc json>`.
    The JSON holds both keyed URLs (E6).
    - Install it on a phone with no personal wallet.
-   - Tokens: none. Veylor has no token client since 2026-11-21 (progress
-     D-161), and a maker that answers an accept `401` refused it.
 2. **Runs.** Do the manual runs marked **mainnet**, with small amounts,
    and M-15 with the beta limit.
 3. **The keyed RPC on mainnet.** A release build is not debuggable, so

@@ -320,7 +320,6 @@ Unchanged from A-ref §8.4: the lock, the background, an account switch, a delet
 `com.zcash.wallet/network_privacy` `excludeFromBackup {path}` already exists (`AppDelegate.swift:427-465`). It creates the directory if needed and sets `isExcludedFromBackup`. Reuse it, or add a twin on a Private USD channel, for the items below. As built (plan VI-11) it is reused: its Dart helper is `excludeFromDeviceBackup` (`lib/src/core/storage/device_backup.dart`), and the page's store is marked from Swift (`RailgunPageHost.excludeWebDataFromBackup`, all of `Library/WebKit` until MI0.7, made and marked before the store's first use: plan VI-15).
 
 - each `private_usd_<walletDbName>_<network>` directory, when `getPrivateUsdDirPath` creates it
-- the token state's directory (MI7)
 - the page store's directory (§6.5)
 
 `isExcludedFromBackup` is set per item, and it survives app updates. It is lost when the directory is recreated, so set it again every time a directory is created.
@@ -328,19 +327,6 @@ Unchanged from A-ref §8.4: the lock, the background, an account switch, a delet
 ### 8.5 Keep-awake
 
 `NativeScreenAwakeBridge` (`lib/src/services/native_screen_awake.dart`; channel `com.zcash.wallet/screen_awake`, method `setEnabled`) already sets `UIApplication.shared.isIdleTimerDisabled` on iOS (`AppDelegate.swift:560-584`). Private USD's keep-awake (A-plan X8) works unchanged through `SyncKeepAwakeNativeHost`, combined with sync keep-awake (`sync_keep_awake_native_host.dart:69-70`). Since progress VI-18 it also holds through a Railgun first sync while the wallet is unlocked (`privateUsdFirstSyncKeepAwakeProvider`), on both platforms.
-
-### 8.6 App Attest (MI7; dropped 2026-11-21 with the token client, progress D-161)
-
-- **The API** is `DCAppAttestService.shared`:
-  - `isSupported`: `false` on the simulator
-  - `generateKey()`: returns a `keyId`
-  - `attestKey(keyId, clientDataHash:)`: returns an attestation object (CBOR)
-  - `generateAssertion(keyId, clientDataHash:)`: returns an assertion
-- **The client data hash** for an issuance mirrors Android's signed message: `SHA-256("zecswap-issuer-v1" ‖ challenge ‖ SHA-256(blinded…))` (A-ref §5.9), subject to the issuer's iOS format (EI6).
-- **Setup.**
-  - The entitlement `com.apple.developer.devicecheck.appattest-environment` (`development` or `production`).
-  - The App Attest capability on the App ID, under the owner's team (DI8).
-- **Errors** keep the existing codes, so Dart's mapping does not change: a DeviceCheck error is `KEYSTORE`, and an argument error is `bad_args`.
 
 ### 8.7 Xcode project, Info.plist, entitlements and signing
 
@@ -350,7 +336,7 @@ Unchanged from A-ref §8.4: the lock, the background, an account switch, a delet
   - No ATS exception is needed: the page uses https only, and the loopback hop is a proxy, not a URL load (confirm in MI0, UI8).
   - No `NSLocalNetworkUsageDescription` is expected, because the hop is loopback.
   - `ITSAppUsesNonExemptEncryption` is absent today (MI8).
-- **Entitlements.** None new until MI7 (App Attest).
+- **Entitlements.** None new.
 - **The privacy manifest** (MI8). `PrivacyInfo.xcprivacy` is absent today. When it is added, declare the app's required-reason APIs; this is an App Store requirement, not one specific to Private USD.
 - **Signing for device rounds** (plan XI11, EI2). The project signs with team `SZTB68DXM4` as `com.keplr.vizor`, with `com.keplr.vizor.SyncWidget` and the app group `group.com.keplr.vizor` (`Runner.entitlements`, `SyncWidgetExtension.entitlements`). On a personal iPhone, change all of these together, for the build only, and never commit the change:
   - the `PRODUCT_BUNDLE_IDENTIFIER` of Runner and of SyncWidget

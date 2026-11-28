@@ -26,8 +26,7 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
   - **Smaller ones.** A fee created but never kept is withheld from the
     resubmission near its quote's end; at `expiresAt` the chain is read
     before an unmined fee ends the bridge; an accept refused `QUOTE_EXPIRED`
-    after its record was saved shows that bridge; token leftovers in the
-    reference and a comment.
+    after its record was saved shows that bridge.
   - **Tests.** Rust: refused while behind with nothing saved or paid, the
     engine waiting instead of paying, a started fee withheld (real wallet
     DB), the chain read at the end, and Dart's lag held to Rust's. Dart, two
@@ -62,32 +61,6 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
     resend after the end, quote life, the `Opened` recovery fee or not,
     abandon, the deposit's slack, a cancelled accept); `open_fee.rs` the
     resubmission exclusion; `send.rs` the deadline expiry.
-
-- **The Privacy Pass token client is gone (2026-11-21, D-161).** The owner
-  decided that the open fee on ZEC → USD bridges (D-160) replaces it. It
-  never ran: both hosted makers' `/v1/info` answer `tokenReturnKey: null`.
-  - **Behaviour.** A maker that answers an accept `401`, whatever its code,
-    refused it: nothing opened, nothing paid, never posted again (forward
-    `NothingSent(MAKER_REFUSED)`, reverse `CANCELLED` with the same cause).
-    Everything else is as it was, the open fee's `402 feeRequired` and the
-    USD → ZEC accept included.
-  - **Rust.** `tokens.rs`, the `zecswap-tokens` crate, the issuer and
-    return-key pins, the maker's `/v1/info` return-key check, the token
-    error codes, `ApiAcceptKind::TokensNeeded` and the issuance calls went.
-    `swaps.db` 8 drops the token fields reverse records kept
-    (`deployment.tokenIssuer`, and `acceptance.tokenRequest`, which nothing
-    wrote in practice); every other field and table is as it was.
-  - **Dart.** The tokens service, the attestation channel's wrapper, the
-    prefetches, the token copy in en, ko and zh, and the review's Tor-off
-    disclosure went. Private USD's start, and a full reset, delete the token
-    store earlier builds wrote (`private_usd_tokens_<network>.json`).
-  - **Native.** The attestation channel is gone from Android
-    (`PrivateUsdAttestationHandler.kt` and its test), iOS and the Mac (the
-    Swift twins and their Xcode references) and Linux (its stub). Android's
-    Keystore attestation keys stay on devices, unused.
-  - **Tests.** Rust: a `401` to an accept is a refusal with nothing opened,
-    forward and reverse; the schema 6 and 7 → 8 migration. The token tests
-    went with the code.
 
 - **A ZEC → USD bridge pays the maker's open fee first (2026-11-21, D-160).**
   Since 2026-11-21 the hosted testnet maker refuses every ZEC → USD accept
@@ -218,16 +191,6 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
   test` for Private USD and the bridge, `fvm flutter analyze`, the Private
   USD Dart tests and the Kotlin boundary test pass; the iOS rule list
   compiled under macOS WebKit. Not yet run on a phone.
-- **Privacy Pass tokens, dormant (M4, 2026-10-25, D-154).** The token
-  client the plan specified is built and unit-tested: `tokens.rs` (the
-  device-wide state, pay and settle, returns, the two-phase issuance), the
-  Kotlin attestation handler, Dart's issuance around it, and the paid
-  re-post in both accept paths. Until a maker turns `[tokens]` on nothing
-  changes: `/v1/info` without a return key asks nothing of the issuer.
-  N1 is closed (the crate resolves). E3 remains the owner's: the issuer
-  must list the shipped package (`com.veylor.app` on Play; `com.keplr
-  .vizor` for debug device tests) and its signing digests before a device
-  can fetch a batch. Not yet run on a phone.
 
 - **The hand-over waits for the ready; indices are the seed's (2026-10-25,
   D-151, D-152).** A ZEC → USD bridge hands its claim to the relayer only
@@ -471,7 +434,7 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
     failures from the font swap, the desktop chart and settings. (6) The 14
     failures that predate this work (below). (7) Release items waiting on the
     owner: M8.7 sign-off, E1 (the zecSwap Zakura pin), E4, and Docker for the
-    Orchard-before-activation regtest; M4 tokens stay skipped (N1).
+    Orchard-before-activation regtest.
   - **Rules the owner set.** Testnet and Sepolia only, nothing that spends
     mainnet funds. Regtest and E2E runs only when asked. Never touch
     `~/dev/zapp/zecSwap*` (the owner keeps work there); `~/dev/zapp/**`,
@@ -697,7 +660,7 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
   will move upstream zecSwap, or a published `zecswap-core`, onto the
   Zakura crates, and Veylor then pins a pushed rev with no patch. Every
   deposit import goes through `zecswap_core` and `zecswap_railgun`, so that
-  switch changes only `rust/Cargo.toml`; upstream veylor has the same testnet NU7 gap; N1 (tokens, M4), E6, E7,
+  switch changes only `rust/Cargo.toml`; upstream veylor has the same testnet NU7 gap; E6, E7,
   E4, and sign-off for M8.7. E2 (relicensing) is dropped: the owner said
   none is needed (2026-10-14); sign off at the end, then commit and push.
 
@@ -705,7 +668,6 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
 
 - [x] M0.1.0 Local patched zecSwap checkout (`~/dev/zapp/zecSwap-zakura`, §12 manifest and diff) and the `[patch]` in veylor
 - [x] M0.1.1 `rust/Cargo.toml`: `zecswap-core`, `zecswap-railgun`, `hmac`, `sha3`, `bech32`; `rust-version = "1.92"`
-- [ ] M0.1.1b `zecswap-tokens` resolves in veylor's graph (no-go today: `digest` conflict, Deviations D-1; needs an owner decision)
 - [x] M0.1.2 `cargo build` and `cargo tree -d`: one `zakura-orchard`, one `zakura-pczt`, no upstream `orchard`/`pczt`/`zcash_protocol` (with `zecswap-core` + `zecswap-railgun`; build 5m20s)
 - [x] M0.1.3 zecSwap's 16 library and 8 `tests/sweep.rs` tests on the Zakura build (24/24 pass; workspace narrowed, D-2)
 - [x] M0.1.4 Debug APK build (`VIZOR_FORM_FACTOR=mobile`); record the `.so` size delta. Both builds pass on all four ABIs. Rust `.so` delta (spike over baseline): arm64 +0.47 MB (67.77 → 68.24 MB, +0.7%), armeabi-v7a +0.41 MB, x86_64 +0.44 MB. No veylor code calls the zecSwap crates yet, so the linker drops most of them; the real delta shows from M1 (re-measure in M8)
@@ -723,7 +685,7 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
 
 M0 status (2026-10-13).
 
-- **M0.1:** go for `zecswap-core` and `zecswap-railgun`, no-go for `zecswap-tokens` (D-1).
+- **M0.1:** go for `zecswap-core` and `zecswap-railgun`.
 - **M0.2:** go, verified offline.
 - **M0.3 (D4, the Tor bridge):** go, pending the transfer proof (M0.3.4b).
 
@@ -766,9 +728,9 @@ way when the file runs alone.
 
 ## M1. Rust foundations
 
-- [x] M1.1 `rust/Cargo.toml` dependency lines (`zecswap-core`, `zecswap-railgun`, `hmac`, `sha3`, `bech32`; not `zecswap-tokens`, N1). Builds with the local `[patch]` (E1 pending; do not merge)
+- [x] M1.1 `rust/Cargo.toml` dependency lines (`zecswap-core`, `zecswap-railgun`, `hmac`, `sha3`, `bech32`). Builds with the local `[patch]` (E1 pending; do not merge)
 - [x] M1.2 `private_usd/mod.rs`: module tree and `PrivateUsdNetwork`
-- [x] M1.3 `deployment.rs`: §7.1 pins and §7.2 constants, including the 2,000,000 fee cap. Token keys are string constants; their `TokenKey::from_base64` parse test waits for N1
+- [x] M1.3 `deployment.rs`: §7.1 pins and §7.2 constants, including the 2,000,000 fee cap
 - [x] M1.4 `railgun_keys.rs`: BIP-85 and the Railgun key chain (§3.3)
 - [x] M1.5 `keys.rs`: `SwapKeyContext::open` (seed, ZIP-32 index, fingerprint check)
 - [x] M1.6 `models.rs`: forward and reverse records in zapp's JSON shape
@@ -1091,21 +1053,6 @@ and restored to `0` after it. Evidence:
 Memory (debug build): peak app PSS 662 MB, peak renderer PSS 335 MB
 (M0: 446 MB and 382 MB).
 
-## M4. Privacy Pass tokens and attestation
-
-Built on 2026-10-25 (D-154), after N1 closed: the crate resolves beside the
-Zakura v3 stack. Tokens stay off at both makers (D20); the client is
-dormant until one turns them on, and E3 (the issuer's allowlist) gates the
-device test.
-
-- [x] M4.1 `private_usd/tokens.rs` (D-154)
-- [x] M4.2 FRB issuance begin, finish and status (D-154)
-- [x] M4.3 Kotlin `PrivateUsdAttestationHandler.kt` (D-154)
-- [x] M4.4 Dart (D-154)
-- [x] M4.5 Error codes and copy (D-154)
-- [ ] M4 gate: unit tests pass on every layer; the device acceptance (the
-      testnet issuer returning a batch) waits on E3.
-
 ## M5. Forward conversion, engine loop, lifecycle guards and forward refunds
 
 - [x] M5.1 `engine.rs` and `forward.rs` (D-31, D-33 to D-38)
@@ -1120,8 +1067,7 @@ device test.
 
 M5 part 1 status (2026-10-13): M5.1 and M5.2, the Rust half, are done. Part 2
 (M5.3–M5.7: the Dart engine, lifecycle, UI, copy and Widgetbook) is next; the
-M5 gate and its device checks wait for it. M4 is skipped for now (N1, B-5), so
-the forward path runs without tokens (D-33).
+M5 gate and its device checks wait for it.
 
 - **What landed.**
   - `rust/src/wallet/private_usd/engine.rs`: the per-account driver lock
@@ -1129,12 +1075,12 @@ the forward path runs without tokens (D-33).
     `Busy`), the forward offer cache (per `(account, index)`, dropped at the
     quote's expiry and on lock, never persisted), the `op_id` registry
     (`OpHandle`, `cancel_op`, `op_activity`; a cancel that arrives before its
-    call registers still stops it), the `Clock` and `TokenSource` seams
-    (`SystemClock`, `NoTokens`), the problem mapping and `delete_account`.
+    call registers still stops it), the `Clock` seam (`SystemClock`), the
+    problem mapping and `delete_account`.
   - `rust/src/wallet/private_usd/forward.rs`: the §5.6 driver (`quote`,
     `accept`, `advance`, `advance_report`, `abandon`, `records`) and the §5.8
     forward refund, generic over `ChainReader`, `HttpTransport`,
-    `ForwardZcash`, `Clock` and `TokenSource`; `WalletZcash`, the Zcash seam
+    `ForwardZcash` and `Clock`; `WalletZcash`, the Zcash seam
     over the M2 operations; `ForwardCall`, which wires the real seams for one
     FRB call.
   - Smaller changes: `keys.rs` (`SwapKeyContext::acceptance`, over
@@ -1173,7 +1119,7 @@ the forward path runs without tokens (D-33).
     `depositing`, `claiming`, `payingOut`, `sweeping` while an advance runs
     (`funding`, `readying`, `refunding` arrive with M6).
   - `void privateUsdClearSessions()` (sync): call on lock; drops every held
-    quote and maker check (M4 adds its issuance sessions here).
+    quote and maker check.
   - `Future<int> privateUsdUnfinishedCount({storeDir, accountUuid})`: the
     deletion and reset warning count; 0 when the wallet never converted
     (nothing is created by asking).
@@ -1195,7 +1141,7 @@ the forward path runs without tokens (D-33).
     required int index, required BigInt maxTotalZat})`: pass the quote's
     `maxTotalZat`. `ApiAcceptResult { ApiAcceptKind kind;
     ApiNothingSentCause? cause; int index }`, `kind` ∈ `accepted`,
-    `tokensNeeded`, `nothingSent`. Repeat calls for the same index are safe.
+    `nothingSent`. Repeat calls for the same index are safe.
   - `Future<ApiForwardAdvance> privateUsdForwardAdvance({dbPath, network,
     accountUuid, storeDir, mnemonicBytes, lightwalletdUrl, ethRpcUrl,
     required int opId, required int index})`: `ApiForwardAdvance {
@@ -1224,7 +1170,7 @@ the forward path runs without tokens (D-33).
     running: open its progress), `amountRefused` (the maker turned the amount
     down), `makerBusy`, `makerUnavailable`, `relayerFee` (the relayer's fee is
     above 2 USDC), `relayerUnreachable` (also a service on another
-    deployment), `ethereumUnreachable`, `tokensRefused`, `zcashWallet`,
+    deployment), `ethereumUnreachable`, `zcashWallet`,
     `mismatch` (wrong seed), `unavailable` (no deployment, hardware account,
     no derivation), `other` (16 used indices in a row).
   - Accept: `quoteExpired` (no offer held: expired, too close to expiry, or
@@ -1241,14 +1187,9 @@ the forward path runs without tokens (D-33).
     conversion"). A failed step returns the reloaded record with `problem`
     set to one of `relayerUnreachable`, `relayerRefused`, `relayerFee`,
     `ethereumUnreachable`, `railgunClosed`, `claimTurn`, `zcashWallet`,
-    `depositUnpayable`, `zcashRejected`, `mismatch`, `tokensUnreachable`,
-    `routeBlocked` or `other` (the §5.8 problem set; Rust folds the rest).
+    `depositUnpayable`, `zcashRejected`, `mismatch`, `routeBlocked` or
+    `other` (the §5.8 problem set; Rust folds the rest).
   - Abandon: `tooLate` once a deposit started or the chain shows the swap.
-  - Accept `tokensNeeded`: the maker wants a token and there is no tokens
-    client before M4. Nothing opened. Show that conversions are unavailable
-    right now and call `privateUsdForwardAbandon(index)`; never retry it in a
-    loop. A record left alone ends `nothingSent` within about five minutes of
-    its quote's expiry anyway.
 - **For part 2: the engine loop** (reference §5.10).
   - For each account of `privateUsdAccountsWithUnfinished`, for each forward
     record with `outcome == null` (`privateUsdForwardRecords`), call
@@ -1384,8 +1325,8 @@ Widgetbook) is next; the M6 gate and its device checks wait for it.
     `Reverse` the keyed ones (`quote`, `accept`, `funding_request`,
     `advance`/`advance_report`, `authorize_ready`, `cancel`, `rescue`), over
     `ChainReader`, `HttpTransport`, the new `ReverseZcash` seam (implemented
-    by `WalletZcash`), `Clock` and `TokenSource`. `ReverseCall` and
-    `run_view` wire the real seams for one FRB call.
+    by `WalletZcash`) and `Clock`. `ReverseCall` and `run_view` wire the
+    real seams for one FRB call.
   - `rust/src/wallet/private_usd/funding_calls.rs`: the funding's three
     calls (`approve`, `openReverse`, `transfer`), 68 + 548 + 68 bytes.
   - Smaller changes: `engine.rs` (the reverse funding sessions, maker checks
@@ -1451,8 +1392,7 @@ Widgetbook) is next; the M6 gate and its device checks wait for it.
     accountUuid, storeDir, ethRpcUrl, required int index})`.
   - `Future<ApiAcceptResult> privateUsdReverseAccept({dbPath, network,
     accountUuid, storeDir, mnemonicBytes, lightwalletdUrl, ethRpcUrl,
-    required int index})`: idempotent; `kind` `accepted`, `tokensNeeded`
-    (cancel the conversion: no tokens client before M4) or `nothingSent`
+    required int index})`: idempotent; `kind` `accepted` or `nothingSent`
     (ended `cancelled`; `cause` when known).
   - `Future<ApiFundingRequest> privateUsdReverseFundingRequest({dbPath,
     network, accountUuid, storeDir, mnemonicBytes, ethRpcUrl, required int
@@ -1532,7 +1472,7 @@ Widgetbook) is next; the M6 gate and its device checks wait for it.
   railgun: railgunProxy, fee})` with its `costRequest` →
   `privateUsdReverseSetCost(debit, railgunFee)`; review shows the record's
   `cost`. "Convert": `privateUsdReverseGoAhead` → `privateUsdReverseAccept`
-  (stop on `tokensNeeded` or `nothingSent`) → spend guard `startConversion`
+  (stop on `nothingSent`) → spend guard `startConversion`
   → `privateUsdReverseFundingRequest(railgunAddress: the page's address)`
   (on `alreadyFunded` skip to an advance) → page `prepareReverse({amount,
   railgun: railgunProxy, token, calls: [{to: callsTo[i], data: callsData[i]}]
@@ -1827,7 +1767,7 @@ M8 status (2026-10-14): the non-device parts are done.
   - M8.7 needs the owner's sign-off.
   - M8's **Done when**, the checklist passing on mainnet with the beta
     limits, needs all of the above.
-  - M1.10b is deferred again (D-108). M4 still waits for N1.
+  - M1.10b is deferred again (D-108).
 - **What landed.**
   - `integration_test/private_usd_device_test.dart`: the opt-in route round
     (`_M8RouteRound`, D-104).
@@ -2785,75 +2725,6 @@ M8 status (2026-10-14): the non-device parts are done.
   - Tests: the probe's verdicts (Node), the code through the Kotlin and
     Swift decoders, the balance's flag through a failure, a retry and a
     success, and the card's two offers.
-- **D-154 (owner, 2026-10-25): Privacy Pass tokens (M4), dormant until a
-  maker asks.** (Removed 2026-11-21, D-161.) Built as plan M4 and reference §5.9 and §8.2 specify, with
-  the brief's changes and these as-built details (§5.9 "As built" lists
-  them too):
-  - **The crate.** `zecswap-tokens` is a git dependency at the pinned rev,
-    `default-features = false` (its client half), not vendored: N1 closed.
-  - **The state.** `tokens.rs` keeps the file per network, written
-    atomically (temp, fsync, rename) and read leniently. A pending return
-    records its direction, for the status it is read from. The store also
-    keeps whether the maker asks (`makerAsks`), which `issuance_begin`
-    learns from `/v1/info` and a `401` sets; `ApiTokenStatus.maker_asks`
-    shows it, and the review screens disclose the fetch-spend link while
-    it holds and Tor is off (`tokensTorOffDisclosure`).
-  - **Paying.** `tokens::accept_paying` serves both drivers: an unpaid
-    post, then at most 3 paid ones. The forward acceptance is built per
-    post; the reverse one is kept without `tokenRequest`, set on the paid
-    post alone and never persisted. `check_maker` compares the return key
-    with the store's pins (the deployment's in the app, generated keys in
-    tests). The transport keeps a refusal's `WWW-Authenticate`, and the
-    maker client takes the `Authorization` header and reads
-    `/v1/swaps/{id}` and `/v1/reverse/swaps/{id}`.
-  - **The reverse resume.** A `401` with no token held, while resuming,
-    is `TokensNeeded` as the advance's problem (copy "The market maker
-    asks for a token…"), and the Dart engine runs the issuance once per
-    record; three tokens refused on a resume cancel the conversion, as a
-    turn-away always did.
-  - **Issuance.** `begin` reads the maker's `/v1/info` first: without the
-    pinned return key it returns `None` and asks nothing of the issuer
-    (the dormant path); with another key it is `TokensRefused`. It then
-    collects every pending return, and fetches ahead for the last
-    challenge moved to today, or the maker's deterministic one. The batch
-    is `clamp(tokensPerDay, 1, 100)`; `session_id` is a `u64`; `finish`'s
-    `next` is the message bytes. `Keystore` is a Dart-raised code only.
-  - **Kotlin.** `PrivateUsdAttestationHandler` on
-    `com.zcash.wallet/private_usd_attestation`: one key per issuer, the
-    key challenge `SHA-256("zecswap-issuer-v1" ‖ issuerName)`, StrongBox
-    then the TEE (a generation both refuse is `unavailable`), remade only
-    on an expired certificate, `SHA256withECDSA`, base64url unpadded, on
-    `Dispatchers.IO` under a mutex. The Swift twin answers `unavailable`.
-  - **Dart.** `PrivateUsdTokensService` (begin → sign → finish, one
-    `SignAgain` repeat; `prefetch` swallows failures), run on the convert
-    screen, after every conversion ends and from a resumed accept; on
-    `tokensNeeded` both convert flows issue once and accept the same index
-    again, else abandon or cancel with the failure's words. Copy for
-    `NoTokensToday`, a refused device, the keystore, no attestation (iOS)
-    and the Tor-off disclosure. No Settings toggle.
-  - **Tests.** Rust: the token module's (the pins, days, issuer before
-    returned, settle by answer, the fold of a return, the day rollover,
-    the file across a restart, the signed message against the brief's
-    vector, both key challenges, the refusal retried once, sessions) and
-    the drivers' against the fake issuer and gate (an unpaid accept
-    carries no request; the paid re-post is the same acceptance plus the
-    request and header; three refused tokens; returns collected after the
-    deposit and after the funding; the return key pinned at the quote; the
-    reverse resume). Kotlin: the port of `AtomicSwapAttestationTest` (6
-    tests). Dart: the channel, the service's repeat, the convert flow's
-    issuance and its failures, the messages, the disclosure.
-  - **Live.** The dormant path ran on the owner's OnePlus 15 on mainnet
-    (2026-10-25): the convert and review screens opened and quotes came
-    back as before, with no prefetch failure logged and no token store
-    written (the maker's info shows no return key, so nothing was asked of
-    the issuer). The paid path waits on E3 (the testnet issuer refuses an
-    unlisted package). Play lists Veylor as `com.veylor.app` (owner,
-    2026-10-25) while this tree's Gradle builds `com.keplr.vizor`, so the
-    issuer needs the Play id with its upload and Play signing digests for
-    release, and `com.keplr.vizor` with the debug digest for device tests;
-    how the release build gets its id is not in this tree (open, owner). The dormant path, a maker whose info
-    shows no return key, is the unit-tested `maker_asks = false` case;
-    on the phone it is what every build does today.
 - **D-155 (owner, 2026-11-11): a conversion waits only on what it waits
   for.** These changes cut a conversion's time; none changes what a step
   authorizes, and `ready` stays the user's tap.
@@ -3046,31 +2917,6 @@ M8 status (2026-10-14): the non-device parts are done.
   - **A canonical address only.** The wallet finds an interrupted payment
     by its recipient as it encodes it; a fee address spelt otherwise
     (uppercase) is refused at the quote rather than risk a second payment.
-
-- **D-161 (owner, 2026-11-21): no Privacy Pass tokens.** The open fee on
-  ZEC → USD bridges (D-160) replaces the token client D-154 built, which
-  never activated: both hosted makers' `/v1/info` show no
-  `tokenReturnKey` (their `token` is the USDC contract, unrelated). Where
-  Veylor now stands, and why:
-  - **A `401` is a refusal.** Without a client, a `401` to an accept is the
-    maker turning it down before acting: forward ends
-    `NothingSent(MAKER_REFUSED)` whatever the code, the open fee's accept
-    too, and reverse is `CANCELLED` (`MAKER_REFUSED`, where the token gate
-    used to say `MAKER_UNAVAILABLE`). Nothing is posted again. Before, a
-    `401 tokenRequired` with no token held left the record unanswered for
-    the issuance.
-  - **Records.** A reverse record pinned the issuer (`tokenIssuer`) in its
-    deployment, and records decode strictly, so the field could not simply
-    go: schema 8 removes it from every reverse record (and an
-    acceptance's `tokenRequest`, never kept in practice), and changes
-    nothing else. A build that knows 7 refuses an 8 store as newer.
-  - **What stays on a device.** The token store file is deleted, best
-    effort and silently, when Private USD starts, and by a full reset.
-    Android's Keystore attestation keys (`vizor_privateusd_attest_*`) stay:
-    nothing reads them, and deleting keys is not worth a native call.
-  - **Windows** (`feat/windows-desktop`, unmerged) still registers the
-    attestation stub in `windows/runner/private_usd_channels.cpp` and names
-    it in `docs/private-usd-windows.md`; both go when it merges.
 
 - **D-162 (2026-11-21): the open fee's review.** What changed, and why:
   - **Expiry, not resends, bounds a late fee.** A fee mined after its quote
@@ -3285,17 +3131,10 @@ M8 status (2026-10-14): the non-device parts are done.
   at its first run). That check's wallet holds no notes, and no device has
   run this: the device round is still to come.
 
-- **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
-  resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's
-  `zakura-client-backend` pins `digest =0.11.0-pre.9` (through
-  `bip32 =0.6.0-pre.1` and `hmac =0.13.0-pre.4`). No `blind-rsa-signatures`
-  0.16+ accepts that pre-release. `zecswap-core` and `zecswap-railgun` resolve and
-  build. Plan updated (M0.1 result, §2 E1, M4 goal, §5.9). The fallback
-  options need an owner decision before M4; none has been applied.
 - **D-2 (M0.1 step 3): the throwaway worktree's workspace was narrowed** to
-  `crates/zecswap-core`. Cargo resolves every member even for `-p`, and
-  `zakura-primitives`' `crypto-common =0.2.0-rc.1` cannot coexist with
-  `zecswap-tokens`. Plan updated (M0.1 step 3, §2 E1).
+  `crates/zecswap-core`. Cargo resolves every member even for `-p`, and one
+  member cannot coexist with `zakura-primitives`' `crypto-common
+  =0.2.0-rc.1`. Plan updated (M0.1 step 3, §2 E1).
 - **D-3 (M0.2): verified offline, not on testnet.** No funded testnet wallet or
   device exists here (B-3, B-4). Evidence: wallet-libraries' own
   `orchard_payment_routes_to_ironwood_and_builds`, and the new veylor test
@@ -3608,13 +3447,12 @@ M8 status (2026-10-14): the non-device parts are done.
   - Once the wallet DB is gone, `resetWallet` calls `wipeRailgunPage()` (the
     engine's wipe, or the channel's when this run built no engine; a
     platform without the host has nothing to wipe), then
-    `deletePrivateUsdDirectories()` and `deletePrivateUsdTokenStores()`.
-    Either failure is a reset error, like the claim-DB cleanup, so a retry
-    finishes it. `deleteAll()` takes the engine keys and balance caches.
+    `deletePrivateUsdDirectories()`. Either failure is a reset error, like
+    the claim-DB cleanup, so a retry finishes it. `deleteAll()` takes the
+    engine keys and balance caches.
   - `private_usd_paths.dart` is not built yet: `wallet_paths.dart` gained
-    `getPrivateUsdDirPath`, `getPrivateUsdTokenStorePath`,
-    `deletePrivateUsdDirectories` and `deletePrivateUsdTokenStores`, and the
-    wrapper waits for its first caller (M4, M5).
+    `getPrivateUsdDirPath` and `deletePrivateUsdDirectories`, and the
+    wrapper waits for its first caller (M5).
 - **D-27 (M3.11): the copy file.** `PrivateUsdCopy`, an
   `abstract final class` of consts and builders, with zapp's key on each.
   Two strings are new: the "Address copied" toast and the info sheet's
@@ -3660,8 +3498,8 @@ M8 status (2026-10-14): the non-device parts are done.
   - The op registry remembers up to 64 ids cancelled before their call
     registered, so a cancel that overtakes its call on the FRB worker queue
     still stops it.
-  - Two more seams: `Clock` (device time and the 2 s catch-up waits, so the
-    tests run instantly) and `TokenSource` (D-33).
+  - One more seam: `Clock` (device time and the 2 s catch-up waits, so the
+    tests run instantly).
   - `forward.rs` holds the driver and its Zcash seam, `ForwardZcash`, whose
     real implementation `WalletZcash` sits over the M2 operations, plus
     `ForwardCall`, which builds the real seams for one FRB call
@@ -3670,8 +3508,8 @@ M8 status (2026-10-14): the non-device parts are done.
   - A new error code, `Cancelled` (both enums): a cancelled call is never a
     failure, so Dart can tell it from one. Part 2 has no Dart switch over
     the codes yet, so nothing else changes.
-  - `private_usd_clear_sessions` lands now, not in M4: on lock it drops the
-    forward offers and maker checks. M4 adds its issuance sessions to it.
+  - `private_usd_clear_sessions` lands now: on lock it drops the forward
+    offers and maker checks.
   - `private_usd_forward_abandon(network, account_uuid, store_dir,
     eth_rpc_url, index)` takes no `db_path`: it reads no wallet DB.
   - `ApiForwardRecord` gains `phase: ApiForwardPhase` (the store's phase
@@ -3687,19 +3525,9 @@ M8 status (2026-10-14): the non-device parts are done.
     become `EthereumUnreachable`, `WrongDeployment` `RelayerUnreachable`,
     the rest `Other`; `RouteBlocked` passes through). Only setup failures,
     `Busy` and `Cancelled` are errors.
-- **D-33 (M5): tokens without M4.** M4 waits for N1 (B-5); makers do not
-  require tokens today (D20), and the owner disabled them on testnet for now.
-  - `engine::TokenSource` is the seam M4 fills: `accept_authorization()`
-    (the `Authorization` of a token already held, sent with the accept) and
-    `token_required(challenge)`. `NoTokens` holds none.
-  - A maker's `tokenRequired` refusal returns `ApiAcceptKind::TokensNeeded`
-    with no retry loop. The refusal sent nothing, so the record stays saved
-    and unanswered; a repeat accept posts the saved quote again for the same
-    index, as the M4 flow will after issuance.
-  - `abandon` ends an unanswered record `MakerUnavailable` (the token
-    turn-away of reference §5.9 and §5.11 F3a) and an answered one
-    `NeverOpened` (zapp's `abandon`, §5.6 step 12). Reference §5.6 updated.
-  - The token return (§5.6 step 11) is not collected: nothing is awaited.
+- **D-33 (M5): `abandon`'s outcomes.** It ends an unanswered record
+  `MakerUnavailable` and an answered one `NeverOpened` (zapp's `abandon`,
+  §5.6 step 11). Reference §5.6 updated.
 - **D-34 (M5.1): the forward refund's sweep.** Reference §5.8 updated.
   - An earlier sweep that may still land is looked for in `joint.db`
     (`joint::find_sent`, from the joint account to any address) before the
@@ -3777,8 +3605,7 @@ M8 status (2026-10-14): the non-device parts are done.
   - veylor's own: `swap_indices_are_never_reused`,
     `a_crash_around_the_deposit_never_pays_it_twice`,
     `no_deposit_is_built_until_the_wallet_has_scanned_to_the_tip`,
-    `a_payout_is_never_signed_above_the_cap`,
-    `a_maker_asking_for_a_token_turns_the_accept_away_without_a_retry` and
+    `a_payout_is_never_signed_above_the_cap` and
     `a_concurrent_advance_and_accept_on_one_account_gives_busy_and_leaves_the_record_intact`;
     the lifecycle file's three through the FRB calls.
   - Adapted from zapp: a refund ends at the testnet pins' 2 Zcash
@@ -3962,9 +3789,7 @@ M8 status (2026-10-14): the non-device parts are done.
     offers "Refresh quote". `relayerFee` says the 2 USDC message when the
     quote's fee is above the deployment's cap, else the "doesn't cover"
     one. Any other failure reads the records and opens the progress if the
-    index is under way, else says it couldn't start. `tokensNeeded` (no
-    tokens client, D-33) says "The market maker isn't taking conversions
-    right now…" and calls the record off, never asking again.
+    index is under way, else says it couldn't start.
   - Progress: the result, problem card, note and "Call it off" sit above
     the step list, so they show without scrolling. Paid shows "Arriving"
     until the balance was read 30 s after the payout (the screen asks for
@@ -3987,9 +3812,6 @@ M8 status (2026-10-14): the non-device parts are done.
     `SyncKeepAwakeNativeHost` (both watched, no short-circuit).
   - The balance counts an account with any conversion record as in use
     (D-21's M5 step), so the home strip keeps it fresh.
-  - The Tor-off disclosure (D10) is not shown in M5: it is about the token
-    service, and M5 fetches no tokens. The review takes a flag, which the
-    capture scenario sets.
   - The swap review's warning line is now `MobileWarningNotice` in
     `lib/src/core/widgets/mobile/` (§9.1), used by both.
 - **D-55 (M5.6): the copy as built.** The Convert tables (amount and quote,
@@ -4000,10 +3822,9 @@ M8 status (2026-10-14): the non-device parts are done.
   all" stays the semantics label), the details tab and its row labels, and
   `convertProblemRoute` for a step held up by the Tor route (`route_blocked`
   says "nothing was sent", which a conversion in progress cannot say).
-  `makerUnavailable` maps to "can't be reached"; `tokensNeeded` to the
-  maker-unavailable result; `mismatch`, `busy`, `unavailable` and `other` to
-  the generic quote error. The reverse, refunds and send tables wait for M6
-  and M7.
+  `makerUnavailable` maps to "can't be reached"; `mismatch`, `busy`,
+  `unavailable` and `other` to the generic quote error. The reverse, refunds
+  and send tables wait for M6 and M7.
 - **D-56 (M5.7): Widgetbook and capture scenarios.** The 15 forward rows of
   §9.7 except the reverse attention banner (M6), registered in Widgetbook's
   Home and Private USD folders and as `FigmaCompareScenario`s;
@@ -4119,11 +3940,7 @@ M8 status (2026-10-14): the non-device parts are done.
   `unknownQuote` as `QuoteExpired`, `rejected`, `invalidRequest`,
   `unknownSwap`, `notFound` and `methodNotAllowed` as `MakerRefused` (zapp
   `MISMATCH`), another swap or other deadlines as `Mismatch`; `internal`,
-  `alreadySpent` and unknown codes are errors, posted again. A token-gate
-  refusal on the user's accept is `TokensNeeded` and leaves the record
-  unanswered (D-33); found by the loop resuming an interrupted accept, it
-  ends `CANCELLED`, as zapp's turned-down token does, since no client can
-  pay one before M4.
+  `alreadySpent` and unknown codes are errors, posted again.
 - **D-76 (M6.1): a cancel waits for a funding post.** The driver lock spans
   the post (up to the client's 180 s), so a cancel then gets `Busy` and
   runs after it; zapp lets it interleave. A cancel while the page proves is
@@ -4131,9 +3948,8 @@ M8 status (2026-10-14): the non-device parts are done.
 - **D-77 (M6.1): the record's deployment.** A step refuses a record whose
   chain, contract, token, Railgun proxy, maker, relayer or Zcash network is
   not the build's pins (`WrongDeployment`). zapp compares the whole pinned
-  deployment; URLs, confirmations and the issuer may change between
-  versions, so they do not strand a conversion, and the current pins' URLs
-  are used.
+  deployment; URLs and confirmations may change between versions, so they
+  do not strand a conversion, and the current pins' URLs are used.
 - **D-78 (M6.1): the sweep home.** It pays at most the reviewed
   `receiveEstimate.feeZat` (without one, the forward refund's limit); the
   estimate is `joint_receipts`' confirmed amount and `5000 × max(2, notes +
@@ -4560,7 +4376,7 @@ M8 status (2026-10-14): the non-device parts are done.
   - **The app's files.** After the test the runner force-stops the app and
     runs `keyed-rpc-scan --app-files`.
     - `run-as` lists the `*private_usd*` files and `shared_prefs/`: that is
-      `swaps.db` with its WAL and SHM, `joint.db` and the token state.
+      `swaps.db` with its WAL and SHM, and `joint.db`.
     - It reads each into memory with `exec-out run-as … cat`, and checks the
       byte count against `stat`.
   - **The logs.** At the end the runner saves `logcat -d` to
@@ -4773,14 +4589,10 @@ M8 status (2026-10-14): the non-device parts are done.
   and `~/dev/zapp/zecSwap-mainnet-beta/target` (18 GB). Clearing them is the
   owner's call.
 - **B-3. Resolved 2026-10-13:** the owner's Galaxy A35 (SM-A356E) is the
-  device (Android 16, bootloader locked, verified boot green, so it also
-  suits E9). Do not install emulators.
+  device (Android 16, bootloader locked, verified boot green). Do not
+  install emulators.
 - **B-4. M0.2 on testnet needs funded testnet ZEC (E8).** The routing was
   verified offline instead (see the M0.2 line).
-- **B-5. `zecswap-tokens` (D-1).** Tokens disabled on testnet by the owner
-  (2026-10-13), temporarily; M5–M7 testnet E2E are not blocked by tokens; N1
-  still open for when they return. An owner decision is needed before M4:
-  options (a)–(c) in plan M0.1 result.
 - **B-7. A funded Sepolia Railgun wallet.** It needs test USDC shielded into a
   Railgun wallet whose mnemonic can be passed as `SPIKE_MNEMONIC`. It blocks
   M0.3.4b and M0.3.5b (one transfer proof, `proofMs`, artifact bytes). Part of

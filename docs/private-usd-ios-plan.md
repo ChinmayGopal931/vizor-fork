@@ -6,14 +6,14 @@
 - conversion both ways between shielded ZEC and private USD, by atomic swap, with refunds and refund recovery ("rescue")
 - private USD send (to a Railgun `0zk` address) and withdraw (to a public `0x` address)
 
-**Scope.** iOS, mobile form factor (`--dart-define=VIZOR_FORM_FACTOR=mobile`), with the same v1 scope as Android (A-plan D5). Desktop stays out, and Android must not change behaviour. The Android plan kept the Rust engine, the Dart models and the JS bundle platform-neutral so that iOS would need "only a Swift `WKWebView` host and an attestation channel" (A-plan, Scope). That still holds, with four findings this plan adds:
+**Scope.** iOS, mobile form factor (`--dart-define=VIZOR_FORM_FACTOR=mobile`), with the same v1 scope as Android (A-plan D5). Desktop stays out, and Android must not change behaviour. The Android plan kept the Rust engine, the Dart models and the JS bundle platform-neutral so that iOS would need "only a Swift `WKWebView` host" (A-plan, Scope). That still holds, with four findings this plan adds:
 
 - **The page's handshake is Android-only.** The host hands the page a `MessagePort` with `postWebMessage`, and the page accepts only a message whose `source` is `null` (`android/railgun-web/src/index.js:53-58`). WebKit has no API to hand a port into a page, so the bundle needs an iOS transport.
 - **The WebView proxy needs iOS 17.** `WKWebsiteDataStore.proxyConfigurations` and `WKWebsiteDataStore(forIdentifier:)` are iOS 17 APIs, while the app supports iOS 15.0.
 - **The App Store raises licensing and review questions** that Android's Play and APK paths did not.
 - **iOS suspends a backgrounded app within seconds** and may reclaim its listening sockets, which affects the loopback bridge.
 
-**Status (2026-10-17).** Planned; nothing built. On Android, M3, M5, M6 and M7 passed on the device, M4 is skipped (tokens are not required, A-plan D20) and M8 is partly done (`docs/private-usd-progress.md`). The owner deferred the iOS host on 2026-10-17 and asked for this plan the same day.
+**Status (2026-10-17).** Planned; nothing built. On Android, M3, M5, M6 and M7 passed on the device and M8 is partly done (`docs/private-usd-progress.md`). The owner deferred the iOS host on 2026-10-17 and asked for this plan the same day.
 
 **Four files.**
 
@@ -50,7 +50,7 @@
 
   Android must keep passing its own gates too: the Kotlin tests always, and, after MI1, an Android M3 device round, because the bundle changes for both platforms. Then commit locally with the milestone in the message. Push only when the owner asks.
 - **When to stop and report.** As on Android (A-plan "How to work"), plus at two more points:
-  - anything that needs the owner's Apple account: signing, App Store Connect, the App Attest capability
+  - anything that needs the owner's Apple account: signing and App Store Connect
   - any install on a phone that may hold a real wallet (XI11)
 - **The owner reviews the UI.** Put the build on the simulator or the iPhone and say what changed and where to look. Do not spend agents on screenshot walkthroughs. Run at most one subagent at a time.
 - **Testing** (owner, 2026-10-13, unchanged). End-to-end first. Write unit tests only where they guard funds, keys or the host boundary.
@@ -92,16 +92,14 @@ Each row is a proposal with its reasoning; the owner confirms or overrides it be
 | DI2 | **Private USD on iOS 17 and later only**, by a runtime check. The app keeps its iOS 15.0 deployment target (`ios/Podfile:1`, `project.pbxproj:697`). | The page's proxy (`WKWebsiteDataStore.proxyConfigurations` with Network's `ProxyConfiguration`) and its dedicated, deletable store (`WKWebsiteDataStore(forIdentifier:)`) are iOS 17 APIs. Raising the whole app to iOS 17 would drop iOS 15 and 16 users for one feature. Below 17 the host answers `supported: false` and the feature stays hidden, as it does for a hardware account. | MI2 |
 | DI3 | **A licensing review before any external iOS distribution** (external TestFlight testers or the App Store). | The bundle ships GPL-3.0 code (snarkjs 0.7.6, ffjavascript, circomlibjs) and zapp's `AGPL-3.0-only` glue (A-ref §6.1; `rw/package.json`). Android ships it as a separately licensed asset (A-plan D3, X12). The App Store's terms are widely held to conflict with the GPL (the FSF's position; VLC was removed from the App Store in 2011 over it), so the Android reasoning may not carry over. The options: (a) ship as on Android after a legal review; (b) get the authors' permission; (c) replace the GPL prover with a native one (A-plan accepted risks: `Railgun-Community/mopro`), which is new work; (d) keep iOS developer-only (Xcode installs) until it is resolved. Development and internal testing do not wait. | MI8 |
 | DI4 | **App Review positioning.** Describe Private USD as a self-custodial wallet feature: atomic swaps with market makers, no custody, no exchange account. Ship it behind the kill switch (A-plan D16), so it can be turned off without a release. | Guideline 3.1.5 governs cryptocurrency apps, and swaps through a privacy protocol invite questions. The kill switch already exists. | MI8 |
-| DI5 | **Tokens on iOS use Apple App Attest.** Build them only when a maker requires tokens (A-plan D20: none does today). | iOS has no Keystore attestation, and the issuer must learn to accept App Attest (EI6, a server change in zecSwap). Until then MI7 waits, as Android's M4 does. | MI7 |
-| DI6 | **Keep Private USD data out of iCloud and device backups:** the `private_usd_*` directories, the token state and the Railgun page's WebKit store. | Android sets `allowBackup="false"` and excludes `app_webview` (A-ref §8.6), while iOS backs up Application Support by default. The records hold relayer tickets and token blinding secrets (A-plan §3.4, X5), and the page's IndexedDB holds the encrypted Railgun wallet. veylor already excludes its Tor directory on iOS this way (`AppDelegate.swift:427-465`), and the `.tpir` directory too (AGENTS.md). | MI3 |
+| DI6 | **Keep Private USD data out of iCloud and device backups:** the `private_usd_*` directories and the Railgun page's WebKit store. | Android sets `allowBackup="false"` and excludes `app_webview` (A-ref §8.6), while iOS backs up Application Support by default. The records hold relayer tickets (A-plan §3.4, X5), and the page's IndexedDB holds the encrypted Railgun wallet. veylor already excludes its Tor directory on iOS this way (`AppDelegate.swift:427-465`), and the `.tpir` directory too (AGENTS.md). | MI3 |
 | DI7 | **One bundle for both platforms**, rebuilt once with E5's changes (A-plan E5: `deleteWallet`, `WALLET_SOURCE = 'vizor'`, `vizor-railgun-init`), an iOS transport and a Safari target. | The page's handshake only works on Android today (§6.2). One rebuild avoids two bundles that drift apart; Android repeats its M3 device round to confirm (UI11). | MI1 |
-| DI8 | **Which Apple team and bundle ID ship iOS Private USD.** The project is signed for team `SZTB68DXM4` as `com.keplr.vizor`, with `com.keplr.vizor.SyncWidget` and the app group `group.com.keplr.vizor`. | Device builds, App Attest (keyed to `<TeamID>.<bundle ID>`), the issuer allowlist and App Store Connect all follow from it, as Android's D19 does. If the fork moves to its own ID, the widget extension, the app group and the keychain access groups move with it. | MI2 (device), MI7, MI8 |
+| DI8 | **Which Apple team and bundle ID ship iOS Private USD.** The project is signed for team `SZTB68DXM4` as `com.keplr.vizor`, with `com.keplr.vizor.SyncWidget` and the app group `group.com.keplr.vizor`. | Device builds and App Store Connect both follow from it. If the fork moves to its own ID, the widget extension, the app group and the keychain access groups move with it. | MI2 (device), MI8 |
 
-**Android decisions that carry over unchanged:** D2 (networks), D3 (the zecSwap crates; the bundle's licensing on iOS is DI3), D5–D18 and D20–D22.
+**Android decisions that carry over unchanged:** D2 (networks), D3 (the zecSwap crates; the bundle's licensing on iOS is DI3), D5–D18, D21 and D22.
 
 **Android decisions that change on iOS:**
 
-- D1 and D19, the attestation identity: DI5 and DI8.
 - D4: the bridge stays, and the WebView side becomes `WKWebsiteDataStore.proxyConfigurations` (XI3).
 - D9, foreground only: the rule is unchanged, but iOS suspends a backgrounded app within seconds (XI8, UI16).
 - D15: a full reset deletes the page's data store (XI6).
@@ -137,15 +135,14 @@ The implementer cannot produce these. Check the row a milestone waits on before 
 | EI2 | **Signing for device builds**: the Apple Developer team and bundle ID (DI8), with a development certificate and profiles on this Mac for the main app and `SyncWidget`. | Any iPhone install | Simulator only | open |
 | EI3 | **The licensing decision (DI3)**, after a legal review. | External TestFlight, the App Store | Internal and developer installs only | open |
 | EI4 | **App Store Connect**: the app record, review notes for Private USD (DI4), export compliance, and the privacy manifest's declarations. | MI8 | — | open |
-| EI5 | **Shared with Android:** E6 (keyed RPC), E7 (the kill-switch JSON), E8 (the testnet maker, relayer and issuer, and funded testnet ZEC) and N2 (a funded Sepolia Railgun wallet). | The device rounds, as on Android | publicnode only; no flag URL | as on Android |
-| EI6 | **Issuer support for App Attest (DI5):** zecSwap's issuer verifies an App Attest attestation (CBOR, the Apple root, the app ID `<TeamID>.<bundle ID>`, the counter) and an assertion for each issuance, with an `issuer.ios` entry in the deployments. | MI7, and only once a maker requires tokens | Not needed while makers don't (A-plan D20) | open |
+| EI5 | **Shared with Android:** E6 (keyed RPC), E7 (the kill-switch JSON), E8 (the testnet maker and relayer, and funded testnet ZEC) and N2 (a funded Sepolia Railgun wallet). | The device rounds, as on Android | publicnode only; no flag URL | as on Android |
 | EI7 | **Decisions DI2, DI6 and DI8.** | MI2 and MI3 | The defaults stated in §1.1 | open |
 
 ## 3. Architecture
 
 ### 3.1 What is shared and what is new
 
-Dart owns the UI and the orchestration; Rust owns every key, every swap rule and all swap networking. Both are shared. On iOS, Swift owns the `WKWebView` and, later, App Attest, just as Kotlin owns the WebView and the Keystore on Android.
+Dart owns the UI and the orchestration; Rust owns every key, every swap rule and all swap networking. Both are shared. On iOS, Swift owns the `WKWebView`, just as Kotlin owns the WebView on Android.
 
 | Component | Location | iOS status |
 |---|---|---|
@@ -155,7 +152,6 @@ Dart owns the UI and the orchestration; Rust owns every key, every swap rule and
 | The Dart feature | `lib/src/features/private_usd/` and `lib/src/providers/private_usd_lifecycle_provider.dart` | **Shared**, with two gates widened and a bootstrap field added (XI9). |
 | The JS bundle | source in `rw/`; built into the Android assets and (new) `sw/railgun/` | **Rebuilt once for both platforms** (DI7): the iOS transport, a Safari target and E5's changes. |
 | The Railgun host | `kt/` on Android; **new in `sw/`** on iOS | **New:** Swift over `WKWebView` (XI1–XI7, XI12, XI14). |
-| Attestation | Kotlin and the Keystore (Android M4, skipped) | **New, later:** Swift and App Attest (MI7, DI5). |
 | The device round | `scripts/private-usd/` (adb only) and `integration_test/private_usd_device_test.dart` (which fails unless on Android, `:338, 368, 392, 410, 427`) | **A new iOS runner**, and the test's platform checks widened (MI3). |
 
 ### 3.2 Data flow
@@ -178,7 +174,7 @@ Dart owns the UI and the orchestration; Rust owns every key, every swap rule and
         │                                         proxyConfigurations = SOCKS5 127.0.0.1:<port>, no failover
         ▼                                                            │ HTTPS, proxied
  wallet/private_usd ──► routed_http ──┬─► Tor (arti, isolated)       ▼
-   maker / relayer / issuer / EVM RPC └─► direct (DirectRouteLease) ◄── railgun_bridge 127.0.0.1 SOCKS5
+   maker / relayer / EVM RPC          └─► direct (DirectRouteLease) ◄── railgun_bridge 127.0.0.1 SOCKS5
                                                                         (allowlist, 443, same route policy)
 ```
 
@@ -191,7 +187,6 @@ Unchanged from A-plan §3.3: the BIP-85 chain, the swap keys, the seed-fingerpri
 - **The seed bytes** come through the same `getMnemonicBytesForAccount(uuid)`, over flutter_secure_storage on the Keychain. Nothing here is iOS-specific.
 - **The Railgun mnemonic's path to JS** gains one hop: Rust, then a Dart `String`, then the method channel, then a Swift `String`, then the `callAsyncJavaScript` arguments. Swift holds it only for the `openWallet` delivery: never log a call's arguments, and drop the references once the delivery returns. This is the same exposure Android accepts.
 - **The engine encryption key** stays an `AppSecureStore` app-managed secret (`vizor_railgun_encryption_key_{uuid}`, A-plan §3.3), Keychain-backed with the app's existing accessibility class.
-- **The App Attest key (MI7)** is a Secure Enclave key that never leaves the device. Only its `keyId` is stored, in the Keychain as `vizor_privateusd_appattest_<issuer>`. Never delete it on reset (as A-plan X4), and regenerate it only when the issuer refuses it.
 
 ### 3.4 Persistence
 
@@ -200,11 +195,9 @@ Every row of A-plan §3.4 applies on iOS. The iOS locations:
 | Data | Location on iOS | Backup | Removed by |
 |---|---|---|---|
 | `swaps.db`, `joint.db` | `<Application Support>/private_usd_<walletDbName>_<network>/` (Dart's `getPrivateUsdDirPath`) | **excluded** (DI6), marked when the directory is created | as on Android |
-| Token state (MI7) | `<Application Support>/private_usd_tokens_<network>.json` | **excluded** (DI6) | full reset |
 | Engine key, balance cache | the Keychain, through `AppSecureStore` | the Keychain's rules (this-device-only items do not migrate) | as on Android |
 | Railgun engine data | `WKWebsiteDataStore(forIdentifier: storeID)`: IndexedDB `railgun-<network>` and `railgun-artifacts`, on disk under `Library/WebKit/` (the exact path is UI6) | **excluded** (DI6), marked after the store's first use | `deleteWallet` (one account); `WKWebsiteDataStore.remove(forIdentifier:)` (full reset) |
 | Kill-switch last value | `NSUserDefaults` through `shared_preferences` (`vizor_private_usd_available_v1`) | default | none needed |
-| App Attest `keyId` (MI7) | the Keychain | not migrated | never (as X4) |
 
 ### 3.5 Invariants
 
@@ -233,7 +226,6 @@ ios/Runner/Railgun/
 ├── RailgunEndpoints.swift       [MI2] the ten hosts (pinned by the Rust test, XI10)
 ├── RailgunError.swift           [MI2] disconnected | timeout | unavailable | protocol | failed → FlutterError codes
 └── railgun/                     [MI1] the built bundle: a folder reference, copied blind, never opened
-ios/Runner/PrivateUsdAttestationHandler.swift   [MI7] App Attest on com.zcash.wallet/private_usd_attestation
 ios/RunnerTests/RailgunHostTests.swift          [MI2] the envelope, the methods table, the scheme handler, the rules, exactly-once
 ```
 
@@ -537,36 +529,6 @@ Every milestone also follows these rules:
 
 **Done when.** The round passes, and the measurements are in §11.
 
-### MI7. Tokens and App Attest (dropped 2026-11-21)
-
-Veylor has no token client since 2026-11-21 (A-progress D-161): the open fee replaces it, so this milestone will not be built. The plan as it stood:
-
-**Goal.** An iPhone can get and spend issuer tokens. Build this only when a maker requires tokens (A-plan D20) and the issuer supports App Attest (EI6).
-
-**Needs.** N1 (the `zecswap-tokens` decision, as Android's M4), EI6, DI5 and DI8.
-
-**Inputs.**
-- iOS reference: §8.6.
-- Android reference: §5.9, §6.2 (the attestation channel).
-- Android plan: M4.
-
-**Tasks.**
-
-1. Swift `PrivateUsdAttestationHandler` on `com.zcash.wallet/private_usd_attestation`, with iOS methods:
-   - `appAttestSupported`
-   - `attest {issuerName, clientDataHash}`: generate a key once per issuer, then `attestKey`
-   - `assert {issuerName, clientDataHash}`: `generateAssertion`
-2. The token protocol's attestation field gains an iOS form (`{platform: "ios", keyId, attestation | assertion}`), agreed with the issuer (EI6). Rust `tokens.rs` builds the message for each platform.
-3. Dart: the attestation service picks the platform's method.
-
-**Done when.** On the iPhone, the testnet issuer returns a batch of tokens, and a maker accepts one.
-
-**Traps.**
-
-- **App Attest does not run on the simulator** (`DCAppAttestService.isSupported` is false there), and Apple rate-limits it per device. Test on the iPhone.
-- **Generate a key once and keep its `keyId`.** A lost `keyId` means a new key, which the issuer sees as a new device (the reasoning of A-plan X4).
-- **The environment entitlement** `com.apple.developer.devicecheck.appattest-environment` is `development` for development builds and `production` for TestFlight and the App Store. The issuer must accept the right one.
-
 ### MI8. Hardening and release (App Store)
 
 **Goal.** iOS release readiness on mainnet.
@@ -599,7 +561,6 @@ Veylor has no token client since 2026-11-21 (A-progress D-161): the open fee rep
 
 - **Build release with all the defines:** `fvm flutter build ipa --release --dart-define=VIZOR_FORM_FACTOR=mobile --dart-define=VIZOR_PRIVATE_USD_ENABLED=true --dart-define-from-file=<rpc json>`.
 - **Check that the IPA contains `railgun/`, with `COPYING`.** A folder reference ships as is; a group would not.
-- **App Attest uses its production environment** in TestFlight and App Store builds (MI7).
 - **The beta limits are enforced by the server.** Test above 50 USDC, and never hard-code the limit.
 
 ## 10. Test strategy
@@ -649,7 +610,6 @@ Skip unit tests for the delegates' glue and the window placement; the device rou
 | UI11 | The bundle built with the `safari17` target still runs on the Android WebView. **The target itself is settled (VI-4):** it changes no byte of the output; MI1.7 still checks the source changes | MI1.7 | Separate builds per platform |
 | UI12 | App Store acceptance (guideline 3.1.5, a privacy protocol) | MI8 | DI4: the kill switch; developer-only distribution |
 | UI13 | GPL and AGPL code in an App Store binary | DI3 (legal review) | DI3's options |
-| UI14 | The issuer accepts App Attest | MI7, EI6 | None needed while makers don't require tokens |
 | UI15 | The first mainnet sync time on an iPhone (about 40 min on the A35) | MI3, on mainnet | A resumable sync; keep the screen on |
 | UI16 | iOS reclaims a suspended app's listening socket (Apple TN2277), so the bridge may be dead after the background | MI0.6 | XI14: restart the bridge on return, then update the proxy or reload the page |
 

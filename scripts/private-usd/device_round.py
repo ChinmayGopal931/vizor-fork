@@ -22,8 +22,8 @@ $ANDROID_SERIAL. Run it with `python3 -I`.
   keyed-rpc-scan --file F --out DIR (--app-files | --logs)
                                 Checks that the keyed RPC never leaks:
                                 `--app-files` reads the app's Private USD
-                                files (swaps.db with its WAL, joint.db, the
-                                token state) and shared_prefs with `run-as`
+                                files (swaps.db with its WAL, joint.db) and
+                                shared_prefs with `run-as`
                                 (debug builds only) into memory; `--logs`
                                 reads every file in DIR (logcat, test and
                                 build logs, evidence). It looks for each keyed
@@ -410,8 +410,8 @@ KEYED_RPC_DEFINES = {
     "mainnet": ("VIZOR_ETHEREUM_RPC_URL_MAINNET", {"eth-mainnet.g.alchemy.com", "mainnet.infura.io"}),
 }
 KEYED_RPC_SCAN_PREFIX = "keyed-rpc-scan-"
-# What `--app-files` reads: the Private USD directory and token state, and
-# the app's SharedPreferences (relative to the app's data directory).
+# What `--app-files` reads: the Private USD directory and the app's
+# SharedPreferences (relative to the app's data directory).
 APP_FILES_FIND = r"find . -type f \( -path '*private_usd*' -o -path './shared_prefs/*' \)"
 
 

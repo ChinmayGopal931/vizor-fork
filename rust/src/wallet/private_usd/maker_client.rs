@@ -194,14 +194,6 @@ mod tests {
             Reply::json(200, &quote),
             Reply::json(200, &accepted),
             Reply::Http {
-                status: 401,
-                headers: vec![(
-                    "www-authenticate",
-                    r#"PrivateToken challenge="abc", token-key="def""#.into(),
-                )],
-                body: r#"{"code":"tokenRequired","error":"spend a token"}"#.into(),
-            },
-            Reply::Http {
                 status: 503,
                 headers: vec![("retry-after", "7".into())],
                 body: r#"{"code":"unavailable","error":"busy"}"#.into(),
@@ -224,14 +216,6 @@ mod tests {
         assert_eq!((opened.t0, opened.t1), (1_790_002_700, 1_790_006_300));
         assert_eq!(opened.late_window, Some(3_600));
         assert!(opened.ticket_for(&Hex([0x5c; 32])).is_some());
-
-        // A maker asking for a Privacy Pass token: a refusal with a code
-        // this build does not know.
-        let token_required = maker.accept(&quote_id, &acceptance()).await.unwrap_err();
-        let SwapHttpError::Refused(refusal) = &token_required else {
-            panic!("{token_required:?}");
-        };
-        assert_eq!((refusal.status, refusal.code), (401, None));
 
         let busy = maker.accept(&quote_id, &acceptance()).await.unwrap_err();
         let SwapHttpError::Refused(refusal) = &busy else {

@@ -5,8 +5,7 @@
 //! the relayer, and since schema 5 it may rescue a payout Railgun sent back,
 //! so paid records are kept. Since schema 6 indices are counted per seed and
 //! ZIP-32 index, not per account, and the counters survive the account.
-//! Since schema 7 a forward record may pay its quote's open fee, since
-//! schema 8 a reverse record keeps no Privacy Pass token fields, and since
+//! Since schema 7 a forward record may pay its quote's open fee, and since
 //! schema 9 a send the relayer refused after an earlier post, and a forward
 //! accept posted before, are recorded as such.
 //!
@@ -31,10 +30,9 @@ const FILE_NAME: &str = "swaps.db";
 /// the windows contract. 4: claims handed to the relayer. 5: rescues of
 /// returned payouts, and paid forward records kept for them. 6: the index
 /// counters per seed and ZIP-32 index. 7: forward records that pay their
-/// quote's open fee. 8: reverse records without the token issuer their
-/// deployment pinned. 9: sends refused after an earlier post, and forward
-/// records whose accept was posted. A build refuses a store newer than
-/// itself, never resetting it.
+/// quote's open fee. 8: the same tables and records as 7. 9: sends refused
+/// after an earlier post, and forward records whose accept was posted. A
+/// build refuses a store newer than itself, never resetting it.
 const SCHEMA_VERSION: i32 = 9;
 const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 /// Finished records kept per direction. Reverse `REFUNDED` and forward
@@ -243,14 +241,13 @@ impl SwapStore {
                 tx.pragma_update(None, "user_version", SCHEMA_VERSION)
                     .map_err(sql)?;
             }
-            // 1 → 2: the deposits tables join. 2 → 3, 3 → 4 and 4 → 5
-            // change no table. 5 → 6: the index counters per seed join; the
-            // per-account ones stay until each is folded in. 6 → 7 changes
-            // no table: records gain the open fee, which a build that knows
-            // 6 would not read. 7 → 8 changes no table: reverse records lose
-            // their Privacy Pass token fields, which this build no longer
-            // reads. 8 → 9 changes no table: sends and forward records gain
-            // fields a build that knows 8 would not read.
+            // 1 → 2: the deposits tables join. 2 → 3, 3 → 4, 4 → 5 and
+            // 7 → 8 change no table. 5 → 6: the index counters per seed
+            // join; the per-account ones stay until each is folded in.
+            // 6 → 7 changes no table: records gain the open fee, which a
+            // build that knows 6 would not read. 8 → 9 changes no table:
+            // sends and forward records gain fields a build that knows 8
+            // would not read.
             1..=8 => {
                 if version == 1 {
                     tx.execute_batch(SCHEMA_V2).map_err(sql)?;
@@ -258,7 +255,6 @@ impl SwapStore {
                 if version <= 5 {
                     tx.execute_batch(SCHEMA_V6).map_err(sql)?;
                 }
-                drop_token_fields(&tx)?;
                 tx.pragma_update(None, "user_version", SCHEMA_VERSION)
                     .map_err(sql)?;
             }
@@ -954,59 +950,6 @@ fn decode(direction: Direction, index: i64, json: &str) -> Result<StoredRecord> 
     Ok(record)
 }
 
-/// Schema 8: reverse records lose their Privacy Pass token fields, which
-/// went with the token client (2026-11-21). Their deployment pinned the
-/// token issuer (`deployment.tokenIssuer`), and an acceptance could carry
-/// the request for its token back (`acceptance.tokenRequest`, never kept in
-/// practice). Nothing else in a record changes, and it is written as this
-/// build writes it, so a later write of it unchanged is skipped and its time,
-/// which orders Activity, stays. A record that does not read as JSON is left
-/// as it is: reading it stays an error, never a reset.
-fn drop_token_fields(tx: &Connection) -> Result<()> {
-    let rows: Vec<(String, i64, String)> = tx
-        .prepare(
-            "SELECT account_uuid, swap_index, record_json FROM swaps
-             WHERE direction = 'reverse'",
-        )
-        .map_err(sql)?
-        .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
-        .map_err(sql)?
-        .collect::<rusqlite::Result<_>>()
-        .map_err(sql)?;
-    for (account, index, json) in rows {
-        let Ok(mut record) = serde_json::from_str::<serde_json::Value>(&json) else {
-            continue;
-        };
-        let mut dropped = false;
-        for (field, token_field) in [
-            ("deployment", "tokenIssuer"),
-            ("acceptance", "tokenRequest"),
-        ] {
-            if let Some(object) = record
-                .get_mut(field)
-                .and_then(serde_json::Value::as_object_mut)
-            {
-                dropped |= object.remove(token_field).is_some();
-            }
-        }
-        if dropped {
-            // One that does not decode for another reason keeps the rest of
-            // its text.
-            let stripped = record.to_string();
-            let json = StoredRecord::decode(Direction::Reverse, &stripped)
-                .and_then(|stored| stored.to_json())
-                .unwrap_or(stripped);
-            tx.execute(
-                "UPDATE swaps SET record_json = ?1
-                 WHERE account_uuid = ?2 AND direction = 'reverse' AND swap_index = ?3",
-                params![json, account, index],
-            )
-            .map_err(sql)?;
-        }
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1329,85 +1272,6 @@ mod tests {
     fn an_older_store_migrates_keeping_its_records() {
         for version in [1, 3, 4, 5, 6, 7, 8] {
             older_store_migrates_keeping_its_records(version);
-        }
-    }
-
-    /// A reverse record schema 6 or 7 kept, with the token issuer its
-    /// deployment pinned (and an acceptance's request for its token back),
-    /// opens at schema 8 without them and otherwise unchanged; a forward
-    /// record and the active pointers stay as they were, and nothing
-    /// migrates twice.
-    #[test]
-    fn reverse_records_lose_their_token_fields_at_schema_8() {
-        for version in [6, 7] {
-            reverse_records_lose_their_token_fields(version);
-        }
-    }
-
-    fn reverse_records_lose_their_token_fields(version: i32) {
-        let current = reverse_states().remove(2);
-        let mut legacy: serde_json::Value = serde_json::from_str(&current).unwrap();
-        legacy["deployment"]["tokenIssuer"] = serde_json::json!({
-            "url": "https://zecswap-testnet.pepeman931.workers.dev/issuer",
-            "name": "zecswap-testnet-issuer",
-            "tokenKey": "token",
-            "returnKey": "return",
-        });
-        legacy["acceptance"]["tokenRequest"] = serde_json::json!("request");
-        let legacy = legacy.to_string();
-        assert!(StoredRecord::decode(Direction::Reverse, &legacy).is_err());
-
-        let dir = tempfile::tempdir().unwrap();
-        let conn = Connection::open(dir.path().join(FILE_NAME)).unwrap();
-        conn.execute_batch(SCHEMA).unwrap();
-        conn.execute_batch(SCHEMA_V2).unwrap();
-        conn.execute_batch(SCHEMA_V6).unwrap();
-        conn.pragma_update(None, "user_version", version).unwrap();
-        let forward_json = forward_json();
-        for (direction, index, phase, json) in [
-            ("reverse", 4, "SENDING_USDC", legacy.as_str()),
-            ("forward", 7, "OPENING", forward_json.as_str()),
-        ] {
-            conn.execute(
-                "INSERT INTO swaps(account_uuid, direction, swap_index, deployment, swap_id,
-                                   phase, finished, record_json, updated_at)
-                 VALUES (?1, ?2, ?3, 'testnet', ?4, ?5, 0, ?6, 1790000000)",
-                params![ACCOUNT, direction, index, hex(32, 0x5c), phase, json],
-            )
-            .unwrap();
-            conn.execute(
-                "INSERT INTO active(account_uuid, direction, swap_index) VALUES (?1, ?2, ?3)",
-                params![ACCOUNT, direction, index],
-            )
-            .unwrap();
-        }
-        drop(conn);
-
-        for _ in 0..2 {
-            let store = SwapStore::open(dir.path()).unwrap();
-            let version: i32 = store
-                .conn
-                .query_row("PRAGMA user_version", [], |row| row.get(0))
-                .unwrap();
-            assert_eq!(version, SCHEMA_VERSION);
-            let kept: String = store
-                .conn
-                .query_row(
-                    "SELECT record_json FROM swaps WHERE direction = 'reverse'",
-                    [],
-                    |row| row.get(0),
-                )
-                .unwrap();
-            assert_eq!(kept, current, "kept as this build writes it");
-            assert_eq!(
-                store.active(ACCOUNT, Direction::Reverse).unwrap(),
-                Some(StoredRecord::decode(Direction::Reverse, &current).unwrap())
-            );
-            assert_eq!(
-                store.active(ACCOUNT, Direction::Forward).unwrap(),
-                Some(StoredRecord::Forward(Box::new(forward(&forward_json))))
-            );
-            assert_eq!(store.unfinished_count(ACCOUNT).unwrap(), 2);
         }
     }
 

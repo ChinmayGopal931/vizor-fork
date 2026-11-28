@@ -538,16 +538,6 @@ another chain is refused.
   contract's records at 3: a build that knows an older schema refuses it as
   newer.
 
-**No Privacy Pass tokens (owner, 2026-11-21).** The open fee replaces the
-token client (plan M4), which is gone; reference §5.9 and progress D-161 say
-what went. A maker that answers an accept `401`, whatever its code, refused
-it: nothing opened or paid, and the accept is never posted again (forward
-`NothingSent(MAKER_REFUSED)`, reverse `CANCELLED`). `swaps.db` 8 dropped the
-token issuer reverse records pinned. Private USD's start and a full reset
-delete the token store earlier builds wrote
-(`deleteLegacyPrivateUsdTokenStores`); Android's Keystore attestation keys
-stay, unused.
-
 **Railgun's sync (the page).**
 
 - A refresh answers once the notes are scanned and checked. Railgun's
