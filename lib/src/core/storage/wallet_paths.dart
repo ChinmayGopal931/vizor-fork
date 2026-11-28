@@ -184,7 +184,6 @@ Future<void> deleteGiftCardTrackingDirectories() async {
 }
 
 const _privateUsdPrefix = 'private_usd_';
-const _privateUsdTokenStorePrefix = 'private_usd_tokens_';
 
 // The Private USD directories this process has kept out of backups.
 final _privateUsdBackupMarked = <String>{};
@@ -267,32 +266,6 @@ Future<void> deletePrivateUsdDirectories() async {
     if (!directoryName.startsWith(_privateUsdPrefix)) continue;
     try {
       await entity.delete(recursive: true);
-    } catch (error, stackTrace) {
-      firstError ??= error;
-      firstStackTrace ??= stackTrace;
-    }
-  }
-  if (firstError != null) {
-    Error.throwWithStackTrace(firstError, firstStackTrace!);
-  }
-}
-
-/// Removes the device-wide Privacy Pass token stores builds before
-/// 2026-11-21 kept (`<support>/private_usd_tokens_<network>.json`, one per
-/// network) and their temporary files: on Private USD's start and in a full
-/// reset. Nothing reads them since the token client went. Android's Keystore
-/// attestation keys stay, unused. Attempts every file and then rethrows the
-/// first failure.
-Future<void> deleteLegacyPrivateUsdTokenStores() async {
-  final support = await getWalletSupportDirectory();
-  Object? firstError;
-  StackTrace? firstStackTrace;
-  await for (final entity in support.list(followLinks: false)) {
-    if (entity is! File) continue;
-    final fileName = entity.path.split(Platform.pathSeparator).last;
-    if (!fileName.startsWith(_privateUsdTokenStorePrefix)) continue;
-    try {
-      await entity.delete();
     } catch (error, stackTrace) {
       firstError ??= error;
       firstStackTrace ??= stackTrace;

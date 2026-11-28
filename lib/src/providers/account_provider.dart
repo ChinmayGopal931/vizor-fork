@@ -2388,9 +2388,8 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
         ); // l10n-ignore: log label or persisted default name
       }
       // Every account's Railgun wallet and scan cache in the page's storage,
-      // the swap records and joint accounts, and the token stores earlier
-      // builds kept. The secure-storage wipe below takes the engine keys and
-      // balance caches.
+      // and the swap records and joint accounts. The secure-storage wipe
+      // below takes the engine keys and balance caches.
       try {
         await ref.read(privateUsdLifecycleProvider).wipeRailgunPage();
       } catch (e, st) {
@@ -2405,15 +2404,6 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
       } catch (e, st) {
         recordError(
           'private USD storage cleanup', // l10n-ignore: log label
-          e,
-          st,
-        );
-      }
-      try {
-        await deleteLegacyPrivateUsdTokenStores();
-      } catch (e, st) {
-        recordError(
-          'private USD token store cleanup', // l10n-ignore: log label
           e,
           st,
         );

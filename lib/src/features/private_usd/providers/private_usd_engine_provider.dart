@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/private_usd_feature_config.dart';
 import '../../../core/layout/app_form_factor.dart';
-import '../../../core/storage/wallet_paths.dart';
 import '../../../providers/account_provider.dart';
 import '../../../providers/app_security_provider.dart';
 import '../../../providers/private_usd_lifecycle_provider.dart';
@@ -146,8 +145,6 @@ final privateUsdEngineProvider = Provider<PrivateUsdEngine>((ref) {
       state == AppLifecycleState.resumed ||
       (kDesktopFormFactor && state == AppLifecycleState.inactive);
   final depositsEnabled = ref.read(privateUsdDepositsEnabledProvider);
-  // The Privacy Pass token store an earlier build kept is no longer read.
-  unawaited(_deleteLegacyTokenStores());
   final engine = PrivateUsdEngine(
     backend: ref.watch(privateUsdSwapBackendProvider),
     // Any account's seed while unlocked; null while locked.
@@ -276,15 +273,6 @@ final privateUsdEngineProvider = Provider<PrivateUsdEngine>((ref) {
   scheduleMicrotask(() => engine.start(resuming: true));
   return engine;
 });
-
-/// Deletes the device-wide Privacy Pass token stores builds before
-/// 2026-11-21 kept, best effort and silently: the next start tries again,
-/// and a full reset deletes them too.
-Future<void> _deleteLegacyTokenStores() async {
-  try {
-    await deleteLegacyPrivateUsdTokenStores();
-  } catch (_) {}
-}
 
 /// The key of [accountUuid]'s conversion under way, if the engine knows one.
 final privateUsdUnderWayProvider =
